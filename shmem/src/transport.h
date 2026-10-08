@@ -122,7 +122,7 @@ void osoe_transport_fini(void);
  * neither - every PE, at the end of shmem_init, once osoe_link_establish has
  * returned. A transport sizes what it queues by it: on AM, the bytes the kernel
  * may hold unsent on a connection (v0.2 step 4, design §3.2), which start-up
- * leaves uncapped so that the link is measured as it is. A job of one node has
+ * leaves to the system so that the link is measured as it is. A job of one node has
  * nothing to size.
  */
 void osoe_transport_link(uint64_t bytes_per_second);

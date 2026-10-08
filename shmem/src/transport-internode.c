@@ -272,23 +272,15 @@ void osoe_internode_backend_start(uint32_t session, bool check)
     osoe_progress_host_start(session);
 }
 
-/* internode-backend.h's link: the cap on each wire's unsent bytes, from the
- * link (wire-settings.h), said once by each lead under SHMEM_DEBUG. */
+/* internode-backend.h's link: the limit on each wire's unsent bytes, from the
+ * link (wire-settings.h), which each lead's agent sets and says under
+ * SHMEM_DEBUG (progress-host.c). */
 void osoe_internode_backend_link(uint64_t bytes_per_second)
 {
     struct osoe_wire_settings settings;
     osoe_wire_settings_read(&settings, &osoe.bootstrap, false);
-    uint32_t bytes = osoe_wire_unsent_bytes(&settings, bytes_per_second);
-    osoe_progress_host_cap_unsent(bytes);
-    if (osoe.bootstrap.debug && osoe_am.lead) {
-        if (bytes)
-            fprintf(stderr, "osoe: node %u caps each connection's unsent bytes at %u%s\n",
-                    osoe.bootstrap.node, bytes,
-                    settings.unsent_set ? " (OSOE_WIRE_UNSENT_BYTES)" : "");
-        else
-            fprintf(stderr, "osoe: node %u leaves its connections' unsent bytes uncapped "
-                            "(OSOE_WIRE_UNSENT_BYTES=0)\n", osoe.bootstrap.node);
-    }
+    osoe_progress_host_limit_unsent(osoe_wire_unsent_bytes(&settings, bytes_per_second),
+                                    settings.unsent_set, osoe.bootstrap.debug);
 }
 
 /* After the agent has been joined: the engine drained what this node owed the

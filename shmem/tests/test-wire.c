@@ -19,6 +19,7 @@
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdarg.h>
@@ -78,11 +79,12 @@ static void pair(int fd[2])
 }
 
 /*
- * The cap on the kernel's unsent bytes (v0.2 step 4, wire-settings.h): the
- * link's 128 µs, at least 16 KiB and at most 1 GiB, or as set; and the option
- * on a real TCP socket, which a cap of 0 leaves alone.
+ * The limit on the kernel's unsent bytes (v0.2 step 4, wire-settings.h): the
+ * link's 128 µs, at least 16 KiB and at most 1 GiB, or as set; the option on a
+ * real TCP socket, which a limit of 0 leaves alone; and lifted again, as an
+ * aborting node lifts it.
  */
-static void unsent_cap(struct osoe_wire *w, const struct osoe_bootstrap *b)
+static void unsent_limit(struct osoe_wire *w, const struct osoe_bootstrap *b)
 {
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, false);
@@ -100,12 +102,17 @@ static void unsent_cap(struct osoe_wire *w, const struct osoe_bootstrap *b)
     CHECK(s.unsent_set && osoe_wire_unsent_bytes(&s, 1000000000) == 0);
     unsetenv("OSOE_WIRE_UNSENT_BYTES");
 
-    osoe_wire_cap_unsent(w, 65536);
+    CHECK(osoe_wire_limit_unsent(w, 65536));
     int v = 0;
     socklen_t length = sizeof v;
     CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, &length) == 0 && v == 65536);
-    osoe_wire_cap_unsent(w, 0);
+    CHECK(osoe_wire_limit_unsent(w, 0));
     CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, &length) == 0 && v == 65536);
+    osoe_wire_lift_unsent(w);
+    CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, &length) == 0 && v == INT_MAX);
+    CHECK(osoe_wire_limit_unsent(w, 16384));
+    struct osoe_wire closed = { .fd = -1 };
+    CHECK(!osoe_wire_limit_unsent(&closed, 16384));   /* not open: not counted */
 }
 
 /* Take everything waiting on `rx`, checking every byte against where it falls
@@ -202,7 +209,7 @@ int main(void)
     osoe_wire_attach(&wires[1], &ring, 1, fd[1], 0, &hi);  /* node 1's end */
     osoe_ring_enable(&ring);
 
-    unsent_cap(&wires[1], &hi);
+    unsent_limit(&wires[1], &hi);
     stream(&ring, &wires[0], &wires[1], PAYLOAD);
     stream(&ring, &wires[1], &wires[0], PAYLOAD);
 

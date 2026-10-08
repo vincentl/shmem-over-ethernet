@@ -351,6 +351,45 @@ void osoe_progress_host_wake_lead(void)
 static bool flag_raised;
 
 /*
+ * The limit on the kernel's unsent bytes the application thread asks the agent
+ * to set (osoe_progress_host_limit_unsent): the bytes plus one, 0 when nothing
+ * is asked. Asked as a writer's dirty bit is - a seq_cst store, then the claimed
+ * wake - and taken as the bits are, at a pass and again after the agent raises
+ * lead_sleeping, so that a request never waits for a sweep
+ * (lead_wake_model.py's protocol, with the request as one more bit). The two
+ * flags beside it are written before the store and read after the take.
+ */
+static _Atomic uint64_t unsent_request;
+static bool unsent_by_hand, unsent_say;
+
+/* On the agent: the wires' limit, as asked, said once under SHMEM_DEBUG with
+ * the wires it reached - which shmem.unsent.* counts. */
+static void limit_unsent(uint64_t asked)
+{
+    uint32_t bytes = (uint32_t)(asked - 1), limited = 0;
+    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
+        limited += osoe_wire_limit_unsent(&osoe_am.wire[slot], bytes);
+    if (!unsent_say)
+        return;
+    if (bytes)
+        fprintf(stderr, "osoe: node %u limits the unsent bytes of each of its %u connections "
+                        "to %u%s\n", osoe.bootstrap.node, limited, bytes,
+                unsent_by_hand ? " (OSOE_WIRE_UNSENT_BYTES)" : "");
+    else
+        fprintf(stderr, "osoe: node %u leaves the unsent bytes of its %u connections to the "
+                        "system (OSOE_WIRE_UNSENT_BYTES=0)\n", osoe.bootstrap.node, limited);
+}
+
+static void take_unsent_request(void)
+{
+    if (atomic_load_explicit(&unsent_request, memory_order_relaxed) == 0)
+        return;
+    uint64_t asked = atomic_exchange_explicit(&unsent_request, 0, memory_order_seq_cst);
+    if (asked)
+        limit_unsent(asked);
+}
+
+/*
  * The check keepalive cannot make (progress.h's osoe_progress_check_silent):
  * the budget keepalive is given - idle, then count probes an interval apart -
  * and at most one look an interval, so a vanished peer with data in flight is
@@ -402,6 +441,7 @@ void osoe_progress_host_advertise(void *blob)
 
 void osoe_progress_host_start(uint32_t session)
 {
+    atomic_store_explicit(&unsent_request, 0, memory_order_seq_cst);  /* a session's own */
     /* Only in a job of more than one node, from the internode backend's start
      * (transport-internode.c), which has set osoe_am.internode and
      * osoe_am.lead before anything reads them. */
@@ -624,6 +664,12 @@ void osoe_progress_host_abort(void)
 {
     if (!osoe_am.lead)
         return;
+    /* The kernel takes this node's last bytes whole, the abortive goodbye among
+     * them, even toward a peer that has stopped reading: that peer then reads
+     * the job's status rather than a stream cut short (the second adversarial
+     * read of v0.2 step 4, N6). */
+    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
+        osoe_wire_lift_unsent(&osoe_am.wire[slot]);
     uint32_t pe = 0;
     int status = EXIT_FAILURE;
     enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
@@ -667,12 +713,14 @@ void osoe_progress_host_exit(void)
     close_connections();
 }
 
-void osoe_progress_host_cap_unsent(uint32_t bytes)
+void osoe_progress_host_limit_unsent(uint32_t bytes, bool by_hand, bool say)
 {
     if (!osoe_am.lead)
         return;
-    for (uint32_t slot = 0; slot + 1 < osoe.job.node_count; slot++)
-        osoe_wire_cap_unsent(&osoe_am.wire[slot], bytes);
+    unsent_by_hand = by_hand;
+    unsent_say = say;
+    atomic_store_explicit(&unsent_request, (uint64_t)bytes + 1, memory_order_seq_cst);
+    osoe_progress_host_wake_lead();
 }
 
 void osoe_progress_host_stop(void)
@@ -724,6 +772,7 @@ bool osoe_progress_host_poll(void)
         atomic_store_explicit(a->lead_sleeping, 0, memory_order_seq_cst);
         flag_raised = false;
     }
+    take_unsent_request();
     if (silent_budget_ms) {
         uint64_t now = osoe_now_ns();
         if (now >= next_silent_check_ns) {
@@ -739,6 +788,8 @@ bool osoe_progress_host_poll(void)
     for (uint32_t w = 0; w < a->dirty_words; w++)
         if (atomic_load_explicit(&a->dirty[w], memory_order_seq_cst) != 0)
             return true;
+    if (atomic_load_explicit(&unsent_request, memory_order_seq_cst) != 0)
+        return true;
     return false;
 }
 

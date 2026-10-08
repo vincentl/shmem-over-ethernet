@@ -132,7 +132,7 @@ void osoe_internode_backend_stop(void);
 /*
  * osoe_transport_link's share: the link is known - its bandwidth as step 2
  * measured or the OSOE_LINK_* settings gave it, 0 when neither did - at the
- * end of shmem_init, on every PE. On AM each lead caps the kernel's unsent
+ * end of shmem_init, on every PE. On AM each lead limits the kernel's unsent
  * bytes on its wires from it (wire-settings.h, design §3.2); a backend on RDMA
  * may size whatever its queue pairs hold from it, or do nothing.
  */

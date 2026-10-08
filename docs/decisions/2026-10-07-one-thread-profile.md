@@ -314,23 +314,29 @@ measured on `f643837` with the spare; `ab-spare-zero.txt` shows the spare's own
 
 On the author's answer (`2026-10-07.md` item 11):
 
-- **The cap.** `osoe_wire_unsent_bytes` - the link's bandwidth times 128 µs, at
-  least 16 KiB, at most 1 GiB, or `OSOE_WIRE_UNSENT_BYTES` (0 for none) - and
-  `osoe_wire_cap_unsent`, `TCP_NOTSENT_LOWAT` on a wire. `shmem_init` hands the
-  established link to the transport (`osoe_transport_link`, a new call of
-  transport.h's, reaching AM through `osoe_internode_backend_link`), and each
-  lead caps its wires from its application thread while its agent runs: it
-  reads only each wire's `fd`, which the mesh wrote once, and the kernel orders
-  the option against the agent's sends. Start-up ran uncapped, so step 2
-  measured the link as it is; a link set by hand gives the bandwidth, a `fixed`
-  shape the floor, a job of one node nothing. Under `SHMEM_DEBUG` each lead
-  says the cap it set.
-- **The tests.** `shmem.wire` checks the arithmetic and the option on a real TCP
-  socket; `shmem.unsent.*` (`unsent.sh`) each lead's line, from a measured link,
-  one set by hand above and below the floor, `fixed`, the setting's own value and
-  0, and nothing on one node.
-- **On the Pi, as built** (`cap-1/`): the leads measured 116.5 MB/s and capped at
-  16,384; a fetch-add behind a 1 MiB put stream 3.3 to 3.9 ms at the median, 5.0
+- **The limit.** `osoe_wire_unsent_bytes` - the link's bandwidth times 128 µs,
+  at least 16 KiB, at most 1 GiB, or `OSOE_WIRE_UNSENT_BYTES` (0 for the
+  system's own) - and `osoe_wire_limit_unsent`, `TCP_NOTSENT_LOWAT` on a wire.
+  `shmem_init` hands the established link to the transport (`osoe_transport_link`,
+  a new call of transport.h's, reaching AM through `osoe_internode_backend_link`),
+  and each lead's application thread asks its agent, which alone owns the
+  sockets, to set it: a request word taken as a dirty bit is, at a pass and
+  again after `lead_sleeping` is raised (`progress-host.c`; as first built the
+  application thread set it itself - the second adversarial read's S1). Start-up
+  ran without it, so step 2 measured the link as it is; a link set by hand gives
+  the bandwidth, under a `fixed` shape too, and otherwise a `fixed` shape the
+  floor; a job of one node nothing. An aborting agent lifts it, so that its
+  abortive goodbye leaves with the kernel even toward a stalled peer (N6). Under
+  `SHMEM_DEBUG` each agent says the limit and the connections it reached.
+- **The tests.** `shmem.wire` checks the arithmetic, the option on a real TCP
+  socket, a closed wire not counted and the lift; `shmem.unsent.*` (`unsent.sh`)
+  each lead's line and that it reached all its connections - nodes less one, or a
+  lead that limited nothing would pass (S2) - from a measured link, one set by
+  hand above and below the floor, `fixed`, the setting's own value and 0, and
+  nothing on one node; `shmem.start-up.wire-unsent-bytes*.invalid` the refusals
+  (N4).
+- **On the Pi, as first built** (`cap-1/`): the leads measured 116.5 MB/s and
+  limited to 16,384; a fetch-add behind a 1 MiB put stream 3.3 to 3.9 ms at the median, 5.0
   at the 99th percentile, three writers of them 4.43 and 6.6 to 7.2, the stream
   at 112 MiB/s - the experiment's figures.
 

@@ -96,7 +96,8 @@ int main(void)
      * nodes fit there and 4,098 are refused - asked for the floor, 4,097 fit
      * as they are.
      */
-    CHECK(chosen == standard && 2048 * 2 * standard == budget);
+    CHECK(osoe_am_choose_buffer(chunk, standard, budget, 2049, &chosen) == OSOE_AM_SIZE_OK);
+    CHECK(chosen == standard && 2048 * 2 * chosen == budget);
     CHECK(osoe_am_choose_buffer(chunk, standard, budget, 2050, &chosen) ==
           OSOE_AM_SIZE_SHRUNK);
     CHECK(chosen == floor);

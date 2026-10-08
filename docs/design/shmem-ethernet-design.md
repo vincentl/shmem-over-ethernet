@@ -263,12 +263,12 @@ control message is roughly **two segments** — the one in flight and the one
 sealed behind it — plus any publication-window stall (§3.6); an earlier draft's
 "one chunk time" understated it.
 
-*Measured in v0.2 step 4, the bound left out the kernel.* Nothing capped a
+*Measured in v0.2 step 4, the bound left out the kernel.* Nothing limited a
 socket's unsent queue, and at a gigabit the kernel held some 2.6 MB of a put
 stream: a fetch-add behind it waited 14 to 22 ms on the Pi, whatever the
-connection buffer. Each connection now caps it (`TCP_NOTSENT_LOWAT`, §3.3) at
+connection buffer. Each connection now limits it (`TCP_NOTSENT_LOWAT`, §3.3) to
 the link's bandwidth times 128 µs, at least 16 KiB, once the link is measured
-at the end of `shmem_init`, so the bound is two segments, the cap and what is in
+at the end of `shmem_init`, so the bound is two segments, the limit and what is in
 flight - 3.3 to 3.9 ms for that fetch-add, the stream at line rate
 (`docs/decisions/2026-10-07-one-thread-profile.md`). The control wire (v0.2
 step 4, Part 2) takes control messages off the data's stream altogether.
@@ -371,13 +371,18 @@ peer's delayed ACK it can sit on a segment for tens of milliseconds.
 > coalescing.
 
 **`TCP_NOTSENT_LOWAT`, once the link is known** (v0.2 step 4). The kernel may
-hold at most the link's bandwidth times 128 µs of a connection's bytes unsent,
-and at least 16 KiB (`wire-settings.h`; `OSOE_WIRE_UNSENT_BYTES` sets it by
-hand, 0 for none): what the link sends while the agent comes round to give it
-more, and no more for a small message to wait behind (§3.2). It is set by the
-lead's application thread at the end of `shmem_init`, after step 2 has measured
-the link uncapped, so that the measurement sees the link as it is; a send the
-kernel cannot then take whole is a short write, offered again (invariant 2).
+hold about the link's bandwidth times 128 µs of a connection's bytes unsent -
+about, since it takes a send whole while it holds less - and at least 16 KiB
+(`wire-settings.h`; `OSOE_WIRE_UNSENT_BYTES` sets it by hand, taken as given,
+0 leaving the system's own): what the link sends while the agent comes round to
+give it more, and no more for a small message to wait behind (§3.2). The lead's
+application thread asks for it at the end of `shmem_init`, after step 2 has
+measured the link without it, so that the measurement sees the link as it is;
+the agent, which alone owns the sockets (invariant 19), sets it on its next
+pass - the request a word taken as a dirty bit is, at a pass and again after
+`lead_sleeping` is raised - and an aborting agent lifts it, so that its last
+bytes leave with the kernel even toward a peer that has stopped reading. A send
+the kernel cannot then take whole is a short write, offered again (invariant 2).
 
 **Not used:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement, and
 only pays above ~10–16 KB. Revisit only on a fast NIC.
@@ -531,7 +536,7 @@ for links fast enough that a millisecond of wire time stops mattering.
 With a put filling the room a buffer has (§3.5), a stream over loopback ran 1.4
 to 1.5 times further at 256 KiB than at the floor (8.8 to 10.0 GiB/s against 6.4
 to 6.5); at a gigabit, with the kernel's
-unsent queue capped (§3.3), the larger buffer costs a fetch-add behind a stream
+unsent queue limited (§3.3), the larger buffer costs a fetch-add behind a stream
 1.7 ms at the 99th percentile and nothing at the median
 (`docs/decisions/2026-10-07.md` item 12).
 

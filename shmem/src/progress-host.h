@@ -60,10 +60,15 @@ void osoe_progress_host_abort(void);
  * thread has been joined, so nothing is polling any more. */
 void osoe_progress_host_stop(void);
 
-/* Cap the kernel's unsent bytes on every wire of this node at `bytes`, 0 for
- * none (osoe_wire_cap_unsent): the lead, once the link is known; nothing on
- * any other PE. */
-void osoe_progress_host_cap_unsent(uint32_t bytes);
+/*
+ * Ask this node's agent to limit the kernel's unsent bytes on every wire to
+ * `bytes`, 0 for the system's own (osoe_wire_limit_unsent): the lead's
+ * application thread, once the link is known; nothing on any other PE. The
+ * agent owns the sockets (invariant 19) and applies it on its next pass, saying
+ * so under `say` (SHMEM_DEBUG) with the wires it limited and, under `by_hand`,
+ * that OSOE_WIRE_UNSENT_BYTES gave it.
+ */
+void osoe_progress_host_limit_unsent(uint32_t bytes, bool by_hand, bool say);
 
 /*
  * One pass of the engine, plus the arrivals waiting to be forwarded. Called by

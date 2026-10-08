@@ -58,8 +58,8 @@ void osoe_wire_settings_read(struct osoe_wire_settings *s, const struct osoe_boo
     case OSOE_ENVIRONMENT_UNSET:
         break;
     default:
-        osoe_fatal("OSOE_WIRE_UNSENT_BYTES='%s' is not a byte count: 0 for no cap, or up to %u",
-                   getenv("OSOE_WIRE_UNSENT_BYTES"), OSOE_WIRE_UNSENT_MAX);
+        osoe_fatal("OSOE_WIRE_UNSENT_BYTES='%s' is not a byte count: 0 to leave the system's "
+                   "own, or up to %u", getenv("OSOE_WIRE_UNSENT_BYTES"), OSOE_WIRE_UNSENT_MAX);
     }
     /* Said whenever injection is on, so a failure names what to reproduce it
      * with; off by default, so a normal run says nothing. */
@@ -79,7 +79,7 @@ uint32_t osoe_wire_unsent_bytes(const struct osoe_wire_settings *s, uint64_t byt
     if (s->unsent_set)
         return s->unsent_bytes;
     /* The link's highest bandwidth (bootstrap.h) times the interval fits in 64
-     * bits: 10^13 x 1.28 x 10^5. */
+     * bits: 10^13 x 1.28 x 10^5 (wire-settings.h's static assertion). */
     uint64_t bytes = bytes_per_second * OSOE_WIRE_UNSENT_NS / UINT64_C(1000000000);
     if (bytes < OSOE_WIRE_UNSENT_FLOOR)
         bytes = OSOE_WIRE_UNSENT_FLOOR;

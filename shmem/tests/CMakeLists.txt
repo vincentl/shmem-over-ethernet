@@ -633,10 +633,10 @@ foreach(case "measured;0,0,1,1" "measured;0,1,2" "few-lanes;0,1" "set;0,0,1,1" "
   endif()
 endforeach()
 
-# The cap on each connection's unsent bytes (v0.2 step 4; wire-settings.h), as
-# each lead says it under SHMEM_DEBUG once the link is known (unsent.sh): from
-# the link measured, set by hand above and below the floor, fixed, the setting's
-# own and none, and nothing on a job of one node.
+# The limit on each connection's unsent bytes (v0.2 step 4; wire-settings.h), as
+# each lead's agent says it under SHMEM_DEBUG once the link is known, with the
+# connections it reached (unsent.sh): from the link measured, set by hand above
+# and below the floor, fixed, the setting's own and 0, and nothing on one node.
 foreach(case "measured;0,0,1,1" "set;0,1" "floor;0,1,2" "fixed;0,1" "by-hand;0,1" "none;0,1"
              "one-node;0,0")
   list(GET case 0 mode)
@@ -810,7 +810,9 @@ foreach(case_expect
     "am-credits|OSOE_AM_CREDITS|abc|OSOE_AM_CREDITS='abc' is not between [0-9]+ and [0-9]+"
     "am-hugepages|OSOE_AM_HUGEPAGES|2|OSOE_AM_HUGEPAGES='2' is not 0 or 1"
     "landing-bytes|OSOE_GET_LANDING_BYTES|abc|OSOE_GET_LANDING_BYTES='abc' is not a decimal byte count"
-    "wire-bytes|OSOE_WIRE_BYTES|abc|OSOE_WIRE_BYTES='abc' is not a byte count between 64 and 1048576")
+    "wire-bytes|OSOE_WIRE_BYTES|abc|OSOE_WIRE_BYTES='abc' is not a byte count between 64 and 1048576"
+    "wire-unsent-bytes|OSOE_WIRE_UNSENT_BYTES|abc|OSOE_WIRE_UNSENT_BYTES='abc' is not a byte count: 0 to leave the system's own, or up to 1073741824"
+    "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
