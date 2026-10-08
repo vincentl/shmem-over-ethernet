@@ -209,8 +209,16 @@ static size_t send_from(struct osoe_wire *w, const void *buffer, size_t len, uin
     uint32_t n = (uint32_t)truncate_to(w, w->sends++ ^ UINT64_C(0x5e4d), len);
     struct io_uring_sqe *sqe = osoe_ring_entry(w->ring);
     /* MSG_NOSIGNAL: a peer that has gone is a completion with -EPIPE, not a signal. */
+    /*
+     * By reference only while the other region owes nothing, so that the
+     * sender always has a region a copied send away from free (wire.h). On the
+     * Pi, with both lent, an acknowledgement the peer was waiting for found no
+     * room until a notification came, and the notification waited for the
+     * peer's TCP to acknowledge, which it delays while it has nothing to send:
+     * osoe-bench's 1 MiB lines took seconds (reservation_model.py, BOTH LENT).
+     */
     if (lent < OSOE_WIRE_LENT_REGIONS && w->zero_copy && n >= w->zero_copy_bytes &&
-        w->owed[0] + w->owed[1] < OSOE_WIRE_ZERO_COPY_OWED_MOST) {
+        w->owed[lent ^ 1] == 0 && w->owed[lent] < OSOE_WIRE_ZERO_COPY_OWED_MOST) {
         /* By reference: the completion says how much the kernel took, and then a
          * notification - IORING_CQE_F_NOTIF on the same tag - when it has let go of
          * those pages, which over TCP is once the peer has acknowledged them. The

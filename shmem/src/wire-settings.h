@@ -62,8 +62,12 @@ _Static_assert(OSOE_LINK_BYTES_PER_SECOND_HIGHEST <= UINT64_MAX / OSOE_WIRE_UNSE
  * peer's TCP has acknowledged it, so a connection's two buffers cap one peer's
  * stream at about 512 KiB a round trip. Part 4 decides its default on a fast link.
  *
- * A wire owes at most OSOE_WIRE_ZERO_COPY_OWED_MOST notifications at once: past
- * them a send copies, so that the completion queue keeps a bound (§3.3, ring.h).
+ * Only one of a connection's two buffers is lent at a time - a send by
+ * reference waits for the other to owe nothing, and copies meanwhile - so that
+ * an acknowledgement or a reply always finds a buffer without waiting on the
+ * peer's TCP (wire.c). A wire owes at most OSOE_WIRE_ZERO_COPY_OWED_MOST
+ * notifications at once: past them a send copies, so that the completion queue
+ * keeps a bound (§3.3, ring.h).
  */
 #define OSOE_WIRE_ZERO_COPY_DEFAULT_BYTES (UINT32_C(16) << 10)
 #define OSOE_WIRE_ZERO_COPY_OWED_MOST     UINT32_C(16)

@@ -1040,6 +1040,11 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
                 osoe_connection_release(connection, c->sending);
                 c->state[c->sending] = OSOE_BUFFER_FREE;
             } else {
+                /* Never both: the wire sends by reference only while the other
+                 * buffer owes nothing (wire.h; reservation_model.py, BOTH LENT). */
+                if (c->state[c->sending ^ 1] == OSOE_BUFFER_LENT)
+                    osoe_fatal("node %u: both buffers toward node %u are lent to the "
+                               "kernel (wire.h)", p->node, peer_of(p, slot));
                 c->state[c->sending] = OSOE_BUFFER_LENT;
             }
             c->sending = OSOE_CONNECTION_NONE;

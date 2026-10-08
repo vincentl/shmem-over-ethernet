@@ -117,6 +117,15 @@ Its breakages, each of which must fail:
   zc_first_notification  released at the first notification of a buffer sent
                          in parts: the later parts are read after the buffer
                          was reopened
+**At most one buffer is lent** (the Pi, 2026-10-08): a part goes by reference
+only while the connection's other buffer owes no notification, and otherwise by
+copy - read once, at its send, and owing nothing - so that a connection always
+has a buffer a copied send away from free. With both lent, an acknowledgement
+the peer waits for found no buffer until a notification came, and that waited
+for the peer's TCP to acknowledge, which it delays while it has nothing to send:
+osoe-bench's 1 MiB lines stalled for seconds. BOTH LENT checks it:
+  zc_both_lent           every part by reference, as first built: both buffers
+                         lent at once (BOTH LENT)
 
 `current` is the tree before slice 2: no pre-open drain. It passes every
 safety check - starving a reply is a liveness property of the *policy*, and a
@@ -143,7 +152,7 @@ REPLY_BASE = 1 + 7 * PER_WRITER
 PREOPEN = ('design', 'open_resets', 'filled_short', 'drain_no_pop', 'drain_lifo')
 FREE, OPEN, SEALEDST, SENDING = 0, 1, 2, 3
 LENT = 4                    # sent by reference, its notifications still owed
-ZERO_COPY = ('zero_copy', 'zc_release_on_send', 'zc_first_notification')
+ZERO_COPY = ('zero_copy', 'zc_release_on_send', 'zc_first_notification', 'zc_both_lent')
 
 
 def QCELL(j): return ('$q', j)          # the kernel's parts, oldest first; 0 is empty
@@ -151,15 +160,27 @@ def OWED(k): return ('$owed', k)        # buffer k's notifications still to come
 def NOTES(k): return ('$notes', k)      # buffer k's notifications come (a breakage's)
 
 
-def pack_part(k, last, first, end, seq):
+def pack_part(k, last, first, end, seq, units=None):
     """A part the kernel holds: units [first, end) of buffer k, segment `seq`,
-    `last` when it ends the segment."""
-    return 1 + k + 2 * last + 4 * first + 64 * end + 4096 * seq
+    `last` when it ends the segment; and, for a part sent by copy, the units as
+    they were read at its send (`units`), since its buffer may be reused at once."""
+    v = 1 + k + 2 * last + 4 * first + 64 * end + 4096 * seq
+    if units is not None:
+        v += 1 << 20
+        for j, ident in enumerate(units):
+            v += ident << (21 + 8 * j)
+    return v
 
 
 def unpack_part(v):
+    """(k, last, first, end, seq, units or None)"""
     v -= 1
-    return v % 2, (v // 2) % 2, (v // 4) % 16, (v // 64) % 64, v // 4096
+    k, last, first, end = v % 2, (v // 2) % 2, (v // 4) % 16, (v // 64) % 64
+    seq = (v >> 12) & 0xff
+    units = None
+    if (v >> 20) & 1:
+        units = [(v >> (21 + 8 * j)) & 0xff for j in range(max(0, end - max(first, H)))]
+    return k, last, first, end, seq, units
 
 
 def HEAD(k): return ('head', k)
@@ -392,12 +413,12 @@ def kernel(design, total, qlen):
         return [({}, {'more': 1 if M[QCELL(0)] else 0}, 'look')]
 
     def check(M, L):
-        k, last, first, end, seq = unpack_part(M[QCELL(0)])
+        k, last, first, end, seq, units = unpack_part(M[QCELL(0)])
         if first == 0 and seq != M[LASTSEQ] + 1:
             return f'SEGSEQ: segment {seq} sent after segment {M[LASTSEQ]}'
         nxt, here = {}, set()
-        for off in range(max(first, H), end):
-            i = M[('$slot', k, off)]
+        for j, off in enumerate(range(max(first, H), end)):
+            i = units[j] if units is not None else M[('$slot', k, off)]
             if i == 0:
                 return (f'TORN: segment {seq} delivered with an uncopied or reused unit at '
                         f'offset {off} of buffer {k}')
@@ -415,14 +436,15 @@ def kernel(design, total, qlen):
         return None
 
     def deliver(M, L):
-        k, last, first, end, seq = unpack_part(M[QCELL(0)])
+        k, last, first, end, seq, units = unpack_part(M[QCELL(0)])
         upd, n = {}, 0
-        for off in range(max(first, H), end):
-            i = M[('$slot', k, off)]
+        for j, off in enumerate(range(max(first, H), end)):
+            i = units[j] if units is not None else M[('$slot', k, off)]
             w = (i - 1) // PER_WRITER
             upd[('$applied', i)] = 1
             upd[('$next', w)] = upd.get(('$next', w), M[('$next', w)]) + 1
-            upd[('$slot', k, off)] = 0
+            if units is None:
+                upd[('$slot', k, off)] = 0          # a copied part's were cleared at its send
             n += 1
         upd[NAPPLIED] = M[NAPPLIED] + n
         if last:
@@ -430,9 +452,10 @@ def kernel(design, total, qlen):
         for j in range(qlen - 1):
             upd[QCELL(j)] = M[QCELL(j + 1)]
         upd[QCELL(qlen - 1)] = 0
-        upd[OWED(k)] = M[OWED(k)] - 1                   # the part's notification
-        if notes:
-            upd[NOTES(k)] = M[NOTES(k)] + 1
+        if units is None:
+            upd[OWED(k)] = M[OWED(k)] - 1               # the part's notification
+            if notes:
+                upd[NOTES(k)] = M[NOTES(k)] + 1
         return upd, {'ack': seq if last else DEL}
 
     B = [('K0', ('await', lambda M, L, t=total: M[QCELL(0)] != 0 or M[NAPPLIED] >= t, '@K1')),
@@ -462,6 +485,13 @@ def progress(design, total, cap, replies):
         if design == 'zc_first_notification':
             return M[NOTES(k)] >= 1
         return M[OWED(k)] == 0
+
+    def seen_releasable(L, k):
+        """The same, as the pass's reap saw it (`ow`, `nt`): the C reads the wire's
+        owed counts, which only the reap at a pass's start moves."""
+        if design == 'zc_first_notification':
+            return (L[f'nt{k}'] or 0) >= 1
+        return (L[f'ow{k}'] or 0) == 0
 
     def todo(M, L):
         if M[NAPPLIED] >= total:
@@ -507,10 +537,15 @@ def progress(design, total, cap, replies):
     else:
         # 0. release a lent buffer once the kernel has given it back: the same two
         # release stores as the copying send's, at its notification instead.
+        def reap(M, L):
+            return [({}, {'ow0': M[OWED(0)] or DEL, 'ow1': M[OWED(1)] or DEL,
+                          'nt0': M[NOTES(0)] or DEL, 'nt1': M[NOTES(1)] or DEL}, 'reap')]
+
         def look_lent(M, L):
-            k = next((k for k in (0, 1) if st(L, k) == LENT and releasable(M, k)), None)
+            k = next((k for k in (0, 1) if st(L, k) == LENT and seen_releasable(L, k)), None)
             return [({}, {'rk': k if k is not None else DEL}, 'look')]
-        B += [('F0', ('nd', look_lent, '@Z0')),
+        B += [('F0', ('nd', reap, '@F0l')),
+              ('F0l', ('nd', look_lent, '@Z0')),
               ('Z0', ('br', lambda L: L['rk'] is not None, '@Z1', '@F1')),
               ('Z1', ('store', lambda L: HEAD(L['rk']), lambda L: SEALED, False, '@Z2')),
               ('Z2', ('store', lambda L: FILLED(L['rk']), lambda L: 0, False, '@Z3')),
@@ -522,6 +557,9 @@ def progress(design, total, cap, replies):
         # 1. the sending buffer to the kernel, a part a send: the rest of it, or a
         # short send's prefix; nothing yet, or the send pending. The last part's
         # completion frees the wire, and the buffer is LENT.
+        # zero_copy: by reference only while the other buffer owes nothing.
+        one_lent = design == 'zero_copy'
+
         def send_parts(M, L):
             k = find(L, SENDING)
             first, length, seq = L['from'] or 0, L['len'], L['sq']
@@ -530,17 +568,39 @@ def progress(design, total, cap, replies):
             if 0 not in cells:
                 return alts
             free = cells.index(0)
+            by_reference = not one_lent or (L[f'ow{1 - k}'] or 0) == 0
             for end in range(first + 1, length + 1):
                 last = 1 if end == length else 0
-                mu = {QCELL(free): pack_part(k, last, first, end, seq), OWED(k): M[OWED(k)] + 1}
-                lu = ({'from': DEL, 'len': DEL, 'sq': DEL, 'sentall': 1} if last else
-                      {'from': end})
-                alts.append((mu, lu, f'send units {first}..{end} of buffer {k}'))
+                if by_reference:
+                    mu = {QCELL(free): pack_part(k, last, first, end, seq),
+                          OWED(k): M[OWED(k)] + 1}
+                else:
+                    offs = range(max(first, H), end)
+                    mu = {QCELL(free): pack_part(k, last, first, end, seq,
+                                                 [M[('$slot', k, off)] for off in offs])}
+                    for off in offs:
+                        mu[('$slot', k, off)] = 0
+                owes = (L[f'ow{k}'] or 0) + (1 if by_reference else 0)
+                # The last part: lent if the buffer owes notifications, and
+                # otherwise released at once, as wire.c's owed count decides.
+                lu = ({'from': DEL, 'len': DEL, 'sq': DEL,
+                       'sentall': 1 if owes or not one_lent else 2} if last else {'from': end})
+                alts.append((mu, lu, f'send units {first}..{end} of buffer {k}' +
+                             ('' if by_reference else ' by copy')))
             return alts
         B += [('F1', ('br', lambda L: find(L, SENDING) is not None, '@Y1', '@F2')),
               ('Y1', ('nd', send_parts, '@Y2')),
-              ('Y2', ('br', lambda L: L['sentall'] == 1, '@Y3', '@F2')),
-              ('Y3', ('set', 'sentall', lambda L: DEL, '@Y4'))]
+              ('Y2', ('br', lambda L: L['sentall'] is not None, '@Y3', '@F2')),
+              ('Y3', ('br', lambda L: L['sentall'] == 2, '@X0', '@Y3b')),
+              ('Y3b', ('set', 'sentall', lambda L: DEL, '@Y4')),
+              # Sent whole by copy: released at once, as a copied buffer always was.
+              ('X0', ('set', 'sentall', lambda L: DEL, '@X1')),
+              ('X1', ('set', 'rk', lambda L: find(L, SENDING), '@X2')),
+              ('X2', ('store', lambda L: HEAD(L['rk']), lambda L: SEALED, False, '@X3')),
+              ('X3', ('store', lambda L: FILLED(L['rk']), lambda L: 0, False, '@X4')),
+              ('X4', ('set', 'st0', lambda L: DEL if L['rk'] == 0 else L['st0'], '@X5')),
+              ('X5', ('set', 'st1', lambda L: DEL if L['rk'] == 1 else L['st1'], '@X6')),
+              ('X6', ('set', 'rk', lambda L: DEL, '@F2'))]
         if design == 'zc_release_on_send':
             B += [('Y4', ('set', 'rk', lambda L: find(L, SENDING), '@Y5')),
                   ('Y5', ('store', lambda L: HEAD(L['rk']), lambda L: SEALED, False, '@Y6')),
@@ -549,8 +609,13 @@ def progress(design, total, cap, replies):
                   ('Y8', ('set', 'st1', lambda L: DEL if L['rk'] == 1 else L['st1'], '@Y9')),
                   ('Y9', ('set', 'rk', lambda L: DEL, '@F2'))]
         else:
+            both = 'BOTH LENT: a connection lent both its buffers to the kernel'
             B += [('Y4', ('set', 'st0', lambda L: LENT if L['st0'] == SENDING else L['st0'], '@Y5')),
-                  ('Y5', ('set', 'st1', lambda L: LENT if L['st1'] == SENDING else L['st1'], '@F2'))]
+                  ('Y5', ('set', 'st1', lambda L: LENT if L['st1'] == SENDING else L['st1'],
+                          '@Y6' if design in ('zero_copy', 'zc_both_lent') else '@F2')),
+                  ('Y6', ('check', lambda M, L, m=both: m if (L['st0'] == LENT and
+                                                              L['st1'] == LENT) else None,
+                          '@F2'))]
 
     # 1. finish an in-flight send, then release.
     B += [('F1' if not zc else 'F1_copying', ('br', lambda L: find(L, SENDING) is not None, '@F1n', '@F2')),
@@ -657,6 +722,12 @@ def progress(design, total, cap, replies):
           ('F4h', ('set', 'k', lambda L: DEL, '@F4i')),
           ('F4i', ('set', 'n', lambda L: DEL, '@TOP')),
           ('PEND', ('done',))]
+    if zc:
+        B = [(('F2p' if lab == 'F2' else lab), ins) for lab, ins in B]
+        B += [('F2', ('set', 'ow0', lambda L: DEL, '@F2c1')),
+              ('F2c1', ('set', 'ow1', lambda L: DEL, '@F2c2')),
+              ('F2c2', ('set', 'nt0', lambda L: DEL, '@F2c3')),
+              ('F2c3', ('set', 'nt1', lambda L: DEL, '@F2p'))]
     return assemble(B)
 
 
@@ -733,6 +804,7 @@ CASES = [
     ('zc_release_on_send', 2, 2, 1, 0, False, False),
     ('zc_release_on_send', 1, 2, 2, 1, False, False),
     ('zc_first_notification', 2, 2, 2, 0, False, False),
+    ('zc_both_lent', 2, 2, 2, 0, False, False),
 
     ('open_resets', 1, 1, 2, 1, False, False),
     ('filled_short', 1, 1, 2, 1, False, False),
@@ -777,7 +849,7 @@ if __name__ == '__main__':
             continue
         zc = design in ZERO_COPY
         res = explore(name, threads, mem0, tso=tso, max_seconds=600 if zc else 240,
-                      liveness_max_states=3_000_000 if zc else 400_000)
+                      liveness_max_states=6_000_000 if zc else 400_000)
         ok &= report(res, expect_ok=expect, tso=tso)
     for variant, writers, sizes, cap, least, replies, tso, expect in FILL_CASES:
         name, threads, mem0 = fill_case(variant, writers, sizes, cap, least, replies)

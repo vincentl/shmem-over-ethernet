@@ -140,11 +140,12 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
 /*
  * osoe_wire_send of bytes in `region`, which the caller lends the kernel: one of
  * a connection's two buffers (§3.5). With OSOE_WIRE_ZERO_COPY on, a send of at
- * least OSOE_WIRE_ZERO_COPY_BYTES goes by reference (IORING_OP_SEND_ZC), unless
- * the wire already owes OSOE_WIRE_ZERO_COPY_OWED_MOST notifications; then the
- * region must stay as it is, even after the send has completed, until
- * osoe_wire_owed says the kernel owes nothing for it. Off, it is
- * osoe_wire_send.
+ * least OSOE_WIRE_ZERO_COPY_BYTES goes by reference (IORING_OP_SEND_ZC) - unless
+ * the other region still owes a notification, or this one already owes
+ * OSOE_WIRE_ZERO_COPY_OWED_MOST - and then the region must stay as it is, even
+ * after the send has completed, until osoe_wire_owed says the kernel owes
+ * nothing for it. So at most one region is ever lent: the other is always a
+ * copied send away from free. Off, it is osoe_wire_send.
  */
 size_t osoe_wire_send_lent(struct osoe_wire *w, const void *buffer, size_t len,
                            uint32_t region);

@@ -403,8 +403,16 @@ buffer is at its last completion. `reservation_model.py`'s `zero_copy` cases
 hold it, and a release at the last completion and one at the first of several
 notifications fail. A buffer about to be written with notifications still owed
 ends the job by name - checked where it is first written, not where it was
-released. A wire owes at most 16 notifications, past which a send copies, so
-that the completion queue keeps its bound: 16 more completions a wire.
+released. **Only one buffer of a connection is lent at a time**: a send goes by
+reference only while the other buffer owes nothing, and copies otherwise, so
+that an acknowledgement or a reply always finds a buffer a copied send away -
+with both lent, the Pi's `osoe-bench` stalled for seconds at 1 MiB, the
+acknowledgement a quiet waited for queued behind two buffers that waited for
+the peer's TCP acknowledgement, which the peer delays while it has nothing to
+send. `reservation_model.py` checks it (BOTH LENT), and the engine ends the job
+if both are ever lent. A wire owes at most 16 notifications, past which a send
+copies, so that the completion queue keeps its bound: 16 more completions a
+wire.
 
 *As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
 One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |
