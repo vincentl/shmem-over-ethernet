@@ -9,12 +9,15 @@ the open questions (§10). The code's comments cite it by section, as `§4.10`;
 start with §1, for the goals and the release point, and §2, for the layers, then
 §4.10, the boundary that the layout of `shmem/src/` follows.
 
-Beside the notes are three proposals, each saying at its head what became of
+Beside the notes are four proposals, each saying at its head what became of
 it: `osoe-pacer-proposal.md`, the stress tester's, `team-resources-proposal.md`,
-the team redesign's, and `mesh-schedule-proposal.md`, a start-up schedule for
-the connection mesh, postponed; and `successor-api-stage-setting.md`, a note on
-what a smaller API after osoe might be, which binds nothing. `workloads/traces/`
-holds virtual traces of the reference workloads of §8.6, read from the source of
+the team redesign's, `progress-helpers-proposal.md`, v0.2 step 4's, and
+`mesh-schedule-proposal.md`, a start-up schedule for the connection mesh,
+postponed; and two documents on a smaller API after osoe, which bind nothing:
+`successor-api-stage-setting.md`, the lessons building osoe taught and a
+strawman, and `core-api-proposal.md`, the proposal that follows from them,
+item by item with its alternatives and the questions put to the author.
+`workloads/traces/` holds virtual traces of the reference workloads of §8.6, read from the source of
 public programs and not run, and its README gives their format. `evidence/`
 holds the raw outputs that the notes and the records cite - model runs and
 litmus tests, experiments, mutation matrices, and a directory for each session

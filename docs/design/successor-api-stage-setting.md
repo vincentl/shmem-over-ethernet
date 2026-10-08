@@ -1,6 +1,8 @@
 # After osoe: setting the stage for a smaller SHMEM-like API
 
-**Status:** stage-setting, with a strawman to argue against. Not a decision
+**Status:** stage-setting, with a strawman to argue against; the proposal that
+follows from it is `core-api-proposal.md` (2026-10-07), which replaces the
+strawman of §4 where the two differ and keeps the lessons of §2. Not a decision
 record; nothing here binds osoe. Written 2026-09-20 from the second adversarial
 review (`docs/reviews/archive/phase1-step2-slice1-review.md`), whose investigators were
 each asked to note where the OpenSHMEM API itself forced cost, complexity or an

@@ -21,7 +21,7 @@ you want; each names the `README.md` of the directories that go with it.
 | Where | What |
 |---|---|
 | `docs/design/shmem-ethernet-design.md` | the design notes: every protocol and data structure, and why it is as it is, in ten sections from the goals (§1) to the open questions (§10); §9 lists the invariants the code is held to. Comments in the code cite its sections, as `§4.10`; a reference of the form `§9.x.y` is to the OpenSHMEM specification |
-| `docs/design/README.md` | the rest of `docs/design/`: three proposals (`osoe-pacer-proposal.md`, `team-resources-proposal.md`, `mesh-schedule-proposal.md`), a note on a possible successor API (`successor-api-stage-setting.md`), the virtual traces of the reference workloads of design §8.6, and the raw outputs the notes cite |
+| `docs/design/README.md` | the rest of `docs/design/`: four proposals (`osoe-pacer-proposal.md`, `team-resources-proposal.md`, `progress-helpers-proposal.md`, `mesh-schedule-proposal.md`), a note and a proposal on a possible successor API (`successor-api-stage-setting.md`, `core-api-proposal.md`), the virtual traces of the reference workloads of design §8.6, and the raw outputs the notes cite |
 | `tools/modelcheck/README.md` | the model checker for osoe's lock-free and futex protocols, and how to write a model |
 | `base/README.md`, `shmem/README.md`, `tools/README.md` | the code: how each directory relates to the rest, and where to start reading |
 
