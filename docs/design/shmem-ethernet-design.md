@@ -7620,6 +7620,12 @@ beside the build, 1.3–1.9× under the busy loops (idle, 55 µs against 29 µs)
 The library's stream, 3.0 GiB/s idle against the floor's 14, is 0.21×. With
 a 1 MiB buffer it is 0.52–0.69×.
 
+*Since v0.2 step 4* a put fills the room a buffer has (§3.5), and the stream row
+reads: bound ≥ 0.15, measured 0.43–0.47 (0.39 at the lowest pair beside the
+suite), 0.083–0.085 with the poll - the pin raised from 0.10 so that the poll
+still fails it by more than half
+(`docs/decisions/2026-10-07-one-thread-profile.md`).
+
 *What the fastest trip can see, and what it cannot.* It is the length of a
 path, and between `echo-uring`'s two kinds — one path of the same length — it
 is what holds still. Between the library and the floor it compares four wakes
