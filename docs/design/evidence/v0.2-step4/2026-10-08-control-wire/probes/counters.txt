@@ -1,0 +1,17 @@
+== a round=1 job=7101 13:05:44
+exit 0
+reduce-loop pes=64 count=20000 reduce8_us=446.7
+real=9.163 user=9.615 sys=18.800
+== b round=1 job=7102 13:05:53
+exit 0
+reduce-loop pes=64 count=20000 reduce8_us=465.6
+real=9.570 user=9.695 sys=19.136
+== a round=2 job=7103 13:06:02
+exit 0
+reduce-loop pes=64 count=20000 reduce8_us=475.5
+real=9.694 user=9.374 sys=19.927
+== b round=2 job=7104 13:06:12
+exit 0
+reduce-loop pes=64 count=20000 reduce8_us=487.3
+real=9.978 user=10.006 sys=18.959
+DONE 13:06:22

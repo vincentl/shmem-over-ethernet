@@ -1,0 +1,2 @@
+putstream-cpu sender host=pi-001 bytes=1048576 seconds=20.5 mib_per_s=112.1 agent_cpu_s=0.65 agent_cpu_s_per_gib=0.289
+putstream-cpu receiver host=pi-002 seconds=20.6 agent_cpu_s=1.64 agent_busy=0.08

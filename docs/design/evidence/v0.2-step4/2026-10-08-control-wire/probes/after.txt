@@ -1,0 +1,7 @@
+a round=1 after-barriers pes=64 count=1000 reduce_us=573.6,488.8,497.2 put_quiet_us=158.4,218.6,183.0 barrier_us=375.4,379.0 real=3.321 user=3.476 sys=6.935
+b round=1 after-barriers pes=64 count=1000 reduce_us=852.5,487.3,506.2 put_quiet_us=288.3,178.8,126.7 barrier_us=346.9,360.0 real=3.616 user=3.327 sys=7.115
+a round=2 after-barriers pes=64 count=1000 reduce_us=867.8,486.1,500.8 put_quiet_us=243.4,195.4,200.1 barrier_us=375.6,389.9 real=3.603 user=3.401 sys=7.019
+b round=2 after-barriers pes=64 count=1000 reduce_us=914.2,509.6,505.3 put_quiet_us=460.2,243.6,266.8 barrier_us=453.4,377.7 real=4.053 user=3.617 sys=7.289
+a round=3 after-barriers pes=64 count=1000 reduce_us=961.4,521.9,521.3 put_quiet_us=435.7,152.2,171.6 barrier_us=385.3,393.5 real=3.978 user=3.475 sys=7.406
+b round=3 after-barriers pes=64 count=1000 reduce_us=981.6,597.7,504.4 put_quiet_us=485.6,259.4,215.9 barrier_us=765.3,359.5 real=4.473 user=3.522 sys=7.465
+DONE 13:08:35

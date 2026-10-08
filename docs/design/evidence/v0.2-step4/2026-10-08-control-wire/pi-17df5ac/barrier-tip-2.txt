@@ -1,0 +1,2 @@
+barrier-behind phase=alone syncs=2000 median_us=172 p90_us=177 p99_us=182 max_us=219 stream_mib_per_s=0
+barrier-behind phase=stream syncs=2000 median_us=1663 p90_us=1704 p99_us=2224 max_us=2265 stream_mib_per_s=112
