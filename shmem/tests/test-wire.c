@@ -58,8 +58,8 @@ static unsigned char pattern(size_t i)
     return (unsigned char)((i * 31 + 7) & 0xff);
 }
 
-/* How many sends the kernel or the injection cut short, and how many receives
- * returned less than was waiting. */
+/* How many sends the kernel or the injection cut short, and how many peeks
+ * the injection cut short of what their provided buffer held. */
 static int short_sends, short_recvs;
 
 /* Two connected TCP sockets on loopback. */
@@ -115,18 +115,20 @@ static void unsent_limit(struct osoe_wire *w, const struct osoe_bootstrap *b)
     CHECK(!osoe_wire_limit_unsent(&closed, 16384));   /* not open: not counted */
 }
 
-/* Take everything waiting on `rx`, checking every byte against where it falls
- * in the stream. The wire must be emptied before the next reap, as the engine
- * empties every readable wire in its pass (§3.3, invariant 23). */
+/* Take everything waiting on `rx`, checking every byte where it arrived against
+ * where it falls in the stream. The wire must be emptied before the next reap,
+ * as the engine empties every readable wire in its pass (§3.3, invariant 23).
+ * A short receive is a peek that showed less than its provided buffer holds. */
 static bool drain(struct osoe_wire *rx, size_t *got)
 {
-    unsigned char in[CHUNK];
     bool moved = false;
     for (;;) {
-        size_t n = osoe_wire_recv(rx, in, sizeof in);
+        const unsigned char *in;
+        size_t whole = rx->queued ? rx->ring->filled[rx->first] - rx->offset : 0;
+        size_t n = osoe_wire_peek(rx, &in);
         if (n == 0)
             return moved;
-        if (n < sizeof in && rx->queued > 0)
+        if (n < whole)
             short_recvs++;
         for (size_t i = 0; i < n; i++)
             if (in[i] != pattern(*got + i)) {
@@ -134,6 +136,7 @@ static bool drain(struct osoe_wire *rx, size_t *got)
                         pattern(*got + i));
                 CHECK_FATAL(false);
             }
+        osoe_wire_consume(rx, n);
         *got += n;
         moved = true;
     }
@@ -180,8 +183,69 @@ static void stream(struct osoe_ring *ring, struct osoe_wire *tx, struct osoe_wir
     CHECK(sent == total && got == total);
 }
 
-int main(void)
+/*
+ * The peek's misuses (wire.h), one a run, each expected to end in its message
+ * (CMakeLists.txt): a consume past what the last peek showed, a second consume
+ * of one peek, and - in the ASan preset, which poisons a provided buffer once it
+ * is the kernel's again (ring.c) - a read of a buffer after its consume. A
+ * misuse that went unremarked would print the last line and fail the match.
+ */
+static int misuse(const char *what)
 {
+    struct osoe_bootstrap lo = { .job = (uint64_t)getpid(), .node = 0, .node_count = 2,
+                                 .no_progress_ns = UINT64_C(10000000000) };
+    struct osoe_bootstrap hi = lo;
+    hi.node = 1;
+    int fd[2];
+    pair(fd);
+    static struct osoe_wire wires[2];
+    struct osoe_ring ring;
+    osoe_wire_ring_open(&ring, wires, 2, &lo);
+    osoe_wire_attach(&wires[0], &ring, 0, fd[0], 1, &lo);
+    osoe_wire_attach(&wires[1], &ring, 1, fd[1], 0, &hi);
+    osoe_ring_enable(&ring);
+    unsigned char out[48];
+    for (size_t i = 0; i < sizeof out; i++)
+        out[i] = pattern(i);
+    size_t sent = 0;
+    struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(10000000000));
+    while (wires[1].queued == 0 && !osoe_deadline_expired(&give_up)) {
+        if (sent < sizeof out)
+            sent += osoe_wire_send(&wires[0], out + sent, sizeof out - sent);
+        osoe_ring_reap(&ring);
+        if (wires[1].queued == 0)
+            osoe_ring_wait(&ring, UINT64_C(1000000));
+    }
+    CHECK_FATAL(wires[1].queued > 0);
+    const unsigned char *bytes;
+    size_t n = osoe_wire_peek(&wires[1], &bytes);
+    CHECK_FATAL(n > 0 && bytes != NULL);
+    if (strcmp(what, "consume-past-peek") == 0) {
+        osoe_wire_consume(&wires[1], n + 1);
+    } else if (strcmp(what, "consume-twice") == 0) {
+        osoe_wire_consume(&wires[1], n);
+        osoe_wire_consume(&wires[1], 1);
+    } else if (strcmp(what, "read-after-consume") == 0) {
+        /* The whole buffer, so that the consume gives it back (no split here). */
+        CHECK_FATAL(n == wires[1].ring->filled[wires[1].first] - wires[1].offset);
+        osoe_wire_consume(&wires[1], n);
+        volatile unsigned char after = bytes[0];
+        (void)after;
+    } else {
+        fprintf(stderr, "no misuse named %s\n", what);
+        return 2;
+    }
+    printf("the misuse %s went unremarked\n", what);
+    return 1;
+}
+
+int main(int argc, char **argv)
+{
+    if (argc > 1) {
+        setenv("OSOE_WIRE_BYTES", "64", 1);
+        setenv("OSOE_WIRE_SPLIT", "0", 1);
+        return misuse(argv[1]);
+    }
     setenv("OSOE_WIRE_BYTES", "64", 1);     /* every transfer spans buffers */
     setenv("OSOE_WIRE_BUFFERS", "4", 1);    /* and the ring runs dry: -ENOBUFS, re-arm */
     setenv("OSOE_WIRE_SPLIT", "5000", 1);   /* and half the rest is truncated besides */
@@ -226,8 +290,13 @@ int main(void)
         if (sent < sizeof probe)
             sent += osoe_wire_send(&wires[0], probe + sent, sizeof probe - sent);
         osoe_ring_reap(&ring);
-        CHECK(osoe_wire_recv(&wires[0], back, sizeof back) == 0);   /* not at the sender */
-        got += osoe_wire_recv(&wires[1], back + got, sizeof back - got);
+        const unsigned char *bytes;
+        CHECK(osoe_wire_peek(&wires[0], &bytes) == 0);              /* not at the sender */
+        for (size_t n; (n = osoe_wire_peek(&wires[1], &bytes)) > 0; got += n) {
+            CHECK_FATAL(n <= sizeof back - got);
+            memcpy(back + got, bytes, n);
+            osoe_wire_consume(&wires[1], n);
+        }
         osoe_ring_wait(&ring, UINT64_C(1000000));
     }
     CHECK(got == sizeof probe && memcmp(probe, back, sizeof probe) == 0);
@@ -252,8 +321,9 @@ int main(void)
     while (!(osoe_wire_ended(&wires[0]) && osoe_wire_ended(&wires[1])) &&
            !osoe_deadline_expired(&give_up)) {
         osoe_ring_reap(&ring);
-        CHECK(osoe_wire_recv(&wires[0], back, sizeof back) == 0);
-        CHECK(osoe_wire_recv(&wires[1], back, sizeof back) == 0);
+        const unsigned char *bytes;
+        CHECK(osoe_wire_peek(&wires[0], &bytes) == 0);
+        CHECK(osoe_wire_peek(&wires[1], &bytes) == 0);
         osoe_ring_wait(&ring, UINT64_C(1000000));
     }
     CHECK(osoe_wire_ended(&wires[0]) && osoe_wire_ended(&wires[1]));

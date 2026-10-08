@@ -280,6 +280,11 @@ static inline bool osoe_am_parser_between_segments(const struct osoe_am_parser *
  * bytes would need the caller to hold them, which is the buffer-holding §3.3
  * forbids. A framing error aborts the job (§3.15) - it means the peer and this
  * PE disagree about the format, and there is no recovery that is not a guess.
+ *
+ * **Nothing points into `bytes` once this returns**: header bytes are copied
+ * into the accumulator, payload to its destination, and the sink is handed
+ * those and never the input. So the caller may feed a provided buffer where
+ * the kernel put it and recycle it at once (progress.c, receive).
  */
 void osoe_am_parse(struct osoe_am_parser *p, const void *bytes, size_t length,
                    const struct osoe_am_sink *sink);

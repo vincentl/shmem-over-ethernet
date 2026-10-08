@@ -1,0 +1,25 @@
+diff --git a/shmem/src/ring.c b/shmem/src/ring.c
+index c817783..b372e01 100644
+--- a/shmem/src/ring.c
++++ b/shmem/src/ring.c
+@@ -40,8 +40,19 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
+      */
+     r->submission_bound = 2 * wire_count + 1;
+     r->completion_bound = buffer_count + 2 * wire_count + 1;
++    /* EXPERIMENT, not for merging: the task-run flags by the environment. */
++    unsigned taskrun = 0;
++    const char *experiment = getenv("OSOE_EXPERIMENT_TASKRUN");
++    if (experiment && strcmp(experiment, "coop") == 0)
++        taskrun = IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG;
++    else if (experiment && strcmp(experiment, "defer") == 0)
++        taskrun = IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_TASKRUN_FLAG;
++    else if (experiment && strcmp(experiment, "defer-coop") == 0)
++        taskrun = IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_COOP_TASKRUN |
++                  IORING_SETUP_TASKRUN_FLAG;
+     struct io_uring_params p = {
+-        .flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE,
++        .flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE |
++                 taskrun,
+         .cq_entries = r->completion_bound,
+     };
+     int e = io_uring_queue_init_params(next_power_of_two(r->submission_bound), &r->uring, &p);

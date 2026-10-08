@@ -143,18 +143,28 @@ static void build(uint64_t seq)
     stream_len = at;
 }
 
-/* Feed the stream, cut at the given offsets. */
+/*
+ * Feed the stream, cut at the given offsets: each cut from a copy of its own,
+ * overwritten as soon as the parse returns, since nothing may point into the
+ * parser's input by then (am.h) - the engine parses provided buffers where the
+ * kernel put them and gives each back once read (the third adversarial read of
+ * v0.2 step 4, S2). A parser that kept part of an earlier cut would record the
+ * overwritten bytes.
+ */
 static void feed(const uint32_t *cuts, uint32_t ncuts)
 {
+    static unsigned char piece[sizeof stream];
     struct osoe_am_parser p;
     osoe_am_parser_init(&p, UINT32_MAX);
     memset(&got, 0, sizeof got);
     uint32_t from = 0;
-    for (uint32_t i = 0; i < ncuts; i++) {
-        osoe_am_parse(&p, stream + from, cuts[i] - from, &sink);
-        from = cuts[i];
+    for (uint32_t i = 0; i <= ncuts; i++) {
+        uint32_t to = i < ncuts ? cuts[i] : stream_len;
+        memcpy(piece, stream + from, to - from);
+        osoe_am_parse(&p, piece, to - from, &sink);
+        memset(piece, 0xa5, to - from);
+        from = to;
     }
-    osoe_am_parse(&p, stream + from, stream_len - from, &sink);
 }
 
 static struct record expected;

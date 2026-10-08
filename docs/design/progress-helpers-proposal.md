@@ -197,8 +197,10 @@ owner h and owns the data wires of the peers that map to it; **with H = 0
 owner 0 owns the data wires too**, and the lead's agent does today's work on
 today's structures plus a second wire a peer. Everything an owner needs is in
 one `struct osoe_progress_owner`: its ring and provided-buffer ring, its wires
-and their slots, its reply pool, its receive scratch, its wake word and
-sleeping flag, its dirty bitmap, its counters, its per-connection state.
+and their slots, its reply pool, its wake word and sleeping flag, its dirty
+bitmap, its counters, its per-connection state. (*Amended on 2026-10-08:* no
+receive scratch - since Part 0's fourth rung a pass parses its provided buffers
+where the kernel put them, `docs/decisions/2026-10-07-one-thread-profile.md`.)
 `osoe_progress_host_poll` becomes a function of an owner; the code that runs
 it is the same for owner 0 and for a helper, and what differs is which wires
 it holds.
@@ -230,8 +232,9 @@ variants stay broken.
 Per owner: a ring (its SQ, CQ and provided-buffer ring, sized from the wires
 it holds, so the total is about today's plus H rings' fixed cost), a reply
 pool sized by §3.8's argument over *its* connections (the sum is today's
-pool), a scratch buffer (one AM chunk), and the bitmap, flag and word (a cache
-line each). The connection area grows by H bitmaps and the lead's control
+pool), and the bitmap, flag and word (a cache line each); no scratch buffer
+since Part 0's fourth rung, which parses in place (*amended on 2026-10-08*).
+The connection area grows by H bitmaps and the lead's control
 wires' private buffers. Nothing per PE changes.
 
 ### 3.5 Counters and the detector
@@ -292,7 +295,8 @@ threaded through `progress-host.c`, `progress.c`, `ring.c`, `wire.c`,
 `connection-area.c`, `am-state.h`, `reply.c`, `agent.c`, `deadlock.c`, the
 rendezvous's second connection, the metrics and `osoe-stat`. The audit's
 fourteen become, under this design: ring and slotting per owner (1), the
-owner's wake protocol (2), the pools and scratch (3), the counters (4), the
+owner's wake protocol (2), the pools (3; the scratch is gone since Part 0's
+fourth rung), the counters (4), the
 detector's request words (5), stop and abort per owner (6), the control
 wires (7), threads (8). Six of the fourteen - the control queue's producers,
 the team state, the arrival handoff, `enqueue` and `forward` across shards,

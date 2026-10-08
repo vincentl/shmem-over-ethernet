@@ -24,7 +24,7 @@
  * How much of `n` this transfer moves: all of it, or - OSOE_WIRE_SPLIT times in
  * a myriad - a prefix of at least one byte. Never nothing: a send truncated to
  * nothing would submit nothing and leave the connection waiting for a
- * completion that is not coming, and a receive returning 0 with bytes queued
+ * completion that is not coming, and a peek returning 0 with bytes queued
  * would end the pass's loop over a wire it must empty (§3.3).
  */
 static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n)
@@ -229,30 +229,41 @@ void osoe_wire_lift_unsent(struct osoe_wire *w)
     (void)setsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, sizeof v);
 }
 
-size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len)
+size_t osoe_wire_peek(struct osoe_wire *w, const unsigned char **bytes)
 {
+    *bytes = NULL;
+    w->peeked = 0;
+    if (w->queued == 0)
+        return 0;
     struct osoe_ring *r = w->ring;
-    uint64_t have = w->queued < len ? w->queued : len;
-    size_t n = truncate_to(w, w->recvs++, have);
-    for (size_t done = 0; done < n; ) {
-        uint32_t b = w->first;
-        size_t take = r->filled[b] - w->offset;
-        if (take > n - done)
-            take = n - done;
-        memcpy((unsigned char *)buffer + done,
-               r->buffer_memory + (size_t)b * r->buffer_bytes + w->offset, take);
-        done += take;
-        w->offset += (uint32_t)take;
-        if (w->offset == r->filled[b]) {        /* emptied: back to the kernel at once */
-            w->first = r->next[b];
-            if (w->first == OSOE_RING_NONE)
-                w->last = OSOE_RING_NONE;
-            w->offset = 0;
-            osoe_ring_recycle(r, b);
-        }
-    }
+    uint32_t b = w->first;
+    *bytes = r->buffer_memory + (size_t)b * r->buffer_bytes + w->offset;
+    w->peeked = (uint32_t)truncate_to(w, w->recvs++, r->filled[b] - w->offset);
+    return w->peeked;
+}
+
+void osoe_wire_consume(struct osoe_wire *w, size_t n)
+{
+    /* Against the last peek, not the buffer: under OSOE_WIRE_SPLIT a peek shows
+     * less than its buffer holds, and a consume of the rest would skip bytes the
+     * parse never saw (the third adversarial read, S1). A peek is consumed once. */
+    if (n > w->peeked)
+        osoe_fatal("%zu bytes from node %u were consumed where the last peek showed %u "
+                   "(wire.h)", n, w->peer, w->peeked);
+    w->peeked = 0;
+    if (n == 0)
+        return;
+    struct osoe_ring *r = w->ring;
+    uint32_t b = w->first;
+    w->offset += (uint32_t)n;
     w->queued -= n;
-    return n;
+    if (w->offset == r->filled[b]) {            /* emptied: back to the kernel at once */
+        w->first = r->next[b];
+        if (w->first == OSOE_RING_NONE)
+            w->last = OSOE_RING_NONE;
+        w->offset = 0;
+        osoe_ring_recycle(r, b);
+    }
 }
 
 void osoe_wire_shutdown(struct osoe_wire *w)

@@ -651,11 +651,15 @@ static bool receive(struct osoe_progress *p, uint32_t slot)
     struct osoe_wire *w = &p->wire[slot];
     struct osoe_progress_connection *c = &p->connection[slot];
     bool moved = false;
+    /* Parsed where the kernel put the bytes (§3.3): the parser keeps no pointer
+     * into them, so each buffer goes back to the kernel as soon as it is read. */
     for (;;) {
-        size_t n = osoe_wire_recv(w, p->scratch, p->scratch_bytes);
+        const unsigned char *bytes;
+        size_t n = osoe_wire_peek(w, &bytes);
         if (n == 0)
             break;
-        osoe_am_parse(&c->parser, p->scratch, n, &sink);
+        osoe_am_parse(&c->parser, bytes, n, &sink);
+        osoe_wire_consume(w, n);
         moved = true;
     }
     /* Ending anyway, the job has nothing to fear from a peer that is ending
@@ -1113,7 +1117,6 @@ static bool flush(struct osoe_progress *p, uint32_t slot)
 void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *area,
                         struct osoe_wire *wires, struct osoe_ring *ring,
                         struct osoe_reply *descriptors, uint32_t descriptor_count,
-                        unsigned char *scratch, uint32_t scratch_bytes,
                         const struct osoe_progress_host *host)
 {
     memset(p, 0, sizeof *p);
@@ -1121,8 +1124,6 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
     p->wire = wires;
     p->ring = ring;
     p->descriptors = descriptors;
-    p->scratch = scratch;
-    p->scratch_bytes = scratch_bytes;
     p->node = area->node;
     p->nodes = area->nodes;
     p->host = *host;

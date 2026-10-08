@@ -1,0 +1,10 @@
+
+ Performance counter stats for process id '535064,535065':
+
+       putstream-535064             1589.49 msec task-clock                       #    0.318 CPUs utilized             
+      osoe-agent-535067             3977.60 msec task-clock                       #    0.795 CPUs utilized             
+       putstream-535065                0.15 msec task-clock                       #    0.000 CPUs utilized             
+      osoe-agent-535066             4471.52 msec task-clock                       #    0.894 CPUs utilized             
+
+       5.001945735 seconds time elapsed
+

@@ -497,11 +497,10 @@ void osoe_progress_host_start(uint32_t session)
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
     osoe_am.busy = calloc((peers + 63) / 64, sizeof *osoe_am.busy);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
-    osoe_am.scratch = malloc(osoe_am.area.chunk_bytes);
     osoe_am.team = calloc(teams, sizeof *osoe_am.team);
     osoe_am.pending = calloc(teams, sizeof *osoe_am.pending);
     if (!osoe_am.wire || !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor ||
-        !osoe_am.scratch || !osoe_am.team || !osoe_am.pending)
+        !osoe_am.team || !osoe_am.pending)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
 
     /*
@@ -529,8 +528,7 @@ void osoe_progress_host_start(uint32_t session)
     struct osoe_progress_host host = { resolve, notify, release, NULL, abort_arrived,
                                        landing_request, landed, completed, deadlock_arrived };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, osoe_am.wire, &osoe_am.ring,
-                       osoe_am.descriptor, descriptors, osoe_am.scratch,
-                       (uint32_t)osoe_am.area.chunk_bytes, &host);
+                       osoe_am.descriptor, descriptors, &host);
     osoe_progress_attach_teams(&osoe_am.progress, osoe_am.team, osoe_am.pending, teams,
                                team_of_record, team_by_name);
     /* Count into the control segment, where osoe-stat and the tests read it. */
@@ -731,14 +729,12 @@ void osoe_progress_host_stop(void)
         free(osoe_am.connection);
         free(osoe_am.busy);
         free(osoe_am.descriptor);
-        free(osoe_am.scratch);
         free(osoe_am.team);
         free(osoe_am.pending);
         osoe_am.wire = NULL;
         osoe_am.connection = NULL;
         osoe_am.busy = NULL;
         osoe_am.descriptor = NULL;
-        osoe_am.scratch = NULL;
         osoe_am.team = NULL;
         osoe_am.pending = NULL;
     }

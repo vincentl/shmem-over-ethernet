@@ -1,0 +1,27 @@
+== configure 07:19:45
+BUILD OK 07:20:06
+== clean put stream, 64 KiB, 20 s 07:20:06
+putstream target=1 bytes=65536 seconds=20.0 mib_per_s=8865
+== profiled put stream, 64 KiB, 30 s 07:20:26
+putstream target=1 bytes=65536 seconds=30.0 mib_per_s=9801
+== profiled put stream, 1 MiB, 30 s 07:20:56
+putstream target=1 bytes=1048576 seconds=30.0 mib_per_s=9944
+== profiled mailbox, 4 PEs on 2 nodes, 30 s 07:21:27
+mailbox t=0.0 round=1 messages=16 messages_per_s=164384 mib_per_s=22.1 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mailbox t=0.0 round=9 messages=144 messages_per_s=131744 mib_per_s=18.2 send_s=0.001 wait_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mailbox t=0.0 round=73 messages=1168 messages_per_s=137331 mib_per_s=18.0 send_s=0.007 wait_s=0.000 check_s=0.000 step_s=0.007 failures=0
+mailbox t=0.1 round=585 messages=9360 messages_per_s=126491 mib_per_s=16.5 send_s=0.062 wait_s=0.006 check_s=0.001 step_s=0.065 failures=0
+mailbox t=0.6 round=4681 messages=74896 messages_per_s=145158 mib_per_s=18.8 send_s=0.428 wait_s=0.016 check_s=0.012 step_s=0.451 failures=0
+mailbox t=4.4 round=37449 messages=599184 messages_per_s=137221 mib_per_s=17.8 send_s=3.640 wait_s=0.103 check_s=0.091 step_s=3.821 failures=0
+mailbox t=9.7 round=80330 messages=1285280 messages_per_s=129684 mib_per_s=16.8 send_s=4.977 wait_s=0.224 check_s=0.123 step_s=5.291 failures=0
+mailbox t=14.8 round=120856 messages=1933696 messages_per_s=128111 mib_per_s=16.6 send_s=4.722 wait_s=0.226 check_s=0.122 step_s=5.061 failures=0
+mailbox t=19.6 round=160890 messages=2574240 messages_per_s=133358 mib_per_s=17.3 send_s=4.570 wait_s=0.144 check_s=0.113 step_s=4.803 failures=0
+mailbox t=24.6 round=202564 messages=3241024 messages_per_s=133871 mib_per_s=17.3 send_s=4.689 wait_s=0.200 check_s=0.122 step_s=4.981 failures=0
+mailbox t=29.5 round=244398 messages=3910368 messages_per_s=135904 mib_per_s=17.6 send_s=4.681 wait_s=0.145 check_s=0.120 step_s=4.925 failures=0
+mailbox t=30.0 round=248298 messages=3972768 messages_per_s=137103 mib_per_s=17.7 send_s=0.437 wait_s=0.014 check_s=0.011 step_s=0.455 failures=0
+summary mailbox rounds=248298 messages=3972768 seconds=29.9 messages_per_s=133039 mib_per_s=17.3 failures=0
+osoe-pacer failures=0 seconds=30.0
+== profiled bare io_uring stream 07:21:58
+small stream_mib_per_s=7.1 mebibytes=1
+uring stream_mib_per_s=16996.8 mebibytes=400000
+DONE 07:22:23

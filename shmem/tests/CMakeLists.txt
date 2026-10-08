@@ -231,6 +231,25 @@ if(OSOE_INTERNODE)
   add_test(NAME shmem.wire COMMAND shmem_test_wire)
   set_tests_properties(shmem.wire PROPERTIES LABELS "tier1" TIMEOUT 120)
   osoe_internode_label(shmem.wire)
+  # The peek's misuses (wire.h), each asserted by its message as the parser's
+  # malformed segments are: a consume past the peek, a second consume of it, and
+  # in the ASan preset alone, which poisons a provided buffer while it is the
+  # kernel's (ring.c), a read of one after its consume.
+  set(wire_misuses
+    "consume-past-peek|consumed where the last peek showed"
+    "consume-twice|consumed where the last peek showed 0")
+  if(CMAKE_C_FLAGS MATCHES "sanitize=[a-z,]*address")
+    list(APPEND wire_misuses "read-after-consume|use-after-poison")
+  endif()
+  foreach(case_expect IN LISTS wire_misuses)
+    string(REPLACE "|" ";" parts "${case_expect}")
+    list(GET parts 0 case)
+    list(GET parts 1 expect)
+    add_test(NAME shmem.wire.misuse.${case} COMMAND shmem_test_wire ${case})
+    set_tests_properties(shmem.wire.misuse.${case} PROPERTIES
+      LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
+    osoe_internode_label(shmem.wire.misuse.${case})
+  endforeach()
 
   # The wire between two processes (tier 2). Two logical nodes, one PE each, so
   # each process is a node lead - the only role that touches a wire (§3.12). It

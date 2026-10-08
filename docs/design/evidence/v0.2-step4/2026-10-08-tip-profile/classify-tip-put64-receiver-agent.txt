@@ -1,0 +1,59 @@
+# classify.py over tip's put64 samples: the receiving lead's agent (tid 517356)
+library copy      47.1%
+kernel copy       32.2%
+kernel network    15.8%
+io_uring           1.8%
+library            1.4%
+kernel other       1.2%
+user other         0.5%
+
+== library copy
+    27.6%  libc <- osoe_wire_recv
+    19.5%  libc <- osoe_am_parse
+     0.0%  memcpy@plt <- osoe_wire_recv
+== kernel copy
+    31.8%  __arch_copy_to_user
+     0.3%  _copy_to_iter
+     0.1%  simple_copy_to_iter
+== kernel network
+     3.0%  arch_counter_get_cntvct
+     1.2%  __skb_datagram_iter
+     0.7%  __local_bh_enable_ip
+     0.6%  __check_object_size
+     0.3%  mem_cgroup_uncharge_skmem
+     0.3%  __tcp_cleanup_rbuf
+     0.3%  __cond_resched
+     0.3%  sk_stream_write_space
+== io_uring
+     0.2%  io_buffer_select
+     0.2%  xa_load
+     0.2%  io_req_post_cqe
+     0.2%  io_recv_finish
+     0.2%  io_fill_cqe_aux
+     0.1%  io_recv
+     0.1%  __io_put_kbufs
+     0.1%  xas_start
+== library
+     0.7%  osoe_am_parse (under osoe_am_parse)
+     0.2%  osoe_wire_recv (under osoe_wire_recv)
+     0.2%  complete (under osoe_am_parse)
+     0.1%  osoe_ring_recycle (under osoe_wire_recv)
+     0.0%  osoe_ring_reap (under osoe_progress_poll)
+     0.0%  agent_main (under agent_main)
+     0.0%  osoe_progress_poll (under osoe_progress_poll)
+     0.0%  destination (under osoe_am_parse)
+== kernel other
+     0.9%  do_signal
+     0.1%  el0_svc
+     0.0%  __cond_resched
+     0.0%  mutex_lock
+     0.0%  hrtimer_init
+== user other
+     0.1%  received [inlined]
+     0.1%  [unknown] [liburing.so.2.9]
+     0.1%  osoe_node_local_id [inlined]
+     0.1%  begin_message [inlined]
+     0.0%  io_uring_buf_ring_add [inlined]
+     0.0%  osoe_counter_word_add [inlined]
+     0.0%  truncate_to [inlined]
+     0.0%  io_uring_buf_ring_advance [inlined]

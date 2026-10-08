@@ -65,7 +65,7 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
     exit(1);
 }
 
-enum { HEAP = 8192, DESCRIPTORS = 32, SCRATCH = 4096, PAYLOAD = 600 };
+enum { HEAP = 8192, DESCRIPTORS = 32, PAYLOAD = 600 };
 
 /*
  * Turn the engine until this node owes the peer nothing.
@@ -334,14 +334,12 @@ int main(void)
     osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
-    static unsigned char scratch[SCRATCH];
     static struct osoe_progress_connection connections[1];
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
                                        NULL, completed, NULL };
     struct osoe_progress p;
-    osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, scratch, SCRATCH,
-                       &host);
+    osoe_progress_init(&p, &area, &wire, &ring, descriptors, DESCRIPTORS, &host);
     osoe_progress_attach(&p, connections, busy);
     /* Two nodes, so the tree is node 0 with node 1 as its only child. */
     static const uint32_t both[] = { 0, 1 };

@@ -1100,15 +1100,19 @@ specification or takes a choice the specification leaves open.
   is a measurement at 1 Gbit/s - 111 to 112 MiB/s on the Pi cluster, a bare
   stream's own rate - and says nothing above it. No faster link has been
   measured. Over loopback between two nodes of a four-core virtual machine
-  running nothing else, the library moved 7.6 to 9.8 GiB/s where a bare
-  io_uring stream between the same two processes moved 9.1 to 15.0 - about two
-  thirds of it, 0.58 to 0.67 by the median of each run
-  (`docs/design/evidence/v0.2-step4/2026-10-07-profile/`). It was a fifth
+  running nothing else, the library moved 10.7 to 10.9 GiB/s where a bare
+  io_uring stream between the same two processes moved 13.9 to 15.0 - about
+  three quarters of it, 0.73 to 0.75 by the median of each run
+  (`docs/design/evidence/v0.2-step4/2026-10-08-tip-profile/`). It was a fifth
   before v0.2 step 4 - held back not by the one thread, none in the job more
   than 56% busy, but by the buffer's turnover, one 64 KiB message a buffer
-  (`docs/decisions/2026-10-07-one-thread-profile.md`) - and two fifths once a
-  put filled the room a connection buffer has left; the default buffer of
-  256 KiB took it to two thirds. The cost per message of
+  (`docs/decisions/2026-10-07-one-thread-profile.md`) - two fifths once a put
+  filled the room a connection buffer has left, and two thirds with the default
+  buffer of 256 KiB. There the receiving node's lead thread became the limit,
+  98% busy, and parsing what arrives where the kernel put it, rather than after
+  a copy, took the stream to three quarters. That thread still limits one
+  stream: its time is the kernel's copy, the TCP stack and the one copy into the
+  heap. The cost per message of
   one thread serving 256 PEs has not been measured on any machine: the Pi
   cluster's nodes run four PEs each, and the stress tester's sixteen-PE mailbox,
   a pipelined point-to-point pattern, with `--cpu-bind=none`, ran at 256,000

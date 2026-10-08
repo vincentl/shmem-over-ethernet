@@ -6,9 +6,29 @@
 
 #include <linux/futex.h>
 
+#if defined(__SANITIZE_ADDRESS__)
+#include <sanitizer/asan_interface.h>
+#endif
+
 #include "fatal.h"
 #include "ring.h"
 #include "wire.h"
+
+/*
+ * A provided buffer is the kernel's from the moment it is given back until its
+ * next completion, and the engine parses buffers where the kernel put them
+ * (wire.h): so in the sanitizer presets a buffer is poisoned for as long as it
+ * is the kernel's, and a read of one after it went back - or past what the
+ * kernel wrote - is a report, not a rare corruption (the third adversarial read
+ * of v0.2 step 4, S2). The kernel's own writes are not instrumented.
+ */
+#if defined(__SANITIZE_ADDRESS__)
+#define KERNEL_OWNS(p, n) ASAN_POISON_MEMORY_REGION((p), (n))
+#define ENGINE_OWNS(p, n) ASAN_UNPOISON_MEMORY_REGION((p), (n))
+#else
+#define KERNEL_OWNS(p, n) ((void)(p), (void)(n))
+#define ENGINE_OWNS(p, n) ((void)(p), (void)(n))
+#endif
 
 /* What a completion is for, in its user data's low byte; the wire's slot is
  * the rest (0 for the futex wait, which is the ring's, not a wire's). */
@@ -66,6 +86,7 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
     if (!r->buffer_memory || !r->next || !r->filled || !r->readable)
         osoe_fatal("out of memory for %u receive buffers of %u bytes", buffer_count,
                    buffer_bytes);
+    KERNEL_OWNS(r->buffer_memory, (size_t)buffer_count * buffer_bytes);
     for (uint32_t i = 0; i < buffer_count; i++)
         io_uring_buf_ring_add(r->buffer_ring, r->buffer_memory + (size_t)i * buffer_bytes,
                               buffer_bytes, (unsigned short)i,
@@ -113,6 +134,7 @@ void osoe_ring_submit(struct osoe_ring *r)
 
 void osoe_ring_recycle(struct osoe_ring *r, uint32_t buffer)
 {
+    KERNEL_OWNS(r->buffer_memory + (size_t)buffer * r->buffer_bytes, r->buffer_bytes);
     io_uring_buf_ring_add(r->buffer_ring, r->buffer_memory + (size_t)buffer * r->buffer_bytes,
                           r->buffer_bytes, (unsigned short)buffer,
                           io_uring_buf_ring_mask(r->buffer_count), 0);
@@ -129,6 +151,7 @@ static void received(struct osoe_ring *r, struct osoe_wire *w, const struct io_u
 {
     if (cqe->res > 0 && (cqe->flags & IORING_CQE_F_BUFFER)) {
         uint32_t buffer = cqe->flags >> IORING_CQE_BUFFER_SHIFT;
+        ENGINE_OWNS(r->buffer_memory + (size_t)buffer * r->buffer_bytes, (size_t)cqe->res);
         r->filled[buffer] = (uint32_t)cqe->res;
         r->next[buffer] = OSOE_RING_NONE;
         if (w->first == OSOE_RING_NONE)
@@ -273,6 +296,7 @@ void osoe_ring_close(struct osoe_ring *r)
         return;
     io_uring_free_buf_ring(&r->uring, r->buffer_ring, r->buffer_count, 0);
     io_uring_queue_exit(&r->uring);
+    ENGINE_OWNS(r->buffer_memory, (size_t)r->buffer_count * r->buffer_bytes);
     free(r->buffer_memory);
     free(r->next);
     free(r->filled);

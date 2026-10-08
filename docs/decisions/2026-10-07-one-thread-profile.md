@@ -16,6 +16,14 @@ author before Part 1" - in a form it did not foresee: not the library's work but
 its protocol's waits. One question for the author, below; the rungs that do not
 depend on it carry on.
 
+**On 2026-10-08** the profile was run again at the tip, `49c62d3`, after the
+first three rungs had merged: the receiving lead's agent is now CPU-bound, and a
+quarter of its time was a copy the design never asked for. The fourth rung,
+parsing in place, removes it; the task-run flags, registered files and the
+provided buffers' size were each measured and none helps. A fourth question for
+the author: a blocking get goes a piece at a time ("2026-10-08: the profile at
+the tip" and after).
+
 ## What was measured
 
 The VM `osoe` (Debian 13, Linux 6.12.95, 4 vCPUs, nothing else running in it, the
@@ -413,11 +421,244 @@ nothing fatal; the properties held but for the letter of one. What was done:
   `OSOE_WIRE_*` is) and **N8** (the `/dev/shm` check asks twice as much for the
   connection area, 250 MiB at 500 nodes, which the README states) stand.
 
-## What goes on meanwhile
+## 2026-10-08: the profile at the tip
 
-The rungs that do not depend on the answer, each measured against the one below
-it: `COOP_TASKRUN` and `DEFER_TASKRUN` (the receiver's 11% in the signal path),
-registered files, the provided buffers' count and size, and the receive's
-scratch copy - half of the receiver's `memcpy`, avoidable for a message that
-lies whole in one provided buffer. The zero-copy send last, behind its setting
-(`2026-10-07.md` item 7).
+The first profile's harness (`profile.sh`, `classify.py`), run again at `main`
+`49c62d3` - the three rungs merged - in the same VM with nothing else running
+(`docs/design/evidence/v0.2-step4/2026-10-08-tip-profile/`, the `tip-*` files):
+
+| | The first profile, `3ee3357` | The tip, `49c62d3` |
+|---|---|---|
+| The 64 KiB put stream, nothing attached | 2,955 MiB/s | 8,865 |
+| The 1 MiB put stream, profiled | 2,823 | 9,944 |
+| The bare io_uring stream | 17,003 | 16,997 |
+| The writer, busy | 25% | 32% |
+| The sending lead's agent | 55% | 74% |
+| The receiving lead's agent | 36% | 98% (99% at 1 MiB) |
+| The VM, idle | 68 to 73% | 49% |
+| Puts that waited for room | 91% | 23% |
+| The mailbox | 134,500 a second, each agent 34% | 133,039, each agent 34% |
+
+1. **The receiving lead's agent is CPU-bound**: 98 to 99% of a CPU over the
+   5 s windows, where the first profile found no thread above 56%. The rungs
+   took the turnover's waits away; what is left on the receiving side is work.
+2. **Its time**, with libc's `memcpy` named by the library function above it
+   (this VM's libc has no symbols, and `classify.py` now says which library
+   function called into it): the receive's copy into the scratch chunk 26 to 28%, the
+   apply's copy into the heap 18 to 20%, the kernel's copy into the provided
+   buffers 32%, the TCP stack 16 to 17%, the ring 2%, the library's own code 1
+   to 1.4%.
+3. **The sending agent's**: the TCP stack 47 to 48% (over loopback the
+   receiving side's softirq runs on the sender), the send's copy 32%, waking
+   threads 10% (`try_to_wake_up`), the library 2%, the ring 1%.
+4. **The brief's stop-and-ask** - the library's own work, not the kernel's
+   copies, the larger share - stood at about even on the receiving side: the
+   library's two copies and its code 46 to 49%, the kernel 51 to 54%. One of
+   the two copies is avoidable, and the fourth rung below removes it; after it
+   the kernel's share is 70 to 71% and the library's 29 to 30%, most of that
+   the one copy no TCP receive avoids, into the destination. So nothing goes
+   to the author on that count.
+
+**What it says.** Over loopback the one thread is now what limits one stream,
+on the receiving side. Helpers do not move it: one peer's stream stays on one
+owner. They count where a node receives from several peers at once, which two
+nodes over loopback cannot show and Part 4 measures.
+
+## What was built: the fourth rung, parsing in place
+
+Built on the profile alone, since design §3.3 already says that payload bytes
+are copied straight from the provided buffers to their destination: the
+scratch chunk was the implementation's, never the design's. Commit `a4d88e3` on
+the branch `receive-in-place`.
+
+- **The C.** `osoe_wire_peek` shows the unread part of the oldest provided
+  buffer queued on a wire, where the kernel put it - all of it, or a prefix when
+  `OSOE_WIRE_SPLIT` says so - and `osoe_wire_consume` gives it back, recycling
+  the buffer the moment it is emptied, as `osoe_wire_recv` did after its copy.
+  The pass parses each span in place. `am.h` now states the contract this leans
+  on: nothing points into the parser's input once it returns - header bytes go
+  to its accumulator, payload to its destination, and the sink is handed those.
+  The scratch chunk is gone from the engine, its init and the AM state.
+- **The tests.** `shmem.wire` and `shmem.wire-pair` check every byte where it
+  arrived, a short receive being a peek that showed less than its buffer holds;
+  the 82 tests of the receive path - the static checks, the parser and its
+  malformed segments, the connection, the wires, the barrier and the engine,
+  `shmem.internode.*` and `shmem.multinode.*` through small buffers under
+  `OSOE_WIRE_SPLIT`, the unsent limits, the floor - pass in debug.
+- **The measurement**, alternating with the tip, three rounds
+  (`receive-in-place-against-tip.txt`):
+
+| | The tip | Parsing in place |
+|---|---|---|
+| The 64 KiB put stream | 9,709-9,927 MiB/s | 10,682-10,847 |
+| The 1 MiB put stream | 9,740-9,882 | 9,668-9,732 |
+| `shmem.floor`'s stream ratio, the median of seven pairs | 0.59-0.69 | 0.73-0.75 |
+| ... the library, and the bare stream beside it | 8,469-10,091, 14,490-15,282 | 10,995-11,168, 14,257-15,357 |
+| The mailbox | 137,505-137,721 a second | 134,625-138,579 |
+
+  The 1 MiB stream does not move. Its apply writes a megabyte of the heap a
+  put, which leaves the cache, where a 64 KiB window stays in it: the copy that
+  remains costs more there, and the copy removed was not what held it.
+- **Profiled after** (`receive-in-place-*`): the receiving agent 93% busy (89%
+  at 1 MiB), the sending one 81% (80%). The receiver's time: the kernel's copy
+  37%, the apply's `memcpy` 25%, the stack 20%, `do_signal` 13% - io_uring's
+  task work interrupting the thread - the library 2.5%, the ring 2%.
+
+## The third adversarial read
+
+A fresh agent read the fourth rung at `a4d88e3` against eight properties - every
+byte parsed once and in order, across buffer edges, splits and the stream's
+end; no buffer given back while anything can read it, and none held across a
+reap; the parser's new contract; the kernel never writing a buffer the engine
+reads; the consume's fatal; the tests; stale references; the performance claim
+- and archived its report as
+`docs/reviews/archive/v0.2-step4-part0-third-adversarial-read.md`. Verdict:
+nothing that loses, repeats, reorders or corrupts a byte; every callback the
+parser's sink reaches read, none able to reap, recycle or re-enter the pass; the
+kernel cannot select a buffer between its completion and its recycle, and the
+buffer ring's release store orders the parse before the kernel's next write.
+What was done with each finding:
+
+- **S1, the consume checked the buffer, not the peek** (should-fix): under
+  `OSOE_WIRE_SPLIT` a consume of the buffer's remainder after a shortened peek
+  would have skipped bytes the parse never saw, or quietly defeated the
+  injection. The wire records what the last peek showed, and a consume past it,
+  or a second consume of one peek, is fatal.
+- **S2, nothing checked that a buffer is not read once given back**
+  (should-fix): the rule this change introduces was held by two adjacent lines.
+  The sanitizer presets now poison a provided buffer for as long as it is the
+  kernel's - given at open and at every recycle, taken back at its completion
+  for the bytes the kernel wrote - so a read after a recycle, or past what
+  arrived, is an ASan report; and `shmem.am`'s parser test feeds every cut from
+  a copy that is overwritten as soon as the parse returns.
+- **N1, three documents still described the copy**: design §3.3, `wire.h`'s
+  head and the helpers proposal's per-owner scratch, which Part 1 builds from,
+  are amended.
+- **N2, the classifier could not show the 27%**: on a libc without symbols
+  every library copy fell in "user other". `classify.py` in the step's 2026-10-08
+  evidence names a libc leaf by the library function under it, and the
+  classifications there are made with it.
+- **N3, what the measurement does not cover**: measured in "Four more
+  measurements" below.
+- **N4**: an empty peek sets its pointer to NULL; a stale comment in
+  `test-wire.c`; and a seed no longer gives the same receive splits as before,
+  since a split is now decided per peek over one buffer's remainder rather than
+  per receive over a chunk - no committed seed is a recorded failure, so no
+  regression case is lost.
+
+## Four more measurements
+
+The read's N3, on the final tree (`a779bac`) against the tip, alternating
+(`receive-in-place-extra-measurements.txt`, `rung-extra.sh`), with the
+receiving ring's counters over 5 s of each run:
+
+- **The 1 MiB stream, eight more pairs**: 9,989 to 10,427 MiB/s against 8,817 to
+  9,862 - faster in all eight, where the first three pairs had leaned 0.1 to 2%
+  the other way. Not slower, then; the tip's spread is the wider.
+- **The ring's counters**: parsing in place leaves the ring dry less often, not
+  more - at 64 KiB puts 29,000 to 30,000 `-ENOBUFS` in 5 s against 41,000 to
+  46,000 at the tip, about 550 a GiB against 960, and at 1 MiB puts 17,000 to
+  22,000 against 39,000 to 46,000. The read's mechanism - a buffer held through
+  its own apply returning later - is outweighed by passes twice as frequent
+  (132,000 to 144,000 in 5 s against 52,000 to 66,000).
+- **Small provided buffers** (`OSOE_WIRE_BYTES` 1 KiB x 1,024 and 4 KiB x 256,
+  1 MiB either way): both builds at about half the default's rate, 4,957 to
+  7,993 MiB/s, the two within each other's spread. A peek, a parse and a
+  consume a buffer cost nothing a completion a kilobyte does not already.
+- **A stream of 64-byte puts**: 959 to 1,004 MiB/s - 15.7 to 16.4 million
+  messages a second applied - against 857 to 1,138; no cost a message.
+
+## Measured and not taken: the task-run flags, registered files, the provided buffers
+
+Each in an experiment build on the fourth rung's tree, its choice made by an
+environment variable so that one build alternates them, three rounds or two
+(`taskrun-flags.txt`, `registered-files.txt`, `provided-buffers-*.txt`). None
+is merged.
+
+- **`COOP_TASKRUN` and `DEFER_TASKRUN`**, each with `TASKRUN_FLAG` so that the
+  reap's submit enters the kernel whenever task work waits, and both together:
+  each costs the 64 KiB stream 5% - none 10,952 to 10,984 MiB/s,
+  `COOP_TASKRUN` 10,327 to 10,440, `DEFER_TASKRUN` 10,299 to 10,535, both
+  10,326 to 10,478 - and moves neither the mailbox nor the round trips of a
+  get, a put and quiet or a fetch-add (54 to 55 µs). Under `DEFER_TASKRUN`
+  both agents do less - the receiver 81% busy where it was 93%, its `do_signal`
+  gone, the sender 75% - and the stream is slower all the same: the time went
+  to waiting, not to a CPU. Deferred, the kernel's copy of what arrived runs
+  only when the agent next enters the ring, at its pass's reap; run as it
+  arrives, it overlaps the agent's parse. Part 4 measures the flags again on a
+  fast link, where a receiver bound by the kernel's copies may weigh them
+  otherwise.
+- **Registered files** (`io_uring_register_files`, `IOSQE_FIXED_FILE` on every
+  receive and send): 10,799 to 11,000 MiB/s against 10,919 to 10,982, the
+  mailbox 136,968 to 137,474 against 135,315 to 137,500 - the file lookup it
+  saves was 0.2 to 0.3% of either agent. A registered socket also outlives its
+  `close` until the ring is torn down, which the close's ordering would have to
+  answer for nothing measurable.
+- **The provided buffers' size and count** (`OSOE_WIRE_BYTES`,
+  `OSOE_WIRE_BUFFERS`, settings already), the 64 KiB stream:
+
+| Size x count | MiB/s | Buffers filled in 5 s | `-ENOBUFS` in 5 s |
+|---|---|---|---|
+| 16 KiB x 64, the default | 10,883-10,938 | 3.52 million | 31,000-33,000 |
+| 16 KiB x 256 | 10,902-11,023 | 3.53-3.56 million | 5,100-5,700 |
+| 64 KiB x 16 | 10,553-10,626 | 0.95 million | 20,000-23,000 |
+| 64 KiB x 64 | 9,982-10,890 | 0.89-1.01 million | 540-2,400 |
+| 256 KiB x 4 | 10,438-10,636 | 0.41-0.42 million | 72,000-74,000 |
+| 256 KiB x 16 | 10,432-10,842 | 0.53-0.60 million | 5,700-6,800 |
+
+  With 1 MiB puts, two rounds: the default 9,954 to 10,140 MiB/s, 64 KiB x 16
+  9,561 to 9,615, 64 KiB x 64 9,983 to 10,095, 256 KiB x 4 10,188 to 10,219.
+  A completion fewer, by four or eight, buys nothing: the receiving agent's
+  time is the copies and the stack, not the ring (2%). More buffers take the
+  re-arms after `-ENOBUFS` from 1% of receives to 0.15%, and the stream does not
+  notice. The default stays, 1 MiB a node.
+
+## Question 4: a blocking get, a piece at a time
+
+**What the profile's round trips showed.** `osoe-bench latency` over loopback,
+on the fourth rung's tree: a put and quiet and a get agree up to 32 KiB (55 to
+62 µs), and then part - at 256 KiB the get takes 337 µs against 90, at 1 MiB
+1,135 against 158, seven times. On the Pi the same gap is in every release
+table, unexplained: a 1 MiB get 11.2 to 11.5 ms against a put's 9.0 to 9.1
+(`docs/pi-cluster-results.md`, "the get gap of the first session").
+
+**Why.** `remote_get` (`transport-internode.c`) asks for a piece of at most a
+chunk's payload - 64 KiB less a reply's header, so seventeen pieces to a
+megabyte - and waits for it to land before it asks for the next: its thread's
+slot holds one token. A put's parts stream behind one another and its quiet
+waits once; a get waits seventeen times. Seventeen of the Pi's 150 µs round
+trips are its 2.4 ms. A nonblocking get's pieces already go out together, as
+far as the landing zone's extents and the connection's credits allow.
+
+- (a) **A blocking get issues its pieces as a nonblocking get does** - each with
+  extents and a record of its own, as many as the zone and the credits allow -
+  and then waits until every one has landed, copying each out as it lands:
+  about one round trip and the bytes' time, the Pi's 1 MiB get toward its put's
+  9.1 ms, a fast link's toward its stream. What it changes: the blocking slot's
+  one token becomes the nonblocking path's per-piece records,
+  `landing_extent_model.py` and `get_completion_model.py` take a blocking get
+  of several pieces in flight, and a blocking get then shares the zone with the
+  PE's nonblocking gets, as they already share it with one another.
+- (b) **Leave it**, the README stating it: between nodes a blocking get of more
+  than a chunk takes a round trip a chunk, and a program that wants them to
+  overlap writes `shmem_get_nbi` and `shmem_quiet`.
+
+**Recommendation: (a)**, built after Part 0's last rung and before Part 1, its
+models first: a get is half of RMA, and a seventh of a put's speed over
+loopback is the largest gap the ladder has met that is the library's own
+protocol. (b) until then, the README saying so. *Undo:* the blocking get one
+piece at a time again.
+
+## The fourth rung's verification
+
+At `a779bac`, the read's fixes in: the four presets with the floor pins on -
+debug 828, release 828, asan 813, tsan 576, every test passing; tier 3, 113;
+`osoe-pacer` mailbox and collectives a minute each and mix ten minutes, no
+failure; the models whole, 34; the SOS suite at 4 x 2, 161 built and passing on
+every map, its two extensions failing as at the tag. Merged into `main`.
+
+## What goes on now
+
+The fourth rung is on `main`. Then the ladder's last rung, the zero-copy send behind a setting off by
+default (`2026-10-07.md` item 7), modelled first; then the ladder's result in
+the README, in place of "two thirds"; then Part 1.

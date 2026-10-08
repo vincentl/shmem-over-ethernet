@@ -276,8 +276,6 @@ struct osoe_progress {
     struct osoe_progress_connection *connection;/* one per peer, by peer slot */
     struct osoe_reply_pool pool;
     struct osoe_reply *descriptors;
-    unsigned char *scratch;                     /* receive staging */
-    uint32_t scratch_bytes;
     uint32_t node, nodes;
     struct osoe_progress_host host;
 
@@ -330,13 +328,11 @@ struct osoe_progress {
 /*
  * Set up for a node of `nodes` logical nodes. `wires` is one wire per peer in
  * peer-slot order, all carried by `ring`; `descriptors` the node-wide pool
- * backing every connection's queues (§3.8), and `scratch` a staging buffer at
- * least one AM chunk long.
+ * backing every connection's queues (§3.8).
  */
 void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *area,
                         struct osoe_wire *wires, struct osoe_ring *ring,
                         struct osoe_reply *descriptors, uint32_t descriptor_count,
-                        unsigned char *scratch, uint32_t scratch_bytes,
                         const struct osoe_progress_host *host);
 
 /*

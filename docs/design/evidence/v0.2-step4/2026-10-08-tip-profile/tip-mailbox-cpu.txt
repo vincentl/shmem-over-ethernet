@@ -1,0 +1,14 @@
+
+ Performance counter stats for process id '517484,517485,517486,517487':
+
+      osoe-pacer-517484              623.61 msec task-clock                       #    0.125 CPUs utilized             
+      osoe-agent-517488             1702.55 msec task-clock                       #    0.340 CPUs utilized             
+      osoe-pacer-517485              610.50 msec task-clock                       #    0.122 CPUs utilized             
+      osoe-agent-517491                0.18 msec task-clock                       #    0.000 CPUs utilized             
+      osoe-pacer-517486              614.08 msec task-clock                       #    0.123 CPUs utilized             
+      osoe-agent-517489             1673.55 msec task-clock                       #    0.335 CPUs utilized             
+      osoe-pacer-517487              557.70 msec task-clock                       #    0.112 CPUs utilized             
+      osoe-agent-517490                0.21 msec task-clock                       #    0.000 CPUs utilized             
+
+       5.000783093 seconds time elapsed
+

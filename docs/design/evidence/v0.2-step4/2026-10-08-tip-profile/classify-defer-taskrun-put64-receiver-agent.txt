@@ -1,0 +1,61 @@
+# classify.py over defer-taskrun's put64 samples: the receiving lead's agent (tid 540944)
+kernel copy       38.8%
+library copy      30.2%
+kernel network    22.0%
+library            3.3%
+io_uring           2.4%
+kernel other       1.8%
+user other         1.6%
+
+== kernel copy
+    38.1%  __arch_copy_to_user
+     0.7%  _copy_to_iter
+     0.1%  simple_copy_to_iter
+== library copy
+    30.1%  libc <- osoe_am_parse
+     0.1%  memcpy@plt <- osoe_am_parse
+== kernel network
+     4.1%  arch_counter_get_cntvct
+     1.8%  __skb_datagram_iter
+     0.8%  __local_bh_enable_ip
+     0.6%  tcp_recvmsg_locked
+     0.6%  mem_cgroup_uncharge_skmem
+     0.5%  __check_object_size
+     0.5%  queued_spin_lock_slowpath
+     0.5%  tcp_v4_rcv
+== library
+     1.3%  osoe_am_parse (under osoe_am_parse)
+     0.5%  osoe_wire_peek (under osoe_wire_peek)
+     0.3%  resolve (under osoe_am_parse)
+     0.2%  osoe_ring_recycle (under receive)
+     0.2%  osoe_ring_reap (under osoe_progress_poll)
+     0.1%  osoe_transport_notify (under osoe_am_parse)
+     0.1%  agent_main (under agent_main)
+     0.1%  complete (under osoe_am_parse)
+== io_uring
+     0.4%  io_recv
+     0.3%  __io_put_kbufs
+     0.2%  io_recv_finish
+     0.2%  io_buffer_select
+     0.2%  io_issue_sqe
+     0.2%  __io_run_local_work
+     0.1%  io_req_post_cqe
+     0.1%  xa_load
+== kernel other
+     0.9%  el0_svc
+     0.3%  invoke_syscall
+     0.2%  fget
+     0.1%  get_random_u16
+     0.1%  __arm64_sys_io_uring_enter
+     0.0%  memset
+     0.0%  syscall_trace_exit
+     0.0%  hrtimer_start_range_ns
+== user other
+     0.5%  [unknown] [liburing.so.2.9]
+     0.2%  __kernel_clock_gettime [[vdso]]
+     0.2%  received [inlined]
+     0.1%  mark [inlined]
+     0.1%  [unknown] [ld-linux-aarch64.so.1]
+     0.1%  busy [inlined]
+     0.1%  truncate_to [inlined]
+     0.0%  publish_ring [inlined]
