@@ -5,7 +5,8 @@ The first item of v0.2's fourth step, on `docs/prompts/v0.2-step4-progress-helpe
 later claim of the step refers to, and the first measurements of the ladder.
 
 **Where it stands.** Measured on the branch `one-thread-ladder`, from `main` at
-`3ee3357`; nothing in the library changed. The profile finds that over loopback
+`3ee3357`. The author answered the question below the same evening, and the
+first rung - a put fills the room - is built on the branch, "What was built". The profile finds that over loopback
 the one thread is not what holds a stream back: the connection buffer's turnover
 is. That is the brief's stop-and-ask - "the ladder's profile showing the
 library's own work, not the kernel's copies, as the larger share: put it to the
@@ -120,6 +121,52 @@ choosing a default.** (a) costs no memory, and is the design's own intent: a
 buffer of twice the chunk was meant to carry two. The buffer's default is a
 choice of memory at scale against speed on one link, better taken with (a)'s
 numbers in hand. *Undo:* reservations whole again, the patch's one call.
+
+## What was built: the first rung, filling the room
+
+On the author's answer (`2026-10-07.md` items 9 and 10), commit `14cdbaa` and the
+record's own:
+
+- **The model first.** `reservation_model.py` gains messages of several units, a
+  writer whose part takes as much of its message as the room after the head it
+  loaded holds - at least `least` units, or the whole remainder when that is
+  less - with the CAS comparing that same head, and a put followed by its
+  signal's fenced rmw as the writer's next message. Its properties are the
+  model's own: ORDER (one writer's units in the order it issued them, which is
+  what fence and the signal rest on), ONCE, TORN, SEQ, QUIET, SEGSEQ and
+  liveness, and OVERFLOW (a reservation never ends past its buffer). Thirteen
+  cases hold - one to three writers, messages of one to three units, buffers of
+  two and three, the floor at one and two units, beside the pre-open drain's
+  reply and under x86-TSO, up to 277,430 states - and three breakages fail: the
+  length taken from one load of the head and the CAS from another (OVERFLOW),
+  a part that does not advance the writer's position (ONCE), and a floor not
+  lowered for a remainder shorter than it (STUCK). The model's 15 earlier cases
+  and 14 earlier breakages are unchanged.
+- **The C.** `osoe_connection_reserve_up_to(connection, most, least, r)`, with
+  `osoe_connection_reserve` its case `least == most`, one CAS loop; the put's
+  part cut to what it took, down to a sixteenth of its largest part - 4 KiB at
+  the default chunk, 62 bytes at the tests' 1 KiB chunk, so that their tiny
+  buffers cut puts too. The kernel's side does not change: one send in flight a
+  wire, a short send offered again from its byte, the peer's parse across
+  provided buffers; `shmem.internode.*` and `shmem.multinode.*` run every put
+  through 2 KiB buffers with `OSOE_WIRE_SPLIT` cutting a fifth of the sends and
+  receives at random bytes.
+- **The tests.** `shmem.connection.fill` runs the C under four writer threads
+  sending 1,200 messages of 1 byte to 2 KiB through 1 KiB buffers, beside a
+  progress thread that seals, sends, opens and drains replies, against WHOLE,
+  ORDER, STALESEQ, FLOOR, FILL (a cut part ends its buffer), BYTES and ACCT;
+  `test-internode.c` signals a put of 5,000 bytes, cut in parts, and checks
+  every byte has landed when the signal has. Five mutants, each caught by the
+  suite's own tests (`mutants.txt`): the header not cut with its part (17
+  failing), the payload not cut (17), a stale head (11, `shmem.connection.fill`
+  among them), the floor not lowered (17), the part's payload eight bytes short
+  (17).
+- **The measurement** (release, alternating with the base): the 64 KiB put
+  stream 6,183 to 6,365 MiB/s against 2,974 to 3,014; `shmem.floor`'s stream
+  ratio, the README's "a fifth", 0.43 to 0.45 by the median of each of six runs
+  against 0.18 to 0.20, the library at 6,420 to 6,650 MiB/s and its floor at
+  14,172 to 15,157 over 21 pairs; the median round trips of a get, a put with
+  quiet and a fetch-add unchanged at 55 µs.
 
 ## What goes on meanwhile
 

@@ -268,6 +268,11 @@ tracking. Header overhead is ~32 bytes per 64 KB.
 **SHMEM chunks above AM's advertised maximum payload; AM never fragments
 internally.** AM keeps one invariant: every message fits in a segment.
 
+*Since v0.2 step 4 a put's part may be shorter than a chunk:* it takes the room
+the open buffer has left, down to a sixteenth of a chunk, and the rest goes on in
+the next (§3.5, "A put's part takes the room there is"). Each part is still a
+self-contained AM landing at its own offset.
+
 ### 3.3 io_uring usage
 
 **Sole issuer.** One ring per progress thread, `IORING_SETUP_SINGLE_ISSUER`.
@@ -635,6 +640,25 @@ already moved `head` and must unwind, and the unwind must still account for
 itself in `filled` or the buffer never becomes sendable, while concurrent
 overflowing writers race to seal. The CAS makes a failed reservation a
 non-event.
+
+**A put's part takes the room there is** (v0.2 step 4,
+`docs/decisions/2026-10-07-one-thread-profile.md`). The loop above is
+`osoe_connection_reserve_up_to`'s whole case: given `most` and `least`, a writer
+takes as much of `most` as the room after the head it loaded holds, 8-byte
+aligned, and asks for a seal only when that is under `least`. The length is
+decided from the head the CAS then compares, never from another load, or a
+writer could reserve past the buffer's end. A put asks for its part whole and at
+least a sixteenth of a chunk, cuts its message to what it got, and sends the
+rest as its next part - a successive message of the same writer, as a chunk
+always was, so fence, signal-after-payload and quiet hold unchanged; every other
+message asks for itself whole. Before it a buffer of twice the chunk carried one
+64 KiB message, the headers leaving no room for a second, so a stream waited for
+a turnover every 64 KiB; over loopback it moved a fifth of a bare stream with no
+thread of the job more than 56% busy, and filling the room took it to 0.44.
+`reservation_model.py`'s `fill` cases check it - messages of several units, a
+put's signal after its parts, the pre-open drain, x86-TSO - and three breakages
+fail: a stale head (OVERFLOW), a part that does not advance (ONCE), a floor not
+lowered for a short remainder (STUCK).
 
 **`filled` is a count, not a watermark.** Out-of-order completion means no
 prefix property holds. This is fine: the buffer is sendable when

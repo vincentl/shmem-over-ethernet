@@ -1099,10 +1099,14 @@ specification or takes a choice the specification leaves open.
   is a measurement at 1 Gbit/s - 111 to 112 MiB/s on the Pi cluster, a bare
   stream's own rate - and says nothing above it. No faster link has been
   measured. Over loopback between two nodes of a four-core virtual machine
-  running nothing else, where only the machine limits a stream, the library
-  moved 2.6 to 4.8 GiB/s where a bare io_uring stream between the same two
-  processes moved 8.3 to 15.3 - a fifth of it, by the median of each run
-  (`docs/design/evidence/release-fixes/floor-idle.txt`). The cost per message of
+  running nothing else, the library moved 6.3 to 6.5 GiB/s where a bare
+  io_uring stream between the same two processes moved 13.8 to 14.8 - about two
+  fifths of it, 0.43 to 0.45 by the median of each run
+  (`docs/design/evidence/v0.2-step4/2026-10-07-profile/`). It was a fifth until
+  a put filled the room a connection buffer has left: that stream was held
+  back not by the one thread - none in the job was more than 56% busy - but by
+  the buffer's turnover, one 64 KiB message a buffer
+  (`docs/decisions/2026-10-07-one-thread-profile.md`). The cost per message of
   one thread serving 256 PEs has not been measured on any machine: the Pi
   cluster's nodes run four PEs each, and the stress tester's sixteen-PE mailbox,
   a pipelined point-to-point pattern, with `--cpu-bind=none`, ran at 256,000
@@ -1360,7 +1364,7 @@ moves every message of the node
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split. |
+| `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split, and a put's part is cut shorter, down to a sixteenth of the chunk, where it fills the room a buffer has left. |
 | `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the default, and the least allowed: a smaller value is refused, not raised - up to 1 GiB. |
 | `OSOE_AM_BUFFER_BUDGET` | `268435456` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. The default buffer is the floor, so at the defaults 1,025 nodes fit and 1,026 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |

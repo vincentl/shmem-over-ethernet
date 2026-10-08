@@ -1,0 +1,11 @@
+mutated header_not_cut
+header_not_cut: 37% tests passed, 17 tests failed out of 27 | caught by: shmem.floor shmem.multinode.0-1-2 shmem.multinode.0-0-1-1-2-2 shmem.multinode.0-0-0-1-2-2 shmem.multinode.0-1-2-0-1-0 shmem.multinode.force-remote.0-1-2
+mutated payload_not_cut
+payload_not_cut: 37% tests passed, 17 tests failed out of 27 | caught by: shmem.floor shmem.multinode.0-0-1-1-2-2 shmem.multinode.0-1-2 shmem.multinode.0-0-0-1-2-2 shmem.multinode.force-remote.0-1-2 shmem.multinode.0-1-2-0-1-0
+mutated stale_head
+stale_head: 59% tests passed, 11 tests failed out of 27 | caught by: shmem.connection.fill shmem.multinode.0-0-1-1-2-2 shmem.multinode.0-0-0-1-2-2 shmem.multinode.force-remote.0-1-2 shmem.multinode.force-remote.0-0-0-1-2-2 shmem.multinode.force-remote.0-1-2-0-1-0
+mutated floor_whole
+floor_whole: 37% tests passed, 17 tests failed out of 27 | caught by: shmem.multinode.0-1-2 shmem.multinode.0-0-1-1-2-2 shmem.multinode.0-0-0-1-2-2 shmem.multinode.force-remote.0-1-2 shmem.multinode.0-1-2-0-1-0 shmem.multinode.force-remote.0-0-1-1-2-2
+mutated payload_short
+payload_short: 37% tests passed, 17 tests failed out of 27 | caught by: shmem.floor shmem.multinode.0-0-1-1-2-2 shmem.multinode.0-1-2 shmem.multinode.0-0-0-1-2-2 shmem.multinode.force-remote.0-1-2 shmem.multinode.0-1-2-0-1-0
+DONE
