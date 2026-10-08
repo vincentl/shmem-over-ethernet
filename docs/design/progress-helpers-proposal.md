@@ -334,8 +334,8 @@ helper exists:
    on a fast link: how the fifth divides between kernel copies, the library's
    parse and apply, the ring's submit and reap, and waits.
 2. Provided buffers: count and size against the segment size
-   (`OSOE_AM_CHUNK`, the 64 KiB connection buffer); multishot receive's buffer
-   ring exhaustion counter.
+   (`OSOE_AM_CHUNK`, 64 KiB, and the connection buffer); multishot receive's
+   buffer ring exhaustion counter.
 3. `IORING_SETUP_DEFER_TASKRUN` with `COOP_TASKRUN` (Linux 6.1), so the
    kernel's completion work runs when the owner enters the ring rather than
    by interrupting it; `IORING_SETUP_SINGLE_ISSUER` is already set.
@@ -352,9 +352,10 @@ helper exists:
    peer has acknowledged the bytes, since the kernel keeps them to
    retransmit, not when the NIC is done; the next segment can go after the
    send CQE, so a connection's two buffers cap one peer's stream at about
-   256 KiB a round trip, some 50 Gb/s at 40 µs. Over loopback the kernel
-   copies anyway and adds the notification. The author's answer (§8 item 4)
-   builds it behind a setting, off by default.
+   256 KiB a round trip, some 50 Gb/s at 40 µs (512 KiB and some 100 Gb/s since
+   the default buffer became 256 KiB, `docs/decisions/2026-10-07.md` item 12).
+   Over loopback the kernel copies anyway and adds the notification. The
+   author's answer (§8 item 4) builds it behind a setting, off by default.
 6. The library's own: the parse per message, the apply's memcpy alignment,
    the dirty-word exchange per pass.
 

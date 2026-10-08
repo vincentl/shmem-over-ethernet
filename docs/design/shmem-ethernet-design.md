@@ -155,7 +155,9 @@ pinned. So are the library's ratios to it (§8.4, phase 1 step 3 slice 2;
 trip at most 3× the floor's, measured 1.4–2.2×; a put and quiet and a
 fetch-add at most 1.5× a get, measured 0.98–1.00×, the pin a wait that polls
 fails; and a stream at the default connection buffer at least 0.1× the
-floor's, measured 0.21–0.43×.
+floor's, measured 0.21–0.43×. *Since v0.2 step 4* the default buffer is 256 KiB
+(§3.4) and a put fills the room a buffer has (§3.5): the stream's pin is 0.3×,
+and it measures 0.58–0.67× (§8.4).
 Track all three per commit through the §3.14 counters.
 
 The floor has since run on the target hardware itself (`docs/pi-cluster.md`,
@@ -384,7 +386,8 @@ default, for large segments, so that it is debugged before a fast NIC exists
 and its default decided on one (`docs/decisions/2026-10-07.md` item 7). Over
 TCP the buffer is released by the notification once the peer has acknowledged
 its bytes, so with it on a connection's two buffers cap one peer's stream at
-about 256 KiB a round trip.*
+about 512 KiB a round trip - some 100 Gb/s at 40 µs (256 KiB and some 50 Gb/s
+while the default buffer was 128 KiB; `docs/decisions/2026-10-07.md` item 12).*
 
 *As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
 One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |
@@ -513,8 +516,8 @@ mistake as a second data socket, in a different place.
 | Variable | Default | Meaning |
 |---|---|---|
 | `OSOE_AM_CHUNK` | 64 KiB | §3.2's fragmentation size, and so the largest message on the wire |
-| `OSOE_AM_BUFFER` | `2 × chunk` | Bytes per connection buffer; a power of two, refused below the floor |
-| `OSOE_AM_BUFFER_BUDGET` | 256 MiB | Per-node ceiling on `2 × (nodes − 1) × buffer` |
+| `OSOE_AM_BUFFER` | `4 × chunk` | Bytes per connection buffer, 256 KiB at the default chunk; a power of two, refused below the floor, `2 × chunk` |
+| `OSOE_AM_BUFFER_BUDGET` | 1 GiB | Per-node ceiling on `2 × (nodes − 1) × buffer` |
 | `OSOE_AM_HUGEPAGES` | 0 | Opt in to huge pages for the area - no effect as built: the area is a `/dev/shm` object, on which Linux refuses `MAP_HUGETLB` |
 
 **The floor is the default, because everything except aggregation pushes down.**
@@ -524,22 +527,33 @@ batch under load without needing headroom, since the buffer only has to hold
 what accumulates during one in-flight send. Going above the floor is an opt-in
 for links fast enough that a millisecond of wire time stops mattering.
 
+*Since v0.2 step 4 the default is four chunks, 256 KiB; the floor stays two.*
+With a put filling the room a buffer has (§3.5), a stream over loopback ran 1.4
+to 1.5 times further at 256 KiB than at the floor (8.8 to 10.0 GiB/s against 6.4
+to 6.5); at a gigabit, with the kernel's
+unsent queue capped (§3.3), the larger buffer costs a fetch-add behind a stream
+1.7 ms at the 99th percentile and nothing at the median
+(`docs/decisions/2026-10-07.md` item 12).
+
 **The budget is a guard rail, not a routine mechanism.** At these defaults it is
-not reached until about a thousand nodes, past what §1 targets, so inside the
-supported range the behaviour is a constant buffer size with no heuristic to
-reason about: 3.75 MB per node at 16 nodes, 125 MB at 500. When it is exceeded
-the buffer halves — staying a power of two, which the ring arithmetic needs —
-and keeps the *largest* size that fits; the floor is a limit, not a target. If
-the floor itself does not fit, that is an error naming both knobs, not a silent
-drop below it, because below the floor aggregation fails at the top of the range
-and surfaces as a performance mystery rather than a message.
+not reached until 2,050 nodes, past what §1 targets (the default buffer holds to
+2,049 nodes: 2,048 peers × 2 × 256 KiB is 1 GiB), so inside the supported range
+the behaviour is a constant buffer size with no heuristic to reason about:
+7.5 MB per node at 16 nodes, 250 MB at 500. When it is exceeded (from 2,050
+nodes at the defaults) the buffer halves — staying a power of two, which the
+ring arithmetic needs — and keeps the *largest* size that fits; the floor is a
+limit, not a target. If the floor itself does not fit (4,098 nodes at the
+defaults; 4,097 fit) that is an error naming both knobs, not a silent drop below
+it, because below the floor aggregation fails at the top of the range and
+surfaces as a performance mystery rather than a message.
 
 **The case that actually needs tuning is testing, not production.** §8.1's
 logical node map puts every node on one machine, so the whole-host cost is
-quadratic: 60 MB at 16 logical nodes, about 1 GB at 64, 16 GB at 256. Lowering
-`OSOE_AM_CHUNK` is the knob for it, since it lowers the floor with it — 64
-logical nodes cost about 1 GB at the default chunk and 129 MB at 8 KiB. Tier-2
-tests set the sizes explicitly rather than inheriting the production default.
+quadratic: 120 MB at 16 logical nodes, about 2 GB at 64, 32 GB at 256. Lowering
+`OSOE_AM_CHUNK` is the knob for it, since it lowers the floor and the default
+with it — 64 logical nodes cost about 2 GB at the default chunk and 250 MB at
+8 KiB. Tier-2 tests set the sizes explicitly rather than inheriting the
+production default.
 
 **Huge pages are off by default**, and heaps do not use them either (§6.2).
 Connection buffers are touched sparsely, because a halo exchange faults six
@@ -7617,6 +7631,10 @@ Beside a `ctest -j4`, a get, a fetch-add and a put and quiet each take about
 30 µs. Spinning before the futex would take the idle round trip to 1.14×, and
 §3.11 says why it is not done.
 
+*Since v0.2 step 4* the default is no longer the floor but four chunks, 256 KiB
+(§3.4), and a put fills the room a buffer has (§3.5): the stream runs at
+0.58–0.67× (the note after the pin table, below).
+
 **Pinned** (phase 1 step 3 slice 2, part B; `shmem.floor`, checked in the
 release preset beside `env.echo-uring`). One job of two logical nodes, one PE
 each, times the floor itself: a trivial io_uring echo and stream on a raw TCP
@@ -7667,6 +7685,10 @@ seldom waits, and the poll measured 0.35–0.64× against the word's 0.52–0.69
 inside the noise. A stream pin at a large buffer would not have caught the
 stand-in this slice removed.
 
+*Since v0.2 step 4* the stream is pinned at the default 256 KiB, where a put
+fills the room a buffer has: the pin is 0.3×, the word measuring 0.58–0.67× and
+the poll 0.161–0.164×.
+
 *On a shaped link* (tier 3, §8.2: the same test, one logical node per network
 namespace, 64 MiB streams). There the wire dominates the wakes, as §10's
 assumption says it should:
@@ -7684,6 +7706,10 @@ the wire is nothing, they double the trip. The default buffer's stream, 0.21×
 on loopback, runs at line rate on every shaped link, since a 1 Gbit/s link
 takes a millisecond to carry one 128 KiB buffer and a turnover's wake is far
 shorter.
+
+*Since v0.2 step 4* the default buffer is 256 KiB, four chunks (§3.4), which a
+gigabit takes about two milliseconds to carry, and the loopback stream is
+0.58–0.67×; the rows above were measured at 128 KiB.
 
 ### 8.5 Development environment
 
@@ -7981,7 +8007,7 @@ Recorded rather than deleted, so they are not reopened from memory.
 | `osoe_transport_put_word` | **Rejected.** `shmem_p` is the hottest pattern in the corpus, but here the backend branches on `len` and the caller spills a value it usually has in a register: single-digit nanoseconds, visible only in a microbenchmark of the boundary itself |
 | Should the `/dev/shm` capacity check (§6.2) warn rather than refuse, since heaps are demand-paged? | **No: it refuses.** `OSOE_SHM_CAPACITY_CHECK=0` makes it a report, for testing on a small `/dev/shm` (2026-09-21). |
 | Authenticating the step-3 handshake | **An optional `OSOE_JOB_SECRET`, proved and never sent** (§6.2; phase 1 step 3 slice 1). The open item: the handshake carried only the job and step ids, which are sequential and public (`squeue`), and the port is a hash of them, so any host that could reach it could join as a node and then read and write every heap by design; the second review's portability F2 proposed a wrapper setting `OSOE_JOB_SECRET=$(head -c16 /dev/urandom \| xxd -p)` before `srun`, which Slurm propagates, and the handshake carrying it. Built so, except that the secret is *proved* rather than carried: a SipHash-2-4 digest over the hello and a fresh nonce from each end, so neither an eavesdropper nor a listener the caller reached by mistake learns it, and a proof replays nowhere. Unset, nothing changes; set on some nodes and not others, the job ends naming both. It authenticates the hello, not the traffic after it |
-| Pin the §1 floor ratios | **Pinned** (phase 1 step 3 slice 2; §8.4, `shmem.floor`). Only once quiet and a full buffer stopped polling, since until then two of the three ratios measured step 2's stand-in. Three pins, each the median of seven side-by-side pairs: a get's, a fetch-add's and a put and quiet's fastest trip within 3× the floor's; a put and quiet and a fetch-add within 1.5× a get; a stream at the default buffer at least 0.1× the floor's. Checked by putting the stand-in back, which the second and third fail and the first cannot see |
+| Pin the §1 floor ratios | **Pinned** (phase 1 step 3 slice 2; §8.4, `shmem.floor`). Only once quiet and a full buffer stopped polling, since until then two of the three ratios measured step 2's stand-in. Three pins, each the median of seven side-by-side pairs: a get's, a fetch-add's and a put and quiet's fastest trip within 3× the floor's; a put and quiet and a fetch-add within 1.5× a get; a stream at the default buffer at least 0.1× the floor's. Checked by putting the stand-in back, which the second and third fail and the first cannot see. *Since v0.2 step 4 the stream's pin is 0.3× (§8.4).* |
 | What orders fence and quiet, where a `seq_cst` store to a thread-local word was the answer? | **Derived from the C11 model:** a release fence for fence (W→W), a `seq_cst` fence for quiet and the barriers (W→R), and `seq_cst` on both loads of a two-sided protocol. Measured, the old store did not order quiet's W→R on aarch64, and an acquire load built as `ldapr` lost wakes (§3.16, §4.6; 2026-09-21). |
 
 ### Still open — blocking

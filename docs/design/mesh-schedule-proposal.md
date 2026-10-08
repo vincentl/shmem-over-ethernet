@@ -102,6 +102,8 @@ eager"), which rewrite the same loop.
 **Beside the schedule, at a thousand nodes.** A node with more than 1,024
 neighbours on one Ethernet segment outgrows Linux's default neighbour table
 (`net.ipv4.neigh.default.gc_thresh3`, 1,024 on the Pi cluster) and then resolves
-peers' addresses again and again, whatever the schedule. That is at the default
-connection budget's ceiling of 1,025 nodes. It is an administrator's setting, and
-the README's limits name it.
+peers' addresses again and again, whatever the schedule. That is a job of more
+than 1,025 nodes, where the default connection budget used to end it; since
+v0.2 step 4 the budget's ceiling is 4,097 nodes (2,049 before the buffers
+halve), so the neighbour table is met first. It is an administrator's setting,
+and the README's limits name it.

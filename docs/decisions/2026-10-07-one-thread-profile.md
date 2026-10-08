@@ -155,7 +155,9 @@ rewritten either way. *Undo:* no cap, today's.
 
 On top of filling, 256 KiB buffers carry a loopback stream 1.75 times further
 (about 10 GiB/s, 0.6 of the bare stream) and change nothing at a gigabit, where
-the link is the limit. Their cost: twice the connection area (the author: fine
+the link is the limit. (*Corrected:* measured beside the spare, which cost the
+128 KiB stream 11%; against filling alone, 1.4 to 1.5 times -
+`tip-against-first-rung.txt`.) Their cost: twice the connection area (the author: fine
 at 500 nodes) and, with the kernel's queue capped, 1.7 ms at the 99th percentile
 of a fetch-add behind a stream on the Pi, not at its median.
 
@@ -301,7 +303,9 @@ measured on `f643837` with the spare; `ab-spare-zero.txt` shows the spare's own
 
 - **Deeper buffers**: 128 KiB 5,555 to 5,743 MiB/s; 256 KiB 9,992 to 10,070;
   512 KiB 8,870 to 9,934; 1 MiB 10,196 to 10,445. On top of filling, 256 KiB is
-  1.75 times the default, and the rest a plateau near 0.6 of the bare stream.
+  1.75 times the default, and the rest a plateau near 0.6 of the bare stream -
+  beside the spare; against filling alone, 1.4 to 1.5 times
+  (`tip-against-first-rung.txt`: 8.8 to 10.0 GiB/s against 6.4 to 6.5).
 - **The kernel's unsent queue capped**: uncapped 5,760 to 5,862; at 16 KiB
   5,762 to 6,357; at 128 KiB 5,752 to 5,934 - the cap costs a loopback stream
   nothing.

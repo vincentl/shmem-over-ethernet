@@ -23,7 +23,7 @@
  * message the wire ever carries. The buffer's floor is twice that, §3.4's, and
  * its default four times, 256 KiB (v0.2 step 4; docs/decisions/2026-10-07.md
  * item 12): with a put filling the room a buffer has (§3.5), a stream over
- * loopback ran 1.75 times further at 256 KiB than at the floor, and at a
+ * loopback ran 1.4 to 1.5 times further at 256 KiB than at the floor, and at a
  * gigabit, where the link is the limit, it costs a small message behind a
  * stream 1.7 ms at the 99th percentile and nothing at the median - §3.2's
  * head-of-line bound, two segments, being in bytes twice the floor's, beside
