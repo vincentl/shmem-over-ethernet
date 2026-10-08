@@ -829,14 +829,14 @@ if(OSOE_INTERNODE)
   # It refuses at once, by name, and the job ends: the other PE of its node by the
   # node's abort, and the PEs of the other node as the lead they wait for ends.
   osoe_refusal_test(shmem.start-up.am-buffer.differs 4 0
-    LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=262144
+    LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=524288
     PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 is [0-9]+ bytes, as the local lead's OSOE_AM_[*] settings made it; this PE's make it [0-9]+: every PE of a job must set OSOE_AM_[*] the same"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   # And the lead's the larger: the object is whole before the PE looks, and its
   # header says what it was made with.
   osoe_refusal_test(shmem.start-up.am-buffer.lead-larger 4 0
-    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=262144
-    PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 262144 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
+    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=524288
+    PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 524288 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   osoe_internode_label(shmem.start-up.am-buffer.differs shmem.start-up.am-buffer.lead-larger)
 endif()

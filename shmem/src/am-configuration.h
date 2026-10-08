@@ -20,24 +20,27 @@
  * Defaults (§3.2, §3.4).
  *
  * The chunk is §3.2's application-level fragmentation size, and so the largest
- * message the wire ever carries. The buffer default is §3.4's floor of twice
- * that, and the floor is the right default because everything else pushes
- * *down*: §3.2 bounds head-of-line blocking at roughly two segments, which on
- * 1 GbE is about 2 ms at this size and doubles with the buffer, while §3.9's
- * self-clocking already grows the batch under load without needing headroom -
- * the buffer only has to hold what accumulates during one in-flight send.
- * Going above the floor is an opt-in for links fast enough that a millisecond
- * of wire time stops mattering.
+ * message the wire ever carries. The buffer's floor is twice that, §3.4's, and
+ * its default four times, 256 KiB (v0.2 step 4; docs/decisions/2026-10-07.md
+ * item 12): with a put filling the room a buffer has (§3.5), a stream over
+ * loopback ran 1.75 times further at 256 KiB than at the floor, and at a
+ * gigabit, where the link is the limit, it costs a small message behind a
+ * stream 1.7 ms at the 99th percentile and nothing at the median - §3.2's
+ * head-of-line bound, two segments, being in bytes twice the floor's, beside
+ * the kernel's unsent queue, which each connection now caps by the link
+ * (wire-settings.h).
  *
- * The budget is a guard rail, not a routine mechanism: at these defaults it is
- * not reached until about a thousand nodes, well past the "hundreds of nodes"
- * §1 targets, so inside the supported range the behaviour is simply "128 KiB
- * buffers, always" with no heuristic to reason about.
+ * The budget is a guard rail, not a routine mechanism: the default buffer holds
+ * to 2,049 nodes, past the "hundreds of nodes" §1 targets; from 2,050 the
+ * buffers are halved to the floor, the lead saying so once, and past 4,097 the
+ * job is refused naming the budget.
  */
 #define OSOE_AM_DEFAULT_CHUNK   (UINT64_C(64) << 10)
 #define OSOE_AM_MIN_CHUNK       (UINT64_C(1) << 10)
 #define OSOE_AM_MAX_CHUNK       (UINT64_C(1) << 20)
-#define OSOE_AM_DEFAULT_BUDGET  (UINT64_C(256) << 20)
+#define OSOE_AM_DEFAULT_BUDGET  (UINT64_C(1) << 30)
+/* The default buffer, in chunks; the floor is two (osoe_am_configuration_read). */
+#define OSOE_AM_DEFAULT_BUFFER_CHUNKS 4
 
 /*
  * §3.8's per-connection reply credit C. It bounds the target's deferred reply
