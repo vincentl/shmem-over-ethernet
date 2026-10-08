@@ -1,0 +1,7 @@
+room_plus_one reservation/fill writers=1 sizes=2,2 cap=3 least=1 SC  states=        405 depth= 73 (miss<1e-24) -> VIOLATION
+    OVERFLOW: writer 0 reserved 2 units at 3 of a buffer of 3 after its header
+    trace: T1:await ok ; T1:pass ; T1:pre-open drain: 0 replies into buffer 0 ; T1:store ('filled', 0)=1 ; T1:store ('seq', 0)=1 ; T1:store ('head', 0)=1 ; T0:load ('head', 0)->1 ; T0:cas ('head', 0) 1->3 True ; T1:await ok ; T1:pass ; T1:load ('head', 0)->3 ; T0:check ok ; T0:load ('seq', 0)->1 ; T0:ghost ('$slot', 0, 1)=1,('$slot', 0, 2)=2 ; T0:add ('filled', 0)->3 ; T0:load ('head', 0)->3 ; T0:cas ('head', 0) 3->5 True ; T0: CHECK FAILED: OVERFLOW: writer 0 reserved 2 units at 3 of a buffer of 3 after its header
+commit_most reservation/fill writers=1 sizes=3 cap=2 least=1 SC  states=         28 depth= 27 (miss<5e-27) -> STUCK
+    T0 blocked at pc 34 (await)
+    trace: T1:await ok ; T1:pass ; T1:pre-open drain: 0 replies into buffer 0 ; T1:store ('filled', 0)=1 ; T1:store ('seq', 0)=1 ; T1:store ('head', 0)=1 ; T0:load ('head', 0)->1 ; T0:cas ('head', 0) 1->3 True ; T1:await ok ; T1:pass ; T1:load ('head', 0)->3 ; T1:or ('head', 0) 3->67 ; T1:pre-open drain: 0 replies into buffer 1 ; T1:store ('filled', 1)=1 ; T1:store ('seq', 1)=2 ; T1:store ('head', 1)=1 ; T0:check ok ; T0:load ('seq', 0)->1 ; T0:ghost ('$slot', 0, 1)=1,('$slot', 0, 2)=2 ; T0:add ('filled', 0)->4 ; T0:load ('head', 0)->67 ; T0:load ('head', 1)->1 ; T0:cas ('head', 1) 1->2 True ; T0:check ok ; T0:load ('seq', 1)->2 ; T0:ghost ('$slot', 1, 1)=3 ; T0:add ('filled', 1)->2
+exit=0

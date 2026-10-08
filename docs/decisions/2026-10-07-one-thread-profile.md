@@ -5,8 +5,10 @@ The first item of v0.2's fourth step, on `docs/prompts/v0.2-step4-progress-helpe
 later claim of the step refers to, and the first measurements of the ladder.
 
 **Where it stands.** Measured on the branch `one-thread-ladder`, from `main` at
-`3ee3357`. The author answered the question below the same evening, and the
-first rung - a put fills the room - is built on the branch, "What was built". The profile finds that over loopback
+`3ee3357`. The author answered question 1 the same evening, and the first rung -
+a put fills the room - is built, read adversarially and verified on the branch
+at `16dd527` ("What was built", "The adversarial read"). Questions 2 and 3 are
+new: the kernel's unsent queue, and the default buffer. The profile finds that over loopback
 the one thread is not what holds a stream back: the connection buffer's turnover
 is. That is the brief's stop-and-ask - "the ladder's profile showing the
 library's own work, not the kernel's copies, as the larger share: put it to the
@@ -122,6 +124,48 @@ buffer of twice the chunk was meant to carry two. The buffer's default is a
 choice of memory at scale against speed on one link, better taken with (a)'s
 numbers in hand. *Undo:* reservations whole again, the patch's one call.
 
+### 2. Cap the kernel's unsent queue - a rung the brief does not list
+
+Today a fetch-add, a get or a small put behind a put stream waits for some 2.6 MB
+the kernel has queued unsent, 14 to 22 ms at a gigabit, whatever the library's
+buffer: design §3.2's "two segments" bound is not what is built. The control
+wire (Part 2) takes the barrier off that queue; the rest of the data plane stays
+on it. `TCP_NOTSENT_LOWAT` on every wire takes the wait to 3.3 to 3.9 ms on the
+Pi at 16 KiB, the stream unchanged there and over loopback.
+
+- (a) **16 KiB, fixed**, a setting to change it: measured on the Pi and over
+  loopback; on a link above a gigabit, untimed.
+- (b) **Scaled to the link**: the cap as about 128 µs of the link's measured
+  bandwidth, at least 16 KiB - 16 KiB on the Pi, more where a link is faster, so
+  that the kernel always holds enough to keep it busy between the agent's
+  passes. A socket option may change at any time, so it is set when step 2 has
+  measured the link, before `shmem_init` returns, and 16 KiB until then.
+- (c) Leave the queue uncapped and rely on the control wire.
+
+**Recommendation: (b)** - the measured 16 KiB where it was measured, and a rule
+that cannot starve a faster link of bytes; (a) is the fallback if the author
+would rather not tie it to the link before a fast link has timed it. Design §3.2
+rewritten either way. *Undo:* no cap, today's.
+
+### 3. The default buffer, now that filling is in
+
+On top of filling, 256 KiB buffers carry a loopback stream 1.75 times further
+(about 10 GiB/s, 0.6 of the bare stream) and change nothing at a gigabit, where
+the link is the limit. Their cost: twice the connection area (the author: fine
+at 500 nodes) and, with the kernel's queue capped, 1.7 ms at the 99th percentile
+of a fetch-add behind a stream on the Pi, not at its median.
+
+- (a) **256 KiB**, `OSOE_AM_BUFFER_BUDGET` raised from 256 MiB to 1 GiB so that
+  it still binds near 2,000 nodes.
+- (b) 256 KiB allocated, but the depth a writer may fill chosen from the link
+  when step 2 has measured it - 128 KiB on a gigabit, the whole above: the Pi's
+  tail kept, a word the writers read and a model to say it is safe.
+- (c) 128 KiB, as today.
+
+**Recommendation: (a).** The cost is a tail at a gigabit only, and smaller than
+what question 2 takes away; (b) is the refinement if the Pi's tail matters more
+than a mechanism. *Undo:* the default back to twice the chunk.
+
 ## What was built: the first rung, filling the room
 
 On the author's answer (`2026-10-07.md` items 9 and 10), commit `14cdbaa` and the
@@ -168,6 +212,38 @@ record's own:
   14,172 to 15,157 over 21 pairs; the median round trips of a get, a put with
   quiet and a fetch-add unchanged at 55 µs.
 
+## The adversarial read
+
+A fresh agent read the diff against seven properties - order, every byte once,
+no reservation past its buffer, no hang, every other caller as before, the
+receiver's parse, the model saying what the C does - and archived its report as
+`docs/reviews/archive/v0.2-step4-part0-adversarial-read.md`, its model variants
+in `docs/reviews/evidence/v0.2-step4-part0/`. Verdict: properties 1 to 6 kept,
+nothing fatal. What was done with each finding:
+
+- **F1, a small message behind a stream** (should-fix, measure first). A stream
+  that fills every buffer leaves a fetch-add nowhere to go until a turnover,
+  where a 64 KiB put used to leave half of each buffer free. Measured on the Pi
+  (the section below): a fetch-add behind the stream waits about 0.4 ms more at
+  the median and 0.6 to 1 ms more at the 99th percentile with the kernel's
+  queue capped, 5 to 6 ms more without. The read's fix - a part leaves a spare
+  at the buffer's end - was modelled (a `tail` breakage failing), built
+  (`f643837`) and measured: it changed neither one writer's wait nor three
+  writers', and cost the loopback stream 11%. The cost is the bytes ahead of a
+  small message in a fuller segment, which a spare cannot change; so it was
+  taken out again (`caf0a9f`), and the model keeps a stream beside a writer of
+  small messages among its `fill` cases.
+- **F2, the floor test's stream pin** (should-fix). The poll the pin guards
+  against measured 0.083 to 0.085 against the pin's 0.10 - caught, by little.
+  The pin is 0.15 now (`16dd527`): the poll fails it by more than 1.7 times, and
+  the library clears it by 2.6 times at its lowest pair beside the suite.
+- **F3** (note): the new signal round quieted before it checked, which would
+  give the bytes time to land behind the signal; it checks first now.
+- **F4, F5** (notes): stale comments - `reserve_waiting`, design §3.11, the test
+  headers, the model's docstring - and the figures (4,094 bytes, a sixteenth of
+  the largest payload) brought up to date; the mask's comment says why it
+  changes nothing.
+
 ## What a small message waits behind a stream, on the Pi
 
 Item 10's caveat measured (`docs/design/evidence/v0.2-step4/2026-10-07-pi-head-of-line/`):
@@ -201,6 +277,32 @@ alternating, each line two or three runs:
   ms and not the median, 512 KiB both. Without the cap the buffer is lost in the
   kernel's queue.
 
+Against the base, alternating three times (`base-fill-1/`, `base-spare-1/`,
+`many-1/`), the spare being the read's F1 fix as built and then removed:
+
+| Writers of fetch-adds | Kernel's unsent queue | Base | Filling the room | With the spare |
+|---|---|---|---|---|
+| one | uncapped | 14.4-16.6 ms, p99 21.1-24.9 | 20.0-21.6 ms, p99 23.8-26.6 | 16.0-20.7 ms, p99 22.7-32.7 |
+| one | 16 KiB | 3.3-3.9 ms, p99 3.9-4.4 | 3.3-3.9 ms, p99 4.7-5.0 | 3.9 ms, p99 5.0 |
+| three, beside one stream | 16 KiB | 4.0-4.4 ms, p99 5.5-6.1 | 4.43 ms, p99 6.6-7.2 | 4.43 ms, p99 6.65-7.2 |
+
+The stream ran at 112 MiB/s in every line, and every writer was served in every
+run: nothing starved.
+
+## On top of filling, over loopback: deeper buffers, and the kernel's queue
+
+In the VM, 64 KiB puts, alternating (`loopback-spare-cap-buffers-floor.txt`,
+measured on `f643837` with the spare; `ab-spare-zero.txt` shows the spare's own
+11%, so the figures without it are about a ninth higher):
+
+- **Deeper buffers**: 128 KiB 5,555 to 5,743 MiB/s; 256 KiB 9,992 to 10,070;
+  512 KiB 8,870 to 9,934; 1 MiB 10,196 to 10,445. On top of filling, 256 KiB is
+  1.75 times the default, and the rest a plateau near 0.6 of the bare stream.
+- **The kernel's unsent queue capped**: uncapped 5,760 to 5,862; at 16 KiB
+  5,762 to 6,357; at 128 KiB 5,752 to 5,934 - the cap costs a loopback stream
+  nothing.
+
+## What goes on meanwhile
 ## What goes on meanwhile
 
 The rungs that do not depend on the answer, each measured against the one below

@@ -1,0 +1,6 @@
+round=1 build=fill2 stream library/floor=0.444 (0.430-0.448)
+round=1 build=poll-fill stream library/floor=0.085 (0.082-0.109)
+round=2 build=fill2 stream library/floor=0.452 (0.430-0.468)
+round=2 build=poll-fill stream library/floor=0.084 (0.082-0.086)
+round=3 build=fill2 stream library/floor=0.454 (0.436-0.460)
+round=3 build=poll-fill stream library/floor=0.083 (0.082-0.088)

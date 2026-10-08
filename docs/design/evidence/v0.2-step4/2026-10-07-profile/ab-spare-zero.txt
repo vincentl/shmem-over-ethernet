@@ -1,0 +1,9 @@
+round=1 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6484
+round=1 build=spare putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5671
+round=1 build=spare-zero putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6531
+round=2 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6524
+round=2 build=spare putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5747
+round=2 build=spare-zero putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6480
+round=3 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6495
+round=3 build=spare putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5779
+round=3 build=spare-zero putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6469

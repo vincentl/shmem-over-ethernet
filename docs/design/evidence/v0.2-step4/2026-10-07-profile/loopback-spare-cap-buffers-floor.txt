@@ -1,0 +1,40 @@
+== the stream: base, fill, spare
+round=1 build=base putstream target=1 bytes=65536 seconds=10.0 mib_per_s=2890
+round=1 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6467
+round=1 build=spare putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5895
+round=2 build=base putstream target=1 bytes=65536 seconds=10.0 mib_per_s=2924
+round=2 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6578
+round=2 build=spare putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5852
+round=3 build=base putstream target=1 bytes=65536 seconds=10.0 mib_per_s=3078
+round=3 build=fill2 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6475
+round=3 build=spare putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5817
+== the cap on loopback: the spare with the kernel's unsent queue capped
+round=1 lowat=0 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5762
+round=1 lowat=16384 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=6357
+round=1 lowat=131072 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5934
+round=2 lowat=0 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5862
+round=2 lowat=16384 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5928
+round=2 lowat=131072 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5752
+round=3 lowat=0 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5760
+round=3 lowat=16384 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5762
+round=3 lowat=131072 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5770
+== deeper buffers on top of the spare
+round=1 buffer=131072 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5555
+round=1 buffer=262144 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=9992
+round=1 buffer=524288 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=9934
+round=1 buffer=1048576 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10196
+round=2 buffer=131072 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=5743
+round=2 buffer=262144 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10070
+round=2 buffer=524288 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=8870
+round=2 buffer=1048576 putstream target=1 bytes=65536 seconds=10.0 mib_per_s=10445
+== the floor test's stream ratio: the spare, and the polling mutant of base and spare
+round=1 build=spare stream library/floor=0.391 (0.376-0.433)
+round=1 build=poll-base stream library/floor=0.042 (0.040-0.044)
+round=1 build=poll-spare stream library/floor=0.084 (0.081-0.085)
+round=2 build=spare stream library/floor=0.390 (0.378-0.432)
+round=2 build=poll-base stream library/floor=0.042 (0.042-0.044)
+round=2 build=poll-spare stream library/floor=0.077 (0.070-0.084)
+round=3 build=spare stream library/floor=0.391 (0.376-0.403)
+round=3 build=poll-base stream library/floor=0.037 (0.034-0.038)
+round=3 build=poll-spare stream library/floor=0.072 (0.070-0.074)
+DONE
