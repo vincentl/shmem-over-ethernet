@@ -25,11 +25,15 @@ shuffled: the rotation's slots with the offsets in one shuffled order, the
 Measured: the time until every wire is attached; the most SYNs reaching one
 listener within one round trip; the most connections waiting at one lead
 (handshake done, hello not yet answered).
+
+Two wires a pair (v0.2 step 4, Part 2; docs/design/progress-helpers-proposal.md
+§3.1): `wires=2` makes every call twice in a row - the control wire, then the
+data wire - so a lead accepts and makes twice the calls, in the same order.
 """
 import heapq, random
 
 def run(n, schedule, in_flight_most=4, slot=100e-6, round_trip=100e-6, answer_cpu=(10e-6, 15e-6),
-        call_cpu=(10e-6, 5e-6, 20e-6), entry=None):
+        call_cpu=(10e-6, 5e-6, 20e-6), entry=None, wires=1):
     one_way = round_trip / 2
     hello_cpu, confirm_cpu = answer_cpu
     dial_cpu, send_cpu, attach_cpu = call_cpu
@@ -45,6 +49,7 @@ def run(n, schedule, in_flight_most=4, slot=100e-6, round_trip=100e-6, answer_cp
             if n % 2 == 0 and i < n // 2:
                 mine.append(i + n // 2)
             calls.append(mine)
+    calls = [[j for j in mine for _ in range(wires)] for mine in calls]
     expected = [0] * n
     for i in range(n):
         for j in calls[i]:
@@ -167,3 +172,6 @@ if __name__ == '__main__':
           [(f"{n} nodes, lead {w}", n, {'entry': late(n, w)}) for n in (256, 1024) for w in (1, n // 4)])
     table("A round trip of 1 ms (a slow network), on schedule",
           [(f"{n} nodes", n, {'round_trip': 1e-3}) for n in (64, 1024)])
+    table("Two wires a pair - the control wire, then the data wire - on schedule",
+          [(f"{n} nodes, {w} wire{'s' if w > 1 else ''}", n, {'wires': w})
+           for n in (4, 16, 64, 256, 1024) for w in (1, 2)])
