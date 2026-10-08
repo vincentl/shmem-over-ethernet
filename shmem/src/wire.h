@@ -5,8 +5,9 @@
  * One TCP connection per node pair, carried by the progress thread's io_uring
  * (ring.h). §7.1 step 2 ran the same interface over a shared-memory stand-in,
  * so that every internode semantic was validated before a socket existed; this
- * replaces the stand-in, and the engine above it did not change: send and recv
- * mean what they meant.
+ * replaced the stand-in, and the engine above it did not change: send and
+ * receive meant what they meant. (Since v0.2 step 4 a receive is a peek and a
+ * consume, so that the engine parses the bytes where the kernel put them.)
  *
  * **It is a byte stream, not a message queue.** osoe_wire_send accepts a prefix
  * of what it was offered and says how much; osoe_wire_peek shows whatever has
@@ -58,6 +59,7 @@ struct osoe_wire {
     uint32_t first, last;       /* buffer numbers, or OSOE_RING_NONE */
     uint32_t offset;            /* bytes of `first` already consumed */
     uint64_t queued;            /* bytes in all of them, not yet consumed */
+    uint32_t peeked;            /* what the last peek showed, until it is consumed */
     bool receiving;             /* its multishot recv is armed */
     bool ended;                 /* the peer's end of stream has arrived */
     int error;                  /* a receive failed, or a send for any reason but
@@ -141,15 +143,19 @@ void osoe_wire_lift_unsent(struct osoe_wire *w);
  * The bytes that have arrived, where the kernel put them: the unread part of
  * the oldest provided buffer queued on this wire - all of it, or a prefix when
  * OSOE_WIRE_SPLIT says so - with `*bytes` at its start. Returns how many, 0
- * when nothing has arrived. The caller reads them in place, with no copy, and
- * gives them back with osoe_wire_consume; until then the buffer is the
- * caller's, and the kernel writes nothing into it. Peek and consume until a
- * peek returns 0, before the next reap (§3.3, invariant 23).
+ * (and `*bytes` NULL) when nothing has arrived. The caller reads them in place,
+ * with no copy, and gives them back with osoe_wire_consume; until then the
+ * buffer is the caller's, and the kernel writes nothing into it. **Nothing of
+ * a buffer may be read once it is given back**: the kernel may fill it again at
+ * once, and the sanitizer presets poison it from then until its next
+ * completion (ring.c). Peek and consume until a peek returns 0, before the
+ * next reap (§3.3, invariant 23).
  */
 size_t osoe_wire_peek(struct osoe_wire *w, const unsigned char **bytes);
 
 /* The first `n` bytes of the last peek are read: a buffer they empty goes back
- * to the kernel at once (§3.3). Fatal past what the peek returned. */
+ * to the kernel at once (§3.3). Fatal past what that peek showed, and for a
+ * second consume of one peek. */
 void osoe_wire_consume(struct osoe_wire *w, size_t n);
 
 /* Send this side's end of stream, once it has nothing more to send. */
