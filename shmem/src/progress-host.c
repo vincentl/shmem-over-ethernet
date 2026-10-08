@@ -382,11 +382,12 @@ void osoe_progress_host_wake_deferred(void)
     }
 }
 
-/* The owner of the connection toward `peer`. */
+/* The owner of the connection toward `peer`, named as the writer's mark names
+ * it (connection-area.h). */
 static uint32_t owner_of_peer(uint32_t peer)
 {
-    uint32_t slot = peer < osoe_am.area.node ? peer : peer - 1;
-    return osoe_owner_of(slot, osoe_am.area.helpers);
+    uint32_t index;
+    return osoe_connection_area_owner(&osoe_am.area, peer, &index);
 }
 
 void osoe_progress_host_wake(uint32_t peer)

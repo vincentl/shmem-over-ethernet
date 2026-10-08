@@ -24,6 +24,14 @@
 
 #include <stdint.h>
 
+/* Node `peer`'s peer slot on node `node`: node order with `node` left out, as
+ * osoe_progress_slot has it - with 4 nodes, node 1 holds peers 0, 2 and 3 in
+ * slots 0, 1 and 2. */
+static inline uint32_t osoe_peer_slot(uint32_t node, uint32_t peer)
+{
+    return peer < node ? peer : peer - 1;
+}
+
 /* The owner of peer slot `slot`'s data wire. */
 static inline uint32_t osoe_owner_of(uint32_t slot, uint32_t helpers)
 {

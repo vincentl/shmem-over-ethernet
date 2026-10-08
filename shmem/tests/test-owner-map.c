@@ -11,9 +11,11 @@
  * the counts a node can have.
  *
  * Then the area, opened in this one process for a node of 8 peers at 0 to 4
- * helpers: a writer's mark sets the bit of the wire's index in its owner's
- * bitmap and nowhere else, and no two owners' words share a cache line, since
- * each is another thread's.
+ * helpers, and of 299 at 2 and 3 - more than 64 wires an owner, so that a word
+ * chosen by the slot rather than the index misses: a writer's mark sets the
+ * bit of the wire's index in its owner's bitmap and nowhere else, no two
+ * owners' flags share a cache line, nor do two owners' bitmaps start on one,
+ * since each is another thread's.
  */
 #include <stdarg.h>
 #include <stdatomic.h>
@@ -51,7 +53,7 @@ void osoe_notice(const char *fmt, ...)
     va_end(ap);
 }
 
-enum { MOST_PEERS = 300, MOST_HELPERS = 64, NODES = 9 };
+enum { MOST_PEERS = 300, MOST_HELPERS = 64 };
 
 /* The map at `peers` and `helpers`, both ways and grouped. */
 static void check_map(uint32_t peers, uint32_t helpers)
@@ -98,18 +100,19 @@ static uintptr_t line_of(const volatile void *p)
     return (uintptr_t)p / 64;
 }
 
-/* The area of a node of NODES - 1 peers at `helpers` helpers, in this
+/* The area of a node of `nodes` - 1 peers at `helpers` helpers, in this
  * process: every mark lands in its owner's bitmap and only there. */
-static void check_area(uint32_t helpers)
+static void check_area(uint32_t nodes, uint32_t helpers)
 {
     struct osoe_bootstrap b = {
         .job = (uint64_t)getpid(), .step = 7, .node = 4, .local_id = 0, .local_count = 1,
         .no_progress_ns = UINT64_C(30000000000),
     };
     struct osoe_connection_area area;
-    osoe_connection_area_open(&area, &b, NODES, helpers, helpers, OSOE_SHM_ANY_CREATOR);
+    osoe_connection_area_open(&area, &b, nodes, helpers, nodes * 8 + helpers,
+                              OSOE_SHM_ANY_CREATOR);
     CHECK(area.helpers == helpers);
-    uint32_t peers = NODES - 1;
+    uint32_t peers = nodes - 1;
     for (uint32_t o = 0; o <= helpers; o++) {
         CHECK(area.owner[o].dirty_words ==
               (osoe_owner_wires(o, peers, helpers) + 63) / 64);
@@ -119,7 +122,7 @@ static void check_area(uint32_t helpers)
                 CHECK(line_of(area.owner[o].dirty) != line_of(area.owner[q].dirty));
         }
     }
-    for (uint32_t peer = 0; peer < NODES; peer++) {
+    for (uint32_t peer = 0; peer < nodes; peer++) {
         if (peer == b.node)
             continue;
         uint32_t slot = peer < b.node ? peer : peer - 1;
@@ -141,7 +144,9 @@ int main(void)
         for (uint32_t helpers = 0; helpers <= MOST_HELPERS; helpers++)
             check_map(peers, helpers);
     for (uint32_t helpers = 0; helpers <= 4; helpers++)
-        check_area(helpers);
+        check_area(9, helpers);
+    check_area(300, 2);
+    check_area(300, 3);
     if (CHECK_DONE())
         return 1;
     printf("owner map: ok\n");

@@ -1328,7 +1328,13 @@ static bool release_local(struct osoe_progress *p)
         uint32_t team = p->pending[k];
         struct osoe_progress_team *t = &p->team[team];
         for (uint32_t j = 0; j < t->tree.children; j++) {
-            uint32_t i = control_index(p, t->tree.child[j]);   /* forward found it */
+            /* Found by forward, which refuses a child without one; refused here
+             * too, rather than an index past owner 0's wires (the adversarial
+             * read of Part 1, N4). */
+            uint32_t i = control_index(p, t->tree.child[j]);
+            if (i == OSOE_CONNECTION_NONE)
+                osoe_fatal("node %u: no connection of its lead's toward node %u, a child in "
+                           "team %u's tree", p->node, t->tree.child[j], t->number);
             drain(o, i);
             flush(o, i);
             settle(o, i);
