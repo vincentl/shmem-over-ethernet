@@ -1,0 +1,21 @@
+== debug 09:58:21
+100% tests passed, 0 tests failed out of 839
+== release 10:06:27
+100% tests passed, 0 tests failed out of 839
+== asan 10:12:54
+100% tests passed, 0 tests failed out of 824
+== tsan 10:16:45
+100% tests passed, 0 tests failed out of 583
+== tier3 10:19:51
+100% tests passed, 0 tests failed out of 113
+== pacer mailbox 10:24:14
+exit 0 osoe-pacer failures=0 seconds=59.9
+== pacer collectives 10:25:14
+exit 0 osoe-pacer failures=0 seconds=59.2
+== pacer mix, ten minutes 10:26:13
+exit 0 osoe-pacer failures=0 seconds=602.8
+== pacer mix with the zero-copy send on, ten minutes 10:36:16
+exit 0 osoe-pacer failures=0 seconds=610.2
+== pacer mailbox with the zero-copy send on 10:46:26
+exit 0 osoe-pacer failures=0 seconds=60.0
+DONE 10:47:26

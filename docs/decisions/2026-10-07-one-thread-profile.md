@@ -816,7 +816,15 @@ done with each:
 
 ## The fifth rung's verification
 
-[FILL]
+At `0d60e52`, the read's fixes in (`verification.txt`,
+`verification-models-sos.txt`): the four presets with the floor pins on - debug
+839, release 839, asan 824, tsan 583, every test passing, the zero-copy suites
+among them; tier 3, 113; `osoe-pacer` mailbox and collectives a minute each and
+mix ten minutes, no failure; and with the zero-copy send on and the deadlock
+detector off, mix ten minutes and mailbox a minute, no failure - where the F1
+mutant hung within a second; the models whole, 35 with `model.visit`; the SOS
+suite at 4 x 2, 161 built and passing on every map, its two extensions failing
+as at the tag. Merged into `main`.
 
 ## What goes on now
 

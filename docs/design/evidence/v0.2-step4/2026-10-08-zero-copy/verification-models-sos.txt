@@ -1,0 +1,9 @@
+== models 09:46:32
+100% tests passed, 0 tests failed out of 35
+Total Test time (real) = 2534.61 sec
+== SOS whole, 4 x 2 10:28:47
+built and exit 0 on every map: 161
+build failures: 2
+runs failing: 2
+DONE
+DONE 10:32:03
