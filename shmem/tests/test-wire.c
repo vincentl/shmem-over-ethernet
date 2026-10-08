@@ -194,10 +194,12 @@ static void stream_lent(struct osoe_ring *ring, struct osoe_wire *tx, struct oso
                         size_t total)
 {
     static unsigned char region[OSOE_WIRE_LENT_REGIONS][CHUNK];
-    size_t length[OSOE_WIRE_LENT_REGIONS] = { 0 }, placed = 0, got = 0, offset = 0;
+    size_t length[OSOE_WIRE_LENT_REGIONS] = { 0 }, placed = 0, sent = 0, got = 0, offset = 0;
     uint32_t k = 0;
     struct osoe_deadline give_up = osoe_deadline_in(UINT64_C(20000000000));
-    while (got < total) {
+    /* Until the sender has been told of every byte too: the last send's
+     * completion is collected by offering its bytes once more (wire.h). */
+    while (sent < total || got < total) {
         bool moved = false;
         if (length[k] == 0 && placed < total && osoe_wire_owed(tx, k) == 0) {
             length[k] = total - placed < CHUNK ? total - placed : CHUNK;
@@ -212,6 +214,7 @@ static void stream_lent(struct osoe_ring *ring, struct osoe_wire *tx, struct oso
             if (n > 0 && n < length[k] - offset)
                 short_sends++;
             offset += n;
+            sent += n;
             moved |= n > 0;
             if (offset == length[k]) {
                 length[k] = 0;          /* sent whole: lent until it owes nothing */
@@ -236,7 +239,7 @@ static void stream_lent(struct osoe_ring *ring, struct osoe_wire *tx, struct oso
             osoe_ring_wait(ring, UINT64_C(1000000));
     }
     CHECK(osoe_wire_owed(tx, 0) == 0 && osoe_wire_owed(tx, 1) == 0);
-    CHECK(placed == total && got == total);
+    CHECK(placed == total && sent == total && got == total);
 }
 
 /*
