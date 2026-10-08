@@ -318,11 +318,21 @@ bool osoe_ring_wait_wake(struct osoe_ring *r, _Atomic uint32_t *wake, uint32_t s
     return osoe_ring_wait(r, timeout_ns);
 }
 
-uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word)
+uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t first, uint32_t count)
 {
-    uint64_t bits = r->readable[word];
-    r->readable[word] = 0;
-    return bits;
+    if (count == 0)
+        return 0;
+    uint64_t want = count >= 64 ? UINT64_MAX : (UINT64_C(1) << count) - 1;
+    uint32_t word = first / 64, shift = first % 64;
+    uint64_t taken = (r->readable[word] >> shift) & want;
+    r->readable[word] &= ~(taken << shift);
+    /* A range that does not start a word runs into the next. */
+    if (shift != 0 && count > 64 - shift) {
+        uint64_t high = r->readable[word + 1] & (want >> (64 - shift));
+        r->readable[word + 1] &= ~high;
+        taken |= high << (64 - shift);
+    }
+    return taken;
 }
 
 void osoe_ring_close(struct osoe_ring *r)

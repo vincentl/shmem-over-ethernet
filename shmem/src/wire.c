@@ -133,17 +133,17 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, 
 static struct osoe_wire *wire_of(struct osoe_wire *wires, struct osoe_ring *const *rings,
                                  uint32_t slot, enum osoe_hello_purpose purpose,
                                  uint32_t peers, uint32_t helpers, struct osoe_ring **ring,
-                                 uint32_t *ring_slot)
+                                 uint32_t *ring_index)
 {
     if (purpose == OSOE_HELLO_CONTROL_WIRE) {
         *ring = rings[0];
-        *ring_slot = osoe_control_ring_slot(slot, peers, helpers);
-        return &wires[*ring_slot];
+        *ring_index = osoe_control_ring_index(slot, peers, helpers);
+        return &wires[*ring_index];
     }
     uint32_t owner = osoe_owner_of(slot, helpers);
     *ring = rings[owner];
-    *ring_slot = osoe_owner_index(slot, helpers);
-    return &wires[osoe_ring_first(owner, peers, helpers) + *ring_slot];
+    *ring_index = osoe_owner_index(slot, helpers);
+    return &wires[osoe_ring_first(owner, peers, helpers) + *ring_index];
 }
 
 static const char *wire_name(enum osoe_hello_purpose purpose)
@@ -178,11 +178,11 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
         bool lacks[b->node ? b->node : 1];
         for (uint32_t peer = 0; peer < b->node; peer++) {
             struct osoe_ring *ring;
-            uint32_t ring_slot;
+            uint32_t ring_index;
             lacks[peer] = false;
             for (uint32_t k = 0; k < 2; k++)
                 if (wire_of(wires, rings, peer, purposes[k], peers, helpers, &ring,
-                            &ring_slot)->fd < 0)
+                            &ring_index)->fd < 0)
                     lacks[peer] = true;
             missing += lacks[peer];
         }
@@ -205,13 +205,13 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
             osoe_fatal("node %u was connected to by node %u, which is not a lower node",
                        b->node, peer);
         struct osoe_ring *ring;
-        uint32_t ring_slot;
+        uint32_t ring_index;
         struct osoe_wire *w = wire_of(wires, rings, peer, purpose, peers, helpers, &ring,
-                                      &ring_slot);
+                                      &ring_index);
         if (w->fd >= 0)
             osoe_fatal("node %u was connected to twice by node %u for its %s wire", b->node,
                        peer, wire_name(purpose));
-        osoe_wire_attach(w, ring, ring_slot, fd, peer, b);
+        osoe_wire_attach(w, ring, ring_index, fd, peer, b);
     }
     osoe_listener_close(l);
     /* Without a rendezvous's mesh - the tests below the library - each peer is
@@ -231,10 +231,10 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
                 fd = osoe_listener_connect(b, session, &at, peer, purposes[k]);
             }
             struct osoe_ring *ring;
-            uint32_t ring_slot;
+            uint32_t ring_index;
             struct osoe_wire *w = wire_of(wires, rings, peer - 1, purposes[k], peers, helpers,
-                                          &ring, &ring_slot);
-            osoe_wire_attach(w, ring, ring_slot, fd, peer, b);
+                                          &ring, &ring_index);
+            osoe_wire_attach(w, ring, ring_index, fd, peer, b);
         }
     for (uint32_t o = 0; o <= helpers; o++)
         osoe_wire_ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],

@@ -119,8 +119,11 @@ bool osoe_ring_wait(struct osoe_ring *r, uint64_t timeout_ns);
 bool osoe_ring_wait_wake(struct osoe_ring *r, _Atomic uint32_t *wake, uint32_t seen,
                          uint64_t timeout_ns);
 
-/* Take, and clear, the readable bits of wires 64*word .. 64*word+63. */
-uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t word);
+/* Take, and clear, the readable bits of the ring's wires `first` to
+ * `first` + `count` - 1, `count` 64 at most, as bits 0 on: a range of wires
+ * need not start a word, since owner 0's control wires follow its data wires on
+ * one ring (owner-map.h). */
+uint64_t osoe_ring_take_readable(struct osoe_ring *r, uint32_t first, uint32_t count);
 
 /* Give a provided buffer back to the kernel (wire.c, when a buffer is empty). */
 void osoe_ring_recycle(struct osoe_ring *r, uint32_t buffer);

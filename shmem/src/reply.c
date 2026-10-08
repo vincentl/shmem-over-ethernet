@@ -46,11 +46,15 @@ void osoe_reply_give(struct osoe_reply_pool *pool, uint32_t index)
     pool->in_use--;
 }
 
+void osoe_reply_queue_init(struct osoe_reply_queue *q)
+{
+    *q = (struct osoe_reply_queue){ .head = OSOE_REPLY_NONE, .tail = OSOE_REPLY_NONE };
+}
+
 void osoe_reply_queues_init(struct osoe_reply_queues *q)
 {
-    *q = (struct osoe_reply_queues){ 0 };
-    q->control.head = q->control.tail = OSOE_REPLY_NONE;
-    q->bulk.head = q->bulk.tail = OSOE_REPLY_NONE;
+    osoe_reply_queue_init(&q->values);
+    osoe_reply_queue_init(&q->bulk);
 }
 
 void osoe_reply_push(struct osoe_reply_pool *pool, struct osoe_reply_queue *q,

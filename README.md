@@ -624,13 +624,13 @@ build tree.
   memory - but for the prefix scans, a tree over the team's ranks; alltoall, in
   which every PE has a block for every other; collect's lengths, a word a PE;
   and the deprecated active-set collectives, which run PE by PE - while the
-  connection mesh is linear in it, n - 1 connections a node ("Scaling with
-  nodes", below); within a node, linear or better in the PEs there - tested with
-  at most 15 PEs on a node, and timed with 4 on the Pi cluster and, for the
-  barrier alone, up to 32 on one four-core virtual machine (design §5.3): a
-  node's barrier arrival is one cache line that all its PEs add to, and in a
-  reduction the node's lead PE combines the node's vectors one after another on
-  its own thread, O(PEs × bytes).
+  connection mesh is linear in it, two connections to each of a node's n - 1
+  peers ("Scaling with nodes", below); within a node, linear or better in the
+  PEs there - tested with at most 15 PEs on a node, and timed with 4 on the Pi
+  cluster and, for the barrier alone, up to 32 on one four-core virtual machine
+  (design §5.3): a node's barrier arrival is one cache line that all its PEs add
+  to, and in a reduction the node's lead PE combines the node's vectors one
+  after another on its own thread, O(PEs × bytes).
 - **Cores are not assumed spare.** A node runs a PE on every core with the
   library's progress thread beside them, so oversubscription is the normal case:
   nothing spins. A waiting PE sleeps on a futex, and a start-up wait for an
@@ -661,11 +661,15 @@ build tree.
   a `memcpy` or a CPU atomic in the caller's own thread - no message, and no
   system call unless the target waits on what it changed, which takes one futex
   wake - and `shmem_ptr` hands out a plain pointer to a node-mate's object.
-- **One TCP connection per pair of nodes**, not per pair of PEs, carries every
-  PE's operations between those two nodes as active messages. Its one ordered
-  stream is what lets `shmem_fence` return without waiting: operations to a node
-  are applied in the order they were sent, so a fence only asks each node
-  written to since the last acknowledgement to acknowledge, and goes on.
+- **Two TCP connections per pair of nodes**, not per pair of PEs. The data
+  wire carries every PE's operations between those two nodes as active
+  messages; its one ordered stream is what lets `shmem_fence` return without
+  waiting: operations to a node are applied in the order they were sent, so a
+  fence only asks each node written to since the last acknowledgement to
+  acknowledge, and goes on. The control wire carries the barrier's arrivals and
+  releases and the deadlock detector's messages, and nothing else, so a
+  barrier's messages never queue behind a put's bytes in a buffer or a socket:
+  they share only the link.
 - **One progress thread a node drives the network.** Every PE starts an agent
   thread; once the job has started, the node lead's is the only thread that
   touches a socket or an io_uring ring. It sends, receives, and applies arriving
@@ -715,7 +719,7 @@ in all), computed from the code; the times are measured where a record says so.
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other - and so P(N - P) blocks into a node, all applied by its one progress thread, a message each up to a chunk (`OSOE_AM_CHUNK`) and, for an `alltoalls` with a stride, one an element: 32.7 million messages a call at 500 nodes of 256 |
 | a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 + 1 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`, then a sync of the parent: about a broadcast and a barrier, and a destroy a barrier of the team; O(P) a member, testing its node's PEs; on each node's lead, O(M log n) once to find the team's nodes from its members, a search of the rank map for each - O(M log M) more when they are not met in node order - and the S leads kept |
 | waiting | a futex word per resource a connection has, shared by the node's PEs; one per thread for its replies and watches, per PE for its agent and its landing zone, per context for its counters | O(1) a waiter - but room made in a connection's buffer wakes every writer waiting for it (Limits) |
-| start-up | the node leads' rendezvous tree, then their mesh; then, where the large collectives' link is measured, the root's lead timing round trips and streams to its first children's, and one reduction of three words handing every PE its numbers | ⌈log₈ n⌉ levels, then n - 1 connections a lead, made one after another; then the measurement, about 27 ms of the Pi cluster's start - its streams carry 1.9 MiB, so about 170 ms on a link of 100 Mbit/s - and the reduction's ⌈log_k n⌉ levels at the fan-out k |
+| start-up | the node leads' rendezvous tree, then their mesh; then, where the large collectives' link is measured, the root's lead timing round trips and streams to its first children's, and one reduction of three words handing every PE its numbers | ⌈log₈ n⌉ levels, then 2(n - 1) connections a lead - a control wire and a data wire a peer - made one after another; then the measurement, about 27 ms of the Pi cluster's start - its streams carry 1.9 MiB, so about 170 ms on a link of 100 Mbit/s - and the reduction's ⌈log_k n⌉ levels at the fan-out k |
 | `SHMEM_THREAD_MULTIPLE` | threads issue on a shared context without a lock; every wait that completes its operations - a quiet, `shmem_pe_quiet`, a strided get's end, and the quiet a barrier or `shmem_clear_lock` makes - takes the context's, and one shares a full quiet that began and ended while it waited for it | O(1) an operation |
 
 Where the design admits a limit of its own: a large broadcast, and a reduction
@@ -754,10 +758,10 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 | What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.4 GiB |
 | The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - and 128 bytes a peer node | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
 | The connection area | in `/dev/shm`, one a node | 512 KiB of buffers and 1.25 KiB of state a peer node | 1.5 MiB | 31.6 MiB | 250 MiB, 0.6 written at start |
-| The node lead's own | its private memory | about 0.8 MiB and 3.5 KB a peer node, most of it the reply pool, and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.0 MiB | 3.5 MiB |
+| The node lead's own | its private memory | about 0.8 MiB and 8.1 KB a peer node - the reply pool, and 4.6 KB of it the peer's control wire, a page its private send buffer - and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.3 MiB | 5.7 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
 | The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one, and under a plane or an arbitrary one as many as the ranks fall in, up to one a rank: 32,000, 768 KB a node, at 500 nodes of 256 under `plane=4` | 1.1 KiB | 10.4 KiB | 79 KiB |
-| Sockets | the lead's | n - 1 a node, n(n - 1)/2 in the job | 3, 6 | 63, 2,016 | 499, 124,750 |
+| Sockets | the lead's | 2(n - 1) a node, a control wire and a data wire to each other node; n(n - 1) in the job | 6, 12 | 126, 4,032 | 998, 249,500 |
 
 A team number is 24.25 KiB a PE at 4 nodes and 26.9 at 500: its counters and
 small slots - one for each child position of the tree and one for releases, for
@@ -802,10 +806,11 @@ times these:
 - **The deprecated active-set collectives** run PE by PE: a binomial tree over
   the set's ranks, log₂ of its size deep, its edges across nodes wherever its
   PEs are.
-- **The mesh**: every pair of nodes connects at start-up, each lead's n - 1
-  connections made one after another. A lead calls no higher node until every
-  lower one has called it, so the start-up is a chain of node-to-node
-  connections, the last lead connected after about n connection times, and a
+- **The mesh**: every pair of nodes connects twice at start-up, a control wire
+  and a data wire, each lead's 2(n - 1) connections made one after another. A
+  lead calls no higher node until every lower one has called it, so the start-up
+  is a chain of node-to-node connections, the last lead connected after about 2n
+  connection times - modelled at 1.7 ms for 4 nodes and 0.58 s for 1,024 - and a
   larger system may need it changed (`docs/design/mesh-schedule-proposal.md`
   proposes a schedule). On one subnet each node also needs an entry in the
   kernel's neighbour table, its record of a peer's Ethernet address, for each
@@ -971,9 +976,10 @@ specification or takes a choice the specification leaves open.
   rendezvous's port range. A heterogeneous Slurm job is refused at start-up.
 - **A host name that resolves only to IPv6 is refused.**
 - **At most 65,535 PEs a node**, and **descriptors for the network**: a lead
-  holds a socket for every other node and a descriptor for every other PE of its
-  node, beside the program's own, so the hard limit on open files (`ulimit -Hn`)
-  must leave room for them; `shmem_init` raises the soft limit to it.
+  holds two sockets for every other node - its control wire and its data wire -
+  and a descriptor for every other PE of its node, beside the program's own, so
+  the hard limit on open files (`ulimit -Hn`) must leave room for them;
+  `shmem_init` raises the soft limit to it.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
   statics.

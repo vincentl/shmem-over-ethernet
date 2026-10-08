@@ -585,15 +585,17 @@ void osoe_progress_host_start(uint32_t session)
     osoe_am.owner = calloc(owners, sizeof *osoe_am.owner);
     struct osoe_ring **rings = calloc(owners, sizeof *rings);
     struct osoe_progress_owner *engine_owners = calloc(owners, sizeof *engine_owners);
-    osoe_am.wire = calloc(peers, sizeof *osoe_am.wire);
+    osoe_am.wire = calloc(2 * (size_t)peers, sizeof *osoe_am.wire);
     osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
+    osoe_am.control = calloc(peers, sizeof *osoe_am.control);
+    osoe_am.control_busy = calloc((peers + 63) / 64, sizeof *osoe_am.control_busy);
     osoe_am.busy = calloc(busy_words, sizeof *osoe_am.busy);
     osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
     osoe_am.team = calloc(teams, sizeof *osoe_am.team);
     osoe_am.pending = calloc(teams, sizeof *osoe_am.pending);
     if (!osoe_am.owner || !rings || !engine_owners || !osoe_am.wire ||
-        !osoe_am.connection || !osoe_am.busy || !osoe_am.descriptor || !osoe_am.team ||
-        !osoe_am.pending)
+        !osoe_am.connection || !osoe_am.control || !osoe_am.control_busy || !osoe_am.busy ||
+        !osoe_am.descriptor || !osoe_am.team || !osoe_am.pending)
         osoe_fatal("out of memory setting up the AM backend for %u peer nodes", peers);
     for (uint32_t o = 0; o < owners; o++)
         rings[o] = &osoe_am.owner[o].ring;
@@ -629,13 +631,18 @@ void osoe_progress_host_start(uint32_t session)
     for (uint32_t o = 0; o < owners; o++) {
         uint32_t first = osoe_owner_first(o, peers, helpers);
         uint32_t count = descriptors_of(o, peers, helpers, teams);
-        osoe_progress_attach(&osoe_am.progress, o, &osoe_am.owner[o].ring, &osoe_am.wire[first],
+        osoe_progress_attach(&osoe_am.progress, o, &osoe_am.owner[o].ring,
+                             &osoe_am.wire[osoe_ring_first(o, peers, helpers)],
                              &osoe_am.connection[first], &osoe_am.busy[busy_before],
                              &osoe_am.descriptor[descriptors_before], count);
         descriptors_before += count;
         busy_before += (osoe_owner_wires(o, peers, helpers) + 63) / 64;
         osoe_am.owner[o].flag_raised = false;
     }
+    /* Owner 0's control wires, after its data wires on its ring (owner-map.h). */
+    osoe_progress_attach_control(&osoe_am.progress,
+                                 &osoe_am.wire[osoe_control_ring_index(0, peers, helpers)],
+                                 osoe_am.control, osoe_am.control_busy);
     osoe_progress_attach_teams(&osoe_am.progress, osoe_am.team, osoe_am.pending, teams,
                                team_of_record, team_by_name);
     /* Count into the control segment, where osoe-stat and the tests read it:
@@ -676,6 +683,14 @@ void osoe_progress_host_start(uint32_t session)
  * of the engine and polls it directly (§3.12): owner `o`'s wires, on its
  * thread - every wire, on the lead's agent, while the node runs no helpers.
  */
+/* The segments owner `o` has sent on every wire it holds, data and control:
+ * what moves while its peers read, which the no-progress rule watches. */
+static uint64_t segments_sent(struct osoe_progress_owner *o)
+{
+    return osoe_counter_word_read(&o->metrics->segments_sent) +
+           osoe_counter_word_read(&o->metrics->control_segments_sent);
+}
+
 static void flush_before_close(struct osoe_progress_owner *o)
 {
     /*
@@ -686,8 +701,7 @@ static void flush_before_close(struct osoe_progress_owner *o)
      * after the bootstrap timeout (second review, atomics F7).
      */
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, osoe_counter_word_read(&o->metrics->segments_sent),
-                           osoe.bootstrap.no_progress_ns);
+    osoe_stall_watch_begin(&watch, segments_sent(o), osoe.bootstrap.no_progress_ns);
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     while (!osoe_progress_idle(o)) {
         if (!osoe_progress_poll(o))
@@ -696,7 +710,7 @@ static void flush_before_close(struct osoe_progress_owner *o)
             continue;
         sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_sweep_expired("shmem_finalize");
-        uint64_t sent = osoe_counter_word_read(&o->metrics->segments_sent);
+        uint64_t sent = segments_sent(o);
         if (osoe_stall_watch_stalled(&watch, sent))
             osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
                        "flushing this node's last messages - segments sent has stayed at "
@@ -735,14 +749,19 @@ static void close_connections(struct osoe_progress_owner *o)
         uint32_t ended = 0;
         for (uint32_t i = 0; i < o->count; i++)
             ended += osoe_wire_ended(&o->wire[i]);
+        for (uint32_t slot = 0; slot < o->controls; slot++)
+            ended += osoe_wire_ended(&o->control_wire[slot]);
         if (osoe_stall_watch_stalled(&watch, ended))
             osoe_fatal("shmem_finalize: no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT) "
-                       "closing this node's connections - %u of %u peers have ended theirs; "
-                       "the others have not finalized",
-                       (unsigned long long)osoe_stall_watch_seconds(&watch), ended, o->count);
+                       "closing this node's connections - %u of %u wires have ended at the "
+                       "far end; the other peers have not finalized",
+                       (unsigned long long)osoe_stall_watch_seconds(&watch), ended,
+                       o->count + o->controls);
     }
     for (uint32_t i = 0; i < o->count; i++)
         osoe_wire_close(&o->wire[i]);
+    for (uint32_t slot = 0; slot < o->controls; slot++)
+        osoe_wire_close(&o->control_wire[slot]);
     osoe_ring_close(o->ring);
 }
 
@@ -778,6 +797,8 @@ void osoe_progress_host_abort(void)
      * read of v0.2 step 4, N6). */
     for (uint32_t i = 0; i < o->count; i++)
         osoe_wire_lift_unsent(&o->wire[i]);
+    for (uint32_t slot = 0; slot < o->controls; slot++)
+        osoe_wire_lift_unsent(&o->control_wire[slot]);
     uint32_t pe = 0;
     int status = EXIT_FAILURE;
     enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
@@ -836,6 +857,8 @@ void osoe_progress_host_stop(void)
         free(osoe_am.owner);
         free(osoe_am.progress.owner);
         free(osoe_am.wire);
+        free(osoe_am.control);
+        free(osoe_am.control_busy);
         free(osoe_am.connection);
         free(osoe_am.busy);
         free(osoe_am.descriptor);
@@ -844,6 +867,8 @@ void osoe_progress_host_stop(void)
         osoe_am.owner = NULL;
         osoe_am.progress.owner = NULL;
         osoe_am.wire = NULL;
+        osoe_am.control = NULL;
+        osoe_am.control_busy = NULL;
         osoe_am.connection = NULL;
         osoe_am.busy = NULL;
         osoe_am.descriptor = NULL;

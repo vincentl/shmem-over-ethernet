@@ -327,11 +327,12 @@ int main(void)
         return CHECK_DONE();
     }
 
-    /* The lead's connection to the other node, and the ring it drives it with
+    /* The lead's two wires to the other node - its data wire, and its control
+     * wire after it on the ring (owner-map.h) - and the ring it drives them with
      * (§6.2, ring.h). */
-    static struct osoe_wire wire;
+    static struct osoe_wire wires[2];
     static struct osoe_ring ring;
-    osoe_wires_open(&wire, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
+    osoe_wires_open(wires, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
     osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
@@ -339,11 +340,14 @@ int main(void)
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
                                        NULL, completed, NULL };
-    /* One owner, the lead's agent, holding the one wire (owner-map.h). */
+    /* One owner, the lead's agent, holding both wires (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;
+    static struct osoe_progress_control control[1];
+    static uint64_t control_busy[1];
     osoe_progress_init(&p, &area, &owner, &host);
-    osoe_progress_attach(&p, 0, &ring, &wire, connections, busy, descriptors, DESCRIPTORS);
+    osoe_progress_attach(&p, 0, &ring, &wires[0], connections, busy, descriptors, DESCRIPTORS);
+    osoe_progress_attach_control(&p, &wires[1], control, control_busy);
     /* Two nodes, so the tree is node 0 with node 1 as its only child. */
     static const uint32_t both[] = { 0, 1 };
     struct osoe_collective_tree tree;
@@ -609,7 +613,8 @@ done:
             check_fails++;
         }
     }
-    osoe_wire_close(&wire);
+    osoe_wire_close(&wires[0]);
+    osoe_wire_close(&wires[1]);
     osoe_ring_close(&ring);
     osoe_connection_area_close(&area);
     arrivals_close();

@@ -175,7 +175,7 @@ struct osoe_progress_team {
     /*
      * An epoch whose release has been forwarded to the children but not yet
      * applied to this node's members, or 0. Applied at the end of the pass,
-     * after the children's connections have been flushed, so the release
+     * after the children's control wires have been flushed, so the release
      * leaves for the next level before this level's local wake (§5.3).
      */
     uint32_t release_pending;
@@ -190,7 +190,15 @@ struct osoe_progress_team {
     uint32_t releases_queued;
 };
 
-/* An owner's private bookkeeping for one connection. Writers see only the
+/*
+ * Where a wire is in its close (§6.4, close_model.py): this node has sealed its
+ * goodbye toward the peer - the last segment it sends there, header-only and
+ * flagged - then sent it, then ended its stream. Each wire has its own (the
+ * progress helpers proposal's §3.1; close_model.py's two_wires).
+ */
+enum osoe_goodbye { OSOE_GOODBYE_NONE, OSOE_GOODBYE_SEALED, OSOE_GOODBYE_SENT };
+
+/* An owner's private bookkeeping for one data connection. Writers see only the
  * seal bit in the buffer's head (§3.5); none of this is shared. */
 struct osoe_progress_connection {
     uint8_t state[2];               /* enum osoe_buffer_state */
@@ -240,7 +248,7 @@ struct osoe_progress_connection {
      * peer's has arrived, so the end of its stream is a peer that finished and
      * not one that died.
      */
-    enum { OSOE_GOODBYE_NONE, OSOE_GOODBYE_SEALED, OSOE_GOODBYE_SENT } goodbye;
+    enum osoe_goodbye goodbye;
     bool peer_goodbye;
     /*
      * The abort (osoe_progress_abort, abort_model.py). `abort_done`: this
@@ -258,6 +266,39 @@ struct osoe_progress_connection {
     struct osoe_reply_queues queues;
 };
 
+/* A control wire's private send buffer: the most one segment of the control
+ * plane's messages takes, header included. */
+#define OSOE_PROGRESS_CONTROL_BYTES 4096u
+
+/*
+ * A node pair's control wire, as owner 0 keeps it (the progress helpers
+ * proposal's §3.1): the lead's alone, and nothing with a payload on it - the
+ * internode tree's ARRIVE and RELEASE, the deadlock detector's messages, the
+ * goodbye and the abortive goodbye. No PE writes a control message, so its
+ * send buffer is private and needs no reservation: the queue's messages are
+ * sealed into it a segment at a time, one send in flight (§3.3), and the next
+ * is sealed once that one has gone whole, so that a burst aggregates behind a
+ * send as §3.9's buffers do. Its stream is parsed as a data wire's, under the
+ * same segment header; nothing on it asks for an acknowledgement, since nothing
+ * waits for a control message to be applied (the proposal's "ordering between
+ * the planes").
+ */
+struct osoe_progress_control {
+    struct osoe_reply_queue queue;  /* the control plane's messages toward the peer */
+    uint32_t bytes;                 /* the sealed segment's length; 0 while none is */
+    uint32_t sent;                  /* bytes of it the wire has taken */
+    uint64_t next_seq;              /* the next segment's sequence */
+    enum osoe_goodbye goodbye;
+    bool peer_goodbye;
+    /* The abort, as a data connection's (osoe_progress_abort). */
+    bool abort_done;
+    bool peer_aborted;
+    uint32_t peer_abort_origin;
+    uint32_t abort_sent;
+    struct osoe_am_parser parser;
+    unsigned char buffer[OSOE_PROGRESS_CONTROL_BYTES];
+};
+
 /*
  * One owner's engine (owner-map.h): its ring and the wires it carries, the
  * connections over them, and everything a pass over them writes. Private to
@@ -266,10 +307,19 @@ struct osoe_progress_connection {
 struct osoe_progress_owner {
     struct osoe_progress *engine;               /* the node's, whose control plane is owner 0's */
     uint32_t index;                             /* 0, the lead's agent, or helper 1 to H */
-    uint32_t count;                             /* the wires it holds */
+    uint32_t count;                             /* the data wires it holds */
     struct osoe_ring *ring;                     /* carries them (ring.h) */
     struct osoe_wire *wire;                     /* `count`, by index (owner-map.h) */
     struct osoe_progress_connection *connection;/* `count`, by the same index */
+    /*
+     * Owner 0's alone: every peer's control wire, by peer slot - on the same
+     * ring, after the data wires (owner-map.h) - their bookkeeping, and a busy
+     * bit each, as the data connections' below. None for a helper.
+     */
+    uint32_t controls;
+    struct osoe_wire *control_wire;
+    struct osoe_progress_control *control;
+    uint64_t *control_busy;
     /*
      * One bit a connection by index: those with send-side work the owner
      * already knows about (busy()), kept current as that work appears and
@@ -364,11 +414,11 @@ void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *ar
 
 /*
  * Bind owner `owner`'s arrays, and put every connection of it into its
- * starting state: its wires, as many as owner-map.h gives it and in index
+ * starting state: its data wires, as many as owner-map.h gives it and in index
  * order, all carried by `ring`; as many connections; its busy bitmap, a bit a
- * wire; and `descriptors`, the pool backing its connections' queues (§3.8).
- * Separate from init because the caller owns the arrays: the loop never
- * allocates.
+ * wire; and `descriptors`, the pool backing its connections' queues (§3.8) -
+ * owner 0's, the control wires' too. Separate from init because the caller
+ * owns the arrays: the loop never allocates.
  */
 void osoe_progress_attach(struct osoe_progress *p, uint32_t owner, struct osoe_ring *ring,
                           struct osoe_wire *wires, struct osoe_progress_connection *connections,
@@ -394,6 +444,15 @@ void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_te
  * apply on this node.
  */
 bool osoe_progress_poll(struct osoe_progress_owner *o);
+
+/*
+ * Bind owner 0's control wires, one a peer by peer slot, on its ring after its
+ * data wires (owner-map.h), their bookkeeping, and a busy bitmap of
+ * (nodes - 1 + 63) / 64 words; and put each into its starting state. After
+ * osoe_progress_attach of owner 0.
+ */
+void osoe_progress_attach_control(struct osoe_progress *p, struct osoe_wire *wires,
+                                  struct osoe_progress_control *controls, uint64_t *busy);
 
 /*
  * Meet every team in a block below `count` whose record is published now, as
@@ -488,8 +547,8 @@ uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
  */
 bool osoe_progress_quiet(struct osoe_progress_owner *o, uint64_t *applied);
 
-/* Queue a deadlock detector message toward `node`'s lead, on the control queue
- * of owner 0's connection to it: the control plane's. */
+/* Queue a deadlock detector message toward `node`'s lead, on owner 0's control
+ * wire to it: the control plane's (the progress helpers proposal's §3.1). */
 void osoe_progress_deadlock_send(struct osoe_progress *p, uint32_t node,
                                  const struct osoe_deadlock_message *m);
 

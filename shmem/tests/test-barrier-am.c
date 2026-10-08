@@ -101,10 +101,12 @@ int main(void)
         return CHECK_DONE();
     }
 
-    /* This lead's connections to every other node, and the ring that carries
-     * them - the mesh a lead makes (§6.2). This thread drives the engine, so
-     * it enables the ring and is its only submitter (ring.h). */
-    static struct osoe_wire wires[MAX_NODES];
+    /* This lead's connections to every other node, two a peer - its data wires,
+     * then its control wires, on which the tree's messages go (owner-map.h) -
+     * and the ring that carries them: the mesh a lead makes (§6.2). This thread
+     * drives the engine, so it enables the ring and is its only submitter
+     * (ring.h). */
+    static struct osoe_wire wires[2 * MAX_NODES];
     static struct osoe_ring ring;
     uint32_t peers = b.node_count - 1;
     osoe_wires_open(wires, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
@@ -118,8 +120,11 @@ int main(void)
     /* One owner, the lead's agent, holding every wire (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;
+    static struct osoe_progress_control controls[MAX_NODES];
+    static uint64_t control_busy[(MAX_NODES + 63) / 64];
     osoe_progress_init(&p, &area, &owner, &host);
     osoe_progress_attach(&p, 0, &ring, wires, connections, busy, descriptors, DESCRIPTORS);
+    osoe_progress_attach_control(&p, &wires[peers], controls, control_busy);
 
     /* The world team's tree: every node, at the fan-out the environment gives
      * (OSOE_COLLECTIVE_FANOUT, so the same binary runs every shape). */
@@ -202,7 +207,7 @@ int main(void)
     CHECK(osoe_progress_closed(&owner));
 
 done:
-    for (uint32_t i = 0; i < peers; i++)
+    for (uint32_t i = 0; i < 2 * peers; i++)
         osoe_wire_close(&wires[i]);
     osoe_ring_close(&ring);
     osoe_connection_area_close(&area);

@@ -10,7 +10,7 @@
  *   ORDER      a queue is FIFO, so replies to one PE keep their order
  *   ROTATION   the bulk queue rotates, so one large reply cannot block the
  *              small ones behind it
- *   PRIORITY   the control queue drains to empty before the bulk queue gets
+ *   PRIORITY   the value queue drains to empty before the bulk queue gets
  *              the remaining space
  *   CHUNKS     a descriptor survives partial draining and pops only when it has
  *              sent everything it owed
@@ -214,30 +214,31 @@ int main(void)
     /* ---- PRIORITY and CHUNKS ---- */
     osoe_reply_pool_init(&pool, slots, POOL);
     osoe_reply_queues_init(&q);
-    /* One large get reply, and a barrier forward arriving behind it. */
+    /* One large get reply, and an AMO's result arriving behind it. */
     uint32_t big = enqueue(&q.bulk, 7, 1000);
     uint32_t small = enqueue(&q.bulk, 8, 40);
-    uint32_t forward = osoe_reply_take(&pool);
-    CHECK(forward != OSOE_REPLY_NONE);
-    osoe_reply_at(&pool, forward)->kind = OSOE_REPLY_AMO;
-    osoe_reply_at(&pool, forward)->origin_pe = 3;
-    osoe_reply_at(&pool, forward)->length = 8;
-    osoe_reply_push(&pool, &q.control, forward);
+    uint32_t value = osoe_reply_take(&pool);
+    CHECK(value != OSOE_REPLY_NONE);
+    osoe_reply_at(&pool, value)->kind = OSOE_REPLY_AMO;
+    osoe_reply_at(&pool, value)->origin_pe = 3;
+    osoe_reply_at(&pool, value)->length = 8;
+    osoe_reply_push(&pool, &q.values, value);
 
     /*
-     * The drain: control to empty first, then bulk round-robin at one chunk
-     * each. Barrier latency gates the whole job, so a forward behind a 1 MiB
-     * get reply stalls every PE - which is the case this ordering exists for,
-     * and the case a single FIFO would get wrong.
+     * The drain: values to empty first, then bulk round-robin at one chunk
+     * each. A thread is blocked on the value, so a result behind a 1 MiB get
+     * reply stalls it for no reason - which is the case this ordering exists
+     * for, and the case a single FIFO would get wrong. (The barrier's forwards,
+     * once the reason, have a wire of their own: progress.h.)
      */
-    uint32_t drained_control = 0;
-    while (osoe_reply_peek(&q.control) != OSOE_REPLY_NONE) {
-        uint32_t i = osoe_reply_pop(&pool, &q.control);
-        drained_control++;
+    uint32_t drained_values = 0;
+    while (osoe_reply_peek(&q.values) != OSOE_REPLY_NONE) {
+        uint32_t i = osoe_reply_pop(&pool, &q.values);
+        drained_values++;
         osoe_reply_give(&pool, i);
     }
-    CHECK(drained_control == 1);
-    CHECK(q.control.depth == 0);
+    CHECK(drained_values == 1);
+    CHECK(q.values.depth == 0);
     CHECK(osoe_reply_peek(&q.bulk) == big);    /* bulk untouched meanwhile */
 
     /* Now the bulk queue, 100 bytes per pass. The small reply must finish long

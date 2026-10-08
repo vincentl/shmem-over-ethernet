@@ -12,11 +12,12 @@
  * out at OSOE_TEST_HELPERS helpers - the area, the mesh, a ring an owner, the
  * engine's owners - and turns every owner from its one thread.
  *
- * Point-to-point traffic alone, since the control plane is owner 0's and at a
- * helper count owner 0 holds no wire: from every node to every other, a put, a
- * blocking get and a fetching AMO, each checked to land on the node it names
- * with the bytes its sender wrote; and the per-connection records read by peer
- * slot, each counting what came from its own peer. Run at 2 and 3 helpers on 5
+ * From every node to every other, a put, a blocking get and a fetching AMO,
+ * each checked to land on the node it names with the bytes its sender wrote,
+ * and the per-connection records read by peer slot, each counting what came
+ * from its own peer; then a barrier over every node, whose messages ride owner
+ * 0's control wires while the helpers' rings carry the data (the progress
+ * helpers proposal's §3.1). Run at 2 and 3 helpers on 5
  * to 9 nodes, where index and slot differ for most wires, it fails on an index
  * taken for a slot in the mesh's attach, in the pass's wire or in the
  * connection records (the read's mutations).
@@ -35,6 +36,7 @@
 #include "base/deadline.h"
 #include "bootstrap.h"
 #include "check.h"
+#include "collective-tree.h"
 #include "connection-area.h"
 #include "node.h"
 #include "owner-map.h"
@@ -126,12 +128,13 @@ static void notify(void *context, uint32_t pe, uint16_t region, uint64_t offset,
     (void)context; (void)pe; (void)region; (void)offset; (void)length;
 }
 
+/* The barrier's release on this node (§5.3): the epoch it released. */
+static uint32_t released_epoch;
+
 static void release(void *context, uint32_t team, uint32_t epoch)
 {
-    (void)context;
-    fprintf(stderr, "node %u: a release of team %u epoch %u, and this test has no team\n",
-            my_node, team, epoch);
-    exit(1);
+    (void)context; (void)team;
+    released_epoch = epoch;
 }
 
 static unsigned char *landing_request(void *context, uint32_t pe, uint64_t token,
@@ -241,9 +244,10 @@ int main(void)
 
     osoe_connection_area_open(&area, &b, nodes, helpers, 0, OSOE_SHM_ANY_CREATOR);
 
-    /* The mesh, each wire on its owner's ring at its index; every ring enabled
-     * here, this thread the one submitter of each (ring.h). */
-    static struct osoe_wire wires[MAX_NODES];
+    /* The mesh, two wires a pair: each data wire on its owner's ring at its
+     * index, each control wire on owner 0's after its data wires (owner-map.h);
+     * every ring enabled here, this thread the one submitter of each (ring.h). */
+    static struct osoe_wire wires[2 * MAX_NODES];
     static struct osoe_ring rings[MAX_OWNERS];
     struct osoe_ring *ring_of[MAX_OWNERS];
     for (uint32_t o = 0; o < owner_count; o++)
@@ -253,17 +257,27 @@ int main(void)
         osoe_ring_enable(&rings[o]);
 
     static struct osoe_progress_connection connections[MAX_NODES];
+    static struct osoe_progress_control controls[MAX_NODES];
+    static uint64_t control_busy[1];
     static uint64_t busy[MAX_OWNERS];
     static struct osoe_reply descriptors[MAX_OWNERS][DESCRIPTORS];
     static struct osoe_am_connection_metrics metrics[MAX_NODES];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
                                        NULL, completed, NULL };
     osoe_progress_init(&engine, &area, owners, &host);
-    for (uint32_t o = 0; o < owner_count; o++) {
-        uint32_t first = osoe_owner_first(o, peers, helpers);
-        osoe_progress_attach(&engine, o, &rings[o], &wires[first], &connections[first],
-                             &busy[o], descriptors[o], DESCRIPTORS);
-    }
+    for (uint32_t o = 0; o < owner_count; o++)
+        osoe_progress_attach(&engine, o, &rings[o], &wires[osoe_ring_first(o, peers, helpers)],
+                             &connections[osoe_owner_first(o, peers, helpers)], &busy[o],
+                             descriptors[o], DESCRIPTORS);
+    osoe_progress_attach_control(&engine, &wires[osoe_control_ring_index(0, peers, helpers)],
+                                 controls, control_busy);
+    /* The world team's tree, every node in it, at a fan-out of 2. */
+    uint32_t members[MAX_NODES];
+    for (uint32_t n = 0; n < nodes; n++)
+        members[n] = n;
+    struct osoe_collective_tree tree;
+    CHECK_FATAL(osoe_collective_tree(members, nodes, my_node, 2, &tree));
+    osoe_progress_team(&engine, 0, &tree);
     /* The connection records, by peer slot, as progress-host.c binds them. */
     for (uint32_t s = 0; s < peers; s++)
         atomic_store_explicit(&metrics[s].peer, s < my_node ? s : s + 1, memory_order_release);
@@ -358,7 +372,18 @@ int main(void)
             }
     }
 
-    /* The close, every owner's connections (§6.4). */
+    /*
+     * A barrier over every node, on the control wires: this node's arrival,
+     * and its release, which comes once every node has arrived. Every node has
+     * had its last data from every other (above), so the close that follows
+     * has none in flight but replies' acknowledgements.
+     */
+    enum { EPOCH = 7 };
+    osoe_progress_arrive(&engine, 0, 0, EPOCH);
+    while (released_epoch != EPOCH)
+        turn();
+
+    /* The close, every owner's wires (§6.4), each its own goodbye. */
     for (uint32_t o = 0; o < owner_count; o++)
         osoe_progress_close(&owners[o]);
     for (;;) {
@@ -389,20 +414,23 @@ int main(void)
         }
         CHECK(osoe_progress_acked(&engine, s < my_node ? s : s + 1) > 0);
     }
-    /* And each owner counted its own wires' traffic, owner 0 none at a helper
-     * count. */
+    /* And each owner counted its own data wires' traffic - owner 0 none at a
+     * helper count - and owner 0 the barrier's on its control wires, a message
+     * at least on every node: a child's arrival or the parent's release. */
     for (uint32_t o = 0; o < owner_count; o++) {
         uint64_t applied = atomic_load_explicit(&owners[o].metrics->messages_applied,
                                                 memory_order_acquire);
         uint32_t held = osoe_owner_wires(o, peers, helpers);
         if (held ? applied < 5 * (uint64_t)held : applied != 0) {
-            fprintf(stderr, "node %u: owner %u, of %u wires, applied %llu messages\n",
+            fprintf(stderr, "node %u: owner %u, of %u data wires, applied %llu messages\n",
                     my_node, o, held, (unsigned long long)applied);
             CHECK(false);
         }
     }
+    CHECK(atomic_load_explicit(&owners[0].metrics->control_messages_applied,
+                               memory_order_acquire) >= 1);
 
-    for (uint32_t i = 0; i < peers; i++)
+    for (uint32_t i = 0; i < 2 * peers; i++)
         osoe_wire_close(&wires[i]);
     for (uint32_t o = 0; o < owner_count; o++)
         osoe_ring_close(&rings[o]);

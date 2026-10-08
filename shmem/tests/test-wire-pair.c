@@ -86,27 +86,30 @@ int main(void)
         .port_high = OSOE_DEFAULT_PORT_HIGH,
     };
 
-    /* One wire, toward the other node, and the ring that carries it: the same
-     * connection a lead makes (§6.2: node 0 connects, node 1 accepts). */
-    struct osoe_wire w;
+    /* The two wires toward the other node, and the ring that carries them: the
+     * connections a lead makes (§6.2: node 0 connects, node 1 accepts), its data
+     * wire first on the ring and its control wire after it (owner-map.h). This
+     * test streams on the data wire; the control wire carries nothing. */
+    struct osoe_wire wires[2];
     struct osoe_ring ring;
-    osoe_wires_open(&w, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
+    osoe_wires_open(wires, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
     osoe_ring_enable(&ring);
+    struct osoe_wire *w = &wires[0];
 
     /* Keepalive is on, at its defaults, on every node-pair socket (wire.c,
      * §3.15) - which only tier 3's cut link would otherwise notice gone. */
     int keepalive = 0, idle = 0, interval = 0, count = 0;
     socklen_t length = sizeof keepalive;
-    CHECK(getsockopt(w.fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, &length) == 0 &&
+    CHECK(getsockopt(w->fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, &length) == 0 &&
           keepalive == 1);
     length = sizeof idle;
-    CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, &length) == 0 &&
+    CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, &length) == 0 &&
           idle == OSOE_DEFAULT_KEEPALIVE_IDLE_S);
     length = sizeof interval;
-    CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, &length) == 0 &&
+    CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, &length) == 0 &&
           interval == OSOE_DEFAULT_KEEPALIVE_INTERVAL_S);
     length = sizeof count;
-    CHECK(getsockopt(w.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, &length) == 0 &&
+    CHECK(getsockopt(w->fd, IPPROTO_TCP, TCP_KEEPCNT, &count, &length) == 0 &&
           count == OSOE_DEFAULT_KEEPALIVE_COUNT);
 
     unsigned char out[CHUNK];
@@ -132,7 +135,7 @@ int main(void)
                     out[i] = pattern(me, sent + i);
                 filled = sent;
             }
-            size_t n = osoe_wire_send(&w, out, want);
+            size_t n = osoe_wire_send(w, out, want);
             sent += n;
             moved |= n > 0;
         }
@@ -140,7 +143,7 @@ int main(void)
         /* Empty the wire before the next reap, as the engine does (§3.3). */
         for (;;) {
             const unsigned char *in;
-            size_t n = osoe_wire_peek(&w, &in);
+            size_t n = osoe_wire_peek(w, &in);
             if (n == 0)
                 break;
             for (size_t i = 0; i < n; i++)
@@ -150,7 +153,7 @@ int main(void)
                             pattern(peer, got + i), peer);
                     CHECK_FATAL(false);
                 }
-            osoe_wire_consume(&w, n);
+            osoe_wire_consume(w, n);
             got += n;
             moved = true;
         }
@@ -174,16 +177,17 @@ int main(void)
      * connection the peer is still sending on (close_model.py). No bytes may
      * arrive after the payload.
      */
-    osoe_wire_shutdown(&w);
+    osoe_wire_shutdown(w);
     struct osoe_deadline d = osoe_deadline_in(UINT64_C(10000000000));
-    while (!osoe_wire_ended(&w) && !osoe_deadline_expired(&d)) {
+    while (!osoe_wire_ended(w) && !osoe_deadline_expired(&d)) {
         osoe_ring_reap(&ring);
         const unsigned char *in;
-        CHECK(osoe_wire_peek(&w, &in) == 0);
+        CHECK(osoe_wire_peek(w, &in) == 0);
         osoe_ring_wait(&ring, UINT64_C(1000000));
     }
-    CHECK(osoe_wire_ended(&w));
-    osoe_wire_close(&w);
+    CHECK(osoe_wire_ended(w));
+    osoe_wire_close(w);
+    osoe_wire_close(&wires[1]);
     osoe_ring_close(&ring);
     return CHECK_DONE();
 }

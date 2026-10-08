@@ -100,7 +100,7 @@ static inline uint32_t osoe_ring_first(uint32_t owner, uint32_t peers, uint32_t 
 
 /* Peer slot `slot`'s control wire: its place on owner 0's ring, and so in an
  * array grouped by ring. */
-static inline uint32_t osoe_control_ring_slot(uint32_t slot, uint32_t peers, uint32_t helpers)
+static inline uint32_t osoe_control_ring_index(uint32_t slot, uint32_t peers, uint32_t helpers)
 {
     return osoe_owner_wires(0, peers, helpers) + slot;
 }
