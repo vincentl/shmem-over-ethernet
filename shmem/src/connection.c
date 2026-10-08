@@ -35,11 +35,12 @@ void osoe_connection_init(struct osoe_connection *c, uint32_t credits)
 enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, uint32_t len,
                                         struct osoe_reservation *r)
 {
-    return osoe_connection_reserve_up_to(c, len, len, r);
+    return osoe_connection_reserve_up_to(c, len, len, 0, r);
 }
 
 enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connection *c,
                                                            uint32_t most, uint32_t least,
+                                                           uint32_t keep,
                                                            struct osoe_reservation *r)
 {
     struct osoe_connection_shared *s = c->s;
@@ -67,14 +68,21 @@ enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connectio
             return OSOE_RESERVATION_NONE;
 
         /*
-         * As much of `most` as the room after this head holds, whole messages
-         * being 8-byte padded - and decided from the head the CAS below
-         * compares, never from another load of it, or a writer could reserve
-         * past the buffer's end (reservation_model.py, `fill_stale`). Less
-         * than `least` fits: the caller asks for a seal, then retries.
+         * As much of `most` as the room after this head holds, less `keep`,
+         * whole messages being 8-byte padded - and decided from the head the
+         * CAS below compares, never from another load of it, or a writer could
+         * reserve past the buffer's end (reservation_model.py, `fill_stale`).
+         * The room is asked whether it exceeds `keep` before `keep` is taken
+         * from it, since unsigned arithmetic would wrap (`tail_underflow`).
+         * Less than `least` fits: the caller asks for a seal, then retries.
+         * The mask changes nothing while heads, capacities and `keep` are
+         * multiples of 8, as every padded message and every buffer size keeps
+         * them; it keeps the length padded by construction rather than by
+         * that argument.
          */
         uint32_t room = h < c->capacity ? c->capacity - h : 0;
-        uint32_t len = most <= room ? most : room & ~(OSOE_MESSAGE_ALIGN - 1);
+        uint32_t usable = room > keep ? room - keep : 0;
+        uint32_t len = most <= usable ? most : usable & ~(OSOE_MESSAGE_ALIGN - 1);
         if (len < least)
             return OSOE_RESERVATION_FULL;
 

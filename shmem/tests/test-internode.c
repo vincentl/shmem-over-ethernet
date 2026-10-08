@@ -10,7 +10,8 @@
  * reach before get and the atomics land.
  *
  * **Three sizes, and the middle one is the point.** A put shorter than an AM
- * chunk is one message; one longer is several (§3.2), and the loop that splits
+ * chunk is one message unless it fills the room a buffer has left; one longer
+ * is several (§3.2), and the loop that splits
  * it is where an off-by-one lands in someone else's bytes rather than in a
  * crash. The chunk is pinned small by the test's environment so that the
  * splitting path runs in a test that finishes in a second.
@@ -321,7 +322,9 @@ int main(void)
             source[i] = pattern(me, partner, i);
         shmem_putmem_signal(inbox + stride * (size_t)me, source, len, signal, 1,
                             SHMEM_SIGNAL_SET, partner);
-        shmem_quiet();
+        /* Wait and check before this PE's own quiet: the quiet's round trip
+         * would give the sender's bytes time to land behind its signal, and
+         * hide the reordering this checks for. */
         shmem_uint64_wait_until(signal, SHMEM_CMP_NE, 0);
         const unsigned char *got_bytes = inbox + stride * (size_t)sender;
         int bad = -1;
@@ -332,6 +335,7 @@ int main(void)
             fprintf(stderr, "PE %d: signal arrived before byte %d of %zu from PE %d\n",
                     me, bad, len, sender);
         CHECK(bad < 0);
+        shmem_quiet();
         shmem_barrier_all();
     }
     shmem_barrier_all();

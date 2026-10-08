@@ -144,8 +144,8 @@ record's own:
   and 14 earlier breakages are unchanged.
 - **The C.** `osoe_connection_reserve_up_to(connection, most, least, r)`, with
   `osoe_connection_reserve` its case `least == most`, one CAS loop; the put's
-  part cut to what it took, down to a sixteenth of its largest part - 4 KiB at
-  the default chunk, 62 bytes at the tests' 1 KiB chunk, so that their tiny
+  part cut to what it took, down to a sixteenth of its largest part - 4,094
+  bytes at the default chunk, 62 at the tests' 1 KiB chunk, so that their tiny
   buffers cut puts too. The kernel's side does not change: one send in flight a
   wire, a short send offered again from its byte, the peer's parse across
   provided buffers; `shmem.internode.*` and `shmem.multinode.*` run every put
@@ -167,6 +167,39 @@ record's own:
   against 0.18 to 0.20, the library at 6,420 to 6,650 MiB/s and its floor at
   14,172 to 15,157 over 21 pairs; the median round trips of a get, a put with
   quiet and a fetch-add unchanged at 55 µs.
+
+## What a small message waits behind a stream, on the Pi
+
+Item 10's caveat measured (`docs/design/evidence/v0.2-step4/2026-10-07-pi-head-of-line/`):
+two Pi nodes, two PEs each, PE 0 streaming 1 MiB puts to node 1 while PE 1 times
+fetch-adds to node 1 over the same connection, the branch's tree at `8a0e2fd`,
+alternating, each line two or three runs:
+
+| Connection buffer | Kernel's unsent queue | Fetch-add, median | p99 | Stream |
+|---|---|---|---|---|
+| (no stream) | - | 171-173 µs | 176-178 µs | - |
+| 128 KiB | uncapped (today) | 16.1-22.2 ms | 24.9-27.1 ms | 112 MiB/s |
+| 256 KiB | uncapped | 21.1-21.6 ms | 23.3-29.4 ms | 112 MiB/s |
+| 512 KiB | uncapped | 21.6-22.2 ms | 26.0-31.6 ms | 112 MiB/s |
+| 128 KiB | 16 KiB | 3.87 ms | 4.99 ms | 112 MiB/s |
+| 128 KiB | 128 KiB | 5.0-5.5 ms | 6.1 ms | 112 MiB/s |
+| 128 KiB | 512 KiB | 8.3 ms | 9.5-10.0 ms | 112 MiB/s |
+| 256 KiB | 16 KiB | 3.88 ms | 6.65 ms | 112 MiB/s |
+| 512 KiB | 16 KiB | 5.2-5.5 ms | 9.4-10.0 ms | 112 MiB/s |
+
+- **Today a fetch-add waits about 21 ms behind a stream at a gigabit, whatever the
+  buffer.** The library sets no socket buffer and no cap on the kernel's unsent
+  queue (`wire.c` sets `TCP_NODELAY` alone), so the kernel queues some 2.6 MB
+  ahead of it. §3.2's bound - "roughly two segments", about 2 ms on 1 GbE - is
+  not what is built. The control wire (Part 2) takes a barrier off this queue;
+  a fetch-add, a get or a small put stays on it.
+- **Capping the unsent queue** (`TCP_NOTSENT_LOWAT`, an experiment by the
+  environment, `notsent-lowat-experiment.patch`) takes the wait to 3.9 ms at
+  16 KiB, with the stream at line rate. The kernel then holds what is in flight
+  and a few kilobytes; the library's two buffers hold the rest.
+- **With the queue capped the buffer shows**: 256 KiB buffers cost the p99 1.7
+  ms and not the median, 512 KiB both. Without the cap the buffer is lost in the
+  kernel's queue.
 
 ## What goes on meanwhile
 

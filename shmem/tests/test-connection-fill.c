@@ -16,7 +16,9 @@
  *   STALESEQ  the sequence number a writer read after reserving is the one of
  *             the segment its part went out in
  *   FLOOR     a part shorter than the floor is the last of its message
- *   FILL      a part cut short ends its buffer: nothing was room for more
+ *   FILL      a part cut short took the room to the spare: nothing more fitted
+ *   TAIL      after a cut part, only messages no larger than the spare - the
+ *             small messages it was left for
  *   BYTES     every payload byte is the one its writer wrote there
  *   ACCT      filled never exceeds the reserved count
  *
@@ -38,13 +40,15 @@
 #include "connection.h"
 
 enum {
-    WRITERS = 4,
+    WRITERS = 4,                    /* the last sends small messages, whole */
     MESSAGES = 300,                 /* a writer's */
     CAPACITY = 1024,                /* a buffer's bytes: small, so messages split often */
     FLOOR = 64,                     /* the least payload a cut part takes */
+    SPARE = 128,                    /* what a cut part leaves at a buffer's end */
     LONGEST = 2 * CAPACITY,         /* a message's longest payload */
     MAX_REPLIES = 256,
 };
+#define SMALL_WRITER (WRITERS - 1)
 #define REPLY_ID WRITERS
 
 /* A part's fixed field, after the message header: whose, which message, where
@@ -74,14 +78,17 @@ static unsigned char pattern(uint32_t writer, uint32_t message, uint32_t j)
 }
 
 /* A message's length, from the writer and its index alone, so the receiver
- * can check it: every length from 1 to LONGEST turns up across the writers. */
+ * can check it: lengths spread over 1 to LONGEST across the writers. */
 static uint32_t length_of(uint32_t writer, uint32_t message)
 {
     uint32_t x = writer * 2654435761u ^ message * 40503u;
     x ^= x >> 13;
     x *= 0x5bd1e995u;
     x ^= x >> 15;
-    return 1 + x % LONGEST;
+    /* The small writer's fit the spare whole, header and fixed part too. */
+    uint32_t longest = writer == SMALL_WRITER ?
+        SPARE - (uint32_t)(sizeof(struct osoe_message_header) + sizeof(struct part)) : LONGEST;
+    return 1 + x % longest;
 }
 
 static void *writer_main(void *arg)
@@ -102,10 +109,13 @@ static void *writer_main(void *arg)
             uint32_t most = osoe_message_padded((uint32_t)sizeof(struct part) + n);
             uint32_t least = osoe_message_padded((uint32_t)sizeof(struct part) +
                                                  (n < FLOOR ? n : FLOOR));
+            uint32_t keep = most <= SPARE ? 0 : SPARE;
+            if (me == SMALL_WRITER)
+                least = most;           /* a small message is reserved whole */
             struct osoe_reservation r;
             for (;;) {
                 enum osoe_reservation_status st =
-                    osoe_connection_reserve_up_to(&connection, most, least, &r);
+                    osoe_connection_reserve_up_to(&connection, most, least, keep, &r);
                 if (st == OSOE_RESERVATION_OK)
                     break;
                 sched_yield();
@@ -136,7 +146,7 @@ static struct {
     uint32_t message, next;
 } expect[WRITERS];
 static uint32_t replies_delivered;
-static uint64_t parts_delivered, parts_cut;
+static uint64_t parts_delivered, parts_cut, small_in_spare;
 
 /* Parse a sealed buffer as a receiver would. */
 static void deliver(uint32_t k, uint32_t bytes)
@@ -147,10 +157,12 @@ static void deliver(uint32_t k, uint32_t bytes)
     uint32_t overhead = (uint32_t)(sizeof(struct osoe_message_header) + sizeof(struct part));
 
     uint32_t off = (uint32_t)sizeof sh, count = 0;
+    bool after_cut = false;
     while (off < bytes) {
         struct osoe_message_header mh;
         memcpy(&mh, base + off, sizeof mh);
         CHECK(mh.kind <= REPLY_ID && mh.len >= sizeof(struct part));
+        CHECK(!after_cut || osoe_message_padded(mh.len) <= SPARE);         /* TAIL */
         if (!(mh.kind <= REPLY_ID && mh.len >= sizeof(struct part)))
             return;
         struct part p;
@@ -176,12 +188,16 @@ static void deliver(uint32_t k, uint32_t bytes)
                     break;
                 }
             if (p.cut) {
-                /* FILL: cut short, so it took the room to the last whole
-                 * 8 bytes, and nothing came after it in this buffer. */
+                /* FILL: cut short, so it took the room to the spare, to the
+                 * last whole 8 bytes. */
                 uint32_t end = off + osoe_message_padded(mh.len);
-                CHECK(!last && end == bytes && CAPACITY - end < OSOE_MESSAGE_ALIGN);
+                CHECK(!last && end <= CAPACITY - SPARE &&
+                      CAPACITY - SPARE - end < OSOE_MESSAGE_ALIGN);
+                after_cut = true;
                 parts_cut++;
             }
+            if (w == SMALL_WRITER && after_cut)
+                small_in_spare++;
             expect[w].next = last ? 0 : p.start + n;
             expect[w].message += last;
         }
@@ -309,9 +325,12 @@ int main(void)
         pthread_join(th[i], NULL);
 
     CHECK(drained > 0 && replies_delivered == drained);
-    /* The test is only a test of filling if parts were cut. */
+    /* The test is only a test of filling if parts were cut, and of the spare if
+     * small messages landed in it. */
     CHECK(parts_cut > 0);
-    printf("parts %llu, of them cut to fill the room %llu, replies %u\n",
-           (unsigned long long)parts_delivered, (unsigned long long)parts_cut, drained);
+    CHECK(small_in_spare > 0);
+    printf("parts %llu, of them cut to fill the room %llu, small messages in a spare %llu, "
+           "replies %u\n", (unsigned long long)parts_delivered, (unsigned long long)parts_cut,
+           (unsigned long long)small_in_spare, drained);
     return CHECK_DONE();
 }

@@ -266,15 +266,19 @@ enum osoe_reservation_status osoe_connection_reserve(struct osoe_connection *c, 
                                         struct osoe_reservation *r);
 
 /*
- * Reserve as much of `most` bytes as the open buffer has room for, and at
- * least `least` - both padded with osoe_message_padded, `least` no more than
- * `most`; r->len says how much was taken. A put fills the room this way, its
- * message cut to the length taken, so that a buffer carries what it can hold
- * rather than one chunk and a gap (v0.2 step 4's first rung; §3.5).
- * osoe_connection_reserve is the case `least` == `most`: a message whole.
+ * Reserve as much of `most` bytes as the open buffer has room for, less `keep`
+ * bytes left at its end, and at least `least` - `most` and `least` padded with
+ * osoe_message_padded, `least` no more than `most`; r->len says how much was
+ * taken. A put fills the room this way, its message cut to the length taken, so
+ * that a buffer carries what it can hold rather than one chunk and a gap, and
+ * keeps a spare at the end for the small messages - a fetch-add, a get's
+ * request - that a stream would otherwise hold back a turnover (v0.2 step 4's
+ * first rung; §3.5). osoe_connection_reserve is the case `least` == `most`,
+ * `keep` 0: a message whole, which may take the spare.
  */
 enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connection *c,
                                                            uint32_t most, uint32_t least,
+                                                           uint32_t keep,
                                                            struct osoe_reservation *r);
 
 /* Where a granted reservation's bytes go. */
