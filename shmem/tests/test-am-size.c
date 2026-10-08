@@ -7,6 +7,7 @@
  * count" - plus §3.4's floor, which is the one rule the budget must never be
  * allowed to break.
  */
+#define _GNU_SOURCE                     /* unsetenv, under shmem.strict-c11's -std=c11 */
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
