@@ -649,9 +649,16 @@ loopback is the largest gap the ladder has met that is the library's own
 protocol. (b) until then, the README saying so. *Undo:* the blocking get one
 piece at a time again.
 
+## The fourth rung's verification
+
+At `a779bac`, the read's fixes in: the four presets with the floor pins on -
+debug 828, release 828, asan 813, tsan 576, every test passing; tier 3, 113;
+`osoe-pacer` mailbox and collectives a minute each and mix ten minutes, no
+failure; the models whole, 34; the SOS suite at 4 x 2, 161 built and passing on
+every map, its two extensions failing as at the tag. Merged into `main`.
+
 ## What goes on now
 
-The fourth rung goes to its adversarial read and its verification, then to
-`main`. Then the ladder's last rung, the zero-copy send behind a setting off by
+The fourth rung is on `main`. Then the ladder's last rung, the zero-copy send behind a setting off by
 default (`2026-10-07.md` item 7), modelled first; then the ladder's result in
 the README, in place of "two thirds"; then Part 1.
