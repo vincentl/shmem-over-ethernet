@@ -5,7 +5,7 @@
 # mutant (the STREAM pin). Builds in /tmp/ladder. Takes the VM lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 OUT=$1; mkdir -p $OUT; : > $OUT/tip.txt
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 for b in fill2 tip; do
   W=/tmp/ladder/$b/work; mkdir -p $W
   [ -x $W/putstream ] || /tmp/ladder/$b/build/release/tools/wrapper/oshcc -O2 -o $W/putstream $S/putstream.c

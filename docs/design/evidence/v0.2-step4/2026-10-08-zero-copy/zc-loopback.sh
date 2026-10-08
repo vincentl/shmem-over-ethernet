@@ -4,7 +4,7 @@
 # nodes' counters over 5 s of each run. usage: zc-loopback.sh OUT NAME. Takes the lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 OUT=$1; NAME=$2; mkdir -p $OUT; : > $OUT/zc-loopback.txt
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 B=/tmp/ladder/$NAME/build/release; W=/tmp/ladder/$NAME/work; mkdir -p $W
 [ -x $W/putstream ] || $B/tools/wrapper/oshcc -O2 -g -o $W/putstream $S/putstream.c || exit 1
 for put in 65536 1048576; do

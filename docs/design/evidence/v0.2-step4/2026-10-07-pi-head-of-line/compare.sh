@@ -11,7 +11,7 @@ echo "start $(date +%H:%M:%S)" >> $LOG
 rsync -a --delete --exclude=/build --exclude=/.git "$TIP"/ pi-login:osoe/ || { echo "rsync failed" >> $LOG; exit 1; }
 ssh pi-login 'rm -rf osoe/build/ladder osoe/build/base-src && mkdir -p osoe/build/ladder osoe/build/base-src' || exit 1
 rsync -a --exclude=/build --exclude=/.git "$BASE"/ pi-login:osoe/build/base-src/ || exit 1
-scp -q /Users/vincent/shmem-over-ethernet/build/scratch/ladder/hol.c /Users/vincent/shmem-over-ethernet/build/scratch/ladder/hol-many.c pi-login:osoe/build/ladder/ || exit 1
+scp -q <repo>/build/scratch/ladder/hol.c <repo>/build/scratch/ladder/hol-many.c pi-login:osoe/build/ladder/ || exit 1
 ssh pi-login 'cd osoe && cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > build/ladder/build.txt 2>&1; echo "tip built: $?"
   build/release/tools/wrapper/oshcc -O2 -o build/ladder/hol build/ladder/hol.c; echo "hol: $?"
   build/release/tools/wrapper/oshcc -O2 -o build/ladder/hol-many build/ladder/hol-many.c; echo "hol-many: $?"

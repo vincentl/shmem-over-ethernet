@@ -1,4 +1,4 @@
---- /Users/vincent/shmem-over-ethernet/build/scratch/wt/one-thread-ladder/shmem/src/wire.c	2026-10-07 19:58:02
+--- <repo>/build/scratch/wt/one-thread-ladder/shmem/src/wire.c	2026-10-07 19:58:02
 +++ shmem/src/wire.c	2026-10-07 21:01:44
 @@ -71,6 +71,13 @@
      int one = 1;

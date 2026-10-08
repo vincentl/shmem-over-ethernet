@@ -69,7 +69,7 @@ void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t 
                    "(Linux 6.0, and 6.2 for the usage report it asks)");
 }
 
-void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
+void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
                       uint32_t peer, const struct osoe_bootstrap *b)
 {
     struct osoe_wire_settings settings;
@@ -77,7 +77,7 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
     const struct osoe_wire_settings *s = &settings;
     /* The seed differs per peer, so the two directions of a pair - and two
      * wires in one test process - split differently. */
-    *w = (struct osoe_wire){ .fd = fd, .peer = peer, .slot = slot, .ring = r,
+    *w = (struct osoe_wire){ .fd = fd, .peer = peer, .index = index, .ring = r,
                              .first = OSOE_RING_NONE, .last = OSOE_RING_NONE, .sent = -1,
                              .seed = osoe_wire_hash(s->seed ^ ((uint64_t)b->node << 32) ^ peer),
                              .split = s->split, .zero_copy = s->zero_copy,
@@ -284,11 +284,11 @@ static size_t send_from(struct osoe_wire *w, const void *buffer, size_t len, uin
          * those pages, which over TCP is once the peer has acknowledged them. The
          * notification says too whether the kernel copied after all (ring.c). */
         io_uring_prep_send_zc(sqe, w->fd, buffer, n, MSG_NOSIGNAL, IORING_SEND_ZC_REPORT_USAGE);
-        io_uring_sqe_set_data64(sqe, osoe_ring_send_tag(w->slot, lent));
+        io_uring_sqe_set_data64(sqe, osoe_ring_send_tag(w->index, lent));
         w->ring->counts.zero_copy_sends++;
     } else {
         io_uring_prep_send(sqe, w->fd, buffer, n, MSG_NOSIGNAL);
-        io_uring_sqe_set_data64(sqe, osoe_ring_send_tag(w->slot, OSOE_WIRE_LENT_REGIONS));
+        io_uring_sqe_set_data64(sqe, osoe_ring_send_tag(w->index, OSOE_WIRE_LENT_REGIONS));
     }
     w->send_at = buffer;
     w->send_bytes = n;

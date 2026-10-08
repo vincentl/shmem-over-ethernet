@@ -3,7 +3,7 @@
 # usage: ab.sh OUT ROUNDS SECONDS BYTES NAME... (each NAME a build in /tmp/ladder)
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 OUT=$1; ROUNDS=$2; SECONDS_EACH=$3; BYTES=$4; shift 4
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 mkdir -p $OUT
 for NAME in "$@"; do
   W=/tmp/ladder/$NAME/work; mkdir -p $W

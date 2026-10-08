@@ -5,7 +5,7 @@
 # usage: buffers-sweep.sh OUT NAME ROUNDS BYTES CONFIG... (CONFIG = size x count)
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1
 OUT=$1; NAME=$2; ROUNDS=$3; PUT=$4; shift 4; mkdir -p $OUT
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 B=/tmp/ladder/$NAME/build/release; W=/tmp/ladder/$NAME/work; mkdir -p $W
 [ -x $W/putstream ] || $B/tools/wrapper/oshcc -O2 -g -o $W/putstream $S/putstream.c || exit 1
 L=$B/tools/launch/osoe-launch; STAT=$B/tools/stat/osoe-stat

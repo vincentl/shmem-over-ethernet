@@ -59,7 +59,7 @@
 struct osoe_wire {
     int fd;
     uint32_t peer;              /* the node at the other end */
-    uint32_t slot;              /* its place in the ring's wires */
+    uint32_t index;             /* its place among its ring's wires (owner-map.h) */
     struct osoe_ring *ring;
     /* Receiving: provided buffers the reap queued here, oldest first. */
     uint32_t first, last;       /* buffer numbers, or OSOE_RING_NONE */
@@ -126,13 +126,13 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
  * The two halves of osoe_wires_open, for a caller that makes its own
  * connections - a test holding both ends of one in a single process. The ring
  * for `count` wires, sized from OSOE_WIRE_BYTES and OSOE_WIRE_BUFFERS and
- * disabled until enabled; and a connected socket made wire `slot` of it, toward
+ * disabled until enabled; and a connected socket made wire `index` of it, toward
  * node `peer`.
  */
 
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          const struct osoe_bootstrap *b);
-void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, int fd,
+void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
                       uint32_t peer, const struct osoe_bootstrap *b);
 
 /*

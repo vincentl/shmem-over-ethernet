@@ -102,7 +102,7 @@ struct osoe_connection_area {
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
     uint32_t credits;       /* §3.8's C, so the pool can be sized by it */
-    struct osoe_connection *connection; /* nodes - 1 handles, indexed by peer_slot() */
+    struct osoe_connection *connection; /* nodes - 1 handles, by peer slot (osoe_peer_slot) */
     bool creator;           /* this PE is the node lead, so it made the object */
     uint32_t helpers;       /* the node's progress helpers (owner-map.h) */
     struct osoe_connection_area_owner *owner;   /* helpers + 1, by owner */
@@ -125,6 +125,22 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
 void osoe_connection_area_close(struct osoe_connection_area *a);
 
 /*
+ * The owner of this node's connection toward `peer` (owner-map.h), and in
+ * `*index` the connection's index among that owner's wires: the one place a
+ * writer names the owner, for its mark below and for the wake after it
+ * (osoe_progress_host_wake). Named twice, the two could disagree, and a mark
+ * in one owner's bitmap with a wake of another loses the wake
+ * (lead_wake_model.py, `mark_wake_apart`).
+ */
+static inline uint32_t osoe_connection_area_owner(const struct osoe_connection_area *a,
+                                                  uint32_t peer, uint32_t *index)
+{
+    uint32_t slot = osoe_peer_slot(a->node, peer);
+    *index = osoe_owner_index(slot, a->helpers);
+    return osoe_owner_of(slot, a->helpers);
+}
+
+/*
  * A writer's half of work discovery: say that connection toward `peer` has
  * something for its owner - committed bytes, or an acknowledgement request -
  * by the bit of the connection's index in its owner's bitmap (owner-map.h).
@@ -136,10 +152,10 @@ void osoe_connection_area_close(struct osoe_connection_area *a);
  */
 static inline void osoe_connection_area_mark(struct osoe_connection_area *a, uint32_t peer)
 {
-    uint32_t slot = peer < a->node ? peer : peer - 1;
-    uint32_t index = osoe_owner_index(slot, a->helpers);
-    atomic_fetch_or_explicit(&a->owner[osoe_owner_of(slot, a->helpers)].dirty[index / 64],
-                             UINT64_C(1) << (index % 64), memory_order_seq_cst);
+    uint32_t index;
+    uint32_t owner = osoe_connection_area_owner(a, peer, &index);
+    atomic_fetch_or_explicit(&a->owner[owner].dirty[index / 64], UINT64_C(1) << (index % 64),
+                             memory_order_seq_cst);
 }
 
 /* This node's connection toward `peer`, or NULL if peer is this node. */

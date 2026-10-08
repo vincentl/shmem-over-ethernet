@@ -8,7 +8,7 @@ NAME=$1; OUT=$2; mkdir -p $OUT
 R=/tmp/ladder/$NAME/build/release
 L=$R/tools/launch/osoe-launch
 STAT=$R/tools/stat/osoe-stat
-S=/Users/vincent/shmem-over-ethernet/build/scratch/ladder
+S=<repo>/build/scratch/ladder
 W=/tmp/ladder/$NAME/work; rm -rf $W; mkdir -p $W
 : > $OUT/index.txt
 $R/tools/wrapper/oshcc -O2 -g -o $W/putstream $S/putstream.c > $OUT/oshcc.txt 2>&1 \

@@ -13,8 +13,8 @@ mkdir -p $OUT; LOG=$OUT/run.txt; : > $LOG
 echo "start $(date +%H:%M:%S)" >> $LOG
 rsync -a --delete --exclude=/build --exclude=/.git "$TREE"/ pi-login:osoe/ || { echo "rsync failed" >> $LOG; exit 1; }
 ssh pi-login 'rm -rf osoe/build/v02s3 && mkdir -p osoe/build/v02s3' || exit 1
-scp -q /Users/vincent/shmem-over-ethernet/docs/design/evidence/pi-cluster/2026-10-04-step-e/e-band.c pi-login:osoe/build/v02s3/e-band.c || exit 1
-rsync -a /Users/vincent/shmem-over-ethernet/corpus/osu-omb/osu-micro-benchmarks-7.5.2/ pi-login:osoe/build/v02s3/osu/ || exit 1
+scp -q <repo>/docs/design/evidence/pi-cluster/2026-10-04-step-e/e-band.c pi-login:osoe/build/v02s3/e-band.c || exit 1
+rsync -a <repo>/corpus/osu-omb/osu-micro-benchmarks-7.5.2/ pi-login:osoe/build/v02s3/osu/ || exit 1
 ssh pi-login 'cd osoe && cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > build/v02s3/build.txt 2>&1; echo "built: $?"
   OSHCC=$HOME/osoe/build/release/tools/wrapper/oshcc
   $OSHCC -O2 -o build/v02s3/e-band build/v02s3/e-band.c; echo "e-band: $?"

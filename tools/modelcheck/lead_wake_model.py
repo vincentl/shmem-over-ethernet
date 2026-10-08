@@ -82,6 +82,13 @@ connections, and the map is what is checked:
   wrong_owner      the writer computes the owner as c mod H, without the 1: its
                    bit lands in another owner's bitmap, or in none, and the
                    owner of its connection sleeps on with the commit unhandled.
+  mark_wake_apart  the writer marks its connection's owner's bitmap and loads,
+                   claims and wakes another owner's flag and word - the next
+                   round - as a writer whose mark and wake each computed the
+                   owner, and one of them wrongly, would: its owner sleeps on
+                   with the bit set. The library names the owner once, for both
+                   (osoe_connection_area_owner; the adversarial read of Part 1,
+                   N2, whose variant this is).
 
 The property is liveness: every commit is handled by its owner, which exits
 when it has handled them all. A lost wake shows as LOST WAKE (the lead asleep with a
@@ -133,6 +140,9 @@ def writer(design, connection, ops, helpers):
         o = connection % helpers                # the map without its 1
     bit = 1 << index
     DIRTY_, SLEEPING_, WAKE_ = DIRTY(o), SLEEPING(o), WAKE(o)
+    if design == 'mark_wake_apart':
+        w = 1 + (o % helpers)                   # the next owner round, for the wake
+        SLEEPING_, WAKE_ = SLEEPING(w), WAKE(w)
     B = []
     for k in range(ops):
         p = f'w{k}_'
@@ -312,6 +322,8 @@ CASES = [
     ('no_recheck', [(0, 1), (2, 1)], False, False, 2),
     ('ring_no_bump', [(0, 1), (2, 1)], False, False, 2),
     ('wrong_owner', [(0, 1), (1, 1)], False, False, 2),
+    ('mark_wake_apart', [(0, 1), (1, 1)], False, False, 2),
+    ('mark_wake_apart', [(0, 1), (1, 1)], True, False, 2),
 ]
 
 if __name__ == '__main__':

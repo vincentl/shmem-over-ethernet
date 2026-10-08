@@ -1142,13 +1142,19 @@ on a line of their own, and each owner's bitmap starts one, since each is
 another thread's. Owner 0 sleeps on its PE slot's `agent_wake` still, which
 stop, abort and the posted arrivals bump too. A writer marks the bit of its
 connection's index in that connection's owner's bitmap and claims that owner's
-wake (`osoe_progress_host_wake`). A wake `OSOE_TRANSPORT_MORE` holds back is
+wake (`osoe_progress_host_wake`), the owner named once, for both
+(`osoe_connection_area_owner`). A wake `OSOE_TRANSPORT_MORE` holds back is
 remembered by the thread, an owner a bit, and made with its next wake whichever
 owner that is for; a wait for what the PE held back toward any number of peers
 wakes every owner of a data wire, each only if it sleeps.
 `lead_wake_model.py` takes the owner as a parameter: its earlier cases are
-unchanged, cases with one and two helpers hold, and a writer that marks one
-owner's bitmap and wakes another loses the wake (`wrong_owner`).
+unchanged, cases with one and two helpers hold, and two breakages lose a wake -
+a writer whose map is wrong for its mark and its wake alike (`wrong_owner`),
+and one that marks its connection's owner and wakes another (`mark_wake_apart`,
+the adversarial read of Part 1's N2). `shmem.owners` runs the engine at two and
+three helpers, every owner of a node turned by one thread, since with none an
+owner's index of a wire is its peer slot and no other test could tell them
+apart.
 
 **Receiving polled every wire** in step 2: the shared-memory wire said nothing
 when bytes arrived, so the lead looked at all *N* − 1 on every pass, O(*N*) per
