@@ -38,11 +38,14 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n)
     return (size_t)((h >> 20) % n + 1);
 }
 
-void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
-                         uint32_t lending, const struct osoe_bootstrap *b)
+/* osoe_wire_ring_open, saying the settings that are said (OSOE_WIRE_SPLIT's
+ * line) only where `announce` asks: once a node, by owner 0's ring (the
+ * adversarial read of Part 1, N7). */
+static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
+                      uint32_t lending, const struct osoe_bootstrap *b, bool announce)
 {
     struct osoe_wire_settings s;
-    osoe_wire_settings_read(&s, b, true);
+    osoe_wire_settings_read(&s, b, announce);
     /* With the zero-copy send on, each data wire's notifications still owed are
      * completions the queue must have room for (§3.3, ring.h) - refused by name
      * where that passes io_uring's own most, rather than failing to create a
@@ -68,6 +71,12 @@ void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t 
     if (!supported)
         osoe_fatal("OSOE_WIRE_ZERO_COPY=on: this kernel's io_uring offers no IORING_OP_SEND_ZC "
                    "(Linux 6.0, and 6.2 for the usage report it asks)");
+}
+
+void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
+                         uint32_t lending, const struct osoe_bootstrap *b)
+{
+    ring_open(r, wires, count, lending, b, true);
 }
 
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
@@ -249,9 +258,9 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
             attach_purpose(w, ring, ring_index, fd, peer, purposes[k], b);
         }
     for (uint32_t o = 0; o <= helpers; o++)
-        osoe_wire_ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
-                            osoe_ring_wires(o, peers, helpers),
-                            osoe_owner_wires(o, peers, helpers), b);
+        ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
+                  osoe_ring_wires(o, peers, helpers), osoe_owner_wires(o, peers, helpers), b,
+                  o == 0);
 }
 
 /* osoe_wire_send and osoe_wire_send_lent: `lent` is the region the bytes are

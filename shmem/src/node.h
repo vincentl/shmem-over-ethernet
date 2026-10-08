@@ -31,7 +31,7 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 35
+#define OSOE_NODE_LAYOUT 36
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -369,6 +369,18 @@ struct osoe_segment_directory {
     uint64_t team_free_offset;
     uint32_t team_map_row;           /* OSOE_MAX_TEAMS */
     uint32_t team_free_words;        /* ceil(OSOE_TEAM_BLOCKS / 64) */
+
+    /*
+     * Appended at layout 36 (v0.2 step 4, Part 3): the AM layer's counters, a
+     * record an owner of the node's wires - the lead's agent, then its
+     * OSOE_PROGRESS_HELPERS helpers (owner-map.h) - by owner, the fifth metric
+     * scope (OSOE_MSCOPE_OWNER). None on a job of one node. After the team
+     * pool's bitmaps, so that nothing before them moved.
+     */
+    uint64_t owners_offset;
+    uint64_t owners_bytes;
+    uint32_t owner_bytes;            /* one record */
+    uint32_t owner_count;            /* OSOE_PROGRESS_HELPERS + 1, or 0 */
 };
 
 /*
@@ -430,23 +442,35 @@ _Static_assert(sizeof(struct osoe_arrival_handoff) == OSOE_CACHELINE,
                "epoch counters do (§5.3)");
 
 /*
- * The AM layer's node-wide counters (§3.14), exported under `transport.am.*`.
+ * The AM layer's counters (§3.14), exported under `transport.am.*`: one record
+ * an owner (owner-map.h) - the lead's agent, owner 0, and each progress helper
+ * - in the node segment's owner section (layout 36), written by that owner's
+ * thread alone, so every field is a single-writer publication (§3.16) and a
+ * reader accepts a value a moment stale. A node's count is its owners' sum, and
+ * its high-water mark their largest: osoe-stat, the tests and the deadlock
+ * detector add them up (the progress helpers proposal's §3.5).
  *
  * Everything they count - segments, the reply pool and queues - is private to
- * the lead's progress thread (§3.12), and until layout 8 so were the counts: a
- * test could not see the acknowledgement protocol echo, or the reply pool run
- * dry, except by the job misbehaving. This is the smallest export that lets a
- * test see both. Node scope only: one record per node, written by that one
- * thread, so every field is a single-writer publication (§3.16) and a reader
- * accepts a value a moment stale. A per-connection scope is the next step.
+ * the owner's thread (§3.12), and until layout 8 so were the counts: a test
+ * could not see the acknowledgement protocol echo, or the reply pool run dry,
+ * except by the job misbehaving. Until layout 36 there was one record, the
+ * node's, in the header, written by the lead's agent, which then held every
+ * wire.
  *
  * Zero on a node whose job never goes internode, and in any build whose
  * backend is not AM - the fields are a backend's private counters, which §3.14
  * gives the `transport.<backend>.*` names so they cannot be mistaken for the
  * boundary's own.
  */
-struct osoe_am_node_metrics {
+struct osoe_am_owner_metrics {
     _Alignas(OSOE_CACHELINE)
+    /* Layout 36: which owner this is - its thread, the wires it holds - for
+     * osoe-stat and for the deadlock detector, which leaves a helper out of
+     * the lead PE's threads as it leaves the agent (deadlock.c). Written once
+     * the owner's thread runs; 0 before. */
+    _Atomic int32_t tid;
+    _Atomic uint32_t data_wires;
+    _Atomic uint32_t control_wires;
     _Atomic uint64_t segments_sent;
     _Atomic uint64_t header_only_sent;        /* §3.4's ack-only segments, among those */
     _Atomic uint64_t segments_applied;
@@ -500,6 +524,10 @@ struct osoe_am_node_metrics {
     _Atomic uint64_t control_segments_sent;
     _Atomic uint64_t control_segments_applied;
     _Atomic uint64_t control_messages_applied;
+    /* Layout 36: the owner's waits that its wake word ended (ring.h), where a
+     * timeout or a socket's completion did not - how often the node's PEs, or
+     * the agent, woke it. */
+    _Atomic uint64_t wakes;
 };
 
 /*
@@ -886,16 +914,12 @@ struct osoe_node_header {
     _Alignas(OSOE_CACHELINE)
     _Atomic uint64_t aborting;
 
-    /* Appended at layout 8; layout 11 appended passes and send_visits to it,
-     * and layout 13 the ring's six counters, which moved nothing before it
-     * (what follows moved, and is found by name). Layout 18 moved every
-     * team's epoch counters and arrival handoff from before this record into
-     * the team blocks at the header's end, which moved it; readers find it by
-     * name. Layout 9 added blocked_detail_kind to the PE slot,
-     * which moved no header field. Layout 8 also gave each epoch counter's line a
-     * second word, released_at_ns (base/epoch.h), in padding it already owned:
-     * no offset moved, but the line's contents changed meaning. */
-    struct osoe_am_node_metrics am;
+    /* The AM layer's node record, appended at layout 8, sat here until layout
+     * 36 moved it to the owner section, a record an owner (struct
+     * osoe_am_owner_metrics); what followed it moved, and is found by name.
+     * Layout 8 also gave each epoch counter's line a second word,
+     * released_at_ns (base/epoch.h), in padding it already owned: no offset
+     * moved, but the line's contents changed meaning. */
 
     /*
      * Appended at layout 12. `hostname` is what makes a walk down the tree
@@ -1187,6 +1211,10 @@ struct osoe_node {
      * one node (§3.14's connection scope). */
     struct osoe_am_connection_metrics *connection_metrics;
     uint32_t connection_count;
+    /* One record an owner of the node's wires, by owner (owner-map.h), or NULL
+     * on a job of one node (layout 36). */
+    struct osoe_am_owner_metrics *owner_metrics;
+    uint32_t owner_count;
     /* The header's pool of team blocks (OSOE_TEAM_BLOCKS), the map from a
      * team's name to its block, `team_map_row` (OSOE_MAX_TEAMS) words a local
      * PE, the bitmap of free blocks, and each local PE's row of published

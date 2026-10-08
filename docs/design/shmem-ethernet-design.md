@@ -1390,8 +1390,15 @@ process, §4.1), and drains the deferred reply queues. It is the sole issuer
 wires on it, their connections, busy bits, reply pool and counters, which only
 the owner's thread touches, while the control plane - the internode tree's
 state, the deadlock detector's messages - is owner 0's. With no helper threads,
-which is all that is built, the lead's agent is the one owner and the sentence
-above holds as written.
+the default, the lead's agent is the one owner and the sentence above holds as
+written. *As built since v0.2 step 4's helpers:* `OSOE_PROGRESS_HELPERS` threads
+of the lead's process beside its agent, each the owner of the data wires to a
+share of the peers on a ring of its own, while the agent keeps every control
+wire (`progress-host.c`; `docs/decisions/2026-10-08-helpers.md`). The agent
+starts them after its own start, asks them - a request word it alone writes, an
+answer word each helper alone writes - for the deadlock detector's views and,
+at the end, to stop, and waits for each to be done before its process ends;
+each reads the node's abort word at every turn, as the agents do.
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address
@@ -1446,8 +1453,11 @@ thread inside it.
 **Progress thread count** is set by memory bandwidth, not PE count. On a Pi it is
 one: the lead's agent itself. At 256 PEs perhaps four, all in the lead process,
 sharded by peer node so each connection has exactly one owner and each stream
-keeps single-threaded ordering *(not built: one thread, the lead's agent,
-whatever the PE count - README, Limits)*.
+keeps single-threaded ordering *(as built in v0.2 step 4: the lead's agent and
+`OSOE_PROGRESS_HELPERS` helpers, 0 by default and at most 64, a peer's data wire
+helper 1 + (its peer slot mod the count)'s and every control wire the agent's -
+`owner-map.h`. How many a node wants is not measured: no link on which one
+thread is the limit has been available - README, Limits)*.
 
 **Why threads in every PE rather than a helper process:**
 

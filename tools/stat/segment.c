@@ -38,9 +38,10 @@
  * rather than the job.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 288,
+_Static_assert(sizeof(struct osoe_segment_directory) == 312,
                "frozen by §3.14: append only. 136 at layout 6; 160 at layout 12; 208 at "
-               "layout 18; 232 at layout 21; 256 at layout 23; 288 at layout 29");
+               "layout 18; 232 at layout 21; 256 at layout 23; 288 at layout 29; 312 at "
+               "layout 36");
 
 uint64_t osoe_segment_now_ns(void)
 {
@@ -354,6 +355,10 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
     if (OSOE_SEGMENT_HAS(s->dir, connection_count))
         s->connection_count = clamp_count(s->dir->connections_offset, s->dir->connection_bytes,
                                           s->bytes, s->bytes, s->dir->connection_count);
+    /* Layout 36's owners' records, which run to the end of the segment. */
+    if (OSOE_SEGMENT_HAS(s->dir, owner_count))
+        s->owner_count = clamp_count(s->dir->owners_offset, s->dir->owner_bytes,
+                                     s->bytes, s->bytes, s->dir->owner_count);
     /* Layout 18's two: the team blocks end the header, so the slots are the
      * section after them; the rows of epochs run to the end of the segment. */
     if (OSOE_SEGMENT_HAS(s->dir, team_count))
@@ -453,6 +458,12 @@ static const unsigned char *record(const struct osoe_segment *s, unsigned scope,
             return NULL;
         n = s->dir->epoch_row_bytes;
         off = s->dir->epochs_offset + (uint64_t)index * n;
+        break;
+    case OSOE_MSCOPE_OWNER:
+        if (index >= s->owner_count)
+            return NULL;
+        n = s->dir->owner_bytes;
+        off = s->dir->owners_offset + (uint64_t)index * n;
         break;
     default:
         return NULL;

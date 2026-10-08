@@ -16,6 +16,14 @@
  * application signal handlers keep running on application threads. */
 void osoe_agent_start(struct osoe_pe_slot *slot);
 
+/*
+ * For a thread of the node's progress engine that the agent starts beside it -
+ * a progress helper (progress-host.c): the scheduler slice the agent asks, and
+ * the CPUs OSOE_AGENT_CPUS gives it, set on the calling thread, as the agent
+ * sets its own. Read by osoe_agent_start, which every helper follows.
+ */
+void osoe_agent_place_this_thread(void);
+
 /* Ask the agent to stop and join it. */
 void osoe_agent_stop(struct osoe_pe_slot *slot);
 

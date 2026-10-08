@@ -856,7 +856,9 @@ foreach(case_expect
     "wire-unsent-bytes|OSOE_WIRE_UNSENT_BYTES|abc|OSOE_WIRE_UNSENT_BYTES='abc' is not a byte count: 0 to leave the system's own, or up to 1073741824"
     "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes"
     "wire-zero-copy|OSOE_WIRE_ZERO_COPY|yes|OSOE_WIRE_ZERO_COPY=yes: on, to send connection buffers by reference"
-    "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1")
+    "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1"
+    "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not a number of threads from 0 to 64"
+    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -885,6 +887,20 @@ if(OSOE_INTERNODE)
     PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 524288 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   osoe_internode_label(shmem.start-up.am-buffer.differs shmem.start-up.am-buffer.lead-larger)
+  # OSOE_PROGRESS_HELPERS differs between a node's PEs (v0.2 step 4, Part 3): the
+  # node's own rendezvous refuses the PE that differs, naming both counts, where
+  # the connection area would have refused it in the name of OSOE_AM_* (the
+  # adversarial read of Part 1, N3). On both nodes, so that every rank ends; the
+  # leads' count given too, so that a suite run with a count of its own keeps it.
+  osoe_refusal_test(shmem.start-up.progress-helpers.differs 4 0
+    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_PROGRESS_HELPERS=0 -e 1:OSOE_PROGRESS_HELPERS=2
+           -e 2:OSOE_PROGRESS_HELPERS=0 -e 3:OSOE_PROGRESS_HELPERS=2
+    PATTERNS "osoe: PE 1: OSOE_PROGRESS_HELPERS differs between PEs: the local lead has 0, this PE has 2"
+             "osoe: PE 3: OSOE_PROGRESS_HELPERS differs between PEs: the local lead has 0, this PE has 2"
+             "osoe: PE 0: another local PE failed during rendezvous"
+             "osoe: PE 2: another local PE failed during rendezvous"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  osoe_internode_label(shmem.start-up.progress-helpers.differs)
 endif()
 
 # A PE whose own environment is bad refuses it before its node has joined, and
@@ -1553,6 +1569,25 @@ endfunction()
 # acknowledgement protocol: 1,320 header-only segments per node in the idle
 # half second.
 osoe_tier2_map_test(ack-echo 0,1)
+
+# Progress helpers (v0.2 step 4, Part 3; owner-map.h). A PE's wake reaches the
+# owner of its wire: each put of PE 0's wakes the helper the map names for its
+# peer, and never the node's other helper (test-helper-wake.c; the wake count is
+# the owner's, layout 36). The deadlock detector, whose requests nudge every
+# helper, is off.
+osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
+# A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
+# helper_request_model.py's `deaf` case stands for - ends the job at
+# shmem_finalize naming it, found by its turns: nothing waits for time to pass.
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.helpers.deaf.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_DEAF_HELPER=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_barrier>)
+  set_tests_properties(shmem.helpers.deaf.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+      "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered")
+  osoe_internode_label(shmem.helpers.deaf.0-1)
+endif()
 
 # A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
 # one getter on node 0, the get's target and five writers on node 1, the

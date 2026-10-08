@@ -513,7 +513,10 @@ srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
 ```
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
-collective's epoch - how many collectives its team has begun - and for how long.
+collective's epoch - how many collectives its team has begun - and for how long;
+and for a node of a job across nodes, each owner of its wires - the lead's
+agent and its progress helpers (`OSOE_PROGRESS_HELPERS`) - with the wires it
+holds, its passes, its wakes and what it has sent and applied.
 The summary's walk follows a team's barriers and syncs between nodes, whose
 epochs each node's progress thread keeps; a team hung in a reduction,
 broadcast, gather or scan shows there as nothing open, and its PE lines are
@@ -670,12 +673,16 @@ build tree.
   releases, the deadlock detector's messages and its own goodbye, and nothing
   else, so a barrier's messages never queue behind a put's bytes in a buffer or
   a socket: they share the link, and the node's progress thread, which takes
-  the control wires first.
-- **One progress thread a node drives the network.** Every PE starts an agent
-  thread; once the job has started, the node lead's is the only thread that
-  touches a socket or an io_uring ring. It sends, receives, and applies arriving
-  puts and atomics directly in the target PE's heap - that PE's own threads are
-  never interrupted. The other agents do only what must happen inside their own
+  the control wires first - or, with progress helpers, not even that: the
+  control wires are the lead's agent's and the data wires its helpers'.
+- **One progress thread a node drives the network, or a few.** Every PE starts
+  an agent thread; once the job has started, the node lead's is the only thread
+  that touches a socket or an io_uring ring - or, with `OSOE_PROGRESS_HELPERS`,
+  it and that many helper threads of the lead's process, each holding the data
+  wires to a share of the other nodes on a ring of its own, the agent keeping
+  every control wire. Each sends, receives, and applies arriving puts and
+  atomics directly in the target PE's heap - that PE's own threads are never
+  interrupted. The other agents do only what must happen inside their own
   process.
 - **Waiting is sleeping.** A PE waiting for a word, a reply or buffer space
   sleeps on a futex, woken by whoever changed what it waits for.
@@ -757,9 +764,9 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 |---|---|---|---|---|---|
 | A PE's heap object: the symmetric heap, then the library's internal region | in `/dev/shm`, one a PE, mapped by every PE of the node | `SHMEM_SYMMETRIC_SIZE`, then about 26 KiB a team number (`OSOE_MAX_TEAMS`) and a 577 KiB lane a thread place (`OSOE_MAX_THREADS` + 1) | 272 MiB, the region 15.63 | 272 MiB, 16.01 | 272 MiB, 16.29 |
 | What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.4 GiB |
-| The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - and 128 bytes a peer node | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
+| The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - 128 bytes a peer node, and 256 bytes an owner of the node's wires: the lead's agent and each progress helper | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
 | The connection area | in `/dev/shm`, one a node | 512 KiB of buffers and 1.25 KiB of state a peer node | 1.5 MiB | 31.6 MiB | 250 MiB, 0.6 written at start |
-| The node lead's own | its private memory | about 0.8 MiB and 8.1 KB a peer node - the reply pool, and 4.6 KB of it the peer's control wire, 4 KiB its private send buffer - and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.3 MiB | 5.7 MiB |
+| The node lead's own | its private memory | about 0.8 MiB and 8.1 KB a peer node - the reply pool, and 4.6 KB of it the peer's control wire, 4 KiB its private send buffer - and 1 MiB of receive buffers as traffic comes; with progress helpers, as much again of receive buffers each, and an io_uring ring and a thread's stack | 1.8 MiB | 2.3 MiB | 5.7 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
 | The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one, and under a plane or an arbitrary one as many as the ranks fall in, up to one a rank: 32,000, 768 KB a node, at 500 nodes of 256 under `plane=4` | 1.1 KiB | 10.4 KiB | 79 KiB |
 | Sockets | the lead's | 2(n - 1) a node, a control wire and a data wire to each other node; n(n - 1) in the job | 6, 12 | 126, 4,032 | 998, 249,500 |
@@ -781,6 +788,7 @@ times these:
 | `OSOE_TEAM_BLOCKS` | the node a kilobyte of `/dev/shm`, written at start; its lead about 760 bytes; every PE about 500 bytes of address space |
 | `OSOE_MAX_THREADS` | every PE a 577 KiB lane of address space and 768 bytes of the control segment |
 | `OSOE_MAX_CONTEXTS` | every PE 128 bytes of the control segment and about 180 bytes, and each context in use 21 bytes a peer node |
+| `OSOE_PROGRESS_HELPERS` | each node's lead a thread, an io_uring ring and `OSOE_WIRE_BYTES` × `OSOE_WIRE_BUFFERS` of receive buffers, 1 MiB at the defaults; the control segment 256 bytes |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | a team number eighteen bytes for each byte of the value, on about 8.9 KiB: 11.1 KiB at 128, 26.9 KiB at the default 1 KiB, 297 KiB at 16 KiB, a PE (at 500 nodes) |
 | `OSOE_COLLECTIVE_FANOUT` | a team number 2.5 KiB and a lane 64 KiB, a PE; the tree is at most ⌈log_k n⌉ levels deep - 3 at 500 nodes at the default 8, 5 at 4, 2 at 32 |
 | `OSOE_COLLECTIVE_PIPELINE` | a lane 144 KiB, 2.4 MiB a PE across its 17 |
@@ -790,12 +798,14 @@ times these:
 
 ### What does not scale, and the limits
 
-- **One progress thread a node** moves every internode message of its node: on
-  the Pi cluster's four PEs a node it keeps up with gigabit's bandwidth, and its
-  message rate depends on where it runs - a pipelined pattern ran at a sixth of
-  its rate under Slurm's default binding, a core a task, against
-  `--cpu-bind=none` (`docs/pi-cluster-results.md`); at 256 PEs a node it has not
-  been measured.
+- **One progress thread a node**, by default, moves every internode message of
+  its node: on the Pi cluster's four PEs a node it keeps up with gigabit's
+  bandwidth, and its message rate depends on where it runs - a pipelined
+  pattern ran at a sixth of its rate under Slurm's default binding, a core a
+  task, against `--cpu-bind=none` (`docs/pi-cluster-results.md`); at 256 PEs a
+  node it has not been measured. Progress helpers (`OSOE_PROGRESS_HELPERS`)
+  spread a node's data wires over more threads, a share of the other nodes
+  each; what they buy has not been measured (Limits).
 - **`alltoall`** sends P(N - P) blocks into a node, a message each up to a
   chunk and, for an `alltoalls` with a stride, one an element, all applied by
   that thread.
@@ -1098,12 +1108,24 @@ specification or takes a choice the specification leaves open.
 **Transport and API**
 
 - **TCP only**; no RDMA backend exists (below).
-- **One thread a node moves every message between nodes.** The progress thread
-  of a node's first PE seals, sends, receives and applies the traffic of all the
-  node's PEs, so a node's message rate and its bandwidth to other nodes are one
-  thread's, whatever its PE count, and each PE's share of the rate falls as the
-  PEs on a node rise. Design §3.12 sketches more such threads for 256 PEs a
-  node, sharded by peer node; they are not built. "Put streams run at line rate"
+- **By default one thread a node moves every message between nodes.** The
+  progress thread of a node's first PE seals, sends, receives and applies the
+  traffic of all the node's PEs, so a node's message rate and its bandwidth to
+  other nodes are one thread's, whatever its PE count, and each PE's share of
+  the rate falls as the PEs on a node rise. `OSOE_PROGRESS_HELPERS` gives the
+  lead's process up to 64 more threads, each holding the data wires to a share
+  of the other nodes - the peer that is p-th in node order, the node itself left
+  out, is helper 1 + (p mod H)'s - while the lead's agent keeps the control
+  wires, so a barrier's messages are one thread's whatever the helpers do. A
+  peer's operations stay on one wire and one thread, applied in order, so a
+  stream between two nodes is still one thread's: what helpers add is the
+  traffic to several peers at once, and nothing has measured it. On the Pi
+  cluster's gigabit one thread already runs a stream at the link's rate, and the
+  four-core virtual machine the suite runs on has no core to spare for a
+  helper. They are built and tested - the suite runs at two and at three
+  helpers a node as at none (How osoe is tested) - and cost each node's lead a
+  thread, an io_uring ring and a megabyte of receive buffers apiece; by default
+  there are none. "Put streams run at line rate"
   is a measurement at 1 Gbit/s - 111 to 112 MiB/s on the Pi cluster, a bare
   stream's own rate - and says nothing above it. No faster link has been
   measured. Over loopback between two nodes of a four-core virtual machine
@@ -1218,6 +1240,14 @@ that one could be added without touching the OpenSHMEM layer.
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
+- **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
+  well as at none, by the environment `ctest` passes on to every test. Under
+  ThreadSanitizer, about sixteen tests across nodes then report a put applied
+  by a helper to a heap a local thread holds: the ordering that makes it safe
+  runs through another process, which the tool cannot see - the reason the
+  multi-node maps are left out of that preset (§8.2) - and with no helpers the
+  agent that applies the put has met the local thread through the barrier's
+  handoff, which the tool does see.
 - **Two builds.** The single-node build runs the same suite less the
   384 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
@@ -1368,13 +1398,14 @@ both are set the `SHMEM_` one controls.
 | `OSOE_SHM_CAPACITY_CHECK` | `1` | `0`: a node whose heaps would not fit `/dev/shm`'s free space is warned, not refused. |
 | `OSOE_KEEP_CONTROL_SEGMENT` | `0` | `1`: the control segment keeps its name in `/dev/shm` until finalize, so a crash leaves it for `osoe-stat` to read; `osoe-stat --gc` removes such segments once their PEs are gone, as it does a [failed start's leftovers](#names-a-failed-start-leaves). |
 
-**The progress thread**: each PE's agent thread, which on a node's first PE
-moves every message of the node
+**The progress threads**: each PE's agent thread, which on a node's first PE
+moves every message of the node, and the helpers that can share the work
 
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. It is a trade, measured on the Pi cluster against `0` with 16 PEs on four nodes. Under Slurm's default binding it gave a pipelined mailbox 1.3 to 1.7 times the messages a second, a 64 KiB reduce 24% less time and a 4 KiB alltoall 10% less, and cost the barrier 8% and an 8-byte reduce or broadcast 11 and 13%. Unbound (`--cpu-bind=none`) it left a 64 KiB reduce as it was, gave the mailbox 2% more and the alltoall 8% less time, and cost the barrier 2 to 4% and an 8-byte reduce or broadcast 10 to 12%. A job that fills its nodes gets Slurm's binding without asking, which is why `100` is the default. |
-| `OSOE_AGENT_CPUS` | `task` | Where each agent thread may run: `task`, on its own PE's CPUs; `node`, on any CPU any PE of its node was bound to - the job's own cores there, never another's. The PEs' threads keep their binding either way. On the Pi cluster, bound, `node` gave the mailbox a fifth more messages a second where the slice was not in force (`OSOE_AGENT_SLICE_US=0`: 42,900 to 51,300) and nothing measurable beside it (58,500 against 57,500 to 62,900), and beside the slice made the barrier and an 8-byte reduce or broadcast 7 to 15% slower and a 64 KiB reduce 18%. The thread is named `osoe-agent`, as `top -H` and `ps -L` show it. |
+| `OSOE_AGENT_CPUS` | `task` | Where each agent thread, and each progress helper, may run: `task`, on its own PE's CPUs; `node`, on any CPU any PE of its node was bound to - the job's own cores there, never another's. The PEs' threads keep their binding either way. On the Pi cluster, bound, `node` gave the mailbox a fifth more messages a second where the slice was not in force (`OSOE_AGENT_SLICE_US=0`: 42,900 to 51,300) and nothing measurable beside it (58,500 against 57,500 to 62,900), and beside the slice made the barrier and an 8-byte reduce or broadcast 7 to 15% slower and a 64 KiB reduce 18%. The thread is named `osoe-agent`, as `top -H` and `ps -L` show it. |
+| `OSOE_PROGRESS_HELPERS` | `0` | Threads of each node lead's process beside its agent that hold the node's data wires: `0` to `64`. The peer node that is p-th in node order, the node itself left out, is helper 1 + (p mod the count)'s; the lead's agent keeps every control wire, which carry the barrier's and the deadlock detector's messages. Each helper is started after the agent, placed and given a slice as the agents are (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`), named `osoe-helper-N`, and stopped at `shmem_finalize` once it has closed its wires. A peer's traffic is always one thread's, so helpers spread a node's traffic with several peers at once, not one stream; nothing has measured what that buys, which is why the default is none. A count above the node's peers leaves the extra helpers idle, each with its ring and receive buffers. `osoe-stat` shows each owner of the node's wires - the agent and every helper - with its wires, passes, wakes and counters. Nodes may differ; a node's PEs may not, in a job of more than one node. *Checked* among a node's PEs. |
 
 **The transport's buffers**, which a program rarely needs to change
 
@@ -1385,7 +1416,7 @@ moves every message of the node
 | `OSOE_AM_BUFFER_BUDGET` | `1073741824` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. At the defaults the 256 KiB buffers hold to 2,049 nodes, are halved to the floor from 2,050, and 4,097 nodes fit and 4,098 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
-| `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by all of a node's connections: the node holds their product, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
+| `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
 | `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting seconds for the peer's delayed TCP acknowledgement; and on a fast link a buffer is the kernel's until acknowledged, which holds one peer's stream to about 512 KiB a round trip. Not timed on a fast link: v0.2 step 4 decides its default there, and whether a connection needs more than two buffers. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused (io_uring's completion queue). `osoe-stat` counts the sends by reference, their notifications, and those the kernel did not send by reference after all. Each node's own. |
 
 **For testing**
@@ -1397,6 +1428,7 @@ moves every message of the node
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
 | `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. |
+| `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection: `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set once the link is known at the end of `shmem_init`. Uncapped, a fetch-add behind a put stream on the Pi cluster waited 14 to 22 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
 | `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED` | A rate per 10,000 at which sends and receives are cut short, and the seed that makes a failing pattern repeat. |
 

@@ -106,6 +106,15 @@ struct osoe_progress_host {
     /* A deadlock detector message from `node`'s lead arrived (§3.15). NULL
      * where there is no detector: the engine's own tests. */
     void (*deadlock)(void *context, uint32_t node, const struct osoe_deadlock_message *m);
+    /*
+     * Whether this node's abort is declared (§3.15): the job is ending, and a
+     * peer's connection failing, or its stream ending without its goodbye, is
+     * a peer ending too. Asked only of a wire that has failed or ended. With
+     * helpers the peer's abortive goodbye may have arrived on a wire another
+     * owner holds, which declared the node's abort (the progress helpers
+     * proposal's Part 3). NULL where there is no node: the engine's own tests.
+     */
+    bool (*aborting)(void *context);
 };
 
 /*
@@ -346,8 +355,10 @@ struct osoe_progress_owner {
      */
     uint64_t *busy;
     /* Application messages applied - any but the detector's - cumulative: part
-     * of this node's activity for the deadlock detector (§3.15). */
-    uint64_t application_applied;
+     * of this node's activity for the deadlock detector (§3.15), which with
+     * helpers the lead's agent sums over the owners, so each owner publishes
+     * its own, a single-writer word (§3.16; deadlock_owners_model.py). */
+    _Atomic uint64_t application_applied;
     bool closing;                               /* osoe_progress_close has begun */
     /* The job is ending (osoe_progress_abort): none of its own traffic goes out
      * any more, and every connection ends with the abortive goodbye below - the
@@ -366,8 +377,8 @@ struct osoe_progress_owner {
      * binds it), and `own_metrics` until then, so that the loop counts the same
      * way whether or not there is a control segment to count into.
      */
-    struct osoe_am_node_metrics *metrics;
-    struct osoe_am_node_metrics own_metrics;
+    struct osoe_am_owner_metrics *metrics;
+    struct osoe_am_owner_metrics own_metrics;
 };
 
 /*

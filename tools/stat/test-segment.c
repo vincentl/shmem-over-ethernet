@@ -16,8 +16,10 @@
  * Only the frozen directory and the metric descriptor are shared, which is
  * exactly the contract segment.h states. It then runs osoe-stat itself against
  * the segment at the layouts either side of the range whose watch word the tool
- * decodes: the one encoding it knows, rather than finds by name; and against a
- * crafted dead job, for what --gc must refuse to remove.
+ * decodes: the one encoding it knows, rather than finds by name; against a
+ * crafted dead job, for what --gc must refuse to remove; and for its views of
+ * the owners of a node's wires (layout 36), on a segment that has them and on
+ * one whose directory ends before them.
  *
  * It also checks the refusals, because a reader that is willing to follow a
  * bad offset into a mapping is worse than one that cannot read at all: a
@@ -46,7 +48,11 @@ enum {
     LOCAL_COUNT  = 2,
     BLOCKS_PER_PE = 2,
     BLOCK_COUNT  = LOCAL_COUNT * BLOCKS_PER_PE,
+    /* Layout 36's owner records: the lead's agent and two progress helpers. */
+    OWNER_BYTES  = 80,
+    OWNER_COUNT  = 3,
 
+    ND_PASSES     = 120,        /* u64: where a library before layout 36 kept transport.am.passes */
     ND_WORLD_SIZE = 128,        /* u32, in the header */
     ND_ABORTING   = 132,        /* u32 */
 
@@ -62,6 +68,38 @@ enum {
     TH_CALLS   = 0,             /* u64, in a block */
     TH_BAD     = 8,             /* u64, an invariant */
     TH_CLAIMED = 16,            /* u64 */
+
+    /* In an owner's record, in an order and at offsets the library's has not:
+     * the counters first, and its tid and wires after them. */
+    AM_PASSES                = 0,       /* u64 */
+    AM_WAKES                 = 8,       /* u64 */
+    AM_SEGMENTS_SENT         = 16,      /* u64 */
+    AM_CONTROL_SEGMENTS_SENT = 24,      /* u64 */
+    AM_SEGMENTS_APPLIED      = 32,      /* u64 */
+    AM_MESSAGES_APPLIED      = 40,      /* u64 */
+    AM_COMPLETIONS           = 48,      /* u64 */
+    AM_TID                   = 56,      /* i32 */
+    AM_DATA_WIRES            = 60,      /* u32 */
+    AM_CONTROL_WIRES         = 64,      /* u32 */
+};
+
+/*
+ * What each owner's record holds: the lead's agent, a progress helper, and a
+ * helper whose thread has not run yet (tid 0). The values differ from field to
+ * field and from owner to owner, so that a reader which found one at another's
+ * offset, or in another owner's record, would say so; the zeros are as the
+ * library has them with helpers, the agent holding control wires only and the
+ * helpers data wires only.
+ */
+static const struct {
+    int32_t tid;
+    uint32_t data_wires, control_wires;
+    uint64_t passes, wakes, segments_sent, control_segments_sent, segments_applied,
+             messages_applied, completions;
+} synthetic_owners[OWNER_COUNT] = {
+    { 4001, 0, 3, 1000, 100, 10, 11, 12, 13, 14 },
+    { 4002, 2, 0, 2000, 200, 20, 0, 22, 23, 24 },
+    { 0, 1, 0, 3000, 300, 30, 0, 32, 33, 34 },
 };
 
 /* PE 0's watch word: 8 bytes at heap offset 0x40, in the encoding segment.h
@@ -111,13 +149,21 @@ static struct osoe_metric_descriptor desc(const char *name, const char *unit, un
  * like this became a loop bound directly: 500-something billion iterations of
  * "for i < local_count" is what the review's fuzz run saw as osoe-stat
  * running silently for ten seconds and more. */
+/* HUGE_OWNER_COUNT is the same lie about the owners' records (layout 36).
+ * BEFORE_OWNERS is not damage either: it is a segment written by a library of
+ * layout 35, whose directory ends where the owners' fields begin. The records
+ * are in the mapping all the same, and the table names the owner scope, so a
+ * reader that did not ask the directory what the writer filled in would find
+ * three owners; and the AM layer's counters are the node's, as they were, in
+ * the header. */
 enum damage {
     GOOD, BAD_MAGIC, BAD_CHECKSUM, STRANGE_DESC_SIZE, OLDER_DIRECTORY,
-    HUGE_LOCAL_COUNT, HUGE_BLOCK_COUNT
+    HUGE_LOCAL_COUNT, HUGE_BLOCK_COUNT, HUGE_OWNER_COUNT, BEFORE_OWNERS
 };
 
 static void *build(const char *name, enum damage damage, size_t *bytes)
 {
+    bool before_owners = damage == BEFORE_OWNERS;
     struct osoe_metric_descriptor table[] = {
         /* Deliberately not the library's order: node, thread and PE metrics
          * interleaved, and two names nothing in this build knows. */
@@ -153,13 +199,40 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
              SLOT_BYTES - 4),
         desc("bogus.misaligned", "", OSOE_MTYPE_U64, OSOE_MKIND_STATE, OSOE_MSCOPE_PE, 8,
              PE_SWEEPS + 4),
+        /* The AM layer's counters, a record each owner (layout 36). Before it
+         * they were the node's: transport.am.passes then sat in the header,
+         * and the rest of these are only there so that the table is the same. */
+        desc("transport.am.tid", "", OSOE_MTYPE_I32, OSOE_MKIND_STATE, OSOE_MSCOPE_OWNER, 4,
+             AM_TID),
+        desc("transport.am.data_wires", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE,
+             OSOE_MSCOPE_OWNER, 4, AM_DATA_WIRES),
+        desc("transport.am.control_wires", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE,
+             OSOE_MSCOPE_OWNER, 4, AM_CONTROL_WIRES),
+        desc("transport.am.passes", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+             before_owners ? OSOE_MSCOPE_NODE : OSOE_MSCOPE_OWNER, 8,
+             before_owners ? ND_PASSES : AM_PASSES),
+        desc("transport.am.wakes", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, OSOE_MSCOPE_OWNER,
+             8, AM_WAKES),
+        desc("transport.am.segments_sent", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+             OSOE_MSCOPE_OWNER, 8, AM_SEGMENTS_SENT),
+        desc("transport.am.control_segments_sent", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+             OSOE_MSCOPE_OWNER, 8, AM_CONTROL_SEGMENTS_SENT),
+        desc("transport.am.segments_applied", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+             OSOE_MSCOPE_OWNER, 8, AM_SEGMENTS_APPLIED),
+        desc("transport.am.messages_applied", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+             OSOE_MSCOPE_OWNER, 8, AM_MESSAGES_APPLIED),
+        desc("transport.am.completions", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+             OSOE_MSCOPE_OWNER, 8, AM_COMPLETIONS),
     };
     uint32_t n = (uint32_t)(sizeof table / sizeof table[0]);
 
     uint64_t slots_off = HEADER_BYTES;
     uint64_t metrics_off = slots_off + (uint64_t)LOCAL_COUNT * SLOT_BYTES;
     uint64_t blocks_off = metrics_off + (uint64_t)n * sizeof table[0];
-    uint64_t total = blocks_off + (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
+    /* The owners' records are last, as the library puts them: the reader's
+     * bound for their count is the end of the segment. */
+    uint64_t owners_off = blocks_off + (uint64_t)BLOCK_COUNT * BLOCK_BYTES;
+    uint64_t total = owners_off + (uint64_t)OWNER_COUNT * OWNER_BYTES;
 
     /* A path is a plain file, which is what this test is really about: a
      * segment this build did not write, read through nothing but the frozen
@@ -188,6 +261,10 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     d.directory_bytes = damage == OLDER_DIRECTORY
         ? (uint32_t)offsetof(struct osoe_segment_directory, landing_offset)
         : (uint32_t)sizeof d;
+    /* A library of layout 35 ended its directory where the owners' fields now
+     * begin, filling in nothing of them. */
+    if (before_owners)
+        d.directory_bytes = (uint32_t)offsetof(struct osoe_segment_directory, owners_offset);
     d.header_bytes = HEADER_BYTES;
     d.segment_bytes = total;
     d.slots_offset = slots_off;
@@ -207,11 +284,21 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
     d.block_count = damage == HUGE_BLOCK_COUNT ? UINT32_C(4278190096) : BLOCK_COUNT;
     d.block_bytes = BLOCK_BYTES;
     d.blocks_per_pe = BLOCKS_PER_PE;
+    /* What follows the blocks, which bounds how many the reader will believe
+     * (D-7): there are no landing zones here, and the owners' records come next. */
+    d.landing_offset = owners_off;
+    d.owners_offset = owners_off;
+    d.owners_bytes = (uint64_t)OWNER_COUNT * OWNER_BYTES;
+    d.owner_bytes = OWNER_BYTES;
+    /* Likewise: the owners' section is still OWNER_COUNT-sized (D-7). */
+    d.owner_count = damage == HUGE_OWNER_COUNT ? UINT32_C(4278190096) : OWNER_COUNT;
     memcpy(p, &d, sizeof d);
     memcpy(p + metrics_off, table, (size_t)d.metrics_bytes);
 
     *(uint32_t *)(p + ND_WORLD_SIZE) = 7;
     *(uint32_t *)(p + ND_ABORTING) = 0;
+    if (before_owners)
+        *(uint64_t *)(p + ND_PASSES) = 777;
 
     for (uint32_t i = 0; i < LOCAL_COUNT; i++) {
         unsigned char *slot = p + slots_off + (uint64_t)i * SLOT_BYTES;
@@ -233,11 +320,28 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
         *(uint64_t *)(blk + TH_CALLS) = 10 * (b + 1);
     }
 
+    /* The records are in the mapping whether or not the directory admits to
+     * them: BEFORE_OWNERS is a reader's test of asking it. */
+    for (uint32_t o = 0; o < OWNER_COUNT; o++) {
+        unsigned char *record = p + owners_off + (uint64_t)o * OWNER_BYTES;
+        *(uint64_t *)(record + AM_PASSES) = synthetic_owners[o].passes;
+        *(uint64_t *)(record + AM_WAKES) = synthetic_owners[o].wakes;
+        *(uint64_t *)(record + AM_SEGMENTS_SENT) = synthetic_owners[o].segments_sent;
+        *(uint64_t *)(record + AM_CONTROL_SEGMENTS_SENT) =
+            synthetic_owners[o].control_segments_sent;
+        *(uint64_t *)(record + AM_SEGMENTS_APPLIED) = synthetic_owners[o].segments_applied;
+        *(uint64_t *)(record + AM_MESSAGES_APPLIED) = synthetic_owners[o].messages_applied;
+        *(uint64_t *)(record + AM_COMPLETIONS) = synthetic_owners[o].completions;
+        *(int32_t *)(record + AM_TID) = synthetic_owners[o].tid;
+        *(uint32_t *)(record + AM_DATA_WIRES) = synthetic_owners[o].data_wires;
+        *(uint32_t *)(record + AM_CONTROL_WIRES) = synthetic_owners[o].control_wires;
+    }
+
     *bytes = total;
     return p;
 }
 
-static void check_good(const char *name)
+static void check_good(const char *name, uint32_t expected_owners)
 {
     struct osoe_segment s;
     char err[256] = "";
@@ -280,6 +384,44 @@ static void check_good(const char *name)
     char buf[64];
     CHECK(osoe_segment_read_str(&s, "pe.blocked.routine", 0, buf, sizeof buf));
     CHECK(strcmp(buf, "shmem_future_wait") == 0);
+
+    /*
+     * The owner scope (layout 36): each owner's record, found by name in
+     * records laid out as the library's are not. A directory that ends before
+     * the owners' fields admits to none (BEFORE_OWNERS; OLDER_DIRECTORY ends
+     * sooner still), though the table names the scope and the mapping holds
+     * records: only asking the directory what the writer filled in keeps them
+     * unread.
+     */
+    CHECK(s.owner_count == expected_owners);
+    for (uint32_t o = 0; o < expected_owners; o++) {
+        CHECK(osoe_segment_read_name(&s, "transport.am.passes", o, &v) &&
+              v == synthetic_owners[o].passes);
+        CHECK(osoe_segment_read_name(&s, "transport.am.wakes", o, &v) &&
+              v == synthetic_owners[o].wakes);
+        CHECK(osoe_segment_read_name(&s, "transport.am.segments_sent", o, &v) &&
+              v == synthetic_owners[o].segments_sent);
+        CHECK(osoe_segment_read_name(&s, "transport.am.control_segments_sent", o, &v) &&
+              v == synthetic_owners[o].control_segments_sent);
+        CHECK(osoe_segment_read_name(&s, "transport.am.segments_applied", o, &v) &&
+              v == synthetic_owners[o].segments_applied);
+        CHECK(osoe_segment_read_name(&s, "transport.am.messages_applied", o, &v) &&
+              v == synthetic_owners[o].messages_applied);
+        CHECK(osoe_segment_read_name(&s, "transport.am.completions", o, &v) &&
+              v == synthetic_owners[o].completions);
+        CHECK(osoe_segment_read_name(&s, "transport.am.tid", o, &v) &&
+              (int64_t)v == synthetic_owners[o].tid);
+        CHECK(osoe_segment_read_name(&s, "transport.am.data_wires", o, &v) &&
+              v == synthetic_owners[o].data_wires);
+        CHECK(osoe_segment_read_name(&s, "transport.am.control_wires", o, &v) &&
+              v == synthetic_owners[o].control_wires);
+    }
+    /* The first index past the owners there are, and one that wraps. (Not
+     * transport.am.passes: BEFORE_OWNERS has it in the header, a node-scope
+     * metric, which any index reads.) */
+    CHECK(!osoe_segment_read_name(&s, "transport.am.wakes", expected_owners, &v));
+    CHECK(!osoe_segment_read_name(&s, "transport.am.wakes", OWNER_COUNT, &v));
+    CHECK(!osoe_segment_read_name(&s, "transport.am.wakes", UINT32_MAX, &v));
 
     /* Refusals, all of which would otherwise be a read outside a record. */
     CHECK(!osoe_segment_read_name(&s, "bogus.past_the_end", 0, &v));
@@ -349,6 +491,224 @@ static void check_watch_gate(const char *file, void *map)
     }
 }
 
+/* osoe-stat with `args` on `file`: its output, both streams, into `out`, and
+ * the status it ended with. */
+static int run_stat(const char *args, const char *file, char *out, size_t size)
+{
+    const char *tool = getenv("OSOE_TEST_STAT");
+    out[0] = '\0';
+    if (!tool) {
+        fprintf(stderr, "OSOE_TEST_STAT is not set\n");
+        CHECK(0);
+        return -1;
+    }
+    char cmd[512];
+    snprintf(cmd, sizeof cmd, "'%s' %s '%s' 2>&1", tool, args, file);
+    FILE *f = popen(cmd, "r");
+    CHECK(f != NULL);
+    if (!f)
+        return -1;
+    size_t n = fread(out, 1, size - 1, f);
+    out[n] = '\0';
+    return pclose(f);
+}
+
+/* The next line of `*text` into `line`, each run of spaces in it taken for one
+ * and none left at either end, so that a table is compared by its columns in
+ * their order and their values, and not by how wide the tool printed them.
+ * False at the end of the text. */
+static bool next_line(const char **text, char *line, size_t size)
+{
+    const char *start = *text;
+    if (*start == '\0')
+        return false;
+    const char *end = strchr(start, '\n');
+    size_t length = end ? (size_t)(end - start) : strlen(start);
+    size_t n = 0;
+    for (size_t i = 0; i < length && n + 1 < size; i++) {
+        if (start[i] == ' ' && (n == 0 || line[n - 1] == ' '))
+            continue;
+        line[n++] = start[i];
+    }
+    while (n > 0 && line[n - 1] == ' ')
+        n--;
+    line[n] = '\0';
+    *text = end ? end + 1 : start + length;
+    return true;
+}
+
+/* Whether some line of `text` is `want`, as next_line sees it. */
+static bool has_line(const char *text, const char *want)
+{
+    char line[512];
+    for (const char *rest = text; next_line(&rest, line, sizeof line);)
+        if (strcmp(line, want) == 0)
+            return true;
+    return false;
+}
+
+static bool ends_with(const char *text, const char *suffix)
+{
+    size_t length = strlen(text), tail = strlen(suffix);
+    return length >= tail && strcmp(text + length - tail, suffix) == 0;
+}
+
+/* The dump's section that opens with the line `header` (with the newlines
+ * round it, so that "owner 1" is not found in "owner 10"), up to the blank line
+ * that ends it. */
+static bool dump_section(const char *out, const char *header, char *section, size_t size)
+{
+    const char *start = strstr(out, header);
+    if (!start)
+        return false;
+    const char *end = strstr(start + strlen(header), "\n\n");
+    size_t length = end ? (size_t)(end - start) : strlen(start);
+    if (length >= size)
+        length = size - 1;
+    memcpy(section, start, length);
+    section[length] = '\0';
+    return true;
+}
+
+/*
+ * osoe-stat's views of the owners (stat.c; layout 36) against the segment
+ * `build` writes, whose three owners are synthetic_owners: the default view's
+ * table, the dump's directory line and one section an owner, the JSON dump's
+ * array, and the threads view's row for each progress helper that has a
+ * thread; and the default view again with one owner, a job with no helpers.
+ * The node's line is the owners' sums: 3 data and 3 control wires, 6000
+ * passes, 600 wakes, 60 segments sent, 11 control segments sent, 66 segments
+ * and 69 messages applied, 72 completions.
+ */
+static void check_owner_views(const char *file, void *map)
+{
+    const struct osoe_segment_directory *dir = map;
+    char out[64 * 1024], section[8192], want[256];
+
+    CHECK(run_stat("-c", file, out, sizeof out) == 0);
+    CHECK(has_line(out, "owner who tid dwires cwires passes wakes seg sent ctrl sent seg appl "
+                        "msg appl completions"));
+    CHECK(has_line(out, "0 agent 4001 0 3 1000 100 10 11 12 13 14"));
+    CHECK(has_line(out, "1 helper 1 4002 2 0 2000 200 20 0 22 23 24"));
+    CHECK(has_line(out, "2 helper 2 - 1 0 3000 300 30 0 32 33 34"));       /* no thread yet */
+    CHECK(has_line(out, "node 3 3 6000 600 60 11 66 69 72"));
+    /* After the PE lines and before the counters. */
+    const char *pes = strstr(out, "blocked in"), *owners = strstr(out, "completions"),
+               *counters = strstr(out, "\ncounter ");
+    CHECK(pes && owners && counters && pes < owners && owners < counters);
+
+    CHECK(run_stat("-d", file, out, sizeof out) == 0);
+    snprintf(want, sizeof want, "owners %" PRIu64 " + %d * %d", dir->owners_offset,
+             (int)OWNER_COUNT, (int)OWNER_BYTES);
+    CHECK(has_line(out, want));
+    for (uint32_t o = 0; o < OWNER_COUNT; o++) {
+        char header[64];
+        if (o == 0)
+            snprintf(header, sizeof header, "\n  owner 0 (the lead's agent)\n");
+        else
+            snprintf(header, sizeof header, "\n  owner %u (progress helper %u)\n", o, o);
+        CHECK(dump_section(out, header, section, sizeof section));
+        snprintf(want, sizeof want, "transport.am.passes %" PRIu64, synthetic_owners[o].passes);
+        CHECK(has_line(section, want));
+        snprintf(want, sizeof want, "transport.am.wakes %" PRIu64, synthetic_owners[o].wakes);
+        CHECK(has_line(section, want));
+        snprintf(want, sizeof want, "transport.am.completions %" PRIu64,
+                 synthetic_owners[o].completions);
+        CHECK(has_line(section, want));
+        snprintf(want, sizeof want, "transport.am.tid %d", (int)synthetic_owners[o].tid);
+        CHECK(has_line(section, want));
+        snprintf(want, sizeof want, "transport.am.control_wires %u",
+                 synthetic_owners[o].control_wires);
+        CHECK(has_line(section, want));
+    }
+    /* Not in the node's section, where they were before layout 36. */
+    CHECK(dump_section(out, "\n  node\n", section, sizeof section));
+    CHECK(strstr(section, "transport.am") == NULL);
+
+    /* The owners, the last array of the document, in order. */
+    CHECK(run_stat("-j -d", file, out, sizeof out) == 0);
+    static const char passes_key[] = "\"transport.am.passes\":";
+    const char *cursor = strstr(out, "\"owners\":[{");
+    CHECK(cursor != NULL);
+    for (uint32_t o = 0; cursor && o < OWNER_COUNT; o++) {
+        cursor = strstr(cursor, passes_key);
+        CHECK(cursor != NULL);
+        if (cursor) {
+            cursor += sizeof passes_key - 1;
+            CHECK(strtoull(cursor, NULL, 10) == synthetic_owners[o].passes);
+        }
+    }
+    CHECK(cursor == NULL || strstr(cursor, passes_key) == NULL);       /* and no fourth */
+    CHECK(strstr(out, "\"transport.am.tid\":4002") != NULL);
+    CHECK(ends_with(out, "}]}\n"));
+
+    /*
+     * The threads view: a row for each helper whose thread has run, after the
+     * counter blocks - here helper 1's and not helper 2's. The lead PE's pid
+     * and helper 1's tid are made this process's and its main thread's, which
+     * are one number, so that the kernel can answer for them: its CPU time and
+     * switches are two more columns than the "-" it prints when it cannot.
+     */
+    int me = (int)getpid();
+    *(int32_t *)((unsigned char *)map + dir->slots_offset + PE_PID) = me;
+    *(int32_t *)((unsigned char *)map + dir->owners_offset + OWNER_BYTES + AM_TID) = me;
+    CHECK(run_stat("-T", file, out, sizeof out) == 0);
+    bool helper_one = false, helper_two = false, agent = false;
+    char row[512];
+    for (const char *rest = out; next_line(&rest, row, sizeof row);) {
+        helper_two = helper_two || ends_with(row, " helper 2");
+        agent = agent || ends_with(row, " agent");              /* it has its counter block */
+        if (!ends_with(row, " helper 1"))
+            continue;
+        helper_one = true;
+        snprintf(want, sizeof want, "- 0 %d %d ", me, me);          /* no block, PE 0 */
+        CHECK(strncmp(row, want, strlen(want)) == 0);
+        unsigned columns = 1;
+        for (const char *c = row; *c; c++)
+            columns += *c == ' ';
+        CHECK(columns == (access("/proc/self/stat", F_OK) == 0 ? 9u : 8u));
+    }
+    CHECK(helper_one);
+    CHECK(!helper_two);
+    CHECK(!agent);
+
+    /*
+     * No helpers, the default: the directory admits to one owner, though the
+     * mapping holds three records. It has its row, and the node's line, which
+     * would say the same, is not printed.
+     */
+    ((struct osoe_segment_directory *)map)->owner_count = 1;
+    CHECK(run_stat("-c", file, out, sizeof out) == 0);
+    CHECK(has_line(out, "0 agent 4001 0 3 1000 100 10 11 12 13 14"));
+    bool others = false;
+    for (const char *rest = out; next_line(&rest, row, sizeof row);)
+        others = others || strncmp(row, "node ", 5) == 0 || strstr(row, "helper") != NULL;
+    CHECK(!others);
+}
+
+/*
+ * The same tool on a segment of layout 35 (BEFORE_OWNERS): it has no owners to
+ * show, in any view, and the AM layer's counters are where the table has them,
+ * the node's.
+ */
+static void check_before_owners_views(const char *file)
+{
+    char out[64 * 1024], section[8192];
+
+    CHECK(run_stat("-c", file, out, sizeof out) == 0);
+    CHECK(strstr(out, "completions") == NULL);                /* no table of owners */
+
+    CHECK(run_stat("-d", file, out, sizeof out) == 0);
+    CHECK(strstr(out, "\n    owners ") == NULL);              /* no directory line */
+    CHECK(strstr(out, "\n  owner ") == NULL);                  /* and no section */
+    CHECK(dump_section(out, "\n  node\n", section, sizeof section));
+    CHECK(has_line(section, "transport.am.passes 777"));
+
+    CHECK(run_stat("-j -d", file, out, sizeof out) == 0);
+    CHECK(strstr(out, "\"owners\":[]") != NULL);
+    CHECK(strstr(out, "\"transport.am.passes\":777") != NULL);
+}
+
 static void check_refused(const char *name, enum damage damage, bool expect_open)
 {
     size_t bytes = 0;
@@ -406,6 +766,16 @@ static void check_huge_counts(const char *name, enum damage damage)
         CHECK(!osoe_segment_read_name(&s, "pe.rank", LOCAL_COUNT, &(uint64_t){ 0 }));
         CHECK(!osoe_segment_read_name(&s, "pe.rank", 1000000, &(uint64_t){ 0 }));
         CHECK(!osoe_segment_read_name(&s, "pe.rank", UINT32_MAX, &(uint64_t){ 0 }));
+    } else if (damage == HUGE_OWNER_COUNT) {
+        CHECK(s.dir->owner_count == UINT32_C(4278190096));
+        CHECK(s.owner_count == OWNER_COUNT);
+        CHECK(s.local_count == LOCAL_COUNT);         /* the other counts: untouched */
+        CHECK(s.block_count == BLOCK_COUNT);
+        CHECK(osoe_segment_read_name(&s, "transport.am.wakes", OWNER_COUNT - 1,
+                                     &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "transport.am.wakes", OWNER_COUNT, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "transport.am.wakes", 1000000, &(uint64_t){ 0 }));
+        CHECK(!osoe_segment_read_name(&s, "transport.am.wakes", UINT32_MAX, &(uint64_t){ 0 }));
     } else {
         CHECK(s.dir->block_count == UINT32_C(4278190096));
         CHECK(s.block_count == BLOCK_COUNT);
@@ -912,8 +1282,9 @@ int main(void)
     void *p = build(file, GOOD, &bytes);
     CHECK(p != NULL);
     if (p) {
-        check_good(file);
+        check_good(file, OWNER_COUNT);
         check_watch_gate(file, p);
+        check_owner_views(file, p);
         munmap(p, bytes);
         unlink(file);
     }
@@ -923,11 +1294,11 @@ int main(void)
     p = build(name, GOOD, &bytes);
     CHECK(p != NULL);
     if (p) {
-        check_good(name);
-        check_good(name + 1);
+        check_good(name, OWNER_COUNT);
+        check_good(name + 1, OWNER_COUNT);
         char path[128];
         snprintf(path, sizeof path, "/dev/shm%s", name);
-        check_good(path);
+        check_good(path, OWNER_COUNT);
         munmap(p, bytes);
         shm_unlink(name);
     }
@@ -942,7 +1313,23 @@ int main(void)
     p = build(file, OLDER_DIRECTORY, &bytes);
     CHECK(p != NULL);
     if (p) {
-        check_good(file);
+        check_good(file, 0);
+        munmap(p, bytes);
+        unlink(file);
+    }
+
+    /*
+     * And one that is short by the owners' fields alone, as a library of layout
+     * 35 wrote it: every other field is there, and so are the records the
+     * fields would name, so what keeps them unread is the directory's own
+     * length. The tool must show the job as it always did - no owners in any
+     * view, the AM layer's counter in the node's section - and not fail.
+     */
+    p = build(file, BEFORE_OWNERS, &bytes);
+    CHECK(p != NULL);
+    if (p) {
+        check_good(file, 0);
+        check_before_owners_views(file);
         munmap(p, bytes);
         unlink(file);
     }
@@ -953,6 +1340,7 @@ int main(void)
 
     check_huge_counts(file, HUGE_LOCAL_COUNT);
     check_huge_counts(file, HUGE_BLOCK_COUNT);
+    check_huge_counts(file, HUGE_OWNER_COUNT);
 
     /* And a segment that is not there at all. */
     struct osoe_segment s;

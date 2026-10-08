@@ -537,6 +537,107 @@ static void print_connection_lines(const struct osoe_segment *s)
     free(waiting);
 }
 
+/*
+ * Who an owner of the node's wires is (layout 36; v0.2 step 4, Part 3): owner
+ * 0 is the lead's agent, and each of the others one of its progress helpers.
+ */
+static void owner_name(uint32_t owner, char *buf, size_t len)
+{
+    if (owner == 0)
+        snprintf(buf, len, "agent");
+    else
+        snprintf(buf, len, "helper %u", owner);
+}
+
+/* One row of the owner table below: what one owner's record holds, or what the
+ * node's owners hold together. `tid` is 0 until the owner's thread runs. */
+struct owner_row {
+    int64_t tid;
+    uint64_t data_wires, control_wires, passes, wakes, segments_sent, control_segments_sent,
+             segments_applied, messages_applied, completions;
+};
+
+static void read_owner_row(const struct osoe_segment *s, uint32_t owner, struct owner_row *row)
+{
+    uint64_t tid = 0;
+    *row = (struct owner_row){ 0 };
+    osoe_segment_read_name(s, "transport.am.tid", owner, &tid);
+    row->tid = (int64_t)tid;
+    osoe_segment_read_name(s, "transport.am.data_wires", owner, &row->data_wires);
+    osoe_segment_read_name(s, "transport.am.control_wires", owner, &row->control_wires);
+    osoe_segment_read_name(s, "transport.am.passes", owner, &row->passes);
+    osoe_segment_read_name(s, "transport.am.wakes", owner, &row->wakes);
+    osoe_segment_read_name(s, "transport.am.segments_sent", owner, &row->segments_sent);
+    osoe_segment_read_name(s, "transport.am.control_segments_sent", owner,
+                           &row->control_segments_sent);
+    osoe_segment_read_name(s, "transport.am.segments_applied", owner, &row->segments_applied);
+    osoe_segment_read_name(s, "transport.am.messages_applied", owner, &row->messages_applied);
+    osoe_segment_read_name(s, "transport.am.completions", owner, &row->completions);
+}
+
+static void add_owner_row(struct owner_row *total, const struct owner_row *row)
+{
+    total->data_wires += row->data_wires;
+    total->control_wires += row->control_wires;
+    total->passes += row->passes;
+    total->wakes += row->wakes;
+    total->segments_sent += row->segments_sent;
+    total->control_segments_sent += row->control_segments_sent;
+    total->segments_applied += row->segments_applied;
+    total->messages_applied += row->messages_applied;
+    total->completions += row->completions;
+}
+
+/* The first three columns are text because the node's line leaves two of them
+ * blank, and an owner whose thread has not run has no tid to show. */
+static void print_owner_row(const char *owner, const char *who, const char *tid,
+                            const struct owner_row *row)
+{
+    printf("%5s %-9s %7s %6" PRIu64 " %6" PRIu64 " %9" PRIu64 " %9" PRIu64 " %9" PRIu64
+           " %9" PRIu64 " %9" PRIu64 " %9" PRIu64 " %11" PRIu64 "\n", owner, who, tid,
+           row->data_wires, row->control_wires, row->passes, row->wakes, row->segments_sent,
+           row->control_segments_sent, row->segments_applied, row->messages_applied,
+           row->completions);
+}
+
+/*
+ * One line per owner of the node's wires (layout 36's owner scope): the
+ * lead's agent, then each progress helper, with the thread it runs in, the
+ * data and control wires it holds (`dwires`, `cwires`) and what it has done.
+ * Printed after the connections, because once "which peer" is answered the
+ * next question about a node that is slow or hung is "which thread moves its
+ * traffic": a `tid` of `-` is an owner whose thread has not started, and
+ * `passes` that stand still while the others' climb are one that is asleep or
+ * holds no wires. With more than one owner a `node` line adds them up, which is
+ * what the node's counters were, one record in its header, before layout 36.
+ *
+ * Nothing is printed for a job of one node, which has no connections and so no
+ * owners, nor for a segment from before layout 36, which has no owner section:
+ * its AM counters are node-scope metrics, and the dump shows them there.
+ */
+static void print_owner_lines(const struct osoe_segment *s)
+{
+    if (s->owner_count == 0)
+        return;
+    printf("\n%5s %-9s %7s %6s %6s %9s %9s %9s %9s %9s %9s %11s\n", "owner", "who", "tid",
+           "dwires", "cwires", "passes", "wakes", "seg sent", "ctrl sent", "seg appl",
+           "msg appl", "completions");
+    struct owner_row total = { 0 };
+    for (uint32_t o = 0; o < s->owner_count; o++) {
+        struct owner_row row;
+        char number[16], who[32], tid[24] = "-";
+        read_owner_row(s, o, &row);
+        snprintf(number, sizeof number, "%u", o);
+        owner_name(o, who, sizeof who);
+        if (row.tid > 0)
+            snprintf(tid, sizeof tid, "%" PRId64, row.tid);
+        print_owner_row(number, who, tid, &row);
+        add_owner_row(&total, &row);
+    }
+    if (s->owner_count > 1)
+        print_owner_row("", "node", "", &total);
+}
+
 /* ---- the summary view -------------------------------------------------- */
 
 /* One team's tree state on one node (§5.3), as the summary shows it. */
@@ -700,6 +801,7 @@ static void counters_human(const struct osoe_segment *s)
     print_identity(s);
     print_pe_lines(s);
     print_connection_lines(s);
+    print_owner_lines(s);
 
     uint32_t npe = s->local_count;
     printf("\n%-40s", "counter");
@@ -802,6 +904,33 @@ static void threads_human(const struct osoe_segment *s)
         printf("%5u %3u %8" PRIu64 " %8" PRIu64 " %12s %12s  %s\n",
                b, pe, pid, tid, cpu, csw, loops ? "agent" : "application");
     }
+
+    /*
+     * The node's progress helpers (layout 36) have no counter block - they
+     * count into a private one nobody reads - and would be missing above. Each
+     * is a thread of the lead PE, local PE 0, and names its own tid in its owner
+     * record once it runs; one that has not has no thread to ask the kernel
+     * about, and is skipped. Owner 0 is the lead's agent, which has its block.
+     */
+    uint64_t lead_pid = 0;
+    osoe_segment_read_name(s, "pe.pid", 0, &lead_pid);
+    for (uint32_t o = 1; o < s->owner_count; o++) {
+        uint64_t tid = 0;
+        osoe_segment_read_name(s, "transport.am.tid", o, &tid);
+        if ((int64_t)tid <= 0)
+            continue;
+
+        struct thread_kernel k;
+        read_thread_kernel(&k, (int64_t)lead_pid, (int64_t)tid);
+        char cpu[32] = "-", csw[32] = "-", kind[32];
+        if (k.found) {
+            print_duration(cpu, sizeof cpu, k.cpu_ns);
+            snprintf(csw, sizeof csw, "%" PRIu64, k.involuntary);
+        }
+        owner_name(o, kind, sizeof kind);
+        printf("%5s %3u %8" PRIu64 " %8" PRIu64 " %12s %12s  %s\n",
+               "-", 0u, lead_pid, tid, cpu, csw, kind);
+    }
 }
 
 /* ---- the state dump --------------------------------------------------- */
@@ -861,6 +990,9 @@ static void dump_human(const struct osoe_segment *s)
     if (OSOE_SEGMENT_HAS(s->dir, connection_count))
         printf("    %-32s %" PRIu64 " + %u * %u\n", "connections", s->dir->connections_offset,
                s->dir->connection_count, s->dir->connection_bytes);
+    if (OSOE_SEGMENT_HAS(s->dir, owner_count))
+        printf("    %-32s %" PRIu64 " + %u * %u\n", "owners", s->dir->owners_offset,
+               s->dir->owner_count, s->dir->owner_bytes);
     if (OSOE_SEGMENT_HAS(s->dir, epoch_row_count)) {
         printf("    %-32s %" PRIu64 " + %u * %u\n", "teams", s->dir->teams_offset,
                s->dir->team_count, s->dir->team_bytes);
@@ -948,6 +1080,19 @@ static void dump_human(const struct osoe_segment *s)
         for (uint32_t i = 0; i < s->nmetrics; i++)
             if (s->metrics[i].scope == OSOE_MSCOPE_CONNECTION)
                 print_value(s, &s->metrics[i], c);
+    }
+
+    /* The AM layer's counters, a record each owner of the node's wires (layout
+     * 36). A segment from before it has them in the node section above, and no
+     * owners here. */
+    for (uint32_t o = 0; o < s->owner_count; o++) {
+        if (o == 0)
+            printf("\n  owner %u (the lead's agent)\n", o);
+        else
+            printf("\n  owner %u (progress helper %u)\n", o, o);
+        for (uint32_t i = 0; i < s->nmetrics; i++)
+            if (s->metrics[i].scope == OSOE_MSCOPE_OWNER)
+                print_value(s, &s->metrics[i], o);
     }
 
     printf("\n  counter blocks\n");
@@ -1097,6 +1242,43 @@ static void dump_json(const struct osoe_segment *s)
             printf(",");
             json_str(stdout, shown);
             printf(":%" PRIu64, v);
+        }
+        printf("}");
+    }
+    printf("]");
+
+    /* Every owner of the node's wires (layout 36), by owner as the PEs are by
+     * local id: the lead's agent first, then its progress helpers, each with
+     * every owner-scope metric. Empty for a job of one node, and for a segment
+     * from before layout 36, whose AM counters are in "node". */
+    printf(",\"owners\":[");
+    for (uint32_t o = 0; o < s->owner_count; o++) {
+        printf("%s{", o ? "," : "");
+        first = true;
+        for (uint32_t i = 0; i < s->nmetrics; i++) {
+            const struct osoe_metric_descriptor *m = &s->metrics[i];
+            if (m->scope != OSOE_MSCOPE_OWNER)
+                continue;
+            char name[48];
+            metric_name(m, name, sizeof name);
+            if (!first)
+                printf(",");
+            first = false;
+            json_str(stdout, name);
+            if (m->type == OSOE_MTYPE_STRING) {
+                char buf[128];
+                osoe_segment_read_str(s, name, o, buf, sizeof buf);
+                printf(":");
+                json_str(stdout, buf);
+            } else {
+                uint64_t v = 0;
+                osoe_segment_read(s, m, o, &v);
+                /* The tid is the one signed field. */
+                if (m->type == OSOE_MTYPE_I32)
+                    printf(":%" PRId64, (int64_t)v);
+                else
+                    printf(":%" PRIu64, v);
+            }
         }
         printf("}");
     }
@@ -1504,7 +1686,8 @@ static void usage(FILE *f)
 "\n"
 "  -c, --counters    per-PE counter totals and where each PE is blocked (default)\n"
 "  -d, --dump        every field of every record: node, PE slots, counter blocks\n"
-"  -T, --threads     one line per counter block, with its kernel CPU time\n"
+"  -T, --threads     one line per counter block, and per progress helper, with its\n"
+"                    kernel CPU time\n"
 "      --summary     a line per node - its collective shape and link - then one\n"
 "                    per node and team: the barrier or sync epoch in\n"
 "                    progress, whether this node's own members arrived, and the\n"

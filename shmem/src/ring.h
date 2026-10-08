@@ -70,6 +70,10 @@ struct osoe_ring {
         /* The zero-copy send (wire-settings.h): sends by reference, their
          * notifications, and the ones that said the kernel copied after all. */
         uint64_t zero_copy_sends, zero_copy_notifications, zero_copy_copied;
+        /* The armed futex wait's completions that saw the word move - woken,
+         * or refused at arming because it already had: the owner's wakes,
+         * where a timeout or a socket's completion is not one. */
+        uint64_t wakes;
     } counts;
 };
 
