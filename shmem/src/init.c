@@ -429,6 +429,16 @@ static void session_start(void)
      * choose; or as set, or none (link-measure.h).
      */
     osoe_link_establish();
+    /*
+     * Then what the transport queues, sized by that link: on AM the kernel's
+     * unsent bytes on every connection (v0.2 step 4, design §3.2). Start-up ran
+     * without the limit, so the link above was measured as it is; where the
+     * shape is fixed and nothing was established, a bandwidth set by hand still
+     * counts here.
+     */
+    osoe_transport_link(osoe.job.link_source != OSOE_LINK_NONE
+                            ? osoe.job.link.bytes_per_second
+                            : osoe.bootstrap.link_bytes_per_second);
     init_pid = getpid();
     static bool exit_handler;
     if (!exit_handler) {

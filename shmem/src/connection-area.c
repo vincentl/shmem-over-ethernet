@@ -94,7 +94,7 @@ static uint64_t align_up(uint64_t n)
 /*
  * Peers are numbered compactly, skipping this node: with 4 nodes, node 1 holds
  * slots for peers 0, 2 and 3 as 0, 1 and 2. Leaving a hole for self would waste
- * two buffers - 256 KiB at the default - on every node for nothing.
+ * two buffers - 512 KiB at the default - on every node for nothing.
  */
 static uint32_t peer_slot(uint32_t self, uint32_t peer)
 {

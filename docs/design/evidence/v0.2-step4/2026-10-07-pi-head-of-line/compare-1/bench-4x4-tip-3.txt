@@ -1,0 +1,67 @@
+osoe-bench pes=16 remote_target=4 local_target=1
+latency put+quiet target=4 where=remote bytes=8 median_us=169.0 fastest_us=165.8
+latency get target=4 where=remote bytes=8 median_us=168.9 fastest_us=167.6
+latency put+quiet target=4 where=remote bytes=64 median_us=170.0 fastest_us=118.6
+latency get target=4 where=remote bytes=64 median_us=170.0 fastest_us=165.4
+latency put+quiet target=4 where=remote bytes=512 median_us=178.1 fastest_us=175.9
+latency get target=4 where=remote bytes=512 median_us=178.3 fastest_us=176.7
+latency put+quiet target=4 where=remote bytes=4096 median_us=195.1 fastest_us=149.9
+latency get target=4 where=remote bytes=4096 median_us=172.6 fastest_us=166.0
+latency put+quiet target=4 where=remote bytes=32768 median_us=425.5 fastest_us=394.5
+latency get target=4 where=remote bytes=32768 median_us=412.3 fastest_us=384.0
+latency put+quiet target=4 where=remote bytes=262144 median_us=2400.2 fastest_us=2359.4
+latency get target=4 where=remote bytes=262144 median_us=3018.0 fastest_us=2977.4
+latency put+quiet target=4 where=remote bytes=1048576 median_us=9080.6 fastest_us=9034.4
+latency get target=4 where=remote bytes=1048576 median_us=11575.1 fastest_us=11503.0
+latency put+quiet target=1 where=local bytes=8 median_us=0.2 fastest_us=0.2
+latency get target=1 where=local bytes=8 median_us=0.1 fastest_us=0.1
+latency put+quiet target=1 where=local bytes=64 median_us=0.2 fastest_us=0.2
+latency get target=1 where=local bytes=64 median_us=0.1 fastest_us=0.1
+latency put+quiet target=1 where=local bytes=512 median_us=0.2 fastest_us=0.2
+latency get target=1 where=local bytes=512 median_us=0.1 fastest_us=0.1
+latency put+quiet target=1 where=local bytes=4096 median_us=0.4 fastest_us=0.4
+latency get target=1 where=local bytes=4096 median_us=0.3 fastest_us=0.2
+latency put+quiet target=1 where=local bytes=32768 median_us=1.4 fastest_us=1.4
+latency get target=1 where=local bytes=32768 median_us=1.3 fastest_us=1.3
+latency put+quiet target=1 where=local bytes=262144 median_us=10.3 fastest_us=10.2
+latency get target=1 where=local bytes=262144 median_us=10.2 fastest_us=10.1
+latency put+quiet target=1 where=local bytes=1048576 median_us=85.8 fastest_us=81.1
+latency get target=1 where=local bytes=1048576 median_us=72.6 fastest_us=68.3
+bandwidth put target=4 where=remote bytes=4096 mib_per_s=111.5
+bandwidth put target=4 where=remote bytes=65536 mib_per_s=112.1
+bandwidth put target=4 where=remote bytes=262144 mib_per_s=112.1
+bandwidth put target=4 where=remote bytes=1048576 mib_per_s=112.1
+bandwidth put target=4 where=remote bytes=4194304 mib_per_s=112.1
+bandwidth put target=1 where=local bytes=4096 mib_per_s=23951.2
+bandwidth put target=1 where=local bytes=65536 mib_per_s=28682.8
+bandwidth put target=1 where=local bytes=262144 mib_per_s=13103.0
+bandwidth put target=1 where=local bytes=1048576 mib_per_s=5667.7
+bandwidth put target=1 where=local bytes=4194304 mib_per_s=5416.2
+atomic fetch-add target=4 where=remote median_us=163.5 fastest_us=162.0
+atomic fetch-add target=1 where=local median_us=0.1 fastest_us=0.1
+barrier pes=16 median_us=175.4 fastest_us=155.4
+reduce pes=16 bytes=8 median_us=197.3 fastest_us=174.3
+broadcast pes=16 bytes=8 median_us=195.4 fastest_us=171.9
+reduce pes=16 bytes=65536 median_us=2300.0 fastest_us=1530.9
+broadcast pes=16 bytes=65536 median_us=1526.8 fastest_us=1201.6
+fcollect pes=16 block=8 median_us=266.6 fastest_us=134.3
+alltoall pes=16 block=8 median_us=346.1 fastest_us=270.7
+fcollect pes=16 block=4096 median_us=688.3 fastest_us=537.1
+alltoall pes=16 block=4096 median_us=2570.6 fastest_us=1990.0
+pairs pe=0 target=8 bytes=1048576 mib_per_s=28.0
+pairs pe=1 target=9 bytes=1048576 mib_per_s=32.2
+pairs pe=2 target=10 bytes=1048576 mib_per_s=32.0
+pairs pe=3 target=11 bytes=1048576 mib_per_s=35.6
+pairs pe=4 target=12 bytes=1048576 mib_per_s=28.0
+pairs pe=5 target=13 bytes=1048576 mib_per_s=32.8
+pairs pe=6 target=14 bytes=1048576 mib_per_s=32.3
+pairs pe=7 target=15 bytes=1048576 mib_per_s=34.8
+pairs pe=8 target=0 bytes=1048576 mib_per_s=28.0
+pairs pe=9 target=1 bytes=1048576 mib_per_s=32.6
+pairs pe=10 target=2 bytes=1048576 mib_per_s=31.9
+pairs pe=11 target=3 bytes=1048576 mib_per_s=35.0
+pairs pe=12 target=4 bytes=1048576 mib_per_s=28.0
+pairs pe=13 target=5 bytes=1048576 mib_per_s=32.2
+pairs pe=14 target=6 bytes=1048576 mib_per_s=31.7
+pairs pe=15 target=7 bytes=1048576 mib_per_s=34.1
+pairs pes=16 total_mib_per_s=447.4

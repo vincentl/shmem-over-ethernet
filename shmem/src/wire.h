@@ -123,6 +123,19 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
  */
 size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
 
+/*
+ * Limit the bytes the kernel may hold unsent on this wire (TCP_NOTSENT_LOWAT;
+ * wire-settings.h, design §3.2); 0 leaves the system's own. On the wire's owner,
+ * the lead's agent (invariant 19), once the link is known - the application
+ * thread asks, progress-host.c. True if the wire is open, and so counted.
+ */
+bool osoe_wire_limit_unsent(struct osoe_wire *w, uint32_t bytes);
+
+/* Lift the limit again, as far as the kernel lets an option go: an aborting
+ * node's last bytes leave with the kernel even toward a peer that has stopped
+ * reading (progress-host.c). Best effort: the job is ending either way. */
+void osoe_wire_lift_unsent(struct osoe_wire *w);
+
 /* Read up to len bytes. Returns how many were delivered, which may be 0. */
 size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len);
 

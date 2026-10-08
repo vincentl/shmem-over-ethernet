@@ -1,0 +1,24 @@
+start 22:31:48
+tip built: 0
+hol: 0
+hol-many: 0
+base built: 0
+bench-4x4-base-1: 0
+bench-4x1-base-1: 0
+bench-4x4-tip-1: 0
+bench-4x1-tip-1: 0
+bench-4x4-base-2: 0
+bench-4x1-base-2: 0
+bench-4x4-tip-2: 0
+bench-4x1-tip-2: 0
+bench-4x4-base-3: 0
+bench-4x1-base-3: 0
+bench-4x4-tip-3: 0
+bench-4x1-tip-3: 0
+hol-tip-1: 0
+hol-many-tip-1: 0
+hol-tip-2: 0
+hol-many-tip-2: 0
+hol-tip-3: 0
+hol-many-tip-3: 0
+end 22:53:01

@@ -751,9 +751,9 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 | What | Where | Grows with | 4 × 4 | 64 × 64 | 500 × 256 |
 |---|---|---|---|---|---|
 | A PE's heap object: the symmetric heap, then the library's internal region | in `/dev/shm`, one a PE, mapped by every PE of the node | `SHMEM_SYMMETRIC_SIZE`, then about 26 KiB a team number (`OSOE_MAX_TEAMS`) and a 577 KiB lane a thread place (`OSOE_MAX_THREADS` + 1) | 272 MiB, the region 15.63 | 272 MiB, 16.01 | 272 MiB, 16.29 |
-| What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.3 GiB |
+| What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.0 GiB | 68.4 GiB |
 | The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - and 128 bytes a peer node | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
-| The connection area | in `/dev/shm`, one a node | 256 KiB of buffers and 1.25 KiB of state a peer node | 0.75 MiB | 15.8 MiB | 125 MiB, 0.6 written at start |
+| The connection area | in `/dev/shm`, one a node | 512 KiB of buffers and 1.25 KiB of state a peer node | 1.5 MiB | 31.6 MiB | 250 MiB, 0.6 written at start |
 | The node lead's own | its private memory | about 0.8 MiB and 3.5 KB a peer node, most of it the reply pool, and 1 MiB of receive buffers as traffic comes | 1.8 MiB | 2.0 MiB | 3.5 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
 | The job object: the rank map and each node's address | in `/dev/shm`, one a node | 136 bytes a node, and 24 a run of the rank map - n of them under a block distribution, P under a cyclic one, and under a plane or an arbitrary one as many as the ranks fall in, up to one a rank: 32,000, 768 KB a node, at 500 nodes of 256 under `plane=4` | 1.1 KiB | 10.4 KiB | 79 KiB |
@@ -780,7 +780,7 @@ times these:
 | `OSOE_COLLECTIVE_FANOUT` | a team number 2.5 KiB and a lane 64 KiB, a PE; the tree is at most ⌈log_k n⌉ levels deep - 3 at 500 nodes at the default 8, 5 at 4, 2 at 32 |
 | `OSOE_COLLECTIVE_PIPELINE` | a lane 144 KiB, 2.4 MiB a PE across its 17 |
 | `OSOE_GET_LANDING_BYTES` | the control segment about that much a PE |
-| `OSOE_AM_CHUNK`, `OSOE_AM_BUFFER_BUDGET` | the connection area four chunks a peer node; the budget then caps the job at budget / (4 × chunk) + 1 nodes, 1,025 at the defaults |
+| `OSOE_AM_CHUNK`, `OSOE_AM_BUFFER_BUDGET` | the connection area eight chunks a peer node at the default buffer, four at its floor; the budget then holds the default to budget / (8 × chunk) + 1 nodes, 2,049 at the defaults, and caps the job at budget / (4 × chunk) + 1, 4,097 |
 | `SHMEM_SYMMETRIC_SIZE` | the address space every PE maps P times |
 
 ### What does not scale, and the limits
@@ -817,16 +817,17 @@ times these:
   so the capacity check asks for P × (`SHMEM_SYMMETRIC_SIZE` + the program's
   statics + 16.3 MiB) and the control segment - 68.1 GiB a node at 256 PEs and
   the default heap, though pages cost only as written - and the connection area
-  checks its own, 125 MiB at 500 nodes; lower the heap, or set
+  checks its own, 250 MiB at 500 nodes; lower the heap, or set
   `OSOE_SHM_CAPACITY_CHECK=0`. The landing zones are a little over
   `OSOE_GET_LANDING_BYTES` × P of the segment, 4.25 KiB of header and records a
   zone besides: 65 MiB at 256 PEs.
 - **A node's team blocks** run out first at many PEs a node: three whole-job
   `shmem_team_split_2d` grids are as many as the default pool holds at 256 PEs
   a node, and a fourth fails (Limits, "Teams").
-- **The ceilings**: 1,025 nodes at the default connection budget; 65,535 PEs a
-  node; `OSOE_MAX_TEAMS` 1,024, `OSOE_TEAM_BLOCKS` 65,536, `OSOE_MAX_THREADS`
-  1,023, a fan-out of 32 and 8 pieces in flight, at most.
+- **The ceilings**: 4,097 nodes at the default connection budget (2,049 before
+  the buffers halve); 65,535 PEs a node; `OSOE_MAX_TEAMS` 1,024,
+  `OSOE_TEAM_BLOCKS` 65,536, `OSOE_MAX_THREADS` 1,023, a fan-out of 32 and 8
+  pieces in flight, at most.
 
 ## Limits, and where osoe departs from the specification
 
@@ -929,14 +930,14 @@ specification or takes a choice the specification leaves open.
 - **A node's heaps live in `/dev/shm`**, and start-up refuses a job whose
   heaps would not fit its free space (`OSOE_SHM_CAPACITY_CHECK=0` warns
   instead).
-- **At the defaults a job has at most 1,025 nodes.** A node's connection
-  buffers - two for each other node, 128 KiB each - must fit
-  `OSOE_AM_BUFFER_BUDGET`, 256 MiB: the buffers of 1,025 nodes come to exactly
-  that and 1,026 are refused at start-up, naming the budget. The budget
-  shrinks the buffers only down to twice `OSOE_AM_CHUNK`, and the default
-  buffer is that size, so at the defaults nothing can shrink: raise the budget
-  or lower the chunk. Where a raised `OSOE_AM_BUFFER` does shrink, each node's
-  lead prints one line saying so.
+- **At the defaults a job has at most 4,097 nodes.** A node's connection
+  buffers - two for each other node - must fit `OSOE_AM_BUFFER_BUDGET`, 1 GiB.
+  The default buffers, 256 KiB each, come to exactly that at 2,049 nodes; from
+  2,050 each node's lead halves them to 128 KiB, twice `OSOE_AM_CHUNK`, the
+  floor, and prints one line saying so. At the floor the buffers of 4,097 nodes
+  come to exactly the budget, and 4,098 nodes are refused at start-up, naming
+  it: the budget shrinks the buffers no further, so raise it or lower the
+  chunk. A raised `OSOE_AM_BUFFER` shrinks the same way, and sooner.
 - **Global and static variables are symmetric only in a program linked by
   `oshcc`**, which links it without position independence and with osoe's
   linker script. Passing a static where a symmetric address is required in
@@ -1099,24 +1100,27 @@ specification or takes a choice the specification leaves open.
   is a measurement at 1 Gbit/s - 111 to 112 MiB/s on the Pi cluster, a bare
   stream's own rate - and says nothing above it. No faster link has been
   measured. Over loopback between two nodes of a four-core virtual machine
-  running nothing else, the library moved 6.3 to 6.5 GiB/s where a bare
-  io_uring stream between the same two processes moved 13.8 to 14.8 - about two
-  fifths of it, 0.43 to 0.45 by the median of each run
-  (`docs/design/evidence/v0.2-step4/2026-10-07-profile/`). It was a fifth until
-  a put filled the room a connection buffer has left: that stream was held
-  back not by the one thread - none in the job was more than 56% busy - but by
-  the buffer's turnover, one 64 KiB message a buffer
-  (`docs/decisions/2026-10-07-one-thread-profile.md`). The cost per message of
+  running nothing else, the library moved 7.6 to 9.8 GiB/s where a bare
+  io_uring stream between the same two processes moved 9.1 to 15.0 - about two
+  thirds of it, 0.58 to 0.67 by the median of each run
+  (`docs/design/evidence/v0.2-step4/2026-10-07-profile/`). It was a fifth
+  before v0.2 step 4 - held back not by the one thread, none in the job more
+  than 56% busy, but by the buffer's turnover, one 64 KiB message a buffer
+  (`docs/decisions/2026-10-07-one-thread-profile.md`) - and two fifths once a
+  put filled the room a connection buffer has left; the default buffer of
+  256 KiB took it to two thirds. The cost per message of
   one thread serving 256 PEs has not been measured on any machine: the Pi
   cluster's nodes run four PEs each, and the stress tester's sixteen-PE mailbox,
   a pipelined point-to-point pattern, with `--cpu-bind=none`, ran at 256,000
   messages a second over a minute. And it grows with the PEs of a node waiting
   to send to one other node at once: each reopening of that connection's
-  buffer, which at the defaults has room for one 64 KiB message, wakes all of
-  them, and when their messages are that large all but one sleep again. In the
-  virtual machine this cost the thread a few microseconds a reopening at 32
-  such PEs, and no run showed the node's rate fall; at 256 it has not been
-  measured.
+  buffer wakes all of them. Until v0.2 step 4 a buffer reopened at the defaults
+  had room for one 64 KiB message, so when their messages were that large all
+  but one slept again; now a put's part takes the room it finds, so each writer
+  of a large put gets some of it, and only a whole message larger than the room
+  left sleeps again. In the virtual machine the wakes cost the thread a few
+  microseconds a reopening at 32 such PEs, and no run showed the node's rate
+  fall; at 256 it has not been measured.
 - **`shmem_ptr` returns a pointer only for PEs on the same node**, NULL for the
   rest - which the specification allows. A wait is woken by the library's own
   operations - atomics, puts, signals - and a plain store through that pointer
@@ -1259,10 +1263,10 @@ that one could be added without touching the OpenSHMEM layer.
   it prints every ratio, each the median of the pairs. Three pins on them - a
   get's, a put-and-quiet's or a fetch-add's fastest round trip at most 3 times
   the connection's; a put-and-quiet's or a fetch-add's median at most 1.5 times
-  a get's; the stream at least a tenth of the connection's - are the project's
-  regression guard, set from runs on its own machines. They exist only in an
-  optimized build without a sanitizer (the `release` preset), and are checked
-  only when asked: with `OSOE_TEST_FLOOR_PINS=1` in the environment, or by
+  a get's; the stream at least three tenths of the connection's - are the
+  project's regression guard, set from runs on its own machines. They exist only
+  in an optimized build without a sanitizer (the `release` preset), and are
+  checked only when asked: with `OSOE_TEST_FLOOR_PINS=1` in the environment, or by
   configuring with `-DOSOE_TEST_PINS=ON`, which sets it for `ctest`. Without
   it the test prints its ratios, says it checked no pin, and passes.
   `env.echo-uring`'s own two pins are checked in every such build.
@@ -1365,8 +1369,8 @@ moves every message of the node
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split, and a put's part is cut shorter, down to a sixteenth of the chunk (4,094 bytes at the default), where it fills the room a buffer has left. |
-| `OSOE_AM_BUFFER` | twice the chunk | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the default, and the least allowed: a smaller value is refused, not raised - up to 1 GiB. |
-| `OSOE_AM_BUFFER_BUDGET` | `268435456` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. The default buffer is the floor, so at the defaults 1,025 nodes fit and 1,026 are refused: raise the budget or lower the chunk. |
+| `OSOE_AM_BUFFER` | four chunks, `262144` | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the least allowed: a smaller value is refused, not raised - up to 1 GiB. The default is four chunks, twice the least. |
+| `OSOE_AM_BUFFER_BUDGET` | `1073741824` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. At the defaults the 256 KiB buffers hold to 2,049 nodes, are halved to the floor from 2,050, and 4,097 nodes fit and 4,098 are refused: raise the budget or lower the chunk. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by all of a node's connections: the node holds their product, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
@@ -1380,6 +1384,7 @@ moves every message of the node
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
 | `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. |
+| `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection: `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set once the link is known at the end of `shmem_init`. Uncapped, a fetch-add behind a put stream on the Pi cluster waited 14 to 22 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
 | `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED` | A rate per 10,000 at which sends and receives are cut short, and the seed that makes a failing pattern repeat. |
 
 **The tools'**: `OSOE_CC` names the compiler `oshcc` runs; `OSOE_NODE_MAP` is

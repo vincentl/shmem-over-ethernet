@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stddef.h>
@@ -199,6 +200,33 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len)
     w->sent = -1;
     w->ring->counts.sends++;
     return 0;
+}
+
+bool osoe_wire_limit_unsent(struct osoe_wire *w, uint32_t bytes)
+{
+    /*
+     * With the kernel's unsent queue limited, a send it cannot take whole is a
+     * short write (§3.3), offered again when the queue drains, and the stream
+     * waits in the connection's own two buffers, where a small message behind
+     * it is a turnover away rather than megabytes (§3.2).
+     */
+    if (w->fd < 0)
+        return false;
+    if (bytes == 0)
+        return true;
+    int v = (int)bytes;
+    if (setsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, sizeof v) != 0)
+        osoe_fatal("cannot limit the unsent bytes toward node %u to %u (TCP_NOTSENT_LOWAT): %s",
+                   w->peer, bytes, strerror(errno));
+    return true;
+}
+
+void osoe_wire_lift_unsent(struct osoe_wire *w)
+{
+    if (w->fd < 0)
+        return;
+    int v = INT_MAX;
+    (void)setsockopt(w->fd, IPPROTO_TCP, TCP_NOTSENT_LOWAT, &v, sizeof v);
 }
 
 size_t osoe_wire_recv(struct osoe_wire *w, void *buffer, size_t len)

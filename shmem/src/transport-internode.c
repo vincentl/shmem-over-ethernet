@@ -54,6 +54,7 @@
 #include "progress.h"
 #include "progress-host.h"
 #include "state.h"
+#include "wire-settings.h"
 #include "transport.h"
 #include "transport-context.h"
 
@@ -269,6 +270,17 @@ void osoe_internode_backend_start(uint32_t session, bool check)
             atomic_store_explicit(&issue_stamp[e], UNSTAMPED, memory_order_seq_cst);
     }
     osoe_progress_host_start(session);
+}
+
+/* internode-backend.h's link: the limit on each wire's unsent bytes, from the
+ * link (wire-settings.h), which each lead's agent sets and says under
+ * SHMEM_DEBUG (progress-host.c). */
+void osoe_internode_backend_link(uint64_t bytes_per_second)
+{
+    struct osoe_wire_settings settings;
+    osoe_wire_settings_read(&settings, &osoe.bootstrap, false);
+    osoe_progress_host_limit_unsent(osoe_wire_unsent_bytes(&settings, bytes_per_second),
+                                    settings.unsent_set, osoe.bootstrap.debug);
 }
 
 /* After the agent has been joined: the engine drained what this node owed the

@@ -37,9 +37,11 @@ void osoe_am_configuration_read(struct osoe_am_configuration *c)
      * §3.4's floor, refused rather than silently raised: a buffer below twice
      * the chunk means one message per segment forever, and a user who asked for
      * it has misunderstood something that will not show up until a benchmark.
+     * The default is a number of chunks, not of bytes, so that it stays above
+     * the floor whatever the chunk.
      */
-    c->buffer = env_bytes("OSOE_AM_BUFFER", 2 * c->chunk, 2 * c->chunk,
-                          UINT64_C(1) << 30, true);
+    c->buffer = env_bytes("OSOE_AM_BUFFER", OSOE_AM_DEFAULT_BUFFER_CHUNKS * c->chunk,
+                          2 * c->chunk, UINT64_C(1) << 30, true);
     c->budget = env_bytes("OSOE_AM_BUFFER_BUDGET", OSOE_AM_DEFAULT_BUDGET,
                           2 * c->chunk, UINT64_C(64) << 30, false);
 

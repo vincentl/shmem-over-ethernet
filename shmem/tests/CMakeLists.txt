@@ -633,6 +633,29 @@ foreach(case "measured;0,0,1,1" "measured;0,1,2" "few-lanes;0,1" "set;0,0,1,1" "
   endif()
 endforeach()
 
+# The limit on each connection's unsent bytes (v0.2 step 4; wire-settings.h), as
+# each lead's agent says it under SHMEM_DEBUG once the link is known, with the
+# connections it reached (unsent.sh): from the link measured, set by hand above
+# and below the floor, fixed, the setting's own and 0, and nothing on one node.
+foreach(case "measured;0,0,1,1" "set;0,1" "floor;0,1,2" "fixed;0,1" "by-hand;0,1" "none;0,1"
+             "one-node;0,0")
+  list(GET case 0 mode)
+  list(GET case 1 map)
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME shmem.unsent.${mode}.${label}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/unsent.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> ${map} ${mode})
+  set_tests_properties(shmem.unsent.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "UNSENT OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.unsent.${mode}.${label})
+  endif()
+endforeach()
+
 if(OSOE_INTERNODE)
   # The node count is the value that shapes the waits: a lead expects children by
   # its own count, so one given too many waits for children that do not exist.
@@ -787,7 +810,9 @@ foreach(case_expect
     "am-credits|OSOE_AM_CREDITS|abc|OSOE_AM_CREDITS='abc' is not between [0-9]+ and [0-9]+"
     "am-hugepages|OSOE_AM_HUGEPAGES|2|OSOE_AM_HUGEPAGES='2' is not 0 or 1"
     "landing-bytes|OSOE_GET_LANDING_BYTES|abc|OSOE_GET_LANDING_BYTES='abc' is not a decimal byte count"
-    "wire-bytes|OSOE_WIRE_BYTES|abc|OSOE_WIRE_BYTES='abc' is not a byte count between 64 and 1048576")
+    "wire-bytes|OSOE_WIRE_BYTES|abc|OSOE_WIRE_BYTES='abc' is not a byte count between 64 and 1048576"
+    "wire-unsent-bytes|OSOE_WIRE_UNSENT_BYTES|abc|OSOE_WIRE_UNSENT_BYTES='abc' is not a byte count: 0 to leave the system's own, or up to 1073741824"
+    "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -806,14 +831,14 @@ if(OSOE_INTERNODE)
   # It refuses at once, by name, and the job ends: the other PE of its node by the
   # node's abort, and the PEs of the other node as the lead they wait for ends.
   osoe_refusal_test(shmem.start-up.am-buffer.differs 4 0
-    LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=262144
+    LAUNCH -n 4 -m 0,0,1,1 -e 1:OSOE_AM_BUFFER=524288
     PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 is [0-9]+ bytes, as the local lead's OSOE_AM_[*] settings made it; this PE's make it [0-9]+: every PE of a job must set OSOE_AM_[*] the same"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   # And the lead's the larger: the object is whole before the PE looks, and its
   # header says what it was made with.
   osoe_refusal_test(shmem.start-up.am-buffer.lead-larger 4 0
-    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=262144
-    PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 262144 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
+    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_AM_BUFFER=524288
+    PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 524288 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   osoe_internode_label(shmem.start-up.am-buffer.differs shmem.start-up.am-buffer.lead-larger)
 endif()

@@ -1,0 +1,2 @@
+osoe: node 0 caps each connection's unsent bytes at 16384
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.1002.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 88258 ns, a message cost of 0 ns, 116539107 bytes a second (20978 us of this start)

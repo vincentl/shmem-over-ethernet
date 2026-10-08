@@ -66,7 +66,9 @@ struct hello {
 };
 #define HELLO_MAGIC UINT32_C(0x6f686365)   /* "echo" */
 
-enum { SEND_BYTES = 128 << 10 };           /* §3.4's default segment: 2 x 64 KiB chunk */
+/* §3.4's default segment until v0.2 step 4, 2 x 64 KiB chunk; kept since, so
+ * that the bare stream every record compares against stays the same. */
+enum { SEND_BYTES = 128 << 10 };
 enum { GROUP = 1, RECEIVE = 1, SEND = 2 };
 
 static _Noreturn void fail(const char *what, int error)

@@ -155,7 +155,9 @@ rewritten either way. *Undo:* no cap, today's.
 
 On top of filling, 256 KiB buffers carry a loopback stream 1.75 times further
 (about 10 GiB/s, 0.6 of the bare stream) and change nothing at a gigabit, where
-the link is the limit. Their cost: twice the connection area (the author: fine
+the link is the limit. (*Corrected:* measured beside the spare, which cost the
+128 KiB stream 11%; against filling alone, 1.4 to 1.5 times -
+`tip-against-first-rung.txt`.) Their cost: twice the connection area (the author: fine
 at 500 nodes) and, with the kernel's queue capped, 1.7 ms at the 99th percentile
 of a fetch-add behind a stream on the Pi, not at its median.
 
@@ -301,12 +303,116 @@ measured on `f643837` with the spare; `ab-spare-zero.txt` shows the spare's own
 
 - **Deeper buffers**: 128 KiB 5,555 to 5,743 MiB/s; 256 KiB 9,992 to 10,070;
   512 KiB 8,870 to 9,934; 1 MiB 10,196 to 10,445. On top of filling, 256 KiB is
-  1.75 times the default, and the rest a plateau near 0.6 of the bare stream.
+  1.75 times the default, and the rest a plateau near 0.6 of the bare stream -
+  beside the spare; against filling alone, 1.4 to 1.5 times
+  (`tip-against-first-rung.txt`: 8.8 to 10.0 GiB/s against 6.4 to 6.5).
 - **The kernel's unsent queue capped**: uncapped 5,760 to 5,862; at 16 KiB
   5,762 to 6,357; at 128 KiB 5,752 to 5,934 - the cap costs a loopback stream
   nothing.
 
-## What goes on meanwhile
+## What was built: the second rung, the kernel's unsent queue
+
+On the author's answer (`2026-10-07.md` item 11):
+
+- **The limit.** `osoe_wire_unsent_bytes` - the link's bandwidth times 128 µs,
+  at least 16 KiB, at most 1 GiB, or `OSOE_WIRE_UNSENT_BYTES` (0 for the
+  system's own) - and `osoe_wire_limit_unsent`, `TCP_NOTSENT_LOWAT` on a wire.
+  `shmem_init` hands the established link to the transport (`osoe_transport_link`,
+  a new call of transport.h's, reaching AM through `osoe_internode_backend_link`),
+  and each lead's application thread asks its agent, which alone owns the
+  sockets, to set it: a request word taken as a dirty bit is, at a pass and
+  again after `lead_sleeping` is raised (`progress-host.c`; as first built the
+  application thread set it itself - the second adversarial read's S1). Start-up
+  ran without it, so step 2 measured the link as it is; a link set by hand gives
+  the bandwidth, under a `fixed` shape too, and otherwise a `fixed` shape the
+  floor; a job of one node nothing. An aborting agent lifts it, so that its
+  abortive goodbye leaves with the kernel even toward a stalled peer (N6). Under
+  `SHMEM_DEBUG` each agent says the limit and the connections it reached.
+- **The tests.** `shmem.wire` checks the arithmetic, the option on a real TCP
+  socket, a closed wire not counted and the lift; `shmem.unsent.*` (`unsent.sh`)
+  each lead's line and that it reached all its connections - nodes less one, or a
+  lead that limited nothing would pass (S2) - from a measured link, one set by
+  hand above and below the floor, `fixed`, the setting's own value and 0, and
+  nothing on one node; `shmem.start-up.wire-unsent-bytes*.invalid` the refusals
+  (N4).
+- **On the Pi, as first built** (`cap-1/`): the leads measured 116.5 MB/s and
+  limited to 16,384; a fetch-add behind a 1 MiB put stream 3.3 to 3.9 ms at the median, 5.0
+  at the 99th percentile, three writers of them 4.43 and 6.6 to 7.2, the stream
+  at 112 MiB/s - the experiment's figures.
+
+## What was built: the third rung, the default buffer, and the ladder's tip
+
+On the author's answer (`2026-10-07.md` item 12): `OSOE_AM_BUFFER`'s default four
+chunks (`OSOE_AM_DEFAULT_BUFFER_CHUNKS`, so that it stays above the floor
+whatever the chunk), the floor two; `OSOE_AM_BUFFER_BUDGET` 1 GiB. A sweep found
+the tests that assumed the default (`test-am-size`, two start-up refusals) and
+some twenty-five statements in the README and the design notes; the README now
+says 2,049 nodes at 256 KiB, halved to the floor from 2,050, 4,098 refused.
+
+The tip - filling the room, the kernel's queue capped by the link, 256 KiB
+buffers - measured:
+
+- **Over loopback** (`tip-against-first-rung.txt`, `floor-tip-pairs.txt`): the
+  64 KiB put stream 8,768 to 10,018 MiB/s against the first rung's 6,404 to
+  6,512 - 1.4 to 1.5 times, where the record's "1.75" was measured beside the
+  spare; `shmem.floor`'s ratio 0.58 to 0.67 by the median of each of six runs,
+  the library at 7.6 to 9.8 GiB/s and the bare stream at 9.1 to 15.0, the host
+  under ordinary desktop load; the mailbox 137,418 to 137,756 messages a second
+  against 137,087 to 137,112, unchanged. The poll the stream's pin guards
+  against measured 0.161 to 0.164, above the pin of 0.15: the pin is 0.3.
+- **On the Pi** (`2026-10-07-pi-head-of-line/compare-1/`): `osoe-bench` at 4 x 4
+  and 4 x 1, alternating with `3ee3357` three times - every line within the
+  noise of the tree before Part 0: puts at 112.1 MiB/s, the barrier 176 and
+  185 µs, a fetch-add's, a get's and a put and quiet's round trips, reduce,
+  broadcast, fcollect and alltoall. One thing moved: at 4 x 4 the pairs' sixteen
+  streams share the links more evenly, the leads' from 64 to 74 MiB/s down to
+  28 and the others' from 28 up to 32 to 39, the total 447 MiB/s either way. A
+  fetch-add behind a 1 MiB put stream 3.9 ms at the median and 6.65 to 6.92 at
+  the 99th percentile, three writers of them 4.43 and 7.2 to 7.8, the stream at
+  112 MiB/s.
+
+## The second adversarial read
+
+A fresh agent read the second and third rungs' code at `37c2ded` against seven
+properties - no hang, loss, reordering or fatal from the limit; every wire once
+a session, the same on every node; no data race and the ownership rule; the
+arithmetic; the single-node build and the boundary; the 256 KiB default; the
+floor's pin - and archived its report as
+`docs/reviews/archive/v0.2-step4-part0-second-adversarial-read.md`. Verdict:
+nothing fatal; the properties held but for the letter of one. What was done:
+
+- **S1, the application thread set an option on sockets the agent owns**
+  (should-fix: invariant 19, §3.12, wire.h's header, though no race). The
+  application thread now asks and the agent sets it, through a request word
+  taken as a dirty bit is - at a pass, and again after `lead_sleeping` is
+  raised, so that it never waits for a sweep - which is the form a helper owning
+  wires will need too.
+- **S2, `shmem.unsent.*` could not see a lead that limited nothing** (should-fix:
+  a launcher printing the lines and opening no socket passed all seven). The
+  agent counts the wires it reached and says so; `unsent.sh` requires every lead
+  to have reached nodes less one.
+- **S3, the floor pin's comment claimed a protocol not run** (should-fix: twelve
+  runs - idle, beside a `ctest -j4`, under 16 busy loops - where six idle runs
+  and three of the poll were taken). Run at the final tree (`pin-protocol.txt`,
+  medians of seven pairs, four runs each): 0.72 to 0.77 idle, 0.43 to 0.54
+  beside a `ctest -j4`, 0.43 to 0.65 under 16 busy loops; the poll 0.145 to
+  0.148 idle, and 0.53 to 0.62 under the loops - where the scheduler's delay to
+  every woken waiter hides it, so that only an idle run can tell. The pin stays
+  0.3: no healthy run came within 1.4 times of it, and an idle poll fails it
+  twice over; the comment now says what was run.
+- **N1**, a bandwidth set by hand was ignored under a `fixed` shape: it counts
+  now. **N3, N5, N7**: 0 leaves the system's own limit, which is none by
+  default; a value by hand is taken as given, however small; the kernel holds
+  "about" the limit, since it takes a send whole while it holds less. **N4**:
+  refusals for a bad `OSOE_WIRE_UNSENT_BYTES`. **N6**: an aborting agent lifts the
+  limit first, so that its abortive goodbye leaves with the kernel even toward a
+  peer stalled past the grace, which then reads the job's status rather than a
+  stream cut short. **N9**: `test-am-size` checks 2,049 itself; a static
+  assertion keeps the overflow argument; the names say "limit", where "cap" read
+  as the contraction `CLAUDE.md` names. **N2** (each node's own setting, as every
+  `OSOE_WIRE_*` is) and **N8** (the `/dev/shm` check asks twice as much for the
+  connection area, 250 MiB at 500 nodes, which the README states) stand.
+
 ## What goes on meanwhile
 
 The rungs that do not depend on the answer, each measured against the one below
