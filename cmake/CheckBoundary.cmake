@@ -71,7 +71,7 @@ set(OSOE_RUNTIME
 # reach any of them.
 set(OSOE_BELOW_BOUNDARY
   am.c am.h am-state.h connection.c connection.h connection-area.c
-  connection-area.h internode-am.c progress.c progress.h progress-host.c
+  connection-area.h internode-am.c owner-map.h progress.c progress.h progress-host.c
   progress-host.h reply.c reply.h ring.c ring.h transport-am.c transport-context.h
   transport-internode.c transport-local.h transport-single-node.c wire.c wire.h)
 
@@ -128,7 +128,7 @@ set(OSOE_ON_BOUNDARY_READING_AM rendezvous.c transport-local.c)
 # for them where none is compiled, so it is held to the third check too.
 set(OSOE_INTERNODE_BACKEND
   am.c am.h am-state.h connection.c connection.h connection-area.c connection-area.h
-  internode-am.c listener.c listener.h progress.c progress.h progress-host.c
+  internode-am.c listener.c listener.h owner-map.h progress.c progress.h progress-host.c
   progress-host.h rendezvous.c rendezvous.h reply.c reply.h ring.c ring.h
   transport-internode.c wire.c wire.h)
 

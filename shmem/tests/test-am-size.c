@@ -116,17 +116,17 @@ int main(void)
      * node of 1 PE and a node of 256 PEs cost exactly the same, because every
      * local PE contends on the same open buffer (§3.5).
      */
-    CHECK(osoe_am_area_bytes(16, floor) == osoe_am_area_bytes(16, floor));
+    CHECK(osoe_am_area_bytes(16, 0, floor) == osoe_am_area_bytes(16, 0, floor));
     for (uint32_t n = 2; n <= 64; n++) {
-        uint64_t a = osoe_am_area_bytes(n, floor);
-        uint64_t b = osoe_am_area_bytes(n + 1, floor);
+        uint64_t a = osoe_am_area_bytes(n, 0, floor);
+        uint64_t b = osoe_am_area_bytes(n + 1, 0, floor);
         /* Each extra node adds exactly one connection: two buffers. */
         CHECK(b - a >= 2 * floor);
         CHECK(b - a < 2 * floor + KB(4));         /* plus its connection state */
     }
 
     /* One node has no peers, so nothing is allocated and any size fits. */
-    CHECK(osoe_am_area_bytes(1, floor) == 0);
+    CHECK(osoe_am_area_bytes(1, 0, floor) == 0);
     CHECK(osoe_am_choose_buffer(chunk, floor, KB(1), 1, &chosen) == OSOE_AM_SIZE_OK);
 
     /*
@@ -172,9 +172,9 @@ int main(void)
      * of four chunks, 120 MiB for 16 nodes and about 2 GiB for 64, and with an
      * 8 KiB chunk - its default buffer 32 KiB - about 250 MiB.
      */
-    CHECK(16 * osoe_am_area_bytes(16, standard) < MB(128));      /* testing: fine */
-    CHECK(64 * osoe_am_area_bytes(64, standard) > MB(1900));     /* ~2 GiB: tune it */
-    CHECK(64 * osoe_am_area_bytes(64, KB(32)) < MB(280));        /* with a small chunk */
+    CHECK(16 * osoe_am_area_bytes(16, 0, standard) < MB(128));      /* testing: fine */
+    CHECK(64 * osoe_am_area_bytes(64, 0, standard) > MB(1900));     /* ~2 GiB: tune it */
+    CHECK(64 * osoe_am_area_bytes(64, 0, KB(32)) < MB(280));        /* with a small chunk */
 
     return CHECK_DONE();
 }

@@ -89,7 +89,7 @@ int main(void)
     CHECK_FATAL(b.node_count >= 3 && b.node_count <= MAX_NODES);
 
     struct osoe_connection_area area;
-    osoe_connection_area_open(&area, &b, b.node_count, 0, OSOE_SHM_ANY_CREATOR);
+    osoe_connection_area_open(&area, &b, b.node_count, 0, 0, OSOE_SHM_ANY_CREATOR);
     arrivals_open();
 
     /* Only the node lead touches a wire or runs the loop (§3.12). The other
@@ -107,7 +107,7 @@ int main(void)
     static struct osoe_wire wires[MAX_NODES];
     static struct osoe_ring ring;
     uint32_t peers = b.node_count - 1;
-    osoe_wires_open(wires, &ring, &b, 0, NULL);
+    osoe_wires_open(wires, (struct osoe_ring *[]){ &ring }, 0, &b, 0, NULL);
     osoe_ring_enable(&ring);
 
     static struct osoe_reply descriptors[DESCRIPTORS];
@@ -115,9 +115,11 @@ int main(void)
     static uint64_t busy[(MAX_NODES + 63) / 64];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, NULL, NULL,
                                        NULL, NULL };
+    /* One owner, the lead's agent, holding every wire (owner-map.h). */
     struct osoe_progress p;
-    osoe_progress_init(&p, &area, wires, &ring, descriptors, DESCRIPTORS, &host);
-    osoe_progress_attach(&p, connections, busy);
+    static struct osoe_progress_owner owner;
+    osoe_progress_init(&p, &area, &owner, &host);
+    osoe_progress_attach(&p, 0, &ring, wires, connections, busy, descriptors, DESCRIPTORS);
 
     /* The world team's tree: every node, at the fan-out the environment gives
      * (OSOE_COLLECTIVE_FANOUT, so the same binary runs every shape). */
@@ -136,7 +138,7 @@ int main(void)
      * the timing check below would then be measuring setup, not the barrier.
      */
     for (int i = 0; i < 64; i++)
-        osoe_progress_poll(&p);
+        osoe_progress_poll(&owner);
 
     enum { EPOCH = 5 };
     /*
@@ -150,7 +152,7 @@ int main(void)
     osoe_progress_arrive(&p, TEAM, 0, EPOCH);
 
     while (releases == 0) {
-        if (!osoe_progress_poll(&p))
+        if (!osoe_progress_poll(&owner))
             osoe_ring_wait(&ring, UINT64_C(1000000));
         if (osoe_deadline_expired(&give_up)) {
             fprintf(stderr, "node %u: the barrier never released\n", b.node);
@@ -182,8 +184,8 @@ int main(void)
      * rather than one. osoe_progress_idle is the library's own predicate for
      * exactly this question.
      */
-    while (!osoe_progress_idle(&p)) {
-        osoe_progress_poll(&p);
+    while (!osoe_progress_idle(&owner)) {
+        osoe_progress_poll(&owner);
         if (osoe_deadline_expired(&give_up))
             break;
     }
@@ -193,11 +195,11 @@ int main(void)
      * stream, and read until every peer's has ended - which is also what keeps
      * this node reading until the nodes it releases have taken their release.
      */
-    osoe_progress_close(&p);
-    while (!osoe_progress_closed(&p) && !osoe_deadline_expired(&give_up))
-        if (!osoe_progress_poll(&p))
+    osoe_progress_close(&owner);
+    while (!osoe_progress_closed(&owner) && !osoe_deadline_expired(&give_up))
+        if (!osoe_progress_poll(&owner))
             osoe_ring_wait(&ring, UINT64_C(1000000));
-    CHECK(osoe_progress_closed(&p));
+    CHECK(osoe_progress_closed(&owner));
 
 done:
     for (uint32_t i = 0; i < peers; i++)

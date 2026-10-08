@@ -187,6 +187,21 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.am-size PROPERTIES LABELS "tier1" TIMEOUT 60)
   osoe_internode_label(shmem.am-size)
 
+  # The map from peer to owner (owner-map.h), both ways, at every helper count a
+  # node may run, and the connection area laid out by it: each writer's mark in
+  # its owner's bitmap alone, and no two owners' words on one line (tier 1, one
+  # process).
+  add_executable(shmem_test_owner_map test-owner-map.c ../src/connection-area.c
+    ../src/am-configuration.c ../src/connection.c ../src/shm-object.c)
+  target_include_directories(shmem_test_owner_map PRIVATE ../src)
+  target_link_libraries(shmem_test_owner_map PRIVATE osoe_base rt)
+  osoe_warnings(shmem_test_owner_map)
+  add_test(NAME shmem.owner-map COMMAND shmem_test_owner_map)
+  set_tests_properties(shmem.owner-map PROPERTIES LABELS "tier1" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "owner map: ok")
+  # internode: compiles connection-area.c
+  osoe_internode_label(shmem.owner-map)
+
   # The reservation protocol (tier 1): the real code under real threads, checking
   # the properties the models check. Writers are threads because that is what the
   # tsan preset can instrument; §8.2 says what that does and does not buy.

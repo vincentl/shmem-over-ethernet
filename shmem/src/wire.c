@@ -17,6 +17,7 @@
 #include "base/environment.h"
 #include "fatal.h"
 #include "listener.h"
+#include "owner-map.h"
 #include "wire.h"
 #include "wire-settings.h"
 
@@ -127,7 +128,14 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t slot, i
         osoe_fatal("cannot set TCP keepalive toward node %u: %s", peer, strerror(errno));
 }
 
-void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
+/* Peer slot `slot`'s wire, where it sits among the owners' (owner-map.h). */
+static struct osoe_wire *wire_of(struct osoe_wire *wires, uint32_t slot, uint32_t peers,
+                                 uint32_t helpers)
+{
+    return &wires[osoe_owner_position(slot, peers, helpers)];
+}
+
+void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
                      const struct osoe_bootstrap *b, uint32_t session,
                      const struct osoe_mesh *mesh)
 {
@@ -153,7 +161,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
                             missing, missing == 1 ? "" : "s");
         for (uint32_t peer = 0; peer < b->node && used > 0 &&
                                 (size_t)used < sizeof expecting - 24; peer++)
-            if (wires[peer].fd < 0 && named++ < 8)
+            if (wire_of(wires, peer, peers, helpers)->fd < 0 && named++ < 8)
                 used += snprintf(expecting + used, sizeof expecting - (size_t)used, "%s%u",
                                  named == 1 ? "node " : ", ", peer);
         if (used > 0 && (size_t)used < sizeof expecting - 8)
@@ -165,9 +173,11 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
             osoe_fatal("node %u was connected to by node %u, which is not a lower node",
                        b->node, peer);
         uint32_t slot = peer;
-        if (wires[slot].fd >= 0)
+        struct osoe_wire *w = wire_of(wires, slot, peers, helpers);
+        if (w->fd >= 0)
             osoe_fatal("node %u was connected to twice by node %u", b->node, peer);
-        osoe_wire_attach(&wires[slot], ring, slot, fd, peer, b);
+        osoe_wire_attach(w, rings[osoe_owner_of(slot, helpers)], osoe_owner_index(slot, helpers),
+                         fd, peer, b);
     }
     osoe_listener_close(l);
     /* Without a rendezvous's mesh - the tests below the library - each peer is
@@ -185,9 +195,13 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *ring,
             osoe_listener_node_address(b, peer, &at);
             fd = osoe_listener_connect(b, session, &at, peer, OSOE_HELLO_MESH);
         }
-        osoe_wire_attach(&wires[peer - 1], ring, peer - 1, fd, peer, b);
+        uint32_t slot = peer - 1;
+        osoe_wire_attach(wire_of(wires, slot, peers, helpers), rings[osoe_owner_of(slot, helpers)],
+                         osoe_owner_index(slot, helpers), fd, peer, b);
     }
-    osoe_wire_ring_open(ring, wires, peers, b);
+    for (uint32_t o = 0; o <= helpers; o++)
+        osoe_wire_ring_open(rings[o], &wires[osoe_owner_first(o, peers, helpers)],
+                            osoe_owner_wires(o, peers, helpers), b);
 }
 
 /* osoe_wire_send and osoe_wire_send_lent: `lent` is the region the bytes are

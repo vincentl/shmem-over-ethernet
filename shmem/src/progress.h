@@ -2,11 +2,15 @@
 /*
  * The node's progress engine (§3.3, §3.7, §3.8, §3.9, §3.12).
  *
- * One pass over every peer connection: receive and apply what arrived, drain
+ * One pass over an owner's connections: receive and apply what arrived, drain
  * deferred replies into outbound buffers, and move sealed buffers onto the
- * wire. The local lead's agent runs it; no other thread does (§3.12), so
- * everything here except the connection buffers themselves is private to that
- * thread.
+ * wire. An *owner* is a thread with a ring and the wires attached to it
+ * (owner-map.h; docs/design/progress-helpers-proposal.md §3.2): the local
+ * lead's agent is owner 0, and with no helpers it holds every wire. The same
+ * pass runs on every owner, and no thread but an owner touches what it owns,
+ * so everything here except the connection buffers themselves is private to
+ * one thread: an owner's to its owner, and the engine's own - the control
+ * plane, the internode tree's state - to owner 0, the lead's agent (§3.12).
  *
  * **A handler may enqueue, but never reserve** (§3.7). That is the load-bearing
  * rule and it shapes this file: applying an incoming message may take a reply
@@ -186,8 +190,8 @@ struct osoe_progress_team {
     uint32_t releases_queued;
 };
 
-/* The progress thread's private bookkeeping for one connection. Writers see
- * only the seal bit in the buffer's head (§3.5); none of this is shared. */
+/* An owner's private bookkeeping for one connection. Writers see only the
+ * seal bit in the buffer's head (§3.5); none of this is shared. */
 struct osoe_progress_connection {
     uint8_t state[2];               /* enum osoe_buffer_state */
     uint32_t open;                  /* the reservable buffer, or OSOE_CONNECTION_NONE */
@@ -254,20 +258,29 @@ struct osoe_progress_connection {
     struct osoe_reply_queues queues;
 };
 
-struct osoe_progress {
+/*
+ * One owner's engine (owner-map.h): its ring and the wires it carries, the
+ * connections over them, and everything a pass over them writes. Private to
+ * the owner's thread, like the rest of this file's state.
+ */
+struct osoe_progress_owner {
+    struct osoe_progress *engine;               /* the node's, whose control plane is owner 0's */
+    uint32_t index;                             /* 0, the lead's agent, or helper 1 to H */
+    uint32_t count;                             /* the wires it holds */
+    struct osoe_ring *ring;                     /* carries them (ring.h) */
+    struct osoe_wire *wire;                     /* `count`, by index (owner-map.h) */
+    struct osoe_progress_connection *connection;/* `count`, by the same index */
+    /*
+     * One bit a connection by index: those with send-side work the owner
+     * already knows about (busy()), kept current as that work appears and
+     * goes, so that a pass finds them in count/64 words instead of asking every
+     * connection. Its dirty bitmap, the writers' half, is the area's
+     * (connection-area.h).
+     */
+    uint64_t *busy;
     /* Application messages applied - any but the detector's - cumulative: part
      * of this node's activity for the deadlock detector (§3.15). */
     uint64_t application_applied;
-    struct osoe_connection_area *area;
-    struct osoe_wire *wire;                     /* one per peer, by peer slot */
-    struct osoe_ring *ring;                     /* carries every wire (ring.h) */
-    /*
-     * One bit per peer slot: the connections with send-side work the lead
-     * already knows about (busy()), kept current as that work appears and
-     * goes, so that a pass finds them in N/64 words instead of asking every
-     * connection. Private, like the rest of this struct.
-     */
-    uint64_t *busy;
     bool closing;                               /* osoe_progress_close has begun */
     /* The job is ending (osoe_progress_abort): none of its own traffic goes out
      * any more, and every connection ends with the abortive goodbye below - the
@@ -276,21 +289,40 @@ struct osoe_progress {
     bool abort_keeps_stream;                    /* a global exit's (osoe_progress_abort) */
     unsigned char abort_segment[64];
     uint32_t abort_segment_bytes;
-    struct osoe_progress_connection *connection;/* one per peer, by peer slot */
+    /* The replies its connections' queues hold (§3.8): the owner's own pool,
+     * sized over its connections - and, owner 0's, the control plane's forwards
+     * and the detector's messages besides. */
     struct osoe_reply_pool pool;
-    struct osoe_reply *descriptors;
+    /*
+     * §3.14 counters, read by osoe-stat and by the tests: owner 0's are the
+     * node header's `am` record when running inside a job (progress-host.c
+     * binds it), and `own_metrics` until then, so that the loop counts the same
+     * way whether or not there is a control segment to count into.
+     */
+    struct osoe_am_node_metrics *metrics;
+    struct osoe_am_node_metrics own_metrics;
+};
+
+/*
+ * The node's engine: what its owners share - read-only once they run - and the
+ * control plane, which is owner 0's (the progress helpers proposal's §3.1).
+ */
+struct osoe_progress {
+    struct osoe_connection_area *area;
     uint32_t node, nodes;
+    uint32_t helpers;                           /* the area's (owner-map.h) */
+    struct osoe_progress_owner *owner;          /* helpers + 1, by owner */
     struct osoe_progress_host host;
 
     /*
      * The internode tree's state, per team block (§5.3; the team redesign's
-     * step D, where it was per team number until then): private to the
-     * progress thread, like everything else here, and O(k) per team - the
-     * topology - plus O(1) for the epoch in progress. An entry is filled the
-     * first time the engine meets its team (`team_source`). `team_count`
-     * entries: OSOE_TEAM_BLOCKS once the host attaches its arrays
-     * (osoe_progress_attach_teams), and until then `own_team`'s, room for the
-     * predefined teams, which is all an engine without a job registers.
+     * step D, where it was per team number until then): owner 0's, like the
+     * rest of the control plane, and O(k) per team - the topology - plus O(1)
+     * for the epoch in progress. An entry is filled the first time the engine
+     * meets its team (`team_source`). `team_count` entries: OSOE_TEAM_BLOCKS
+     * once the host attaches its arrays (osoe_progress_attach_teams), and until
+     * then `own_team`'s, room for the predefined teams, which is all an engine
+     * without a job registers.
      *
      * `pending` lists the teams whose release this pass has forwarded and not
      * yet applied (release_pending), so that the pass's end costs what it has
@@ -310,46 +342,38 @@ struct osoe_progress {
     osoe_progress_team_finder *team_find;
 
     /*
-     * §3.14 counters, read by osoe-stat and by the tests: the node header's
-     * `am` record when running inside a job (progress-host.c binds it), and
-     * `own_metrics` until then, so that the loop counts the same way whether
-     * or not there is a control segment to count into.
-     */
-    struct osoe_am_node_metrics *metrics;
-    struct osoe_am_node_metrics own_metrics;
-    /*
-     * §3.14's connection scope, in the control segment where osoe-stat and the
-     * tests read it (progress-host.c binds it); each team's tree state is
-     * published into its own block (`published` above). NULL outside a job -
-     * the engine's own tests run without a control segment - and every write
-     * to them is guarded, because a diagnostic must not decide whether the
-     * loop can run.
+     * §3.14's connection scope, by peer slot, in the control segment where
+     * osoe-stat and the tests read it (progress-host.c binds it): a record a
+     * connection, each written by the connection's owner alone. Each team's
+     * tree state is published into its own block (`published` above). NULL
+     * outside a job - the engine's own tests run without a control segment -
+     * and every write to them is guarded, because a diagnostic must not decide
+     * whether the loop can run.
      */
     struct osoe_am_connection_metrics *connection_metrics;
 };
 
 /*
- * Set up for a node of `nodes` logical nodes. `wires` is one wire per peer in
- * peer-slot order, all carried by `ring`; `descriptors` the node-wide pool
- * backing every connection's queues (§3.8).
+ * Set up the engine of a node of the area's nodes and helpers: `owners` is the
+ * caller's array of helpers + 1, which osoe_progress_attach fills an owner at a
+ * time.
  */
 void osoe_progress_init(struct osoe_progress *p, struct osoe_connection_area *area,
-                        struct osoe_wire *wires, struct osoe_ring *ring,
-                        struct osoe_reply *descriptors, uint32_t descriptor_count,
+                        struct osoe_progress_owner *owners,
                         const struct osoe_progress_host *host);
 
 /*
- * One pass. Returns true if anything moved, which is what tells the idle loop
- * whether to sleep (§3.10): a pass that moved nothing is the only safe moment
- * to wait, and the wait still carries a sweep deadline so that a lost wake
- * costs latency rather than the job.
+ * Bind owner `owner`'s arrays, and put every connection of it into its
+ * starting state: its wires, as many as owner-map.h gives it and in index
+ * order, all carried by `ring`; as many connections; its busy bitmap, a bit a
+ * wire; and `descriptors`, the pool backing its connections' queues (§3.8).
+ * Separate from init because the caller owns the arrays: the loop never
+ * allocates.
  */
-/* Bind the per-connection state, one entry per peer in peer-slot order, and
- * the busy bitmap, (nodes - 1 + 63) / 64 words, and put every connection into
- * its starting state. Separate from init because the caller owns the arrays:
- * the loop never allocates. */
-void osoe_progress_attach(struct osoe_progress *p,
-                          struct osoe_progress_connection *connections, uint64_t *busy);
+void osoe_progress_attach(struct osoe_progress *p, uint32_t owner, struct osoe_ring *ring,
+                          struct osoe_wire *wires, struct osoe_progress_connection *connections,
+                          uint64_t *busy, struct osoe_reply *descriptors,
+                          uint32_t descriptor_count);
 
 /* Bind the per-team state, `count` entries - one per block of the node's pool
  * of teams (OSOE_TEAM_BLOCKS) - and a list of as many block indices, both
@@ -361,7 +385,15 @@ void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_te
                                 osoe_progress_team_source *source,
                                 osoe_progress_team_finder *find);
 
-bool osoe_progress_poll(struct osoe_progress *p);
+/*
+ * One pass of owner `o`, on its thread. Returns true if anything moved, which
+ * is what tells the idle loop whether to sleep (§3.10): a pass that moved
+ * nothing is the only safe moment to wait, and the wait still carries a sweep
+ * deadline so that a lost wake costs latency rather than the job. Owner 0's
+ * pass runs the control plane's work besides: the releases the tree has to
+ * apply on this node.
+ */
+bool osoe_progress_poll(struct osoe_progress_owner *o);
 
 /*
  * Meet every team in a block below `count` whose record is published now, as
@@ -375,9 +407,10 @@ bool osoe_progress_poll(struct osoe_progress *p);
 void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count);
 
 /*
- * Does this node owe the network nothing? True when every connection has an
- * empty reply queue, nothing sealed, nothing in flight, and no committed bytes
- * waiting in an open buffer.
+ * Does owner `o` owe the network nothing? True when every connection of it has
+ * an empty reply queue, nothing sealed, nothing in flight, and no committed
+ * bytes waiting in an open buffer - and, owner 0's, no release of the tree's
+ * waiting to be applied.
  *
  * It exists for teardown. §5.3's root releases its own node the instant the
  * last node arrives and only *enqueues* the releases that free the others, so
@@ -385,7 +418,7 @@ void osoe_progress_meet_teams(struct osoe_progress *p, uint32_t count);
  * still in a buffer that only its engine sends. Stopping the engine there
  * hangs every other node (§6.4).
  */
-bool osoe_progress_idle(struct osoe_progress *p);
+bool osoe_progress_idle(struct osoe_progress_owner *o);
 
 /*
  * End the job naming any peer whose kernel has acknowledged nothing sent to it
@@ -398,26 +431,27 @@ bool osoe_progress_idle(struct osoe_progress *p);
  * one whose buffer is full is probed through a zero window with nothing
  * outstanding.
  */
-void osoe_progress_check_silent(struct osoe_progress *p, uint32_t budget_ms);
+void osoe_progress_check_silent(struct osoe_progress_owner *o, uint32_t budget_ms);
 
 /*
- * Close every connection (§6.4, close_model.py): each one, once it owes the
- * peer nothing, sends its goodbye - a header-only segment flagged
+ * Close every connection of owner `o` (§6.4, close_model.py): each one, once
+ * it owes the peer nothing, sends its goodbye - a header-only segment flagged
  * OSOE_AM_SEGMENT_GOODBYE, the last it will send - and then ends its stream;
  * the passes that follow keep receiving until every peer's stream has ended
  * too. Called once the engine is idle (osoe_progress_idle). An end of stream
  * that arrives before its goodbye is a peer that died, and ends the job then
  * as at any other time.
  */
-void osoe_progress_close(struct osoe_progress *p);
+void osoe_progress_close(struct osoe_progress_owner *o);
 
-/* Every connection has sent its goodbye and ended its stream, and seen the
- * peer's goodbye and the end of the peer's. Its sockets may then be closed. */
-bool osoe_progress_closed(const struct osoe_progress *p);
+/* Every connection of owner `o` has sent its goodbye and ended its stream, and
+ * seen the peer's goodbye and the end of the peer's. Its sockets may then be
+ * closed. */
+bool osoe_progress_closed(const struct osoe_progress_owner *o);
 
 /*
- * The job is ending (§3.15; abort_model.py). From here the engine sends none of
- * the job's own traffic. Each connection finishes the segment already on its
+ * The job is ending (§3.15; abort_model.py). From here owner `o` sends none of
+ * the job's own traffic. Each connection of it finishes the segment already on its
  * wire, so the peer's stream stays whole, then sends its abortive goodbye - a
  * segment flagged OSOE_AM_SEGMENT_GOODBYE carrying one OSOE_AM_ABORT - and ends
  * its stream; unless it has nobody to tell: its normal goodbye already went, the
@@ -431,30 +465,31 @@ bool osoe_progress_closed(const struct osoe_progress *p);
  * costs. A connection that fails from here is a peer that is ending too, and is
  * not a fatal; nor is a peer's end of stream without its goodbye.
  */
-void osoe_progress_abort(struct osoe_progress *p, uint32_t pe, int32_t status,
+void osoe_progress_abort(struct osoe_progress_owner *o, uint32_t pe, int32_t status,
                          uint32_t disposition, bool keep_stream);
 
-/* Every connection has had its abortive goodbye acknowledged by the peer's
- * kernel, or has nobody to tell. O(N) calls to the kernel. */
-bool osoe_progress_aborted(const struct osoe_progress *p);
+/* Every connection of owner `o` has had its abortive goodbye acknowledged by
+ * the peer's kernel, or has nobody to tell. O(N) calls to the kernel. */
+bool osoe_progress_aborted(const struct osoe_progress_owner *o);
 
-/* Every peer's stream has ended, by its end of stream or an error, but a peer
- * whose own abort named a rank other than `carrier`: a node carrying its own
- * caller of shmem_global_exit (abort.h). O(N). */
-bool osoe_progress_peers_ended(const struct osoe_progress *p, uint32_t carrier);
+/* The stream of every peer of owner `o`'s has ended, by its end of stream or
+ * an error, but a peer whose own abort named a rank other than `carrier`: a
+ * node carrying its own caller of shmem_global_exit (abort.h). O(N). */
+bool osoe_progress_peers_ended(const struct osoe_progress_owner *o, uint32_t carrier);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);
 
 /*
- * The deadlock detector's view (§3.15, transport.h's node_quiet): idle, and every
- * connection's peer has applied the last segment that carried application
- * work; where one has not said so, ask it. `applied`: the application messages
- * applied, cumulative.
+ * The deadlock detector's view (§3.15, transport.h's node_quiet), of owner `o`'s
+ * connections: idle, and every connection's peer has applied the last segment
+ * that carried application work; where one has not said so, ask it.
+ * `applied`: the application messages it has applied, cumulative.
  */
-bool osoe_progress_quiet(struct osoe_progress *p, uint64_t *applied);
+bool osoe_progress_quiet(struct osoe_progress_owner *o, uint64_t *applied);
 
-/* Queue a deadlock detector message toward `node`'s lead, on the control queue. */
+/* Queue a deadlock detector message toward `node`'s lead, on the control queue
+ * of owner 0's connection to it: the control plane's. */
 void osoe_progress_deadlock_send(struct osoe_progress *p, uint32_t node,
                                  const struct osoe_deadlock_message *m);
 

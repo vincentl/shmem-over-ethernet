@@ -103,18 +103,40 @@ bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen);
 bool osoe_internode_am_take_arrivals(void);
 
 /*
- * Ask the local lead's agent to run a pass: it seals what writers have
- * committed, sends it, and reaps what has arrived (§3.12's "a flag plus a futex
- * wake", where here the committed bytes are the flag).
+ * Ask the owner of the connection toward `peer` (owner-map.h) to run a pass:
+ * it seals what writers have committed, sends it, and reaps what has arrived
+ * (§3.12's "a flag plus a futex wake", where here the committed bytes are the
+ * flag) - and every owner this thread held a wake back from
+ * (osoe_progress_host_defer), since one wake covers whatever an operation left
+ * behind.
  *
  * Called by an application thread after committing into a connection buffer
  * and setting its dirty bit (osoe_connection_area_mark), and again by anything
  * waiting on a peer - a writer out of room, a quiet waiting for an
- * acknowledgement. It makes the futex syscall only if the lead has raised
- * lead_sleeping and this caller claims the wake (§3.10, lead_wake_model.py);
- * otherwise it is one load.
+ * acknowledgement. It makes the futex syscall only if the owner has raised its
+ * `sleeping` flag and this caller claims the wake (§3.10, lead_wake_model.py,
+ * whose owner is a parameter); otherwise it is one load an owner.
  */
-void osoe_progress_host_wake_lead(void);
+void osoe_progress_host_wake(uint32_t peer);
+
+/*
+ * Hold back the wake osoe_progress_host_wake(peer) would make, for the next
+ * wake this thread makes (OSOE_TRANSPORT_MORE, transport.h): the bytes are
+ * committed and marked, and only the syscall waits. If no wake ever comes, the
+ * owner's own sweep finds them, so holding one back costs latency at worst.
+ */
+void osoe_progress_host_defer(uint32_t peer);
+
+/* Make the wakes this thread has held back, each only if its owner sleeps:
+ * after asking several peers to acknowledge, one wake an owner asked. */
+void osoe_progress_host_wake_deferred(void);
+
+/*
+ * Wake every owner of a data wire, each only if it sleeps: for a wait that
+ * whatever this PE held back may be what ends, toward any number of peers - a
+ * landing zone full of gets in flight, a context's gets to land.
+ */
+void osoe_progress_host_wake_all(void);
 
 /*
  * The highest segment sequence `peer` has acknowledged *applying* (§4.6), which
