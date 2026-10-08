@@ -164,12 +164,52 @@ static bool proc_restricted(void)
 }
 
 /*
- * Every file descriptor of every visible process that refers to a /dev/shm
- * object named like a control segment - linked or not - calls `visit` with the
- * object's name ("/osoe....") and the path that opens it ("/proc/<pid>/fd/<n>").
- * A visit returning true stops the walk. This is how a segment is found once
- * its name has been removed (§3.14): every PE keeps its control segment open
- * for the life of the session, so the kernel still knows the object, and
+ * One process's descriptors, `dir` its /proc/<pid>/fd: each that refers to a
+ * /dev/shm object named like a control segment - linked or not - is offered to
+ * `visit` with the object's name ("/osoe....") and the path that opens it
+ * ("<dir>/<n>"). True once a visit has stopped the walk; `*denied` is set when
+ * the directory may not be read.
+ */
+static bool walk_descriptors(const char *dir, bool (*visit)(void *, const char *, const char *),
+                             void *ctx, bool *denied)
+{
+    DIR *fds = opendir(dir);
+    if (!fds) {
+        if (errno == EACCES)
+            *denied = true;
+        return false;
+    }
+    const struct dirent *f;
+    while ((f = readdir(fds))) {
+        if (f->d_name[0] == '.')
+            continue;
+        char link[600], target[256];
+        snprintf(link, sizeof link, "%s/%.255s", dir, f->d_name);
+        ssize_t n = readlink(link, target, sizeof target - 1);
+        if (n <= 0)
+            continue;
+        target[n] = '\0';
+        if (strncmp(target, "/dev/shm/", 9) != 0)
+            continue;
+        char *deleted = strstr(target, " (deleted)");
+        if (deleted)
+            *deleted = '\0';
+        if (!is_control_name(target + 9))
+            continue;
+        if (visit(ctx, target + 8, link)) {
+            closedir(fds);
+            return true;
+        }
+    }
+    closedir(fds);
+    return false;
+}
+
+/*
+ * Every file descriptor of every visible process, as walk_descriptors offers
+ * them. A visit returning true stops the walk. This is how a segment is found
+ * once its name has been removed (§3.14): every PE keeps its control segment
+ * open for the life of the session, so the kernel still knows the object, and
  * /proc/<pid>/fd/<n> opens that same object for any process allowed to see it.
  * /proc/<pid>/map_files/ is not used: it needs CAP_SYS_ADMIN.
  */
@@ -185,36 +225,10 @@ static enum proc_search walk_proc(bool (*visit)(void *, const char *, const char
             continue;
         char dir[300];
         snprintf(dir, sizeof dir, "/proc/%.255s/fd", p->d_name);
-        DIR *fds = opendir(dir);
-        if (!fds) {
-            if (errno == EACCES)
-                denied = true;
-            continue;
+        if (walk_descriptors(dir, visit, ctx, &denied)) {
+            closedir(procs);
+            return PROC_NOTHING;
         }
-        const struct dirent *f;
-        while ((f = readdir(fds))) {
-            if (f->d_name[0] == '.')
-                continue;
-            char link[600], target[256];
-            snprintf(link, sizeof link, "%s/%.255s", dir, f->d_name);
-            ssize_t n = readlink(link, target, sizeof target - 1);
-            if (n <= 0)
-                continue;
-            target[n] = '\0';
-            if (strncmp(target, "/dev/shm/", 9) != 0)
-                continue;
-            char *deleted = strstr(target, " (deleted)");
-            if (deleted)
-                *deleted = '\0';
-            if (!is_control_name(target + 9))
-                continue;
-            if (visit(ctx, target + 8, link)) {
-                closedir(fds);
-                closedir(procs);
-                return PROC_NOTHING;
-            }
-        }
-        closedir(fds);
     }
     closedir(procs);
     if (proc_restricted())
@@ -259,7 +273,19 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
         fd = shm_open(s->name, O_RDONLY | O_NONBLOCK, 0);
         if (fd < 0 && errno == ENOENT) {
             struct find_one f = { .name = s->name };
-            enum proc_search why = walk_proc(match_name, &f);
+            /*
+             * This process's own descriptors before every process's: a PE
+             * reading its own node's segment - each test of what its lead
+             * published - holds it open itself, while the walk of /proc costs
+             * a readlink for every descriptor of every process before the
+             * holder, and those grow with a job's sockets: N(N - 1) on N
+             * logical nodes of one host, twice that since a pair has two
+             * wires (v0.2 step 4, Part 2).
+             */
+            bool denied = false;
+            enum proc_search why = PROC_NOTHING;
+            if (!walk_descriptors("/proc/self/fd", match_name, &f, &denied))
+                why = walk_proc(match_name, &f);
             if (f.found)
                 fd = open(f.path, O_RDONLY | O_NONBLOCK);
             else if (why == PROC_RESTRICTED)
