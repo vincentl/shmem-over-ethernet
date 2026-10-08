@@ -41,8 +41,9 @@ enum { CANDIDATES = 32 };
 #define HELLO_NS  UINT64_C(100000000)           /* 0.1 s for a hello */
 
 #define HELLO_MAGIC   UINT64_C(0x6f6c6568656f736f)   /* "osoehelo", little-endian */
-#define HELLO_VERSION 3         /* 2: the launch's shape;
-                                 * 3: nonces and proofs (OSOE_JOB_SECRET) */
+#define HELLO_VERSION 4         /* 2: the launch's shape;
+                                 * 3: nonces and proofs (OSOE_JOB_SECRET);
+                                 * 4: a control wire beside each pair's data wire */
 
 struct hello {
     uint64_t magic;
@@ -438,7 +439,7 @@ static void judge_claim(const struct osoe_listener *l, const struct hello *h)
  * confirmation (ACCEPTED) or dropped.
  */
 static void caller_answer(struct osoe_listener *l, struct osoe_listener_caller *c,
-                          enum osoe_hello_purpose purpose)
+                          uint32_t purposes)
 {
     const struct osoe_bootstrap *b = l->bootstrap;
     const struct hello *h = &c->hello;
@@ -456,7 +457,8 @@ static void caller_answer(struct osoe_listener *l, struct osoe_listener_caller *
         a.verdict = NOT_THIS_NODE;
     else if (!b->secured)
         judge_counts(l, h);
-    if (a.verdict == ACCEPTED && h->purpose != (uint32_t)purpose)
+    if (a.verdict == ACCEPTED &&
+        (h->purpose >= 32 || !(purposes & OSOE_HELLO_PURPOSE(h->purpose))))
         a.verdict = NOT_YET;
     else if (a.verdict == ACCEPTED && !b->secured)
         judge_claim(l, h);
@@ -471,7 +473,7 @@ static void caller_answer(struct osoe_listener *l, struct osoe_listener_caller *
     }
     c->answer = a;
     c->answered = true;
-    c->purpose = (uint32_t)purpose;
+    c->purpose = h->purpose;
     c->got = 0;
 }
 
@@ -481,7 +483,7 @@ static void caller_answer(struct osoe_listener *l, struct osoe_listener_caller *
  * once proved (listener.h).
  */
 static int caller_confirmed(struct osoe_listener *l, struct osoe_listener_caller *c,
-                            uint32_t *peer)
+                            uint32_t *peer, enum osoe_hello_purpose *purpose)
 {
     const struct osoe_bootstrap *b = l->bootstrap;
     if (c->confirmation.magic != HELLO_MAGIC) {
@@ -505,11 +507,13 @@ static int caller_confirmed(struct osoe_listener *l, struct osoe_listener_caller
     int flags = fcntl(fd, F_GETFL);
     fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
     *peer = c->hello.from_node;
+    if (purpose)
+        *purpose = (enum osoe_hello_purpose)c->purpose;
     return fd;
 }
 
-int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpose,
-                         uint32_t *peer, const char *expecting)
+int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *peer,
+                         enum osoe_hello_purpose *purpose, const char *expecting)
 {
     const struct osoe_bootstrap *b = l->bootstrap;
     if (!expecting)
@@ -560,7 +564,7 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
                 }
                 if (c->hello_until_ns - now < wait_ns)
                     wait_ns = c->hello_until_ns - now;
-            } else if (c->purpose != (uint32_t)purpose) {
+            } else if (!(purposes & OSOE_HELLO_PURPOSE(c->purpose))) {
                 continue;               /* answered for another purpose: its call */
             }
             p[count] = (struct pollfd){ .fd = c->fd, .events = POLLIN };
@@ -598,11 +602,11 @@ int osoe_listener_accept(struct osoe_listener *l, enum osoe_hello_purpose purpos
             bool gone = false;
             if (!c->answered) {
                 if (caller_read(c, &c->hello, sizeof c->hello, &gone))
-                    caller_answer(l, c, purpose);
+                    caller_answer(l, c, purposes);
                 else if (gone)
                     caller_drop(c);
             } else if (caller_read(c, &c->confirmation, sizeof c->confirmation, &gone)) {
-                int fd = caller_confirmed(l, c, peer);
+                int fd = caller_confirmed(l, c, peer, purpose);
                 if (fd >= 0)
                     return fd;
             } else if (gone) {

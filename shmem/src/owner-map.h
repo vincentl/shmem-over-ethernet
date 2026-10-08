@@ -69,4 +69,32 @@ static inline uint32_t osoe_owner_position(uint32_t slot, uint32_t peers, uint32
            osoe_owner_index(slot, helpers);
 }
 
+/*
+ * The rings (the progress helpers proposal's §3.1): owner 0's carries its data
+ * wires, by index, and after them every control wire, by peer slot, since the
+ * control plane is the lead's; a helper's carries its data wires. So a data
+ * wire's place on its ring is its index, as everything else its owner keeps a
+ * wire is numbered, and a control wire's is owner 0's data wires' count on.
+ * A node's wires in one array are grouped by ring in owner order.
+ */
+static inline uint32_t osoe_ring_wires(uint32_t owner, uint32_t peers, uint32_t helpers)
+{
+    return osoe_owner_wires(owner, peers, helpers) + (owner == 0 ? peers : 0);
+}
+
+/* Where owner `owner`'s ring's wires start in an array grouped by ring. */
+static inline uint32_t osoe_ring_first(uint32_t owner, uint32_t peers, uint32_t helpers)
+{
+    return owner == 0 ? 0
+                      : osoe_ring_wires(0, peers, helpers) +
+                            osoe_owner_first(owner, peers, helpers);
+}
+
+/* Peer slot `slot`'s control wire: its place on owner 0's ring, and so in an
+ * array grouped by ring. */
+static inline uint32_t osoe_control_ring_slot(uint32_t slot, uint32_t peers, uint32_t helpers)
+{
+    return osoe_owner_wires(0, peers, helpers) + slot;
+}
+
 #endif /* OSOE_OWNER_MAP_H */

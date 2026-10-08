@@ -41,7 +41,8 @@ static uint32_t accepted_node = UINT32_MAX;
 static void *accept_one(void *unused)
 {
     (void)unused;
-    accepted = osoe_listener_accept(&lead, OSOE_HELLO_MESH, &accepted_node, "node 1");
+    accepted = osoe_listener_accept(&lead, OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE),
+                                    &accepted_node, NULL, "node 1");
     return NULL;
 }
 
@@ -81,7 +82,7 @@ static void refused(int fd)
 static void real_peer_joins(const struct osoe_bootstrap *node1, const struct sockaddr_in *at,
                             pthread_t t)
 {
-    int good = osoe_listener_connect_port(node1, 0, at, lead.port, 0, OSOE_HELLO_MESH);
+    int good = osoe_listener_connect_port(node1, 0, at, lead.port, 0, OSOE_HELLO_DATA_WIRE);
     CHECK_FATAL(joined_in_time(t));
     CHECK_FATAL(accepted >= 0);
     CHECK(accepted_node == 1);
@@ -114,7 +115,7 @@ int main(void)
      * proof is the one the lead just sent it; the answer and the confirmation
      * are made with different tags, so replaying it fails. */
     CHECK_FATAL(pthread_create(&t, NULL, accept_one, NULL) == 0);
-    struct hello h = { HELLO_MAGIC, HELLO_VERSION, OSOE_HELLO_MESH, node1.job, node1.step, 0,
+    struct hello h = { HELLO_MAGIC, HELLO_VERSION, OSOE_HELLO_DATA_WIRE, node1.job, node1.step, 0,
                        1, 0, node1.node_count, node1.world_size, fresh_nonce() };
     struct answer a;
     int fd = stranger(&node1, &loopback, &h, &a);
