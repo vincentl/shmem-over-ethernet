@@ -513,16 +513,15 @@ static uint64_t turnover(const struct osoe_connection *connection)
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer
  * that is often full is visible rather than assumed rare.
  *
- * It takes up to `len` and at least `least`, leaving `keep` at the buffer's end
- * (osoe_connection_reserve_up_to): a put's part takes the room there is less a
- * spare, and every other message passes its whole length as both and keeps
- * nothing.
+ * It takes up to `len` and at least `least` (osoe_connection_reserve_up_to):
+ * a put's part takes the room there is, and every other message passes its
+ * whole length as both.
  */
 static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, int pe,
-                            const char *routine, uint32_t len, uint32_t least, uint32_t keep,
+                            const char *routine, uint32_t len, uint32_t least,
                             struct osoe_reservation *r)
 {
-    if (osoe_connection_reserve_up_to(connection, len, least, keep, r) == OSOE_RESERVATION_OK)
+    if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK)
         return;
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
@@ -534,7 +533,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
     bool swept = false;
     for (;;) {
         uint32_t seen = osoe_wait_word_load(word);
-        if (osoe_connection_reserve_up_to(connection, len, least, keep, r) == OSOE_RESERVATION_OK) {
+        if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK) {
             if (swept)
                 count_if_lost(&word->word, slept_on, routine);
             break;
@@ -592,15 +591,6 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
      * waits for the next buffer, since each part pays a message's header and
      * its parse at the peer, and a sliver of room is better left empty. */
     uint32_t smallest_part = limit / 16 ? limit / 16 : 1;
-    /* What a part larger than it leaves at the end of a buffer it cuts: room for
-     * the small messages - a fetch-add, a get's request, a signal - that a
-     * stream filling every buffer would otherwise hold back for a turnover.
-     * Measured on the Pi, a fetch-add behind a put stream waited 0.3 ms more at
-     * the median and up to 1 ms more at the 99th percentile without it
-     * (docs/decisions/2026-10-07-one-thread-profile.md). A 128th of the
-     * buffer, 1 KiB at the default, and at least 256 bytes. */
-    uint32_t spare = connection->capacity / 128 > 256 ? connection->capacity / 128 : 256;
-    spare &= ~(OSOE_MESSAGE_ALIGN - 1);
     const unsigned char *at = src;
     /* A zero-length put is a no-op the spec still allows to be issued; it must
      * not become a message, or the peer applies an empty write and the loop
@@ -614,8 +604,8 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
         struct osoe_reservation r;
         /*
          * Fill the room (v0.2 step 4's first rung): this part takes as much of
-         * the open buffer as there is, less the spare, down to smallest_part of
-         * payload, or the whole remainder if that is less - so a buffer carries what it holds,
+         * the open buffer as there is, down to smallest_part of payload, or the
+         * whole remainder if that is less - so a buffer carries what it holds,
          * where a chunk at a time left a buffer of twice the chunk carrying
          * one, and a stream waited for a turnover every chunk
          * (docs/decisions/2026-10-07-one-thread-profile.md). The parts of a put
@@ -625,9 +615,7 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
          */
         uint32_t least = osoe_message_padded((uint32_t)sizeof m +
                                              (n < smallest_part ? n : smallest_part));
-        uint32_t keep = osoe_message_padded(body) <= spare ? 0 : spare;
-        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), least,
-                        keep, &r);
+        reserve_waiting(connection, peer, pe, "shmem_put", osoe_message_padded(body), least, &r);
         if (r.len < osoe_message_padded(body)) {
             /* A part: the reservation is 8-byte padded, so its payload is too. */
             n = r.len - overhead;
@@ -968,7 +956,7 @@ static uint64_t send_message(struct osoe_connection *connection, uint32_t peer, 
     struct osoe_message_header h = { kind, 0, body };
     struct osoe_reservation r;
     reserve_waiting(connection, peer, pe, routine, osoe_message_padded(body),
-                    osoe_message_padded(body), 0, &r);
+                    osoe_message_padded(body), &r);
     unsigned char *to = osoe_reservation_bytes(connection, &r);
     memcpy(to, &h, sizeof h);
     memcpy(to + sizeof h, fixed, fixed_bytes);

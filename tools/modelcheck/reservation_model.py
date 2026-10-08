@@ -96,12 +96,8 @@ reservation with such messages. Their breakages, each of which must fail:
                    copies the same units again (ONCE)
   fill_floor       the floor is not lowered to a remainder shorter than it,
                    which then never fits (STUCK)
-`tail` (TAIL_CASES): a part of a message larger than the spare leaves the
-buffer's last `spare` units to messages no larger than it - a fetch-add, a get's
-request - which a stream would otherwise hold back for a turnover; a stream
-beside a writer of one-unit messages. Its breakage:
-  tail_underflow   the room less the spare, taken without asking whether the
-                   room is the smaller, wraps (OVERFLOW)
+Some `fill` cases put a stream beside a writer of one-unit messages - a
+fetch-add, a get's request - which take whatever room the stream leaves.
 
 `current` is the tree before slice 2: no pre-open drain. It passes every
 safety check - starving a reply is a liveness property of the *policy*, and a
@@ -209,7 +205,7 @@ def writer(w, msgs, cap, quiet):
     return assemble(B)
 
 
-def part_blocks(p, w, cap, least, done, variant, spare=0):
+def part_blocks(p, w, cap, least, done, variant):
     """One message of a filling writer (v0.2 step 4's first rung,
     transport-internode.c's remote_put): each part reserves as much of the
     message's remaining units as the open buffer has room for - at least
@@ -226,11 +222,6 @@ def part_blocks(p, w, cap, least, done, variant, spare=0):
     so the next part copies the same units again.
     variant 'fill_floor': the floor is not lowered to a remainder smaller than
     it, which then never fits.
-    `spare`: a part of a message larger than it leaves the buffer's last `spare`
-    units to the small messages a stream would otherwise hold back for a
-    turnover; a message no larger than it may take them (remote_put's `keep`).
-    variant 'tail_underflow': the room less the spare is taken without asking
-    whether the room is smaller than the spare, as unsigned arithmetic would.
     """
     stale = variant == 'fill_stale'
     B = [(p + 'S0', ('load', lambda L: HEAD(0), 'v', '@' + p + 'B0')),
@@ -241,13 +232,8 @@ def part_blocks(p, w, cap, least, done, variant, spare=0):
          (p + 'K1', ('set', 'k', lambda L: 1, '@' + p + 'KH')),
          (p + 'KH', ('set', 'h', lambda L: L['v'], '@' + p + 'KV')),
          (p + 'KV', ('set', 'v', lambda L: DEL, '@' + p + 'T')),
-         # The room after the head, less the spare a part of a larger message
-         # leaves, and the part: as much of the remainder as that holds.
-         (p + 'T', ('set', 't', (lambda L, c=cap, sp=spare: min(
-                        L['rem'], (H + c - L['h'] - (sp if L['rem'] > sp else 0)) % (1 << 32)))
-                    if variant == 'tail_underflow' else
-                    (lambda L, c=cap, sp=spare: max(0, min(
-                        L['rem'], H + c - L['h'] - (sp if L['rem'] > sp else 0)))),
+         # The room after the head, and the part: as much of the remainder as fits.
+         (p + 'T', ('set', 't', lambda L, c=cap: max(0, min(L['rem'], H + c - L['h'])),
                     '@' + p + 'CHK')),
          (p + 'CHK', ('br', (lambda L, f=least: L['t'] < f) if variant == 'fill_floor' else
                       (lambda L, f=least: L['t'] < min(L['rem'], f)), '@' + p + 'FW',
@@ -291,7 +277,7 @@ def part_blocks(p, w, cap, least, done, variant, spare=0):
     return B
 
 
-def filling_writer(w, sizes, cap, least, quiet, variant, spare=0):
+def filling_writer(w, sizes, cap, least, quiet, variant):
     """A writer of messages of `sizes` units - a put of several parts, then a
     put-with-signal's fenced rmw of one - each sent as part_blocks says."""
     B = [('U0', ('set', 'u', lambda L: 0, '@m0_M'))]
@@ -299,7 +285,7 @@ def filling_writer(w, sizes, cap, least, quiet, variant, spare=0):
         p = f'm{m}_'
         nxt = f'@m{m + 1}_M' if m + 1 < len(sizes) else '@Q0'
         B += [(p + 'M', ('set', 'rem', lambda L, n=size: n, '@' + p + 'S0'))]
-        B += part_blocks(p, w, cap, least, nxt, variant, spare)
+        B += part_blocks(p, w, cap, least, nxt, variant)
     units = sum(sizes)
     if quiet:
         B += [('Q0', ('set', 'rem', lambda L: DEL, '@Q1')),
@@ -517,20 +503,19 @@ def case(design, writers, msgs, cap, replies=0, quiet=True):
     return name, threads, mem
 
 
-def fill_case(variant, writers, sizes, cap, least, replies=0, quiet=True, spare=0):
+def fill_case(variant, writers, sizes, cap, least, replies=0, quiet=True):
     """`sizes` is every writer's messages, or with `writers` None a tuple of
     each writer's own - a stream beside a writer of small messages."""
     each = [sizes] * writers if writers is not None else list(sizes)
     total = sum(sum(own) for own in each) + replies
-    threads = [filling_writer(w, own, cap, least, quiet, variant, spare)
+    threads = [filling_writer(w, own, cap, least, quiet, variant)
                for w, own in enumerate(each)]
     threads.append(progress('design', total, cap, replies))
     mem = {HEAD(0): SEALED, HEAD(1): SEALED, FILLED(0): 0, FILLED(1): 0, SEQ(0): 0, SEQ(1): 0,
            ACKED: 0}
     shown = ' '.join(','.join(map(str, own)) for own in each)
     name = (f"reservation/{variant} writers={len(each)} sizes={shown} "
-            f"cap={cap} least={least}{f' spare={spare}' if spare else ''}"
-            f"{f' replies={replies}' if replies else ''}")
+            f"cap={cap} least={least}{f' replies={replies}' if replies else ''}")
     return name, threads, mem
 
 
@@ -587,23 +572,15 @@ FILL_CASES = [
     ('fill', 2, (2, 2), 3, 1, 0, False, True),
     ('fill', 2, (3, 1), 3, 1, 1, False, True),     # puts and their signals beside a reply
     ('fill', 2, (3,), 2, 1, 0, True, True),        # x86-TSO, every message split
+    # a stream beside a writer of one-unit messages - fetch-adds, get requests
+    ('fill', None, ((3, 3), (1, 1)), 3, 1, 0, False, True),
+    ('fill', None, ((3,), (1, 1)), 2, 1, 0, False, True),
+    ('fill', None, ((3, 1), (1,)), 3, 1, 1, False, True),   # the stream's signal; a reply
+    ('fill', None, ((2, 2), (1, 1)), 3, 1, 0, True, True),  # x86-TSO
 
     ('fill_stale', 2, (2,), 3, 1, 0, False, False),
     ('fill_no_advance', 1, (3,), 2, 1, 0, False, False),
     ('fill_floor', 1, (2, 1), 2, 2, 0, False, False),
-]
-
-# The spare a stream's parts leave for small messages (remote_put's `keep`): a
-# stream of several-unit puts beside a writer of one-unit messages, the spare one
-# unit. (variant, each writer's sizes, cap, least, spare, replies, tso, expect_ok)
-TAIL_CASES = [
-    ('tail', ((3, 3), (1, 1)), 3, 1, 1, 0, False, True),
-    ('tail', ((3,), (1, 1)), 2, 1, 1, 0, False, True),
-    ('tail', ((3, 1), (1,)), 3, 1, 1, 1, False, True),     # the stream's signal; a reply
-    ('tail', ((2, 2), (1, 1)), 3, 1, 1, 0, True, True),    # x86-TSO
-    ('tail', ((3,), (3,)), 3, 1, 1, 0, False, True),       # two streams, the spare unused
-
-    ('tail_underflow', ((3, 3), (1, 1)), 3, 1, 1, 0, False, False),
 ]
 
 if __name__ == '__main__':
@@ -617,12 +594,6 @@ if __name__ == '__main__':
         ok &= report(res, expect_ok=expect, tso=tso)
     for variant, writers, sizes, cap, least, replies, tso, expect in FILL_CASES:
         name, threads, mem0 = fill_case(variant, writers, sizes, cap, least, replies)
-        if not keep(name):
-            continue
-        res = explore(name, threads, mem0, tso=tso, max_seconds=240)
-        ok &= report(res, expect_ok=expect, tso=tso)
-    for variant, each, cap, least, spare, replies, tso, expect in TAIL_CASES:
-        name, threads, mem0 = fill_case(variant, None, each, cap, least, replies, spare=spare)
         if not keep(name):
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=600,
