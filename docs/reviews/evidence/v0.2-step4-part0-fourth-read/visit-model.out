@@ -1,0 +1,39 @@
+close copy       writes=1 states=    25 -> ok
+close copy       writes=2 states=    38 -> ok
+close copy       writes=3 states=    51 -> ok
+close zc         writes=1 states=    89 -> ok
+close zc         writes=2 states=    99 -> STUCK
+    visit ; write ; visit ; visit ; write ; visit ; complete 0 ; visit ; visit ; complete 1 ; visit ; close ; notify both ; peer goodbye and end ; visit
+    final: ack_coming=False, acked=False, asked=False, asks=(False, False), busy=False, carried=False, closing=True, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=True, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+close zc         writes=3 states=   149 -> STUCK
+    visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; visit ; visit ; complete 0 ; visit ; close ; notify both ; peer goodbye and end ; visit
+    final: ack_coming=False, acked=False, asked=False, asks=(False, False), busy=False, carried=False, closing=True, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=True, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+close zc_late    writes=1 states=    89 -> ok
+close zc_late    writes=2 states=   218 -> ok
+close zc_late    writes=3 states=   273 -> ok
+close zc_reseal  writes=1 states=    89 -> ok
+close zc_reseal  writes=2 states=   213 -> ok
+close zc_reseal  writes=3 states=   268 -> ok
+copy       writes=1 states=    30 -> ok
+copy       writes=2 states=    63 -> ok
+copy       writes=3 states=    76 -> ok
+copy       writes=4 states=    89 -> ok
+zc         writes=1 states=    79 -> ok
+zc         writes=2 states=   183 -> STUCK
+    visit ; write ; visit ; visit ; write ; visit ; complete 0 ; visit ; visit ; ask ; complete 1 ; notify both ; visit
+    final: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, carried=False, data=(False, False), dirty=False, done=(False, False), owed=(0, 0), readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+zc         writes=3 states=   281 -> STUCK
+    visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; visit ; visit ; ask ; complete 0 ; notify both ; visit
+    final: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, carried=False, data=(False, False), dirty=False, done=(False, False), owed=(0, 0), readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+zc         writes=4 states=   386 -> STUCK
+    visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; notify 1 ; visit ; write ; visit ; complete 0 ; visit ; visit ; ask ; complete 1 ; notify both ; visit
+    final: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, carried=False, data=(False, False), dirty=False, done=(False, False), owed=(0, 0), readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+zc_late    writes=1 states=    79 -> ok
+zc_late    writes=2 states=   281 -> ok
+zc_late    writes=3 states=   381 -> ok
+zc_late    writes=4 states=   494 -> ok
+zc_reseal  writes=1 states=    79 -> ok
+zc_reseal  writes=2 states=   274 -> ok
+zc_reseal  writes=3 states=   371 -> ok
+zc_reseal  writes=4 states=   484 -> ok
+exit 0

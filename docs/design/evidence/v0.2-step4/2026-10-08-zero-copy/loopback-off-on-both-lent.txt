@@ -1,0 +1,13 @@
+put=65536 round=1 zero_copy=off mib_per_s=10409 n0.sends=240701 n0.short_sends=13 n1.sends=814
+put=65536 round=1 zero_copy=on mib_per_s=5112 n0.sends=106300 n0.zero_copy_sends=106210 n0.zero_copy_notifications=106210 n0.zero_copy_copied=106210 n1.sends=413
+put=65536 round=2 zero_copy=off mib_per_s=10495 n0.sends=245751 n1.sends=822
+put=65536 round=2 zero_copy=on mib_per_s=5300 n0.sends=107055 n0.zero_copy_sends=106986 n0.zero_copy_notifications=106988 n0.zero_copy_copied=106988 n1.sends=415
+put=65536 round=3 zero_copy=off mib_per_s=10505 n0.sends=244999 n0.short_sends=11 n1.sends=821
+put=65536 round=3 zero_copy=on mib_per_s=5369 n0.sends=107942 n0.zero_copy_sends=107859 n0.zero_copy_notifications=107860 n0.zero_copy_copied=107860 n1.sends=419
+put=1048576 round=1 zero_copy=off mib_per_s=9829 n0.sends=217995 n0.short_sends=35 n1.sends=776
+put=1048576 round=1 zero_copy=on mib_per_s=5190 n0.sends=103824 n0.zero_copy_sends=103817 n0.zero_copy_notifications=103817 n0.zero_copy_copied=103817 n1.sends=404
+put=1048576 round=2 zero_copy=off mib_per_s=9739 n0.sends=216739 n0.short_sends=77 n1.sends=771
+put=1048576 round=2 zero_copy=on mib_per_s=5183 n0.sends=104425 n0.zero_copy_sends=104422 n0.zero_copy_notifications=104421 n0.zero_copy_copied=104421 n1.sends=407
+put=1048576 round=3 zero_copy=off mib_per_s=9825 n0.sends=216556 n0.short_sends=2 n1.sends=774
+put=1048576 round=3 zero_copy=on mib_per_s=5165 n0.sends=103802 n0.zero_copy_sends=103798 n0.zero_copy_notifications=103796 n0.zero_copy_copied=103796 n1.sends=403
+DONE

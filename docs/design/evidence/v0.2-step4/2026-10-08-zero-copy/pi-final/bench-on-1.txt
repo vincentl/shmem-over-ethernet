@@ -1,0 +1,16 @@
+osoe-bench pes=2 remote_target=1 local_target=-1
+latency put+quiet target=1 where=remote bytes=8 median_us=168.9 fastest_us=165.8
+latency get target=1 where=remote bytes=8 median_us=169.0 fastest_us=167.9
+latency put+quiet target=1 where=remote bytes=64 median_us=170.1 fastest_us=167.8
+latency get target=1 where=remote bytes=64 median_us=170.2 fastest_us=168.7
+latency put+quiet target=1 where=remote bytes=512 median_us=178.3 fastest_us=176.1
+latency get target=1 where=remote bytes=512 median_us=178.5 fastest_us=176.9
+latency put+quiet target=1 where=remote bytes=4096 median_us=194.6 fastest_us=188.4
+latency get target=1 where=remote bytes=4096 median_us=172.5 fastest_us=160.8
+latency put+quiet target=1 where=remote bytes=32768 median_us=416.6 fastest_us=383.0
+latency get target=1 where=remote bytes=32768 median_us=410.2 fastest_us=378.7
+latency put+quiet target=1 where=remote bytes=262144 median_us=2386.2 fastest_us=2366.9
+latency get target=1 where=remote bytes=262144 median_us=3016.1 fastest_us=2955.8
+latency put+quiet target=1 where=remote bytes=1048576 median_us=9074.9 fastest_us=9029.2
+latency get target=1 where=remote bytes=1048576 median_us=11549.7 fastest_us=11436.4
+atomic fetch-add target=1 where=remote median_us=169.1 fastest_us=167.3

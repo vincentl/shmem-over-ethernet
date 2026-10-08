@@ -612,6 +612,10 @@ is merged.
   time is the copies and the stack, not the ring (2%). More buffers take the
   re-arms after `-ENOBUFS` from 1% of receives to 0.15%, and the stream does not
   notice. The default stays, 1 MiB a node.
+- **The library's own code** - the brief's rungs of the parse per message and
+  the dirty-word exchange per pass - is 1.0 to 2.5% of either agent's time in
+  every profile here, the parse's own frames under 1.5% and the exchange too
+  small to show: nothing for a rung to take, so none was built.
 
 ## Question 4: a blocking get, a piece at a time
 
@@ -657,8 +661,166 @@ debug 828, release 828, asan 813, tsan 576, every test passing; tier 3, 113;
 failure; the models whole, 34; the SOS suite at 4 x 2, 161 built and passing on
 every map, its two extensions failing as at the tag. Merged into `main`.
 
+## What was built: the fifth rung, the zero-copy send behind a setting
+
+On the author's answer (`2026-10-07.md` item 7; the brief's amendment, its item
+4): the ladder's last rung, the one that merges without a measured gain, since
+over loopback it can have none. Branch `zero-copy-one-lent`.
+
+- **The model first.** `reservation_model.py` gains the `zero_copy` designs: a
+  sealed buffer goes to the kernel in one send or several - a short send's
+  remainder a send of its own - and a kernel thread takes each part in the
+  order it was sent and delivers it by reading the buffer as it is *then* (a NIC
+  reads the pages when it transmits, and again when it retransmits, until the
+  peer has acknowledged them), then posts that part's notification. A send's
+  completion frees the wire for the other buffer at once; the buffer it sent is
+  LENT until every notification of its parts has come, then released by the same
+  two release stores as a copied buffer. A part goes by reference only while the
+  other buffer owes nothing, and otherwise by copy - read once, at its send - so
+  that at most one buffer is lent (the Pi below says why), checked as BOTH LENT;
+  and the engine sees the owed counts as the pass's reap left them, as the C does.
+  Eight cases hold with liveness, up to 4,199,187 states under x86-TSO; three
+  breakages fail - released at the last send's completion as a copied buffer is
+  (`zc_release_on_send`, SEQ), released at the first notification of a buffer
+  sent in parts (`zc_first_notification`, SEQ: the kernel read a unit of a buffer
+  reopened under it), and every part by reference as first built
+  (`zc_both_lent`, BOTH LENT). The model's 32 earlier cases and 17 breakages are
+  unchanged. `wait_word_model.py`, which the decision named, needs no case: the
+  release stays on the agent and the reopen's wake is the same call; only its
+  moment moves, which is the reservation model's subject. And
+  `visit_model.py` (the fourth read's, below) for the visits themselves.
+- **The C.** `OSOE_WIRE_ZERO_COPY` (`off` by default, or `on`) and
+  `OSOE_WIRE_ZERO_COPY_BYTES` (16 KiB): `osoe_wire_send_lent` sends a connection
+  buffer's bytes by reference (`IORING_OP_SEND_ZC`, with
+  `IORING_SEND_ZC_REPORT_USAGE`) where a send carries at least that much and the
+  other buffer owes nothing; the ring's reap counts each completion that says a
+  notification follows as owed to its buffer - the region rides in the tag's
+  bits 4 to 7 - and each notification off, a notification owed by nothing a
+  fatal; `flush()` releases a sent buffer at once if it owes nothing and
+  otherwise marks it `OSOE_BUFFER_LENT`, released by a later pass at its last
+  notification. Two independent checks end the job by name: a buffer about to be
+  written - leaving FREE for the pre-open drain and the open - with
+  notifications owed, and both buffers lent. A wire owes at most 16
+  notifications, past which a send copies; the completion queue's bound is 16
+  more a wire with the setting on, refused by name past io_uring's 65,536 (3,638
+  nodes at the default buffers). Three counters, layout 34, shown by
+  `osoe-stat`, which learnt the layout: sends by reference, their notifications,
+  and the ones that said the bytes did not go by reference after all. With the
+  setting off nothing changes: the same sends, tags and releases.
+- **The tests.** `shmem.wire.zero-copy` streams through two regions lent in turn,
+  each refilled only once it owes nothing, and counts the notifications against
+  the sends exactly; `shmem.multinode.zero-copy.*` and
+  `shmem.internode.zero-copy.*` run their suites with every send of 64 bytes or
+  more by reference, the deadlock detector off so that a stranded wait is the
+  launcher's timeout, and fail if no send of the node went by reference; the two
+  settings' refusals. Four mutants, each caught: a release at the last send's
+  completion ("would be written with 1 zero-copy notifications still owed", 8 of
+  8 suites), a notification that zeroes its count ("owed none", 8 of 8), every
+  send by reference ("both buffers ... are lent", 8 of 8), and `busy()` without
+  the seal still owed (a launcher's timeout, 1 of 32 runs of the suites; and
+  under `osoe-pacer mix` with the setting on and the detector off, all three
+  two-minute runs, each stuck about a second in and killed at the launcher's
+  timeout).
+
+## What the zero-copy send does, on the Pi and over loopback
+
+The Pi: two nodes, one PE each, a 1 MiB put stream for 20 s with each node's
+agent CPU read from `/proc` (`putstream-cpu.c`, the Pi has no `perf`) and the
+sending node's counters over the stream; and `osoe-bench`'s latency and atomic
+lines at 2 x 1 - off, on at the default 16 KiB, and on for every send of 64
+bytes or more - three rounds each, alternating (`2026-10-08-zero-copy/`).
+`pi-both-lent/` is the send as first built, every send by reference;
+`pi-one-lent/` and `pi-final/` as built, the second at the final tree, `0d60e52`,
+its numbers the first's. Over loopback, `loopback-off-on-both-lent.txt` and
+`loopback-off-on-one-lent.txt`, three rounds each.
+
+| | Off | On, both lent | On, one lent |
+|---|---|---|---|
+| The 1 MiB stream | 112.1 MiB/s | 112.1 | 112.1 |
+| Sends by reference, of all sends | - | 87-89% | 28% |
+| ... that the kernel copied after all | - | 11-14% | 0 to 2 of 13,400-13,600 |
+| The sending agent's CPU a GiB | 0.30-0.52 s | 0.267-0.271 | 0.320 |
+| `osoe-bench`, every send of 64 bytes by reference: 1 MiB put and quiet | 9,078-9,080 µs | stalled for minutes | 9,070-9,076 |
+| ... a 1 MiB get, a fetch-add | 11,559-11,570 µs, 169 | stalled | 11,551-11,563, 170 |
+| Over loopback, the 64 KiB stream | 10,409-10,790 MiB/s | 5,112-5,369 | 6,609-6,633 |
+| ... the 1 MiB stream | 9,739-10,314 | 5,165-5,190 | 6,190-6,513 |
+
+- **On a NIC a send by reference is real**: the Pi's macb took 86 to 89% of
+  them without a copy, and with every send allowed by reference the sending
+  agent spent a third less CPU a gibibyte.
+- **Lending both buffers stalls a quiet.** With every send of 64 bytes or more
+  by reference, `osoe-bench`'s 1 MiB lines did not finish in 25 minutes: a quiet
+  waited about half a second at a time, its acknowledgement request finding no
+  buffer while both waited for notifications, and the notifications for the
+  peer's TCP acknowledgement, which the peer delays while it has nothing to send
+  (40 ms and more). So at most one buffer is lent: the other is always a copied
+  send away from free, every line of `osoe-bench` is the copying send's, and no
+  run stalls.
+- **The price is the saving.** One lent at a time, a stream's sends go by
+  reference about a quarter of the time and the agent's CPU a gibibyte is the
+  copying send's. At a gigabit the agent is 8% busy either way, so nothing here
+  argues for a default; the setting stays off. Keeping both the saving and the
+  liveness wants a buffer an acknowledgement can always use - a third buffer, or
+  a private header-only segment when both are lent - which is the brief's
+  question for Part 4, on a fast link: "whether a connection needs more than two
+  buffers".
+- **Over loopback** the kernel copies every send by reference - every
+  notification says so - and posts a completion more a send: with one lent, half
+  the sends by reference and the stream at about 60% of the copying send's; with
+  both lent, half. Which is why it is off by default, as the decision expected.
+
+## The fourth adversarial read
+
+A fresh agent read the zero-copy send as first built (`bd87633`) against eight
+properties - no byte written while the kernel may read it; no buffer lent for
+ever; the count exact; the completion queue's bound; nothing changed with the
+setting off; the model saying what the C does; tests that can fail; the
+settings, counters and documents - and archived its report as
+`docs/reviews/archive/v0.2-step4-part0-fourth-adversarial-read.md`, its
+models in `docs/reviews/evidence/v0.2-step4-part0-fourth-read/`. Verdict: the
+buffer protocol sound - every writer traced, the count exact, the queue bounded,
+the default path unchanged, and a harsher variant of the model with notifications
+out of order and a read at each one passing - and one fatal finding. What was
+done with each:
+
+- **F1, a connection whose two buffers come back in one visit loses its pending
+  seal** (fatal). The seal step runs before the open step, and `busy()` had no
+  term for a seal still owed: with both buffers released by one visit - a lent
+  one at its notification, the other at its completion - the visit opened one
+  after the seal step had passed, and a quiet's late acknowledgement request
+  waited for the deadlock detector's sweep (1 s, then 2 and 4: nine of 36 suite
+  runs took a second longer, two seven), or for ever with the detector off; the
+  close's goodbye the same. `busy()` now keeps a connection visited while a late
+  request is not yet carried (`flush` keeps the want it loaded in the
+  connection's private state) and, closing, while its goodbye is unsealed. The
+  read's model of one connection's visits, promoted as `visit_model.py` with the
+  one-lent rule added, shows why the rule alone was not enough: one lent without
+  the busy terms is STUCK at a quiet; the design holds at a quiet and at the
+  close. Invariant 37 states the three rules.
+- **S1, the tests could not fail** on whether anything went by reference, and
+  the wire test not on a miscount: the suites now check their node's sends by
+  reference, run with the detector off, and the wire test counts exactly. S2,
+  `osoe-pacer mix` with the setting on: in the verification below.
+- **N1**: the completion queue past io_uring's 65,536 is refused by name.
+  **N2** (a lent buffer waits for a delayed acknowledgement at a burst's end),
+  **N3** (the threshold applies to bytes offered, not taken) and **N4** (a lent
+  buffer is idle to `osoe_progress_idle`; the deadlock detector's argument then
+  rests on TCP's cumulative acknowledgement) stand as recorded here. **N5**, the
+  documents: design §3.3's bound and invariant 12, §3.14's counters, the wire's
+  headers, the README's range, invariant 37 new. **N6**: `wait_word_model.py`'s
+  reason is in the model paragraph above; the Pi's numbers are above. **N7**
+  (poisoning lent buffers under ASan) would see only the lead's own writes, the
+  other PEs being other processes, so it is not built. **N8**: the small items
+  taken; `ef9da73`, which fails a test as committed, stays in the branch's
+  history, marked in its message as not yet built.
+
+## The fifth rung's verification
+
+[FILL]
+
 ## What goes on now
 
-The fourth rung is on `main`. Then the ladder's last rung, the zero-copy send behind a setting off by
-default (`2026-10-07.md` item 7), modelled first; then the ladder's result in
-the README, in place of "two thirds"; then Part 1.
+Part 0 is done: five rungs built, three measured and not taken, the one thread
+at its best over loopback about three quarters of the bare stream (the
+README's). Question 4, a blocking get a piece at a time, is the author's. Then
+Part 1, the owners.
