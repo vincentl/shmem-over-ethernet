@@ -1099,6 +1099,22 @@ if(OSOE_INTERNODE)
     FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
   osoe_internode_label(shmem.progress shmem.progress.forged-get-reply
     shmem.progress.forged-get-reply-bounds)
+  # A node that is ending excuses a peer's reset and sends nothing more on the
+  # failed wire (the second adversarial read of Part 3, S1;
+  # abort_owners_model.py's reset_stream): node 1's lead resets its data wire
+  # and ends while node 0's lead, its node ending, has a send's completion still
+  # to collect, which node 0 reaps in one pass with the reset. Offering that
+  # segment again was send_from's fatal; without the node excuse the reset is
+  # one too.
+  add_test(NAME shmem.progress.reset-while-ending
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+            OSOE_TEST_FORGE=reset-while-ending
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+            $<TARGET_FILE:shmem_test_progress>)
+  set_tests_properties(shmem.progress.reset-while-ending PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "RESET WHILE ENDING OK" FAIL_REGULAR_EXPRESSION "osoe_fatal")
+  osoe_internode_label(shmem.progress.reset-while-ending)
   # The planes kept apart (the progress helpers proposal's §3.1): node 0's lead
   # sends a barrier arrival on its data wire, or a get reply on its control
   # wire, and node 1 must refuse each by name - the get reply before its
@@ -1574,8 +1590,13 @@ osoe_tier2_map_test(ack-echo 0,1)
 # owner of its wire: each put of PE 0's wakes the helper the map names for its
 # peer, and never the node's other helper (test-helper-wake.c; the wake count is
 # the owner's, layout 36). The deadlock detector, whose requests nudge every
-# helper, is off.
-osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
+# helper, is off. Not under ThreadSanitizer, as the node maps above are not:
+# the helpers land the puts in heaps their PEs' own threads touch, ordered
+# through another process, and the preset runs at no helpers (the second
+# adversarial read of Part 3, S2).
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
+endif()
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
 # shmem_finalize naming it, found by its turns: nothing waits for time to pass.
@@ -1601,6 +1622,21 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.helpers.abort-wait.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
   osoe_internode_label(shmem.helpers.abort-wait.0-0-1-1)
+  # A node that is ending excuses a peer's end, and sends nothing more on a
+  # connection that failed (abort_owners_model.py's reset_stream; the second
+  # adversarial read of Part 3, S1): node 0 ends by a non-lead's global exit, its
+  # helpers half a second behind it, while node 1 streams to it; node 1's lead
+  # dies of a fatal of its own 150 ms after the exit, and node 0's helpers read
+  # its connections' end - a reset where input was unread - before their own
+  # abort. Without the excuse, or with a send on the failed connection, node 0's
+  # helper raises a fatal and its agent waits out the grace.
+  add_test(NAME shmem.helpers.reset-stream.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_ABORT_DELAY_MS=500
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 reset-stream)
+  set_tests_properties(shmem.helpers.reset-stream.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  osoe_internode_label(shmem.helpers.reset-stream.0-0-1-1)
 endif()
 
 # A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):

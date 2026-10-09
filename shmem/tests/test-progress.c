@@ -39,6 +39,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "am.h"
 #include "arrivals.h"
@@ -216,6 +219,16 @@ static void release(void *context, uint32_t team, uint32_t epoch)
     releases++;
 }
 
+/* Whether this node's abort is declared (progress.h's host aborting): never,
+ * but under OSOE_TEST_FORGE=reset-while-ending below. */
+static bool ending;
+
+static bool aborting(void *context)
+{
+    (void)context;
+    return ending;
+}
+
 /* The area and peer post() marks: every writer says it committed, as the
  * library's do, because the lead drains only connections whose dirty bit is
  * set or which it already knows are busy (§3.10). */
@@ -339,7 +352,7 @@ int main(void)
     static struct osoe_progress_connection connections[1];
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
-                                       NULL, completed, NULL, NULL };
+                                       NULL, completed, NULL, aborting };
     /* One owner, the lead's agent, holding both wires (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;
@@ -382,6 +395,43 @@ int main(void)
      * at the end says so if it was written instead.
      */
     const char *forge = getenv("OSOE_TEST_FORGE");
+    /*
+     * OSOE_TEST_FORGE=reset-while-ending (the second adversarial read of Part
+     * 3, S1; abort_owners_model.py's reset_stream): node 1's lead resets its
+     * data wire and ends, while node 0's lead, its node ending too, has a send's
+     * completion still to collect. Node 0 reaps the completion and the reset in
+     * one pass; it must excuse the reset - a node ending has nothing to fear
+     * from a peer that ends - and send nothing more on the failed wire, where
+     * offering the segment again was send_from's fatal.
+     */
+    if (forge && strcmp(forge, "reset-while-ending") == 0) {
+        struct timespec pause = { 0, 200 * 1000 * 1000 };
+        if (node == 1) {
+            struct linger abortive = { 1, 0 };      /* the close resets the connection */
+            CHECK_FATAL(setsockopt(wires[0].fd, SOL_SOCKET, SO_LINGER, &abortive,
+                                   sizeof abortive) == 0);
+            nanosleep(&pause, NULL);                /* node 0's segment has come */
+            osoe_connection_area_close(&area);
+            _exit(0);
+        }
+        struct osoe_am_put put = { .target_pe = peer_lead, .region = 0, .offset = PUT_AT };
+        while (!post(c, OSOE_AM_PUT, &put, sizeof put, mine, sizeof mine))
+            osoe_progress_poll(&owner);
+        while (connections[0].sending == OSOE_CONNECTION_NONE)
+            osoe_progress_poll(&owner);             /* sealed and handed to the kernel */
+        nanosleep(&pause, NULL);
+        nanosleep(&pause, NULL);                    /* sent, and the reset come back */
+        ending = true;
+        for (int pass = 0; pass < 8; pass++)
+            osoe_progress_poll(&owner);
+        CHECK(wires[0].error != 0);                 /* the reset was read, and excused */
+        if (!CHECK_DONE())
+            printf("RESET WHILE ENDING OK: node 1's reset read and excused, nothing sent "
+                   "after it\n");
+        fflush(stdout);
+        osoe_connection_area_close(&area);
+        _exit(CHECK_DONE());
+    }
     bool bounds = forge && strcmp(forge, "get-reply-bounds") == 0;
     /* get-reply-bounds: the receiving lead arms a known token before anything
      * moves and never re-arms, and the forged reply carries it, so the token

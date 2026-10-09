@@ -1186,8 +1186,13 @@ static bool flush(struct osoe_progress_owner *o, uint32_t i)
     if (c->peer_aborted)
         return false;
     /* Nor to a peer that has reset the connection, which reads nothing more:
-     * whether it was ending or died, its stream's end says (receive). */
-    if (w->send_error)
+     * whether it was ending or died, its stream's end says (receive). Nor on a
+     * connection that failed: every pass that fails one reads it before this
+     * flush, and receive_wire has ended the job, or excused the failure while
+     * this node is ending too - and a send would raise the fatal the excuse
+     * spared (send_from; abort_owners_model.py's reset_stream, the second
+     * adversarial read of Part 3's S1). */
+    if (w->error || w->send_error)
         return false;
     bool moved = false;
 
@@ -1496,8 +1501,9 @@ static bool flush_control(struct osoe_progress_owner *o, uint32_t slot)
     struct osoe_wire *w = &o->control_wire[slot];
     if (o->aborting)
         return flush_control_aborting(o, slot);
-    /* A peer ending, or one that reset the wire, is told nothing more (flush). */
-    if (c->peer_aborted || w->send_error)
+    /* A peer ending, or one that reset the wire, is told nothing more, nor is
+     * anything sent on a wire that failed (flush). */
+    if (c->peer_aborted || w->error || w->send_error)
         return false;
     bool moved = false;
     if (c->bytes) {

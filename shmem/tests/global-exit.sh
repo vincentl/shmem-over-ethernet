@@ -80,6 +80,32 @@ echo "global exit: $nonzero of $RANKS ranks left nonzero, $with_status with stat
      "(the caller's: $caller_left); the launcher exited $launched; $written of $RANKS lines" \
      "written; $killed ranks killed, $stuck still computing; $strays ends naming another" \
      "PE, $lost goodbyes lost; ended ${took} s after the caller"
+# reset-stream: the caller's node ends by its global exit, and the other node's
+# lead dies of a fatal of its own 150 ms later, ending - where input is unread,
+# resetting - the connections the caller's node still reads and acknowledges
+# on while its helpers wait out OSOE_TEST_ABORT_DELAY_MS. The caller's node must
+# excuse that end, as a node ending anyway, and send nothing more on a
+# connection that failed (progress.c's receive_wire and flush;
+# abort_owners_model.py): its ranks leave with the global exit's statuses, well
+# before the grace, and no line says that a connection failed or ended without
+# its goodbye. The other node's ranks leave as its lead's fatal has them.
+if [ "$MODE" = reset-stream ]; then
+    node=$(printf '%s\n' "$MAP" | cut -d, -f$((CALLER + 1)))
+    mates_left=0
+    for r in $(printf '%s\n' "$MAP" | tr , '\n' | grep -n "^$node\$" | cut -d: -f1); do
+        rank=$((r - 1))
+        [ "$rank" -eq "$CALLER" ] && continue
+        printf '%s\n' "$out" | grep -q "rank $rank \(exited\|killed\)" && mates_left=$((mates_left + 1))
+    done
+    failures=$(printf '%s\n' "$out" | grep -c "to node [0-9]* failed\|without its goodbye")
+    echo "reset-stream: the caller left with $STATUS: $caller_left; its node's other ranks" \
+         "nonzero or killed: $mates_left; $failures lines of a failed or ended connection"
+    [ "$stuck" -eq 0 ] && [ "$caller_left" -eq 1 ] && [ "$mates_left" -eq 0 ] &&
+        [ "$failures" -eq 0 ] || exit 1
+    [ -n "$began" ] && awk -v t="$took" 'BEGIN { exit !(t < 6) }' || exit 1
+    echo "GLOBAL EXIT OK"
+    exit 0
+fi
 [ "$stuck" -eq 0 ] || exit 1
 [ "$launched" -eq "$expected" ] || exit 1
 if [ "$HOW" = fatal ]; then

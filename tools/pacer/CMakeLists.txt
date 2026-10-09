@@ -157,14 +157,18 @@ endforeach()
 # periods ended just at --seconds split - a PE that read the time as up left
 # for the teardown's world sync while its team's other member began the next
 # period, and the job hung (2026-10-08: a 60 s run, whose seed's first five
-# periods take 60.0 s, about one run in forty). Here PE 1's clock starts 2 s
-# late, more than any period of 0.5 s takes, so that a run of PEs each deciding
-# for itself splits every time and the deadlock detector ends it.
+# periods took 60.0 s, about one run in forty). Here PE 1's clock starts an
+# hour late, so that by its own clock its time is never up: PEs each deciding
+# for itself split at the first period's end past 4 s, however long the build's
+# periods take, and the deadlock detector ends the job. A late start of 2 s split
+# them only where that end came within 2 s of the deadline, which a debug run
+# met by half a second (the second adversarial read of Part 3, S3); agreed, the
+# longest-run PE's clock decides, and PE 1's late one changes nothing.
 add_test(NAME tools.pacer.mix-end.0-0-0-0
   COMMAND osoe-launch -n 4 -m 0,0,0,0 -t 60 -- $<TARGET_FILE:osoe-pacer> --seconds 4
           --period 0.5 mix)
 set_tests_properties(tools.pacer.mix-end.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 120
-  ENVIRONMENT "OSOE_TEST_PACER_LATE_START=2"
+  ENVIRONMENT "OSOE_TEST_PACER_LATE_START=3600"
   PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
   FAIL_REGULAR_EXPRESSION "${pacer_failed}")
 

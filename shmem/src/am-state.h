@@ -78,7 +78,7 @@ struct osoe_am_state {
     struct osoe_am_owner *owner;                 /* the area's helpers + 1, by owner */
     struct osoe_wire *wire;                      /* 2 x (nodes - 1), grouped by ring (owner-map.h):
                                                   * the data wires, and owner 0's control wires */
-    struct osoe_progress_connection *connection; /* nodes - 1, grouped by owner */
+    struct osoe_progress_connection *connection; /* each owner's, on lines of its own (lines_of) */
     struct osoe_progress_control *control;       /* nodes - 1, owner 0's, by peer slot */
     uint64_t *control_busy;                      /* their busy bitmap */
     uint64_t *busy;                              /* each owner's bitmap in turn */

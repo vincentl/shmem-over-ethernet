@@ -29,6 +29,13 @@
  *              reset, which drops what is queued unless the goodbye has been
  *              acknowledged first. With a quiet each time the senders stall
  *              and the receiver drains, and the end is a clean FIN
+ *   reset-stream
+ *              stream, and PE n/2 - the other node's lead in the maps this
+ *              runs on - dies of a fatal of its own 150 ms after the caller
+ *              ends the job, which ends that node at once, telling nobody, and
+ *              its connections with it - a reset where input is unread - while
+ *              the caller's node is ending and, under OSOE_TEST_ABORT_DELAY_MS,
+ *              its helpers still read and acknowledge the stream from there
  *   start-pes  every PE starts with start_pes, and every other PE returns from
  *              main after a barrier, so its main thread is inside exit, in
  *              start_pes's finalize - a barrier the caller never reaches -
@@ -177,12 +184,17 @@ int main(int argc, char **argv)
     shmem_barrier_all();
 
     double start = seconds();
-    if (strcmp(mode, "stream") == 0) {
+    int reset = strcmp(mode, "reset-stream") == 0;
+    if (strcmp(mode, "stream") == 0 || reset) {
         int target = (me + npes / 2) % npes;
         while (seconds() < start + COMPUTE_SECONDS) {
             shmem_putmem(window, data, STREAM_BYTES, target);
             if (me == caller && seconds() > start + 0.3)
                 end_the_job(how);
+            if (reset && me == npes / 2 && seconds() > start + 0.45) {
+                int private_word = 0;   /* not symmetric: a fatal of this PE's own */
+                shmem_putmem(&private_word, &private_word, sizeof private_word, 0);
+            }
         }
     } else {
         int second = strcmp(mode, "two-callers") == 0 ? (caller + 1) % npes : -1;
