@@ -1114,8 +1114,8 @@ specification or takes a choice the specification leaves open.
   other nodes are one thread's, whatever its PE count, and each PE's share of
   the rate falls as the PEs on a node rise. `OSOE_PROGRESS_HELPERS` gives the
   lead's process up to 64 more threads, each holding the data wires to a share
-  of the other nodes - the peer that is p-th in node order, the node itself left
-  out, is helper 1 + (p mod H)'s - while the lead's agent keeps the control
+  of the other nodes - the peer that is p-th in node order, counting from 0 and
+  the node itself left out, is helper 1 + (p mod H)'s - while the lead's agent keeps the control
   wires, so a barrier's messages are one thread's whatever the helpers do. A
   peer's operations stay on one wire and one thread, applied in order, so a
   stream between two nodes is still one thread's: what helpers add is the
@@ -1242,12 +1242,15 @@ that one could be added without touching the OpenSHMEM layer.
   three.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
   well as at none, by the environment `ctest` passes on to every test. Under
-  ThreadSanitizer, about sixteen tests across nodes then report a put applied
-  by a helper to a heap a local thread holds: the ordering that makes it safe
-  runs through another process, which the tool cannot see - the reason the
-  multi-node maps are left out of that preset (§8.2) - and with no helpers the
-  agent that applies the put has met the local thread through the barrier's
-  handoff, which the tool does see.
+  ThreadSanitizer about seventeen tests across nodes - a different few at each
+  count - then report a put or an atomic a helper applies to a heap a local
+  thread holds, or that thread's read of what it landed: the ordering that makes
+  it safe runs through another process, which the tool cannot see - the reason
+  the multi-node maps are left out of that preset (§8.2) - and with no helpers
+  the agent that applies the put has met the local thread through the barrier's
+  handoff, which the tool does see. Every report of those runs is checked to be
+  of that kind, and none of the helpers' own words; the preset gates the suite
+  at no helpers alone.
 - **Two builds.** The single-node build runs the same suite less the
   384 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
@@ -1405,7 +1408,7 @@ moves every message of the node, and the helpers that can share the work
 |---|---|---|
 | `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. It is a trade, measured on the Pi cluster against `0` with 16 PEs on four nodes. Under Slurm's default binding it gave a pipelined mailbox 1.3 to 1.7 times the messages a second, a 64 KiB reduce 24% less time and a 4 KiB alltoall 10% less, and cost the barrier 8% and an 8-byte reduce or broadcast 11 and 13%. Unbound (`--cpu-bind=none`) it left a 64 KiB reduce as it was, gave the mailbox 2% more and the alltoall 8% less time, and cost the barrier 2 to 4% and an 8-byte reduce or broadcast 10 to 12%. A job that fills its nodes gets Slurm's binding without asking, which is why `100` is the default. |
 | `OSOE_AGENT_CPUS` | `task` | Where each agent thread, and each progress helper, may run: `task`, on its own PE's CPUs; `node`, on any CPU any PE of its node was bound to - the job's own cores there, never another's. The PEs' threads keep their binding either way. On the Pi cluster, bound, `node` gave the mailbox a fifth more messages a second where the slice was not in force (`OSOE_AGENT_SLICE_US=0`: 42,900 to 51,300) and nothing measurable beside it (58,500 against 57,500 to 62,900), and beside the slice made the barrier and an 8-byte reduce or broadcast 7 to 15% slower and a 64 KiB reduce 18%. The thread is named `osoe-agent`, as `top -H` and `ps -L` show it. |
-| `OSOE_PROGRESS_HELPERS` | `0` | Threads of each node lead's process beside its agent that hold the node's data wires: `0` to `64`. The peer node that is p-th in node order, the node itself left out, is helper 1 + (p mod the count)'s; the lead's agent keeps every control wire, which carry the barrier's and the deadlock detector's messages. Each helper is started after the agent, placed and given a slice as the agents are (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`), named `osoe-helper-N`, and stopped at `shmem_finalize` once it has closed its wires. A peer's traffic is always one thread's, so helpers spread a node's traffic with several peers at once, not one stream; nothing has measured what that buys, which is why the default is none. A count above the node's peers leaves the extra helpers idle, each with its ring and receive buffers. `osoe-stat` shows each owner of the node's wires - the agent and every helper - with its wires, passes, wakes and counters. Nodes may differ; a node's PEs may not, in a job of more than one node. *Checked* among a node's PEs. |
+| `OSOE_PROGRESS_HELPERS` | `0` | Threads of each node lead's process beside its agent that hold the node's data wires: `0` to `64`. The peer node that is p-th in node order, the node itself left out, is helper 1 + (p mod the count)'s; the lead's agent keeps every control wire, which carry the barrier's and the deadlock detector's messages. Each helper is started after the agent, placed and given a slice as the agents are (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`), named `osoe-helper-N`, and stopped at `shmem_finalize` once it has closed its wires. A peer's traffic is always one thread's, so helpers spread a node's traffic with several peers at once, not one stream; nothing has measured what that buys, which is why the default is none. A count above the node's peers leaves the extra helpers idle, each with its ring and receive buffers. Under `OSOE_AGENT_CPUS=task`, the default, the helpers run on the lead PE's CPUs as its agent does: where Slurm binds each task to one core, the lead's main thread, its agent and every helper share that core, and helpers add threads but no CPU - `node` lets them run on any CPU of the node's tasks. `osoe-stat` shows each owner of the node's wires - the agent and every helper - with its wires, passes, wakes and counters; a helper's own thread-scope counters, such as `transport.notify.calls` for the puts it lands, are not kept. Nodes may differ; a node's PEs may not, in a job of more than one node. *Checked* among a node's PEs. |
 
 **The transport's buffers**, which a program rarely needs to change
 

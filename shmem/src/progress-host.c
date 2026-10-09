@@ -301,6 +301,12 @@ static void deadlock_arrived(void *context, uint32_t node, const struct osoe_dea
     osoe_deadlock_message(node, m);
 }
 
+/* OSOE_TEST_ABORT_DELAY_MS, in nanoseconds, or 0: a peer's abortive goodbye
+ * acted on that late, and a helper's own abort begun that late (abort_arrived,
+ * helper_main), so that a test sees what the agent's wait for its helpers'
+ * goodbyes is for (abort_owners_model.py's no_wait). */
+static uint64_t abort_delay_ns;
+
 /* A peer's abortive goodbye (progress.h): this node aborts too, on behalf of
  * the same PE and with the same status and disposition - unless it already has,
  * and then the first declaration stands (node.c) - and its agent, woken by the
@@ -308,6 +314,11 @@ static void deadlock_arrived(void *context, uint32_t node, const struct osoe_dea
 static void abort_arrived(void *context, uint32_t pe, int32_t status, uint32_t disposition)
 {
     (void)context;
+    if (abort_delay_ns) {
+        struct timespec late = { (time_t)(abort_delay_ns / 1000000000),
+                                 (long)(abort_delay_ns % 1000000000) };
+        nanosleep(&late, NULL);
+    }
     osoe_node_declare_abort(&osoe.node, pe, status,
                             disposition == OSOE_ABORT_GLOBAL_EXIT ? OSOE_ABORT_GLOBAL_EXIT
                                                                   : OSOE_ABORT_FATAL);
@@ -602,6 +613,39 @@ static uint32_t descriptors_of(uint32_t owner, uint32_t peers, uint32_t helpers,
     return n;
 }
 
+/*
+ * Each owner's slice of an array the node allocates once - its connections,
+ * busy words and reply descriptors - starts a line of its own (the adversarial
+ * read of Part 3, S2): with helpers the next owner's slice is another thread's,
+ * written at every visit. The step, in elements, that keeps a slice of
+ * `element`-byte items on a line boundary, and `n` rounded up to it.
+ */
+static uint64_t line_step(uint64_t element)
+{
+    uint64_t a = element, b = OSOE_CACHELINE;
+    while (b) {
+        uint64_t t = a % b;
+        a = b;
+        b = t;
+    }
+    return OSOE_CACHELINE / a;
+}
+
+static uint64_t to_step(uint64_t n, uint64_t step)
+{
+    return (n + step - 1) / step * step;
+}
+
+/* `count` elements of `element` bytes, zeroed, starting a line. */
+static void *lines_of(uint64_t count, uint64_t element)
+{
+    uint64_t bytes = to_step(count * element, OSOE_CACHELINE);
+    void *p = aligned_alloc(OSOE_CACHELINE, bytes ? bytes : OSOE_CACHELINE);
+    if (p)
+        memset(p, 0, bytes);
+    return p;
+}
+
 /* This lead's node-pair listener, from advertise to the mesh (osoe_wires_open
  * closes it). Outside osoe_am, which osoe_transport_init starts afresh after the
  * rendezvous that carried its port. */
@@ -642,6 +686,12 @@ void osoe_progress_host_start(uint32_t session)
         deaf_helper > helpers)
         osoe_fatal("OSOE_TEST_DEAF_HELPER='%s' names none of this node's %u progress helpers",
                    getenv("OSOE_TEST_DEAF_HELPER"), helpers);
+    uint32_t delay_ms = 0;
+    if (osoe_environment_u32("OSOE_TEST_ABORT_DELAY_MS", &delay_ms) == OSOE_ENVIRONMENT_INVALID ||
+        delay_ms > 1000 * OSOE_ABORT_GRACE_SECONDS / 2)
+        osoe_fatal("OSOE_TEST_ABORT_DELAY_MS='%s' is not a delay from 0 to %u milliseconds",
+                   getenv("OSOE_TEST_ABORT_DELAY_MS"), 1000u * OSOE_ABORT_GRACE_SECONDS / 2);
+    abort_delay_ns = (uint64_t)delay_ms * 1000000;
     /*
      * §3.8's two arguments. C per connection bounds the replies - the origin
      * takes a credit per get or fetching AMO and returns it when the reply
@@ -684,10 +734,14 @@ void osoe_progress_host_start(uint32_t session)
      * were made for.
      */
     uint32_t teams = osoe.bootstrap.team_blocks, owners = helpers + 1;
-    uint32_t descriptors = 0, busy_words = 0;
+    uint64_t connection_step = line_step(sizeof *osoe_am.connection);
+    uint64_t busy_step = line_step(sizeof *osoe_am.busy);
+    uint64_t descriptor_step = line_step(sizeof *osoe_am.descriptor);
+    uint64_t connections = 0, descriptors = 0, busy_words = 0;
     for (uint32_t o = 0; o < owners; o++) {
-        descriptors += descriptors_of(o, peers, helpers, teams);
-        busy_words += (osoe_owner_wires(o, peers, helpers) + 63) / 64;
+        connections += to_step(osoe_owner_wires(o, peers, helpers), connection_step);
+        descriptors += to_step(descriptors_of(o, peers, helpers, teams), descriptor_step);
+        busy_words += to_step((osoe_owner_wires(o, peers, helpers) + 63) / 64, busy_step);
     }
     /* On lines of their own (am-state.h): a size that is a multiple of the
      * alignment, as aligned_alloc asks, since the type's alignment is a line. */
@@ -700,11 +754,11 @@ void osoe_progress_host_start(uint32_t session)
     struct osoe_progress_owner *engine_owners =
         aligned_alloc(OSOE_CACHELINE, owners * sizeof *engine_owners);
     osoe_am.wire = calloc(2 * (size_t)peers, sizeof *osoe_am.wire);
-    osoe_am.connection = calloc(peers, sizeof *osoe_am.connection);
+    osoe_am.connection = lines_of(connections, sizeof *osoe_am.connection);
     osoe_am.control = calloc(peers, sizeof *osoe_am.control);
     osoe_am.control_busy = calloc((peers + 63) / 64, sizeof *osoe_am.control_busy);
-    osoe_am.busy = calloc(busy_words, sizeof *osoe_am.busy);
-    osoe_am.descriptor = calloc(descriptors, sizeof *osoe_am.descriptor);
+    osoe_am.busy = lines_of(busy_words, sizeof *osoe_am.busy);
+    osoe_am.descriptor = lines_of(descriptors, sizeof *osoe_am.descriptor);
     osoe_am.team = calloc(teams, sizeof *osoe_am.team);
     osoe_am.pending = calloc(teams, sizeof *osoe_am.pending);
     if (!osoe_am.owner || !rings || !engine_owners || !osoe_am.wire ||
@@ -742,16 +796,18 @@ void osoe_progress_host_start(uint32_t session)
                                        landing_request, landed, completed, deadlock_arrived,
                                        node_aborting };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, engine_owners, &host);
-    uint32_t descriptors_before = 0, busy_before = 0;
+    uint64_t connections_before = 0, descriptors_before = 0, busy_before = 0;
     for (uint32_t o = 0; o < owners; o++) {
-        uint32_t first = osoe_owner_first(o, peers, helpers);
+        uint32_t wires = osoe_owner_wires(o, peers, helpers);
         uint32_t count = descriptors_of(o, peers, helpers, teams);
         osoe_progress_attach(&osoe_am.progress, o, &osoe_am.owner[o].ring,
                              &osoe_am.wire[osoe_ring_first(o, peers, helpers)],
-                             &osoe_am.connection[first], &osoe_am.busy[busy_before],
+                             &osoe_am.connection[connections_before],
+                             &osoe_am.busy[busy_before],
                              &osoe_am.descriptor[descriptors_before], count);
-        descriptors_before += count;
-        busy_before += (osoe_owner_wires(o, peers, helpers) + 63) / 64;
+        connections_before += to_step(wires, connection_step);
+        descriptors_before += to_step(count, descriptor_step);
+        busy_before += to_step((wires + 63) / 64, busy_step);
         osoe_am.owner[o].flag_raised = false;
     }
     /* Owner 0's control wires, after its data wires on its ring (owner-map.h). */
@@ -793,10 +849,12 @@ static uint64_t segments_sent(struct osoe_progress_owner *o)
 /*
  * A sweep of owner `o`'s close (§4.10). On the agent, what every library wait
  * does: the node's abort ends the process there (sweep.c), as it did before
- * there were helpers. On a helper, whether the node's abort has come, which the
- * helper answers by aborting its own wires (helper_stop): only the agent ends
- * the process (abort.c), and a helper that ended it would leave its peers
- * untold.
+ * there were helpers - telling no peer, and waiting for no helper, which races
+ * the process's end with its own goodbyes (the adversarial read of Part 3, N1:
+ * no peer is told less than it was with no helpers). On a helper, whether the
+ * node's abort has come, which the helper answers by aborting its own wires
+ * (helper_stop): only the agent ends the process (abort.c), and a helper that
+ * ended it would leave its own peers untold even where the agent tells its own.
  */
 static bool sweep_finds_abort(struct osoe_progress_owner *o)
 {
@@ -972,15 +1030,19 @@ static void say_stop(struct osoe_am_owner *h, uint32_t state)
 
 /* A quiet or an idle request answered, after a whole pass begun after the
  * helper read it (helper_main): the verdict of the owner's own view (§3.15)
- * and the request it answers, one word. */
-static void answer(uint32_t helper, uint32_t request)
+ * and the request it answers, one word. True when a quiet request found the
+ * owner not quiet: its view may have asked a peer to acknowledge - marked a
+ * connection busy - which a pass seals, so the helper goes round again before
+ * it sleeps, as the agent's pass follows its own view (agent.c). */
+static bool answer(uint32_t helper, uint32_t request)
 {
     struct osoe_progress_owner *o = &osoe_am.progress.owner[helper];
     uint64_t applied;
-    bool yes = request_kind(request) == REQUEST_QUIET ? osoe_progress_quiet(o, &applied)
-                                                      : osoe_progress_idle(o);
+    bool quiet = request_kind(request) == REQUEST_QUIET;
+    bool yes = quiet ? osoe_progress_quiet(o, &applied) : osoe_progress_idle(o);
     atomic_store_explicit(&osoe_am.owner[helper].answer, request | (yes ? ANSWER_YES : 0),
                           memory_order_release);
+    return quiet && !yes;
 }
 
 /*
@@ -1065,16 +1127,24 @@ static void *helper_main(void *arg)
     atomic_store_explicit(&o->metrics->tid, (int32_t)syscall(SYS_gettid), memory_order_release);
     osoe_ring_enable(o->ring);          /* its only submitter from here (ring.h) */
     uint32_t taken = 0, due = 0;
-    uint64_t turns = 0;
+    uint64_t turns = 0, abort_seen_ns = 0;
     for (;;) {
         /* The wake word before the request and the abort word, as every wait
          * loads its word before its pass (§4.9): a request stored, or an abort
-         * declared, before the word was bumped is never slept through. */
+         * declared, before the word was bumped is never slept through. Under
+         * OSOE_TEST_ABORT_DELAY_MS the helper goes on passing that long first,
+         * its wires read and excused as an ending node's are (progress.h's
+         * host aborting). */
         uint32_t seen = atomic_load_explicit(wake_word(helper), memory_order_acquire);
         uint32_t request = atomic_load_explicit(&h->request, memory_order_seq_cst);
         if (osoe_abort_pending()) {
-            helper_abort(helper);
-            return NULL;
+            uint64_t now = osoe_now_ns();
+            if (abort_seen_ns == 0)
+                abort_seen_ns = now;
+            if (now - abort_seen_ns >= abort_delay_ns) {
+                helper_abort(helper);
+                return NULL;
+            }
         }
         lower_flag(helper);
         take_unsent_request(helper);
@@ -1091,7 +1161,7 @@ static void *helper_main(void *arg)
         /* After a whole pass begun after the request was read: the pass
          * between a sample's halves, owner by owner (deadlock_owners_model.py). */
         if (due) {
-            answer(helper, due);
+            moved |= answer(helper, due);
             due = 0;
         }
         /* Counted seq_cst, after the turn and before the next turn's load of

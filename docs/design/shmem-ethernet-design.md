@@ -1397,8 +1397,12 @@ share of the peers on a ring of its own, while the agent keeps every control
 wire (`progress-host.c`; `docs/decisions/2026-10-08-helpers.md`). The agent
 starts them after its own start, asks them - a request word it alone writes, an
 answer word each helper alone writes - for the deadlock detector's views and,
-at the end, to stop, and waits for each to be done before its process ends;
-each reads the node's abort word at every turn, as the agents do.
+at the end, to stop, joining each once it is done; each reads the node's abort
+word at every turn, as the agents do, and on an abort the agent waits for each
+to be done within its grace before its process ends. An abort found at a sweep
+of the agent's own close at `shmem_finalize` ends the process there, as it did
+with no helpers, telling no peer and waiting for no helper (the adversarial
+read of Part 3, N1).
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address
@@ -2069,15 +2073,19 @@ to the rule above - time only paces the looking.
   between does nothing another thread or node could see - a routine that posts
   and then waits, as a barrier does, begins counting after the post
   (`base/sweep.h`'s contract, which every sleeping loop keeps). `/proc` lists the
-  PE's threads, its agent's and io_uring's workers' aside, and whether each
-  sleeps; a thread woken and not yet run does not. The engine says whether the
-  node owes the network anything, and whether every segment it sent that carried
-  application work has been applied by its peer - asking the peer, where it has
-  not said so, with the late acknowledgement request §3.4 already has. The
-  node's *activity* is the changes in its PEs' words and the application
-  messages its engine applied.
+  PE's threads, its agent's, the lead's progress helpers' and io_uring's
+  workers' aside, and whether each sleeps; a thread woken and not yet run does
+  not. The engine says whether the node owes the network anything, and whether
+  every segment it sent that carried application work has been applied by its
+  peer - asking the peer, where it has not said so, with the late
+  acknowledgement request §3.4 already has; with helpers each owner says so of
+  its own wires, a helper in answer to the agent's request (§3.12). The node's
+  *activity* is the changes in its PEs' words and the application messages its
+  engine applied, every owner's counted.
 - *A sample* is taken by the node's lead's agent in two halves with a pass of
-  its engine between them: the words, then `/proc`, which must show as many
+  its engine between them (with helpers, a pass of each owner, a helper's answer
+  naming the request the first half posted or a later one): the words, then
+  `/proc`, which must show as many
   threads as the words count in waits, all asleep; the pass, which takes what
   the PEs posted before they began to wait and the engine cannot see until it
   has (on AM, a collective's arrivals); then `/proc` again, the engine quiet, and
@@ -2355,9 +2363,11 @@ connections. At 4,096 nodes that is 4,095 segments of 56 bytes from each lead. A
 connection with nobody to tell is skipped: one whose normal goodbye has gone,
 whose peer died, or whose peer's own abortive goodbye has arrived — and a peer
 whose abortive goodbye has arrived is sent nothing more of the job's, since its
-exit may already have reset the connection. From the moment the engine aborts, a
-failed connection or an end of stream without a goodbye is a peer that is ending
-too, not a fatal. A goodbye counts as told once the peer's kernel has
+exit may already have reset the connection. From the moment the node's abort is
+declared - before its owners have begun their own, with helpers, since the
+goodbye that declared it may have come on a wire another owner holds - a failed
+connection or an end of stream without a goodbye is a peer that is ending too,
+not a fatal. A goodbye counts as told once the peer's kernel has
 acknowledged it (`SIOCOUTQ` at 0), the engine receiving meanwhile: this
 process's end with input unread is a reset, and a reset drops whatever is still
 queued — the goodbye among it, behind a stream or waiting on a retransmission —

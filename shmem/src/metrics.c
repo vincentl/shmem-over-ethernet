@@ -601,6 +601,11 @@ void osoe_metrics_unpooled(void)
     my_block = &orphan;
 }
 
+bool osoe_metrics_thread_unpooled(void)
+{
+    return unpooled;
+}
+
 struct osoe_counter_block *osoe_metrics_block(void)
 {
     if (unpooled)

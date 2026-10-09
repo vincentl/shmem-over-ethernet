@@ -1665,14 +1665,16 @@ static bool busy(const struct osoe_progress_owner *o, uint32_t i)
            (o->closing && c->goodbye == OSOE_GOODBYE_NONE);
 }
 
-/* After a visit: keep the connection's bit while it is busy, clear it once not. */
+/* After a visit: keep the connection's bit while it is busy, clear it once not
+ * - stored only when it changes, so that a visit that leaves it as it was
+ * writes no line (the adversarial read of Part 3, S2). */
 static void settle(struct osoe_progress_owner *o, uint32_t i)
 {
     uint64_t bit = UINT64_C(1) << (i % 64);
-    if (busy(o, i))
-        o->busy[i / 64] |= bit;
-    else
-        o->busy[i / 64] &= ~bit;
+    uint64_t word = o->busy[i / 64];
+    uint64_t now = busy(o, i) ? word | bit : word & ~bit;
+    if (now != word)
+        o->busy[i / 64] = now;
 }
 
 /*

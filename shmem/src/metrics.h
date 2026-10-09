@@ -231,6 +231,9 @@ struct osoe_counter_block *osoe_metrics_block(void);
  */
 void osoe_metrics_unpooled(void);
 
+/* Whether the calling thread is one such: a progress helper. */
+bool osoe_metrics_thread_unpooled(void);
+
 /* Bind this process to its PE's slice of the node's block pool, and release it.
  * Until osoe_metrics_init, and after osoe_metrics_fini, counting is a no-op on
  * a process-private block: the library counts the same either way and nothing

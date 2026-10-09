@@ -373,7 +373,7 @@ struct osoe_segment_directory {
     /*
      * Appended at layout 36 (v0.2 step 4, Part 3): the AM layer's counters, a
      * record an owner of the node's wires - the lead's agent, then its
-     * OSOE_PROGRESS_HELPERS helpers (owner-map.h) - by owner, the fifth metric
+     * OSOE_PROGRESS_HELPERS helpers (owner-map.h) - by owner, the seventh metric
      * scope (OSOE_MSCOPE_OWNER). None on a job of one node. After the team
      * pool's bitmaps, so that nothing before them moved.
      */
@@ -466,8 +466,9 @@ struct osoe_am_owner_metrics {
     _Alignas(OSOE_CACHELINE)
     /* Layout 36: which owner this is - its thread, the wires it holds - for
      * osoe-stat and for the deadlock detector, which leaves a helper out of
-     * the lead PE's threads as it leaves the agent (deadlock.c). Written once
-     * the owner's thread runs; 0 before. */
+     * the lead PE's threads as it leaves the agent (deadlock.c). The wires
+     * written at start, by the lead's thread that opens them; the tid once the
+     * owner's thread runs, 0 before. */
     _Atomic int32_t tid;
     _Atomic uint32_t data_wires;
     _Atomic uint32_t control_wires;

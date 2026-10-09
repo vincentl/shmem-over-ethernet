@@ -1587,6 +1587,20 @@ if(OSOE_INTERNODE)
     PASS_REGULAR_EXPRESSION
       "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered")
   osoe_internode_label(shmem.helpers.deaf.0-1)
+  # An ending node's agent waits for its helpers' abortive goodbyes before its
+  # process ends (abort_owners_model.py's no_wait): under OSOE_TEST_ABORT_DELAY_MS
+  # a helper begins its abort half a second late, and a peer acts on an abortive
+  # goodbye half a second late, so that only the data wire's own goodbye, ahead
+  # of its end, keeps the peer's helper from taking that end for a death - here a
+  # non-lead's fatal, which its lead's goodbyes carry (global-exit.sh's lost
+  # goodbyes and strays).
+  add_test(NAME shmem.helpers.abort-wait.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_ABORT_DELAY_MS=500
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 fatal 1 1 compute)
+  set_tests_properties(shmem.helpers.abort-wait.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  osoe_internode_label(shmem.helpers.abort-wait.0-0-1-1)
 endif()
 
 # A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
