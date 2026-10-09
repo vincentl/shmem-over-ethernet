@@ -1236,7 +1236,7 @@ that one could be added without touching the OpenSHMEM layer.
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
   run before every merge, on the exact tree that merges: about 760 tests in
-  release, and the model checker's 30 tests beside them, which run in that build
+  release, and the model checker's 40 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
@@ -1263,7 +1263,8 @@ that one could be added without touching the OpenSHMEM layer.
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion
   under `SHMEM_THREAD_MULTIPLE`,
-  rendezvous, abort, the proof a deadlock is found by, and the teams' - a team
+  rendezvous, abort, the proof a deadlock is found by, a progress helper's
+  requests and its abort, and the teams' - a team
   block's life, a split's pending numbers, a pool found empty, the posted
   arrivals - is checked
   exhaustively in small configurations by an explicit-state model checker
