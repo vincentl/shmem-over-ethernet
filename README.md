@@ -1438,8 +1438,10 @@ moves every message of the node, and the helpers that can share the work
 
 **The tools'**: `OSOE_CC` names the compiler `oshcc` runs; `OSOE_NODE_MAP` is
 `osoe-launch`'s `-m`; `OSOE_CORPUS` is where `tools/corpus` keeps the reading
-corpus it fetches, for development. `OSOE_BOOTSTRAP_TIMEOUT`, `OSOE_WATCHDOG`
-and `OSOE_LIVENESS` are retired, and ignored with a notice.
+corpus it fetches, for development; `OSOE_TEST_PACER_LATE_START`, a positive
+number of seconds, starts `osoe-pacer`'s PE 1 that late on the `mix`'s clock,
+so that a test sees the PEs agree when its time is up. `OSOE_BOOTSTRAP_TIMEOUT`,
+`OSOE_WATCHDOG` and `OSOE_LIVENESS` are retired, and ignored with a notice.
 
 ### Starting PEs without a launcher
 

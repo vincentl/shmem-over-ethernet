@@ -152,6 +152,22 @@ foreach(map IN LISTS pacer_mix_maps)
   endif()
 endforeach()
 
+# mix's end agreed: the time is up when the PE that has run longest says so.
+# Each PE once read its own clock at the top of a period, and a run whose
+# periods ended just at --seconds split - a PE that read the time as up left
+# for the teardown's world sync while its team's other member began the next
+# period, and the job hung (2026-10-08: a 60 s run, whose seed's first five
+# periods take 60.0 s, about one run in forty). Here PE 1's clock starts 2 s
+# late, more than any period of 0.5 s takes, so that a run of PEs each deciding
+# for itself splits every time and the deadlock detector ends it.
+add_test(NAME tools.pacer.mix-end.0-0-0-0
+  COMMAND osoe-launch -n 4 -m 0,0,0,0 -t 60 -- $<TARGET_FILE:osoe-pacer> --seconds 4
+          --period 0.5 mix)
+set_tests_properties(tools.pacer.mix-end.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 120
+  ENVIRONMENT "OSOE_TEST_PACER_LATE_START=2"
+  PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+  FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+
 if(OSOE_INTERNODE)
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     # mix long enough that collectives' rounds, carried from period to period, go
