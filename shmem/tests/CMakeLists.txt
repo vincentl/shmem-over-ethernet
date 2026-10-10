@@ -296,6 +296,14 @@ if(OSOE_INTERNODE)
   add_test(NAME shmem.wire.zero-copy COMMAND shmem_test_wire zero-copy)
   set_tests_properties(shmem.wire.zero-copy PROPERTIES LABELS "tier1" TIMEOUT 120)
   osoe_internode_label(shmem.wire.zero-copy)
+  # And with every send by reference refused for want of locked memory, the
+  # ring made first (locked-memory.h; ring.c): each sending wire refused once,
+  # lending nothing after, and every byte arriving by copy. Skipped where the
+  # process may lock memory whatever its limit (CAP_IPC_LOCK).
+  add_test(NAME shmem.wire.zero-copy-refused COMMAND shmem_test_wire zero-copy-refused)
+  set_tests_properties(shmem.wire.zero-copy-refused PROPERTIES LABELS "tier1" TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIPPED: this process may lock memory")
+  osoe_internode_label(shmem.wire.zero-copy-refused)
   # The peek's misuses (wire.h), each asserted by its message as the parser's
   # malformed segments are: a consume past the peek, a second consume of it, and
   # in the ASan preset alone, which poisons a provided buffer while it is the
@@ -1418,6 +1426,37 @@ foreach(map IN LISTS osoe_internode_maps)
     osoe_internode_label(shmem.internode.zero-copy.${label})
   endif()
 endforeach()
+# The zero-copy send refused for want of locked memory (the review of v0.2
+# step 4's merge point, portability P1; ring.c): every PE lowers its own
+# locked-memory limit to nothing once its rings are made
+# (OSOE_TEST_LOCKED_MEMORY=0, locked-memory.h), so that every send by reference
+# after shmem_init is refused, on any kernel and whatever else the user holds -
+# a limit set before the job would have to leave room for rings, which Linux
+# 6.14 and later charge too, and none for the sends. Each refused send goes
+# again by copy, the job ends well, and each process says so once, naming its
+# limit - where the job once ended "Cannot allocate memory" on a connection. A
+# wire that went on lending after a refusal still ends this job well - a region
+# owing the refused send's notification makes the next send copy - so
+# shmem.wire.zero-copy-refused, which counts the refusals, is the test of that.
+# Skipped where a process may lock memory whatever its
+# limit (CAP_IPC_LOCK, which io_uring does not charge). Not under
+# ThreadSanitizer, as this program's other multi-node maps are not (above).
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.internode.zero-copy-refused.0-1-2
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64 OSOE_DEADLOCK_SECONDS=0
+            OSOE_TEST_LOCKED_MEMORY=0
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 60 --
+            $<TARGET_FILE:shmem_test_internode>)
+  set_tests_properties(shmem.internode.zero-copy-refused.0-1-2 PROPERTIES LABELS "tier2"
+    TIMEOUT 90 PASS_REGULAR_EXPRESSION "refused for want of locked memory"
+    FAIL_REGULAR_EXPRESSION
+      "Cannot allocate memory;exited with status [1-9];killed by signal;timeout after;left behind"
+    SKIP_REGULAR_EXPRESSION "SKIPPED: a PE may lock memory")
+  osoe_internode_label(shmem.internode.zero-copy-refused.0-1-2)
+endif()
 # The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the
 # launcher's variables as srun does, SLURM_ in place of OSOE_. One node, one PE
 # a node, the block map, and the cyclic one, whose ranks are not contiguous per

@@ -37,6 +37,7 @@
 #include "ring.h"
 #include "wire.h"
 #include "wire-settings.h"
+#include "locked-memory.h"
 
 /* wire.c's error path, replaced here so a failure is a test failure. */
 _Noreturn void osoe_fatal(const char *fmt, ...);
@@ -300,7 +301,10 @@ static int misuse(const char *what)
 
 int main(int argc, char **argv)
 {
-    bool zero_copy = argc > 1 && strcmp(argv[1], "zero-copy") == 0;
+    /* zero-copy-refused: the zero-copy send with every send by reference
+     * refused for want of locked memory, the ring made first (locked-memory.h). */
+    bool refused = argc > 1 && strcmp(argv[1], "zero-copy-refused") == 0;
+    bool zero_copy = refused || (argc > 1 && strcmp(argv[1], "zero-copy") == 0);
     if (argc > 1 && !zero_copy) {
         setenv("OSOE_WIRE_BYTES", "64", 1);
         setenv("OSOE_WIRE_SPLIT", "0", 1);
@@ -337,21 +341,36 @@ int main(int argc, char **argv)
     osoe_wire_attach(&wires[0], &ring, 0, fd[0], 1, &lo);  /* node 0's end */
     osoe_wire_attach(&wires[1], &ring, 1, fd[1], 0, &hi);  /* node 1's end */
     osoe_ring_enable(&ring);
+    if (refused && !osoe_test_no_locked_memory()) {
+        printf("SKIPPED: this process may lock memory whatever its limit (CAP_IPC_LOCK), so "
+               "no send by reference is refused\n");
+        return 0;
+    }
 
     unsent_limit(&wires[1], &hi);
     if (zero_copy) {
         stream_lent(&ring, &wires[0], &wires[1], PAYLOAD);
         stream_lent(&ring, &wires[1], &wires[0], PAYLOAD);
-        /* Sends by reference happened, and every one was given back - over
-         * loopback, copied after all, which the notification says. */
-        CHECK(ring.counts.zero_copy_sends > 0);
-        CHECK(ring.counts.zero_copy_notifications > 0);
-        CHECK(ring.counts.zero_copy_notifications == ring.counts.zero_copy_sends);
-        CHECK(ring.counts.zero_copy_copied <= ring.counts.zero_copy_notifications);
-        fprintf(stderr, "zero copy: %llu sends by reference, %llu notifications, %llu copied\n",
-                (unsigned long long)ring.counts.zero_copy_sends,
+        fprintf(stderr, "zero copy: %llu sends by reference, %llu refused, %llu notifications, "
+                "%llu copied\n", (unsigned long long)ring.counts.zero_copy_sends,
+                (unsigned long long)ring.counts.zero_copy_refused,
                 (unsigned long long)ring.counts.zero_copy_notifications,
                 (unsigned long long)ring.counts.zero_copy_copied);
+        if (refused) {
+            /* Each of the two sending wires was refused once and lent nothing
+             * after: every send by reference it made is its refused one, and
+             * every byte still arrived, in order (stream_lent), by copy. */
+            CHECK(ring.counts.zero_copy_refused == 2);
+            CHECK(ring.counts.zero_copy_sends == ring.counts.zero_copy_refused);
+            CHECK(ring.counts.zero_copy_notifications <= ring.counts.zero_copy_sends);
+        } else {
+            /* Sends by reference happened, and every one was given back - over
+             * loopback, copied after all, which the notification says. */
+            CHECK(ring.counts.zero_copy_sends > 0);
+            CHECK(ring.counts.zero_copy_notifications > 0);
+            CHECK(ring.counts.zero_copy_notifications == ring.counts.zero_copy_sends);
+            CHECK(ring.counts.zero_copy_copied <= ring.counts.zero_copy_notifications);
+        }
     } else {
         stream(&ring, &wires[0], &wires[1], PAYLOAD);
         stream(&ring, &wires[1], &wires[0], PAYLOAD);

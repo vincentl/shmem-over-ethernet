@@ -37,6 +37,15 @@
 void probe_build_info(void)
 {
     printf("info full build: liburing %d.%d\n", IO_URING_VERSION_MAJOR, IO_URING_VERSION_MINOR);
+    /* What io_uring's rings, on Linux 6.14 and later, and the zero-copy send
+     * count against (base/ring-check.h): a limit too low for them says only
+     * "Cannot allocate memory" where it is met (the review of v0.2 step 4's
+     * merge point, portability P1). */
+    long long kib = osoe_locked_memory_kib();
+    if (kib < 0)
+        printf("info locked-memory limit (ulimit -l): none\n");
+    else
+        printf("info locked-memory limit (ulimit -l): %lld KiB\n", kib);
 }
 
 static long futex2_wait(void *word, uint64_t value, unsigned flags,

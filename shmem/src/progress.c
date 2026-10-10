@@ -4,11 +4,14 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <limits.h>
 #include <stdbit.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "base/futex.h"
+#include "base/ring-check.h"
 #include "fatal.h"
 #include "deadlock.h"
 #include "owner-map.h"
@@ -1734,6 +1737,11 @@ static bool release_local(struct osoe_progress *p)
 }
 
 /* The ring's counts since the last pass, into the owner's record (§3.14). */
+/* Process-private: whether this process has said that the zero-copy send was
+ * refused for want of locked memory (publish_ring), which it says once,
+ * whichever owner meets it first. */
+static _Atomic bool zero_copy_refusal_said;
+
 static void publish_ring(struct osoe_progress_owner *o)
 {
     struct osoe_ring_counts *k = &o->ring->counts;
@@ -1749,6 +1757,18 @@ static void publish_ring(struct osoe_progress_owner *o)
     osoe_counter_word_add(&o->metrics->zero_copy_sends, k->zero_copy_sends);
     osoe_counter_word_add(&o->metrics->zero_copy_notifications, k->zero_copy_notifications);
     osoe_counter_word_add(&o->metrics->zero_copy_copied, k->zero_copy_copied);
+    if (k->zero_copy_refused && !atomic_exchange_explicit(&zero_copy_refusal_said, true,
+                                                          memory_order_seq_cst)) {
+        long long kib = osoe_locked_memory_kib();
+        char limit[32] = "none";
+        if (kib >= 0)
+            snprintf(limit, sizeof limit, "%lld KiB", kib);
+        osoe_notice("node %u: a zero-copy send was refused for want of locked memory: io_uring "
+                    "counts what every send by reference of this user's processes on this "
+                    "host lends, against each process's own limit (ulimit -l, %s here) - "
+                    "raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections "
+                    "that met it copy from here on", o->engine->node, limit);
+    }
     *k = (struct osoe_ring_counts){ 0 };
 }
 

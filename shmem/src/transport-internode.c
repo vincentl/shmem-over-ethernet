@@ -241,12 +241,22 @@ const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *w
         return NULL;
     struct utsname u;
     const char *release = uname(&u) == 0 ? u.release : "unknown";
+    /* EPERM at creation is the sysctl; ENOMEM, on Linux 6.14 and later, can be
+     * the locked-memory limit, which io_uring then charges its rings to
+     * (base/ring-check.h) - under `ulimit -l 0` on the Pi's 6.18 the check fails
+     * so, and the kernel says no more. */
+    char cause[160] = "";
+    long long kib = osoe_locked_memory_kib();
+    if (ring_error == EPERM && facility == osoe_ring_check_creating)
+        snprintf(cause, sizeof cause,
+                 ", which usually means the kernel.io_uring_disabled sysctl is set");
+    else if (ring_error == ENOMEM && kib >= 0)
+        snprintf(cause, sizeof cause,
+                 ", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, "
+                 "%lld KiB here", kib);
     snprintf(why, len,
              "osoe needs io_uring with %s for a job of %u nodes (it fails with \"%s\"%s); "
-             "this kernel is %s", facility, b->node_count, strerror(ring_error),
-             ring_error == EPERM && facility == osoe_ring_check_creating
-                 ? ", which usually means the kernel.io_uring_disabled sysctl is set"
-                 : "", release);
+             "this kernel is %s", facility, b->node_count, strerror(ring_error), cause, release);
     return why;
 }
 

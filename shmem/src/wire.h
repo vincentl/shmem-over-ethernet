@@ -69,7 +69,9 @@ struct osoe_wire {
     bool receiving;             /* its multishot recv is armed */
     bool ended;                 /* the peer's end of stream has arrived */
     int error;                  /* a receive failed, or a send for any reason but
-                                 * the peer's reset: -errno, or 0 */
+                                 * the peer's reset or a send by reference refused
+                                 * for want of locked memory, which is no failure
+                                 * (ring.c): -errno, or 0 */
     /* A send met the peer's reset - its process ended with input unread:
      * -EPIPE or -ECONNRESET, or 0. Nothing more is sent, and the receive side
      * goes on, since it may hold what the peer sent ahead of the reset, its
@@ -85,10 +87,13 @@ struct osoe_wire {
     uint64_t seed;
     uint32_t split;             /* truncations per myriad; 0 disables */
     uint64_t sends, recvs;      /* this wire's transfers, for the hash */
-    /* The zero-copy send (wire-settings.h): on, the least bytes a send by
-     * reference carries, and per region the notifications the kernel still
-     * owes - each send by reference whose completion said one would follow,
-     * less the ones that have come; the region rides in the send's tag. */
+    /* The zero-copy send (wire-settings.h): on - and off for the rest of the
+     * job once a send by reference is refused for want of locked memory, which
+     * then goes again by copy (ring.c) - the least bytes a send by reference
+     * carries, and per region the notifications the kernel still owes - each
+     * send by reference whose completion said one would follow, a refused one
+     * among them, less the ones that have come; the region rides in the send's
+     * tag. */
     bool zero_copy;
     uint32_t zero_copy_bytes;
     uint32_t owed[OSOE_WIRE_LENT_REGIONS];
@@ -149,10 +154,11 @@ size_t osoe_wire_send(struct osoe_wire *w, const void *buffer, size_t len);
  * a connection's two buffers (§3.5). With OSOE_WIRE_ZERO_COPY on, a send of at
  * least OSOE_WIRE_ZERO_COPY_BYTES goes by reference (IORING_OP_SEND_ZC) - unless
  * the other region still owes a notification, or this one already owes
- * OSOE_WIRE_ZERO_COPY_OWED_MOST - and then the region must stay as it is, even
- * after the send has completed, until osoe_wire_owed says the kernel owes
- * nothing for it. So at most one region is ever lent: the other is always a
- * copied send away from free. Off, it is osoe_wire_send.
+ * OSOE_WIRE_ZERO_COPY_OWED_MOST, or the wire has met the locked-memory limit
+ * (ring.c) - and then the region must stay as it is, even after the send has
+ * completed, until osoe_wire_owed says the kernel owes nothing for it. So at
+ * most one region is ever lent: the other is always a copied send away from
+ * free. Off, it is osoe_wire_send.
  */
 size_t osoe_wire_send_lent(struct osoe_wire *w, const void *buffer, size_t len,
                            uint32_t region);

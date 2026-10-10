@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,6 +11,7 @@
 #include <sanitizer/asan_interface.h>
 #endif
 
+#include "base/ring-check.h"
 #include "fatal.h"
 #include "ring.h"
 #include "wire.h"
@@ -53,6 +55,25 @@ static uint32_t next_power_of_two(uint32_t n)
     return p;
 }
 
+/*
+ * What a ring's -ENOMEM can mean, said where it ends the job: on Linux 6.14 and
+ * later io_uring charges a ring's memory, and a provided-buffer ring's, to the
+ * locked-memory limit (base/ring-check.h), and the kernel says no more - under
+ * `ulimit -l 0` on the Pi's 6.18 every ring is refused so (2026-10-10).
+ */
+static const char *locked_memory_note(int e)
+{
+    static char note[192];
+    if (e != -ENOMEM)
+        return "";
+    long long kib = osoe_locked_memory_kib();
+    if (kib < 0)
+        return "";
+    snprintf(note, sizeof note, " (on Linux 6.14 and later io_uring counts its rings against "
+             "the locked-memory limit, ulimit -l, which is %lld KiB here)", kib);
+    return note;
+}
+
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
                     uint32_t lending_count, uint32_t buffer_count, uint32_t buffer_bytes,
                     uint32_t notifications_per_wire)
@@ -75,7 +96,8 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
     };
     int e = io_uring_queue_init_params(next_power_of_two(r->submission_bound), &r->uring, &p);
     if (e < 0)
-        osoe_fatal("cannot create an io_uring for %u connections: %s", wire_count, strerror(-e));
+        osoe_fatal("cannot create an io_uring for %u connections: %s%s", wire_count,
+                   strerror(-e), locked_memory_note(e));
     if (p.sq_entries < r->submission_bound || p.cq_entries < r->completion_bound)
         osoe_fatal("the kernel gave an io_uring of %u submissions and %u completions; %u "
                    "connections and %u receive buffers need %u and %u (§3.3)", p.sq_entries,
@@ -84,7 +106,8 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
 
     r->buffer_ring = io_uring_setup_buf_ring(&r->uring, buffer_count, 0, 0, &e);
     if (!r->buffer_ring)
-        osoe_fatal("cannot register %u receive buffers: %s", buffer_count, strerror(-e));
+        osoe_fatal("cannot register %u receive buffers: %s%s", buffer_count, strerror(-e),
+                   locked_memory_note(e));
     /* malloc, not aligned_alloc: nothing here needs a page (and a page is not
      * 4096 bytes on a Pi 5, §8.5), and C11's aligned_alloc wants the size a
      * multiple of the alignment, which 4 x 64 bytes is not - asan's catch. */
@@ -249,6 +272,34 @@ void osoe_ring_reap(struct osoe_ring *r)
                     osoe_fatal("a send that copies toward node %u said a notification "
                                "would follow", w->peer);
                 w->owed[region]++;
+            }
+            if ((cqe->res == -ENOMEM || cqe->res == -ENOBUFS) &&
+                region < OSOE_WIRE_LENT_REGIONS) {
+                /*
+                 * A send by reference refused for want of locked memory. io_uring
+                 * charges each one the length it offers, and two pages, until its
+                 * notification, adding to one count for every process of the
+                 * user on the host, which it holds to each process's own limit
+                 * (ulimit -l, 8 MiB by default) - which sixteen logical nodes on
+                 * one machine passed (the review of v0.2 step 4's merge point,
+                 * portability P1) - and says -ENOMEM; -ENOBUFS, MSG_ZEROCOPY's
+                 * own refusal, is taken so too, since a copy is always right.
+                 * Not this connection's failure: the charge comes before the
+                 * socket is reached, so nothing was sent, and this wire copies
+                 * from here on. Nothing is in flight either, so the wire is
+                 * marked free: the visit the mark brings, in this pass, offers
+                 * the same bytes again by copy, where a send still marked in
+                 * flight would only be collected there, and the bytes wait for
+                 * a pass nothing brings (the adversarial read of this change,
+                 * 3). A notification still owed (IORING_CQE_F_MORE, above) is
+                 * counted as for any send, and says the bytes were copied.
+                 */
+                w->zero_copy = false;
+                w->sending = false;
+                w->sent = -1;
+                r->counts.zero_copy_refused++;
+                mark(r, index);
+                break;
             }
             if (cqe->res < 0) {
                 /* The peer's reset (wire.h) - not a send after this side's

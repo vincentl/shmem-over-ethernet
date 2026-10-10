@@ -25,6 +25,8 @@
  * after a quiet that covered remote peers, transport.wait.dirty_peers must have
  * counted them.
  */
+#define _GNU_SOURCE
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +35,7 @@
 
 #include "check.h"
 #include "invariants.h"
+#include "locked-memory.h"
 
 enum { SMALL = 64, CHUNKED = 5000, TINY = 1, PATTERN_MOD = 251 };
 
@@ -111,6 +114,28 @@ int main(void)
     shmem_init();
     me = shmem_my_pe();
     npes = shmem_n_pes();
+    /* OSOE_TEST_LOCKED_MEMORY=0: every PE lowers its locked-memory limit to
+     * nothing, its node's rings made, so that each send by reference from here
+     * on is refused and goes again by copy (shmem.internode.zero-copy-refused;
+     * locked-memory.h). Where any PE may lock memory whatever its limit, no
+     * send would be refused, and every PE skips alike. */
+    const char *locked = getenv("OSOE_TEST_LOCKED_MEMORY");
+    if (locked && strcmp(locked, "0") == 0) {
+        /* On the heap: this program's statics are not symmetric (not oshcc's). */
+        int *may_lock = shmem_malloc(2 * sizeof *may_lock);
+        CHECK_FATAL(may_lock != NULL);
+        may_lock[0] = !osoe_test_no_locked_memory();
+        shmem_int_max_reduce(SHMEM_TEAM_WORLD, &may_lock[1], &may_lock[0], 1);
+        bool skip = may_lock[1] != 0;
+        shmem_free(may_lock);
+        if (skip) {
+            if (me == 0)
+                printf("SKIPPED: a PE may lock memory whatever its limit (CAP_IPC_LOCK), so "
+                       "no send by reference is refused\n");
+            shmem_finalize();
+            return 0;
+        }
+    }
     local_id = atoi(osoe_test_launcher("LOCALID") ? osoe_test_launcher("LOCALID") : "0");
     read_local_ranks();
 

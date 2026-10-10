@@ -279,10 +279,6 @@ rated them (round six's readiness Q5-5).
   - the mesh's accept loop rebuilding its notice of the missing nodes before
     every accept, O(n²) on the highest lead, and the ring's own ceiling of 8,192
     nodes refused as an io_uring error rather than by name (scale S7);
-  - the zero-copy send charging the user's locked-memory limit
-    (`RLIMIT_MEMLOCK`), a job past it ending "Cannot allocate memory" on a
-    connection (portability P1): fall back to the copy, or name the limit,
-    before Part 4 decides the setting's default;
   - the backend's own threads named to the deadlock detector through
     `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
     owner's last pass shown with its age in `osoe-stat` (Q5-9);

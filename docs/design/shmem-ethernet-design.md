@@ -439,7 +439,19 @@ the peer's TCP acknowledgement, which the peer delays while it has nothing to
 send. `reservation_model.py` checks it (BOTH LENT), and the engine ends the job
 if both are ever lent. A wire owes at most 16 notifications, past which a send
 copies, so that the completion queue keeps its bound: 16 more completions a
-wire.
+wire. *Since 2026-10-10* **a send by reference refused for want of locked
+memory moved nothing**: io_uring charges each one the length it offers, and two
+pages, until its notification, adding to one count for all the user's processes
+on the host, held to each process's own `ulimit -l`, and says `-ENOMEM`; sixteen
+logical nodes on one machine passed the default 8 MiB (the review of v0.2 step
+4's merge point, portability P1). The same bytes then go again by copy, in the
+same pass, and the wire lends no more for the rest of the job; the refused
+send's notification is still owed, and counted. Each process says so once,
+naming its limit. `reservation_model.py`'s `zc_refused` cases hold it, with the
+refused send's notification coming before or after those of the buffer's
+earlier parts, and a refusal not counted owed fails. On Linux 6.14 and later
+io_uring charges its rings to the same count too, so a ring's creation past the
+limit fails `-ENOMEM`, which the library's message and the probe now name.
 
 *As built* (phase 1 step 3 slice 1; `ring.[ch]`, `wire.[ch]`, `listener.[ch]`).
 One ring per progress thread, created `IORING_SETUP_SINGLE_ISSUER |
@@ -492,7 +504,9 @@ every send: a peer that has gone is a completion with `-EPIPE`, not a signal.
 Such a failure — `-EPIPE` or `-ECONNRESET`, the peer's reset — is the send
 side's alone (phase 1 step 4, third review): the wire sends nothing more, and
 its receive side goes on, since what the peer sent ahead of the reset is still
-there to read; any other failure is the whole connection's.
+there to read. A send by reference refused for want of locked memory is no
+failure: it moved nothing, and goes again by copy (above). Any other failure is
+the whole connection's.
 
 **Split injection survives the socket.** `OSOE_WIRE_SPLIT` and `OSOE_WIRE_SEED`
 truncate sends (to at least one byte — a send truncated to nothing would wait for
@@ -1928,8 +1942,9 @@ totals written by the progress thread once a pass - `transport.am.completions`,
 `receive_buffers` (provided buffers filled), `receive_enobufs`,
 `receive_rearms` (every multishot end, `-ENOBUFS` or not), `sends` and
 `short_sends`; since layout 34, the zero-copy send's `zero_copy_sends` (sends by
-reference), `zero_copy_notifications` and `zero_copy_copied` (notifications
-that said the bytes did not go by reference after all). `-ENOBUFS` and short
+reference, a refused one among them), `zero_copy_notifications` and
+`zero_copy_copied` (notifications that said the bytes did not go by reference
+after all - a refused send's among them, since it lent nothing). `-ENOBUFS` and short
 sends are normal under load; a rate far
 above the traffic's is a provided-buffer ring too small for the peers sending
 at once (§3.3). Per peer they wait, as the rest of this list does. An
