@@ -1,0 +1,79 @@
+Internal ctest changing into directory: /tmp/v02-keepalive-mutant/build/tier3
+UpdateCTestConfiguration  from :/tmp/v02-keepalive-mutant/build/tier3/DartConfiguration.tcl
+Parse Config file:/tmp/v02-keepalive-mutant/build/tier3/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/v02-keepalive-mutant/build/tier3/DartConfiguration.tcl
+Parse Config file:/tmp/v02-keepalive-mutant/build/tier3/DartConfiguration.tcl
+Test project /tmp/v02-keepalive-mutant/build/tier3
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 232
+    Start 232: shmem.keepalive.loopback-off.0-1
+
+232: Test command: /usr/bin/cmake "-E" "env" "--unset=OSOE_KEEPALIVE" "SHMEM_DEBUG=1" "/tmp/v02-keepalive-mutant/build/tier3/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "60" "--" "/tmp/v02-keepalive-mutant/build/tier3/shmem/tests/shmem_test_keepalive" "off"
+232: Working Directory: /tmp/v02-keepalive-mutant/build/tier3/shmem/tests
+232: Test timeout computed to be: 90
+232: osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+232: osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+232: osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.414612.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 16687 ns, a message cost of 0 ns, 4529525093 bytes a second (1551 us of this start)
+232: osoe: node 0 limits the unsent bytes of each of its 1 connections to 579779
+232: osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.414612.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 16687 ns, a message cost of 0 ns, 4529525093 bytes a second (1613 us of this start)
+232: osoe: node 1 limits the unsent bytes of each of its 1 connections to 579779
+232: PE 0: 2 connected TCP sockets, 2 with keepalive off
+232: KEEPALIVE OFF OK
+232: PE 1: 2 connected TCP sockets, 2 with keepalive off
+1/3 Test #232: shmem.keepalive.loopback-off.0-1 ....***Failed  Error regular expression found in output. Regex=[probes its connections with TCP keepalive]  0.05 sec
+test 233
+    Start 233: shmem.keepalive.set-on.0-1
+
+233: Test command: /usr/bin/cmake "-E" "env" "OSOE_KEEPALIVE=60,10,6" "SHMEM_DEBUG=1" "/tmp/v02-keepalive-mutant/build/tier3/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "60" "--" "/tmp/v02-keepalive-mutant/build/tier3/shmem/tests/shmem_test_keepalive" "on"
+233: Working Directory: /tmp/v02-keepalive-mutant/build/tier3/shmem/tests
+233: Test timeout computed to be: 90
+233: osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+233: osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+233: osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.414618.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 16333 ns, a message cost of 0 ns, 13717156212 bytes a second (1560 us of this start)
+233: osoe: node 0 limits the unsent bytes of each of its 1 connections to 1755795
+233: osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.414618.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 16333 ns, a message cost of 0 ns, 13717156212 bytes a second (1575 us of this start)
+233: osoe: node 1 limits the unsent bytes of each of its 1 connections to 1755795
+233: PE 0: 2 connected TCP sockets, 2 with keepalive on
+233: KEEPALIVE ON OK
+233: PE 1: 2 connected TCP sockets, 2 with keepalive on
+2/3 Test #233: shmem.keepalive.set-on.0-1 ..........   Passed    0.06 sec
+test 842
+    Start 842: tier3.pi.keepalive.default-on.0-1
+
+842: Test command: /usr/bin/sudo "-n" "/tmp/v02-keepalive-mutant/tools/launch/tier3.sh" "pi" "2" "SHMEM_DEBUG=1" "--" "/tmp/v02-keepalive-mutant/build/tier3/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "300" "--" "/tmp/v02-keepalive-mutant/build/tier3/shmem/tests/shmem_test_keepalive" "on"
+842: Working Directory: /tmp/v02-keepalive-mutant/build/tier3/shmem/tests
+842: Test timeout computed to be: 400
+842: osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+842: osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+842: osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.414651.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 176498 ns, a message cost of 0 ns, 124390528 bytes a second (24611 us of this start)
+842: osoe: node 0 limits the unsent bytes of each of its 1 connections to 16384
+842: osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.414651.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 176498 ns, a message cost of 0 ns, 124390528 bytes a second (24659 us of this start)
+842: osoe: node 1 limits the unsent bytes of each of its 1 connections to 16384
+842: PE 1: 2 connected TCP sockets, 2 with keepalive on
+842: PE 0: 2 connected TCP sockets, 2 with keepalive on
+842: KEEPALIVE ON OK
+3/3 Test #842: tier3.pi.keepalive.default-on.0-1 ...   Passed    0.10 sec
+
+The following tests passed:
+	shmem.keepalive.set-on.0-1
+	tier3.pi.keepalive.default-on.0-1
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+internode    =   0.21 sec*proc (3 tests)
+tier2        =   0.11 sec*proc (2 tests)
+tier3        =   0.10 sec*proc (1 test)
+
+Total Test time (real) =   0.23 sec
+
+The following tests FAILED:
+	232 - shmem.keepalive.loopback-off.0-1 (Failed)         internode tier2
+Errors while running CTest
+Output from these tests are in: /tmp/v02-keepalive-mutant/build/tier3/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

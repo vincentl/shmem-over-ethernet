@@ -1,0 +1,341 @@
+Internal ctest changing into directory: /tmp/v02-keepalive-final/build/debug
+Test project /tmp/v02-keepalive-final/build/debug
+    Start 566: shmem.circulant.70
+    Start 565: shmem.circulant.64
+    Start 564: shmem.circulant.33
+1/3 Test #564: shmem.circulant.33 ...............   Passed   38.84 sec
+2/3 Test #566: shmem.circulant.70 ...............***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 70 nodes
+] 51.77 sec
+osoe: PE 34: node 34: node 31 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 34: control segment /osoe.395533.0.34.0 (osoe-stat /osoe.395533.0.34.0, while any PE of this node is alive)
+osoe: PE 50: node 50: the connection to node 4 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 50: control segment /osoe.395533.0.50.0 (osoe-stat /osoe.395533.0.50.0, while any PE of this node is alive)
+osoe: PE 65: node 65: the control wire to node 1 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 65: control segment /osoe.395533.0.65.0 (osoe-stat /osoe.395533.0.65.0, while any PE of this node is alive)
+osoe: PE 56: node 56: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 56: control segment /osoe.395533.0.56.0 (osoe-stat /osoe.395533.0.56.0, while any PE of this node is alive)
+osoe: PE 61: node 61: the control wire to node 1 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 61: control segment /osoe.395533.0.61.0 (osoe-stat /osoe.395533.0.61.0, while any PE of this node is alive)
+osoe: PE 9: node 9: the control wire to node 54 failed: Connection reset by peer; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 9: control segment /osoe.395533.0.9.0 (osoe-stat /osoe.395533.0.9.0, while any PE of this node is alive)
+osoe: PE 7: node 7: node 51 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 7: control segment /osoe.395533.0.7.0 (osoe-stat /osoe.395533.0.7.0, while any PE of this node is alive)
+osoe: PE 12: node 12: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 12: control segment /osoe.395533.0.12.0 (osoe-stat /osoe.395533.0.12.0, while any PE of this node is alive)
+osoe: PE 10: node 10: the control wire to node 54 failed: Connection reset by peer; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 10: control segment /osoe.395533.0.10.0 (osoe-stat /osoe.395533.0.10.0, while any PE of this node is alive)
+osoe: PE 69: node 69: the control wire to node 5 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 69: control segment /osoe.395533.0.69.0 (osoe-stat /osoe.395533.0.69.0, while any PE of this node is alive)
+osoe: PE 66: node 66: the control wire to node 1 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 66: control segment /osoe.395533.0.66.0 (osoe-stat /osoe.395533.0.66.0, while any PE of this node is alive)
+osoe: PE 8: node 8: the control wire to node 54 failed: Connection reset by peer; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 8: control segment /osoe.395533.0.8.0 (osoe-stat /osoe.395533.0.8.0, while any PE of this node is alive)
+osoe: PE 67: node 67: the control wire to node 1 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 67: control segment /osoe.395533.0.67.0 (osoe-stat /osoe.395533.0.67.0, while any PE of this node is alive)
+osoe: PE 6: node 6: the connection to node 54 failed: Connection reset by peer; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 6: control segment /osoe.395533.0.6.0 (osoe-stat /osoe.395533.0.6.0, while any PE of this node is alive)
+osoe: PE 38: node 38: node 26 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 38: control segment /osoe.395533.0.38.0 (osoe-stat /osoe.395533.0.38.0, while any PE of this node is alive)
+osoe: PE 45: node 45: node 13 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 45: control segment /osoe.395533.0.45.0 (osoe-stat /osoe.395533.0.45.0, while any PE of this node is alive)
+osoe: PE 60: node 60: the control wire to node 1 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 60: control segment /osoe.395533.0.60.0 (osoe-stat /osoe.395533.0.60.0, while any PE of this node is alive)
+osoe: PE 25: node 25: node 32 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 25: control segment /osoe.395533.0.25.0 (osoe-stat /osoe.395533.0.25.0, while any PE of this node is alive)
+osoe: PE 58: node 58: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 58: control segment /osoe.395533.0.58.0 (osoe-stat /osoe.395533.0.58.0, while any PE of this node is alive)
+osoe: PE 36: node 36: node 26 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 36: control segment /osoe.395533.0.36.0 (osoe-stat /osoe.395533.0.36.0, while any PE of this node is alive)
+osoe: PE 55: node 55: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 55: control segment /osoe.395533.0.55.0 (osoe-stat /osoe.395533.0.55.0, while any PE of this node is alive)
+osoe: PE 1: node 1: the control wire to node 54 failed: Connection reset by peer; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 1: control segment /osoe.395533.0.1.0 (osoe-stat /osoe.395533.0.1.0, while any PE of this node is alive)
+osoe: PE 62: node 62: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 62: control segment /osoe.395533.0.62.0 (osoe-stat /osoe.395533.0.62.0, while any PE of this node is alive)
+osoe: PE 5: node 5: the control wire to node 54 failed: Connection reset by peer; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 5: control segment /osoe.395533.0.5.0 (osoe-stat /osoe.395533.0.5.0, while any PE of this node is alive)
+osoe: PE 53: node 53: the control wire to node 3 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 53: control segment /osoe.395533.0.53.0 (osoe-stat /osoe.395533.0.53.0, while any PE of this node is alive)
+osoe: PE 59: node 59: the control wire to node 1 failed: Connection reset by peer; this PE was not waiting in the library
+osoe: PE 59: control segment /osoe.395533.0.59.0 (osoe-stat /osoe.395533.0.59.0, while any PE of this node is alive)
+osoe: PE 49: node 49: node 13 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 49: control segment /osoe.395533.0.49.0 (osoe-stat /osoe.395533.0.49.0, while any PE of this node is alive)
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 8 exited with status 1
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 12 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 50 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 10 exited with status 1
+osoe-launch: rank 11 killed by signal 15
+osoe-launch: rank 13 killed by signal 15
+osoe-launch: rank 14 killed by signal 15
+osoe-launch: rank 15 killed by signal 15
+osoe-launch: rank 16 killed by signal 15
+osoe-launch: rank 17 killed by signal 15
+osoe-launch: rank 18 killed by signal 15
+osoe-launch: rank 19 killed by signal 15
+osoe-launch: rank 21 killed by signal 15
+osoe-launch: rank 22 killed by signal 15
+osoe-launch: rank 23 killed by signal 15
+osoe-launch: rank 24 killed by signal 15
+osoe-launch: rank 25 exited with status 1
+osoe-launch: rank 26 killed by signal 15
+osoe-launch: rank 27 killed by signal 15
+osoe-launch: rank 28 killed by signal 15
+osoe-launch: rank 29 killed by signal 15
+osoe-launch: rank 30 killed by signal 15
+osoe-launch: rank 31 killed by signal 15
+osoe-launch: rank 32 killed by signal 15
+osoe-launch: rank 33 killed by signal 15
+osoe-launch: rank 34 exited with status 1
+osoe-launch: rank 35 killed by signal 15
+osoe-launch: rank 36 exited with status 1
+osoe-launch: rank 37 killed by signal 15
+osoe-launch: rank 38 exited with status 1
+osoe-launch: rank 39 killed by signal 15
+osoe-launch: rank 40 killed by signal 15
+osoe-launch: rank 41 killed by signal 15
+osoe-launch: rank 42 killed by signal 15
+osoe-launch: rank 43 killed by signal 15
+osoe-launch: rank 44 killed by signal 15
+osoe-launch: rank 45 exited with status 1
+osoe-launch: rank 46 killed by signal 15
+osoe-launch: rank 47 killed by signal 15
+osoe-launch: rank 48 killed by signal 15
+osoe-launch: rank 49 exited with status 1
+osoe-launch: rank 51 killed by signal 15
+osoe-launch: rank 52 killed by signal 15
+osoe-launch: rank 53 exited with status 1
+osoe-launch: rank 54 killed by signal 15
+osoe-launch: rank 55 exited with status 1
+osoe-launch: rank 56 exited with status 1
+osoe-launch: rank 57 killed by signal 15
+osoe-launch: rank 58 exited with status 1
+osoe-launch: rank 59 exited with status 1
+osoe-launch: rank 60 exited with status 1
+osoe-launch: rank 61 exited with status 1
+osoe-launch: rank 62 exited with status 1
+osoe-launch: rank 63 killed by signal 15
+osoe-launch: rank 64 killed by signal 15
+osoe-launch: rank 65 exited with status 1
+osoe-launch: rank 66 exited with status 1
+osoe-launch: rank 67 exited with status 1
+osoe-launch: rank 68 killed by signal 15
+osoe-launch: rank 69 exited with status 1
+osoe-launch: rank 20 killed by signal 15
+
+3/3 Test #565: shmem.circulant.64 ...............***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 64 nodes
+] 51.79 sec
+osoe: PE 54: node 54: node 48 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 54: control segment /osoe.395582.0.54.0 (osoe-stat /osoe.395582.0.54.0, while any PE of this node is alive)
+osoe: PE 59: node 59: node 28 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 59: control segment /osoe.395582.0.59.0 (osoe-stat /osoe.395582.0.59.0, while any PE of this node is alive)
+osoe: PE 60: node 60: node 28 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 60: control segment /osoe.395582.0.60.0 (osoe-stat /osoe.395582.0.60.0, while any PE of this node is alive)
+osoe: PE 25: node 25: node 60 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 25: control segment /osoe.395582.0.25.0 (osoe-stat /osoe.395582.0.25.0, while any PE of this node is alive)
+osoe: PE 42: node 42: node 60 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 42: control segment /osoe.395582.0.42.0 (osoe-stat /osoe.395582.0.42.0, while any PE of this node is alive)
+osoe: PE 14: node 14: node 44 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 14: control segment /osoe.395582.0.14.0 (osoe-stat /osoe.395582.0.14.0, while any PE of this node is alive)
+osoe: PE 0: node 0: node 54 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 0: control segment /osoe.395582.0.0.0 (osoe-stat /osoe.395582.0.0.0, while any PE of this node is alive)
+osoe: PE 19: node 19: node 60 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 19: control segment /osoe.395582.0.19.0 (osoe-stat /osoe.395582.0.19.0, while any PE of this node is alive)
+osoe: PE 33: node 33: node 48 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 33: control segment /osoe.395582.0.33.0 (osoe-stat /osoe.395582.0.33.0, while any PE of this node is alive)
+osoe: PE 40: node 40: node 20 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 40: control segment /osoe.395582.0.40.0 (osoe-stat /osoe.395582.0.40.0, while any PE of this node is alive)
+osoe: PE 32: node 32: node 58 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 32: control segment /osoe.395582.0.32.0 (osoe-stat /osoe.395582.0.32.0, while any PE of this node is alive)
+osoe: PE 27: node 27: node 61 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 27: control segment /osoe.395582.0.27.0 (osoe-stat /osoe.395582.0.27.0, while any PE of this node is alive)
+osoe: PE 13: node 13: node 61 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 13: control segment /osoe.395582.0.13.0 (osoe-stat /osoe.395582.0.13.0, while any PE of this node is alive)
+osoe: PE 1: node 1: node 61 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 1: control segment /osoe.395582.0.1.0 (osoe-stat /osoe.395582.0.1.0, while any PE of this node is alive)
+osoe: PE 5: node 5: node 61 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 5: control segment /osoe.395582.0.5.0 (osoe-stat /osoe.395582.0.5.0, while any PE of this node is alive)
+osoe: PE 10: node 10: node 59 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 10: control segment /osoe.395582.0.10.0 (osoe-stat /osoe.395582.0.10.0, while any PE of this node is alive)
+osoe: PE 7: node 7: node 56 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 7: control segment /osoe.395582.0.7.0 (osoe-stat /osoe.395582.0.7.0, while any PE of this node is alive)
+osoe: PE 8: node 8: node 56 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 8: control segment /osoe.395582.0.8.0 (osoe-stat /osoe.395582.0.8.0, while any PE of this node is alive)
+osoe: PE 63: node 63: node 14 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 63: control segment /osoe.395582.0.63.0 (osoe-stat /osoe.395582.0.63.0, while any PE of this node is alive)
+osoe: PE 62: node 62: node 14 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 62: control segment /osoe.395582.0.62.0 (osoe-stat /osoe.395582.0.62.0, while any PE of this node is alive)
+osoe: PE 23: node 23: node 43 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 23: control segment /osoe.395582.0.23.0 (osoe-stat /osoe.395582.0.23.0, while any PE of this node is alive)
+osoe: PE 34: node 34: node 49 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 34: control segment /osoe.395582.0.34.0 (osoe-stat /osoe.395582.0.34.0, while any PE of this node is alive)
+osoe: PE 35: node 35: node 57 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 35: control segment /osoe.395582.0.35.0 (osoe-stat /osoe.395582.0.35.0, while any PE of this node is alive)
+osoe: PE 12: node 12: node 61 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 12: control segment /osoe.395582.0.12.0 (osoe-stat /osoe.395582.0.12.0, while any PE of this node is alive)
+osoe: PE 38: node 38: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 38: control segment /osoe.395582.0.38.0 (osoe-stat /osoe.395582.0.38.0, while any PE of this node is alive)
+osoe: PE 11: node 11: node 63 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+osoe: PE 11: control segment /osoe.395582.0.11.0 (osoe-stat /osoe.395582.0.11.0, while any PE of this node is alive)
+osoe: PE 36: node 36: node 42 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 36: control segment /osoe.395582.0.36.0 (osoe-stat /osoe.395582.0.36.0, while any PE of this node is alive)
+osoe: PE 29: node 29: node 48 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 29: control segment /osoe.395582.0.29.0 (osoe-stat /osoe.395582.0.29.0, while any PE of this node is alive)
+osoe: PE 51: node 51: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 51: control segment /osoe.395582.0.51.0 (osoe-stat /osoe.395582.0.51.0, while any PE of this node is alive)
+osoe: PE 52: node 52: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 52: control segment /osoe.395582.0.52.0 (osoe-stat /osoe.395582.0.52.0, while any PE of this node is alive)
+osoe: PE 45: node 45: node 16 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 45: control segment /osoe.395582.0.45.0 (osoe-stat /osoe.395582.0.45.0, while any PE of this node is alive)
+osoe: PE 2: node 2: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 2: control segment /osoe.395582.0.2.0 (osoe-stat /osoe.395582.0.2.0, while any PE of this node is alive)
+osoe: PE 17: node 17: node 59 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 17: control segment /osoe.395582.0.17.0 (osoe-stat /osoe.395582.0.17.0, while any PE of this node is alive)
+osoe: PE 20: node 20: node 40 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 20: control segment /osoe.395582.0.20.0 (osoe-stat /osoe.395582.0.20.0, while any PE of this node is alive)
+osoe: PE 16: node 16: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 16: control segment /osoe.395582.0.16.0 (osoe-stat /osoe.395582.0.16.0, while any PE of this node is alive)
+osoe: PE 53: node 53: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 53: control segment /osoe.395582.0.53.0 (osoe-stat /osoe.395582.0.53.0, while any PE of this node is alive)
+osoe: PE 39: node 39: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 39: control segment /osoe.395582.0.39.0 (osoe-stat /osoe.395582.0.39.0, while any PE of this node is alive)
+osoe: PE 58: node 58: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 58: control segment /osoe.395582.0.58.0 (osoe-stat /osoe.395582.0.58.0, while any PE of this node is alive)
+osoe: PE 57: node 57: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 57: control segment /osoe.395582.0.57.0 (osoe-stat /osoe.395582.0.57.0, while any PE of this node is alive)
+osoe: PE 50: node 50: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 50: control segment /osoe.395582.0.50.0 (osoe-stat /osoe.395582.0.50.0, while any PE of this node is alive)
+osoe: PE 61: node 61: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 61: control segment /osoe.395582.0.61.0 (osoe-stat /osoe.395582.0.61.0, while any PE of this node is alive)
+osoe: PE 44: node 44: node 16 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 44: control segment /osoe.395582.0.44.0 (osoe-stat /osoe.395582.0.44.0, while any PE of this node is alive)
+osoe: PE 46: node 46: node 16 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 46: control segment /osoe.395582.0.46.0 (osoe-stat /osoe.395582.0.46.0, while any PE of this node is alive)
+osoe: PE 43: node 43: node 16 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 43: control segment /osoe.395582.0.43.0 (osoe-stat /osoe.395582.0.43.0, while any PE of this node is alive)
+osoe: PE 49: node 49: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 49: control segment /osoe.395582.0.49.0 (osoe-stat /osoe.395582.0.49.0, while any PE of this node is alive)
+osoe: PE 37: node 37: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 37: control segment /osoe.395582.0.37.0 (osoe-stat /osoe.395582.0.37.0, while any PE of this node is alive)
+osoe: PE 28: node 28: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 28: control segment /osoe.395582.0.28.0 (osoe-stat /osoe.395582.0.28.0, while any PE of this node is alive)
+osoe: PE 47: node 47: node 14 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 47: control segment /osoe.395582.0.47.0 (osoe-stat /osoe.395582.0.47.0, while any PE of this node is alive)
+osoe: PE 31: node 31: node 39 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 31: control segment /osoe.395582.0.31.0 (osoe-stat /osoe.395582.0.31.0, while any PE of this node is alive)
+osoe: PE 48: node 48: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 48: control segment /osoe.395582.0.48.0 (osoe-stat /osoe.395582.0.48.0, while any PE of this node is alive)
+osoe: PE 55: node 55: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 55: control segment /osoe.395582.0.55.0 (osoe-stat /osoe.395582.0.55.0, while any PE of this node is alive)
+osoe: PE 15: node 15: node 55 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 15: control segment /osoe.395582.0.15.0 (osoe-stat /osoe.395582.0.15.0, while any PE of this node is alive)
+osoe: PE 3: node 3: node 19 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 3: control segment /osoe.395582.0.3.0 (osoe-stat /osoe.395582.0.3.0, while any PE of this node is alive)
+osoe: PE 18: node 18: node 19 ended its connection without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 18: control segment /osoe.395582.0.18.0 (osoe-stat /osoe.395582.0.18.0, while any PE of this node is alive)
+osoe: PE 41: node 41: node 2 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 41: control segment /osoe.395582.0.41.0 (osoe-stat /osoe.395582.0.41.0, while any PE of this node is alive)
+osoe: PE 9: node 9: node 13 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 9: control segment /osoe.395582.0.9.0 (osoe-stat /osoe.395582.0.9.0, while any PE of this node is alive)
+osoe: PE 56: node 56: node 1 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 56: control segment /osoe.395582.0.56.0 (osoe-stat /osoe.395582.0.56.0, while any PE of this node is alive)
+osoe: PE 26: node 26: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 26: control segment /osoe.395582.0.26.0 (osoe-stat /osoe.395582.0.26.0, while any PE of this node is alive)
+osoe: PE 24: node 24: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was not waiting in the library
+osoe: PE 24: control segment /osoe.395582.0.24.0 (osoe-stat /osoe.395582.0.24.0, while any PE of this node is alive)
+osoe: PE 21: node 21: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 21: control segment /osoe.395582.0.21.0 (osoe-stat /osoe.395582.0.21.0, while any PE of this node is alive)
+osoe: PE 22: node 22: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was not waiting in the library
+osoe: PE 22: control segment /osoe.395582.0.22.0 (osoe-stat /osoe.395582.0.22.0, while any PE of this node is alive)
+osoe: PE 4: node 4: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 4: control segment /osoe.395582.0.4.0 (osoe-stat /osoe.395582.0.4.0, while any PE of this node is alive)
+osoe: PE 6: node 6: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 6: control segment /osoe.395582.0.6.0 (osoe-stat /osoe.395582.0.6.0, while any PE of this node is alive)
+osoe: PE 30: node 30: node 1 ended its control wire without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_uint8_sum_reduce
+osoe: PE 30: control segment /osoe.395582.0.30.0 (osoe-stat /osoe.395582.0.30.0, while any PE of this node is alive)
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 8 exited with status 1
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 11 exited with status 1
+osoe-launch: rank 12 exited with status 1
+osoe-launch: rank 13 exited with status 1
+osoe-launch: rank 14 exited with status 1
+osoe-launch: rank 15 exited with status 1
+osoe-launch: rank 16 exited with status 1
+osoe-launch: rank 17 exited with status 1
+osoe-launch: rank 18 exited with status 1
+osoe-launch: rank 19 exited with status 1
+osoe-launch: rank 23 exited with status 1
+osoe-launch: rank 25 exited with status 1
+osoe-launch: rank 29 exited with status 1
+osoe-launch: rank 31 exited with status 1
+osoe-launch: rank 33 exited with status 1
+osoe-launch: rank 34 exited with status 1
+osoe-launch: rank 35 exited with status 1
+osoe-launch: rank 36 exited with status 1
+osoe-launch: rank 39 exited with status 1
+osoe-launch: rank 40 exited with status 1
+osoe-launch: rank 42 exited with status 1
+osoe-launch: rank 54 exited with status 1
+osoe-launch: rank 55 exited with status 1
+osoe-launch: rank 57 exited with status 1
+osoe-launch: rank 58 exited with status 1
+osoe-launch: rank 59 exited with status 1
+osoe-launch: rank 60 exited with status 1
+osoe-launch: rank 61 exited with status 1
+osoe-launch: rank 62 exited with status 1
+osoe-launch: rank 63 exited with status 1
+osoe-launch: rank 26 exited with status 1
+osoe-launch: rank 30 exited with status 1
+osoe-launch: rank 51 exited with status 1
+osoe-launch: rank 56 exited with status 1
+osoe-launch: rank 24 exited with status 1
+osoe-launch: rank 45 exited with status 1
+osoe-launch: rank 38 exited with status 1
+osoe-launch: rank 32 exited with status 1
+osoe-launch: rank 22 exited with status 1
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 27 exited with status 1
+osoe-launch: rank 37 exited with status 1
+osoe-launch: rank 41 exited with status 1
+osoe-launch: rank 43 exited with status 1
+osoe-launch: rank 48 exited with status 1
+osoe-launch: rank 20 exited with status 1
+osoe-launch: rank 44 exited with status 1
+osoe-launch: rank 46 exited with status 1
+osoe-launch: rank 47 exited with status 1
+osoe-launch: rank 49 exited with status 1
+osoe-launch: rank 50 exited with status 1
+osoe-launch: rank 52 exited with status 1
+osoe-launch: rank 53 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 10 exited with status 1
+osoe-launch: rank 28 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 21 exited with status 1
+
+
+33% tests passed, 2 tests failed out of 3
+
+Label Time Summary:
+internode    = 142.39 sec*proc (3 tests)
+tier2        = 142.39 sec*proc (3 tests)
+
+Total Test time (real) =  51.82 sec
+
+The following tests FAILED:
+	565 - shmem.circulant.64 (Failed)                       internode tier2
+	566 - shmem.circulant.70 (Failed)                       internode tier2
+Errors while running CTest

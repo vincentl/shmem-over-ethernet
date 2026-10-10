@@ -1,0 +1,63 @@
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=6 nodes=3 layout=2,2,2 hosts=lima-osoe heap=256m memory=128m seed=1 report=5 exercises=collectives
+exercise collectives typed=319 timed=87 sizes=8..1m teams=world,even seconds=60 memory=12.1m
+collectives t=0.0 round=1 calls=45 calls_per_s=27573 mib_per_s=0.8 typed_s=0.001 timed_s=0.001 check_s=0.000 step_s=0.002 failures=0
+library nodes=3 bytes_sent=6176 gets_nonblocking=0 landing_full=0 reserve_stalls=0 wakes_sent=36 barrier_ns=10720671
+collectives t=0.0 round=9 calls=393 calls_per_s=24488 mib_per_s=2.1 typed_s=0.004 timed_s=0.007 check_s=0.000 step_s=0.014 failures=0
+library nodes=3 bytes_sent=74640 gets_nonblocking=0 landing_full=0 reserve_stalls=1 wakes_sent=435 barrier_ns=35153791
+collectives t=2.6 round=73 calls=2712 calls_per_s=891 mib_per_s=467.0 typed_s=0.070 timed_s=0.279 check_s=1.797 step_s=2.603 failures=0
+library nodes=3 bytes_sent=429944744 gets_nonblocking=0 landing_full=0 reserve_stalls=1304 wakes_sent=6047 barrier_ns=2788888827
+collectives t=7.0 round=195 calls=7194 calls_per_s=1033 mib_per_s=413.9 typed_s=0.106 timed_s=0.397 check_s=3.008 step_s=4.337 failures=0
+library nodes=3 bytes_sent=788736936 gets_nonblocking=0 landing_full=0 reserve_stalls=2273 wakes_sent=12550 barrier_ns=8088977080
+collectives t=13.0 round=335 calls=12159 calls_per_s=815 mib_per_s=447.0 typed_s=0.137 timed_s=0.591 check_s=4.188 step_s=6.089 failures=0
+library nodes=3 bytes_sent=1041019968 gets_nonblocking=0 landing_full=0 reserve_stalls=3086 wakes_sent=15131 barrier_ns=8394167297
+collectives t=17.3 round=449 calls=16308 calls_per_s=964 mib_per_s=416.0 typed_s=0.098 timed_s=0.405 check_s=3.139 step_s=4.302 failures=0
+library nodes=3 bytes_sent=785454088 gets_nonblocking=0 landing_full=0 reserve_stalls=2266 wakes_sent=11999 barrier_ns=7978633131
+collectives t=23.3 round=581 calls=21150 calls_per_s=810 mib_per_s=451.8 typed_s=0.128 timed_s=0.561 check_s=4.115 step_s=5.976 failures=0
+library nodes=3 bytes_sent=1028315064 gets_nonblocking=0 landing_full=0 reserve_stalls=3036 wakes_sent=14320 barrier_ns=7923207353
+collectives t=27.5 round=691 calls=24945 calls_per_s=917 mib_per_s=416.5 typed_s=0.095 timed_s=0.383 check_s=2.906 step_s=4.136 failures=0
+library nodes=3 bytes_sent=745973792 gets_nonblocking=0 landing_full=0 reserve_stalls=2121 wakes_sent=11610 barrier_ns=7589485912
+collectives t=33.1 round=823 calls=29997 calls_per_s=902 mib_per_s=434.0 typed_s=0.126 timed_s=0.558 check_s=3.829 step_s=5.600 failures=0
+library nodes=3 bytes_sent=912783776 gets_nonblocking=0 landing_full=0 reserve_stalls=2629 wakes_sent=14064 barrier_ns=8179313441
+collectives t=37.2 round=940 calls=34020 calls_per_s=970 mib_per_s=450.8 typed_s=0.106 timed_s=0.419 check_s=2.916 step_s=4.148 failures=0
+library nodes=3 bytes_sent=781016456 gets_nonblocking=0 landing_full=0 reserve_stalls=2367 wakes_sent=12448 barrier_ns=6080946965
+collectives t=42.2 round=1081 calls=39285 calls_per_s=1054 mib_per_s=450.9 typed_s=0.119 timed_s=0.533 check_s=3.432 step_s=4.997 failures=0
+library nodes=3 bytes_sent=909529216 gets_nonblocking=0 landing_full=0 reserve_stalls=2609 wakes_sent=14594 barrier_ns=8958899947
+collectives t=48.4 round=1222 calls=44127 calls_per_s=779 mib_per_s=412.5 typed_s=0.129 timed_s=0.522 check_s=4.470 step_s=6.213 failures=0
+library nodes=3 bytes_sent=1103449408 gets_nonblocking=0 landing_full=0 reserve_stalls=3234 wakes_sent=15272 barrier_ns=9805709272
+collectives t=52.0 round=1335 calls=48399 calls_per_s=1203 mib_per_s=433.1 typed_s=0.102 timed_s=0.346 check_s=2.523 step_s=3.550 failures=0
+library nodes=3 bytes_sent=620889976 gets_nonblocking=0 landing_full=0 reserve_stalls=1747 wakes_sent=10898 barrier_ns=5543541551
+collectives t=58.8 round=1494 calls=54024 calls_per_s=826 mib_per_s=437.0 typed_s=0.139 timed_s=0.645 check_s=4.749 step_s=6.809 failures=0
+library nodes=3 bytes_sent=1206404400 gets_nonblocking=0 landing_full=0 reserve_stalls=3508 wakes_sent=17942 barrier_ns=10609721294
+collectives t=61.3 round=1523 calls=55257 calls_per_s=488 mib_per_s=472.9 typed_s=0.052 timed_s=0.237 check_s=1.810 step_s=2.528 failures=0
+library nodes=3 bytes_sent=419034480 gets_nonblocking=0 landing_full=0 reserve_stalls=1341 wakes_sent=3881 barrier_ns=2610418339
+summary collectives rounds=1523 calls=55257 seconds=61.3 calls_per_s=901 mib_per_s=436.7 failures=0
+summary collectives team=world bytes=8 median reduce_us=122.9 broadcast_us=124.9 collect_us=284.8 fcollect_us=163.9 alltoall_us=132.8 scan_us=98.2
+summary collectives team=world bytes=8 fastest reduce_us=58.3 broadcast_us=31.9 collect_us=176.0 fcollect_us=71.7 alltoall_us=78.1 scan_us=38.6
+summary collectives team=world bytes=64 median reduce_us=128.8 broadcast_us=129.7 collect_us=290.7 fcollect_us=175.6 alltoall_us=136.1 scan_us=101.4
+summary collectives team=world bytes=64 fastest reduce_us=67.0 broadcast_us=34.7 collect_us=166.1 fcollect_us=74.5 alltoall_us=76.1 scan_us=46.9
+summary collectives team=world bytes=512 median reduce_us=128.0 broadcast_us=118.6 collect_us=301.8 fcollect_us=180.5 alltoall_us=146.1 scan_us=104.0
+summary collectives team=world bytes=512 fastest reduce_us=71.3 broadcast_us=26.5 collect_us=182.8 fcollect_us=69.8 alltoall_us=58.4 scan_us=41.7
+summary collectives team=world bytes=4096 median reduce_us=145.3 broadcast_us=136.9 collect_us=509.0 fcollect_us=377.7 alltoall_us=363.9 scan_us=132.0
+summary collectives team=world bytes=4096 fastest reduce_us=61.5 broadcast_us=44.1 collect_us=194.6 fcollect_us=81.9 alltoall_us=65.8 scan_us=68.1
+summary collectives team=world bytes=32768 median reduce_us=306.8 broadcast_us=425.5 collect_us=2210.6 fcollect_us=229.8 alltoall_us=2149.5 scan_us=178.0
+summary collectives team=world bytes=32768 fastest reduce_us=191.0 broadcast_us=39.6 collect_us=224.8 fcollect_us=91.8 alltoall_us=102.4 scan_us=88.4
+summary collectives team=world bytes=262144 median reduce_us=620.6 broadcast_us=2552.2 collect_us=2482.5 fcollect_us=2699.9 alltoall_us=4035.1 scan_us=1236.6
+summary collectives team=world bytes=262144 fastest reduce_us=232.3 broadcast_us=224.1 collect_us=537.9 fcollect_us=513.4 alltoall_us=578.6 scan_us=770.9
+summary collectives team=world bytes=1048576 median reduce_us=2269.9 broadcast_us=4485.1 collect_us=3491.4 fcollect_us=4898.7 alltoall_us=8198.6 scan_us=4689.8
+summary collectives team=world bytes=1048576 fastest reduce_us=888.2 broadcast_us=945.4 collect_us=1738.2 fcollect_us=1612.4 alltoall_us=2338.3 scan_us=3110.7
+summary collectives team=even bytes=8 median reduce_us=68.6 broadcast_us=72.8 collect_us=153.7 fcollect_us=104.0 alltoall_us=110.0 scan_us=75.8
+summary collectives team=even bytes=8 fastest reduce_us=24.0 broadcast_us=3.8 collect_us=93.2 fcollect_us=43.4 alltoall_us=56.0 scan_us=20.6
+summary collectives team=even bytes=64 median reduce_us=78.7 broadcast_us=83.4 collect_us=213.2 fcollect_us=125.4 alltoall_us=115.7 scan_us=84.4
+summary collectives team=even bytes=64 fastest reduce_us=19.0 broadcast_us=4.9 collect_us=91.9 fcollect_us=37.8 alltoall_us=54.0 scan_us=25.7
+summary collectives team=even bytes=512 median reduce_us=88.9 broadcast_us=94.9 collect_us=231.3 fcollect_us=108.0 alltoall_us=117.2 scan_us=88.8
+summary collectives team=even bytes=512 fastest reduce_us=24.8 broadcast_us=6.2 collect_us=97.6 fcollect_us=27.2 alltoall_us=58.6 scan_us=35.6
+summary collectives team=even bytes=4096 median reduce_us=120.9 broadcast_us=103.7 collect_us=243.0 fcollect_us=129.0 alltoall_us=131.1 scan_us=118.4
+summary collectives team=even bytes=4096 fastest reduce_us=41.3 broadcast_us=5.7 collect_us=100.7 fcollect_us=43.9 alltoall_us=59.0 scan_us=41.5
+summary collectives team=even bytes=32768 median reduce_us=267.0 broadcast_us=107.4 collect_us=245.0 fcollect_us=140.8 alltoall_us=144.0 scan_us=145.6
+summary collectives team=even bytes=32768 fastest reduce_us=145.2 broadcast_us=7.5 collect_us=135.8 fcollect_us=55.2 alltoall_us=78.8 scan_us=87.1
+summary collectives team=even bytes=262144 median reduce_us=343.9 broadcast_us=426.0 collect_us=370.8 fcollect_us=272.1 alltoall_us=289.5 scan_us=919.0
+summary collectives team=even bytes=262144 fastest reduce_us=260.4 broadcast_us=218.8 collect_us=231.5 fcollect_us=152.5 alltoall_us=186.8 scan_us=815.0
+summary collectives team=even bytes=1048576 median reduce_us=948.7 broadcast_us=1635.2 collect_us=1283.6 fcollect_us=1323.1 alltoall_us=1451.4 scan_us=3559.0
+summary collectives team=even bytes=1048576 fastest reduce_us=729.7 broadcast_us=1434.0 collect_us=781.6 fcollect_us=662.6 alltoall_us=1070.9 scan_us=3080.2
+summary collectives sync_us=70.4 even_sync_us=65.1 barrier_all_us=71.1
+osoe-pacer failures=0 seconds=61.3

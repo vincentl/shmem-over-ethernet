@@ -1,0 +1,104 @@
+Internal ctest changing into directory: /tmp/v02-keepalive-final/build/tier3
+UpdateCTestConfiguration  from :/tmp/v02-keepalive-final/build/tier3/DartConfiguration.tcl
+Parse Config file:/tmp/v02-keepalive-final/build/tier3/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/v02-keepalive-final/build/tier3/DartConfiguration.tcl
+Parse Config file:/tmp/v02-keepalive-final/build/tier3/DartConfiguration.tcl
+Test project /tmp/v02-keepalive-final/build/tier3
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 730
+    Start 730: tier3.pi.wire-pair
+
+730: Test command: /usr/bin/sudo "-n" "/tmp/v02-keepalive-final/tools/launch/tier3.sh" "pi" "2" "OSOE_WIRE_BYTES=64" "OSOE_WIRE_SPLIT=3000" "OSOE_WIRE_SEED=20260919" "--" "/tmp/v02-keepalive-final/build/tier3/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "300" "--" "/tmp/v02-keepalive-final/build/tier3/shmem/tests/shmem_test_wire_pair"
+730: Working Directory: /tmp/v02-keepalive-final/build/tier3/shmem/tests
+730: Test timeout computed to be: 400
+730: osoe: wire split 3000 per myriad, OSOE_WIRE_SEED=20260919
+730: osoe: wire split 3000 per myriad, OSOE_WIRE_SEED=20260919
+1/5 Test #730: tier3.pi.wire-pair ....................   Passed    0.18 sec
+test 764
+    Start 764: tier3.pi.vanished-node.0-1
+
+764: Test command: /usr/bin/cmake "-E" "env" "WRAP=sudo -n /tmp/v02-keepalive-final/tools/launch/tier3.sh pi 2 TIER3_CUT=1 OSOE_KEEPALIVE=1,1,3 --" "sh" "/tmp/v02-keepalive-final/shmem/tests/vanished-node.sh" "/tmp/v02-keepalive-final/build/tier3/tools/launch/osoe-launch" "/tmp/v02-keepalive-final/build/tier3/shmem/tests/shmem_test_vanished-node" "2" "0,1"
+764: Working Directory: /tmp/v02-keepalive-final/build/tier3/shmem/tests
+764: Test timeout computed to be: 120
+764: tier3.sh: node 1's link now drops everything
+764: osoe: PE 1: node 1: node 0 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+764: osoe: PE 1: control segment /osoe.412397.0.1.0 (osoe-stat /osoe.412397.0.1.0, while any PE of this node is alive)
+764: osoe-launch: rank 1 exited with status 1
+764: osoe: PE 0: node 0: node 1 stopped answering: its kernel has acknowledged nothing sent to it for 4 s (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_barrier_all
+764: osoe: PE 0: control segment /osoe.412397.0.0.0 (osoe-stat /osoe.412397.0.0.0, while any PE of this node is alive)
+764: osoe-launch: rank 0 exited with status 1
+764: vanished node: found 2 times, 2 of 2 ranks left with the failure status, 0 bad
+764: VANISHED NODE OK
+2/5 Test #764: tier3.pi.vanished-node.0-1 ............   Passed    5.42 sec
+test 765
+    Start 765: tier3.pi.vanished-node.0-0-1-1
+
+765: Test command: /usr/bin/cmake "-E" "env" "WRAP=sudo -n /tmp/v02-keepalive-final/tools/launch/tier3.sh pi 2 TIER3_CUT=1 OSOE_KEEPALIVE=1,1,3 --" "sh" "/tmp/v02-keepalive-final/shmem/tests/vanished-node.sh" "/tmp/v02-keepalive-final/build/tier3/tools/launch/osoe-launch" "/tmp/v02-keepalive-final/build/tier3/shmem/tests/shmem_test_vanished-node" "4" "0,0,1,1"
+765: Working Directory: /tmp/v02-keepalive-final/build/tier3/shmem/tests
+765: Test timeout computed to be: 120
+765: tier3.sh: node 1's link now drops everything
+765: osoe: PE 2: node 1: node 0 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+765: osoe: PE 2: control segment /osoe.412451.0.1.0 (osoe-stat /osoe.412451.0.1.0, while any PE of this node is alive)
+765: osoe: PE 3: ending: the job is aborting on behalf of PE 2; this PE was not waiting in the library
+765: osoe-launch: rank 3 exited with status 1
+765: osoe-launch: rank 2 exited with status 1
+765: osoe: PE 0: node 0: node 1 stopped answering: its kernel has acknowledged nothing sent to it for 4 s (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_barrier_all
+765: osoe: PE 0: control segment /osoe.412451.0.0.0 (osoe-stat /osoe.412451.0.0.0, while any PE of this node is alive)
+765: osoe: PE 1: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_barrier_all
+765: osoe-launch: rank 0 exited with status 1
+765: osoe-launch: rank 1 exited with status 1
+765: vanished node: found 2 times, 4 of 4 ranks left with the failure status, 0 bad
+765: VANISHED NODE OK
+3/5 Test #765: tier3.pi.vanished-node.0-0-1-1 ........   Passed    5.34 sec
+test 766
+    Start 766: tier3.pi.vanished-node-inflight.0-1
+
+766: Test command: /usr/bin/cmake "-E" "env" "WRAP=sudo -n /tmp/v02-keepalive-final/tools/launch/tier3.sh pi 2 TIER3_CUT=1 OSOE_KEEPALIVE=1,1,3 OSOE_TEST_MODE=inflight --" "sh" "/tmp/v02-keepalive-final/shmem/tests/vanished-node.sh" "/tmp/v02-keepalive-final/build/tier3/tools/launch/osoe-launch" "/tmp/v02-keepalive-final/build/tier3/shmem/tests/shmem_test_vanished-node" "2" "0,1"
+766: Working Directory: /tmp/v02-keepalive-final/build/tier3/shmem/tests
+766: Test timeout computed to be: 120
+766: tier3.sh: node 1's link now drops everything
+766: osoe: PE 1: node 1: node 0 stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was not waiting in the library
+766: osoe: PE 1: control segment /osoe.412511.0.1.0 (osoe-stat /osoe.412511.0.1.0, while any PE of this node is alive)
+766: osoe-launch: rank 1 exited with status 1
+766: osoe: PE 0: node 0: node 1 stopped answering: its kernel has acknowledged nothing sent to it for 4 s (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_quiet
+766: osoe: PE 0: control segment /osoe.412511.0.0.0 (osoe-stat /osoe.412511.0.0.0, while any PE of this node is alive)
+766: osoe-launch: rank 0 exited with status 1
+766: vanished node: found 2 times, 2 of 2 ranks left with the failure status, 0 bad
+766: VANISHED NODE OK
+4/5 Test #766: tier3.pi.vanished-node-inflight.0-1 ...   Passed    5.49 sec
+test 842
+    Start 842: tier3.pi.keepalive.default-on.0-1
+
+842: Test command: /usr/bin/sudo "-n" "/tmp/v02-keepalive-final/tools/launch/tier3.sh" "pi" "2" "SHMEM_DEBUG=1" "--" "/tmp/v02-keepalive-final/build/tier3/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "300" "--" "/tmp/v02-keepalive-final/build/tier3/shmem/tests/shmem_test_keepalive" "on"
+842: Working Directory: /tmp/v02-keepalive-final/build/tier3/shmem/tests
+842: Test timeout computed to be: 400
+842: osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+842: osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+842: osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.412562.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 186207 ns, a message cost of 0 ns, 127427241 bytes a second (24918 us of this start)
+842: osoe: node 0 limits the unsent bytes of each of its 1 connections to 16384
+842: osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.412562.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 186207 ns, a message cost of 0 ns, 127427241 bytes a second (24984 us of this start)
+842: osoe: node 1 limits the unsent bytes of each of its 1 connections to 16384
+842: PE 1: 2 connected TCP sockets, 2 with keepalive on
+842: PE 0: 2 connected TCP sockets, 2 with keepalive on
+842: KEEPALIVE ON OK
+5/5 Test #842: tier3.pi.keepalive.default-on.0-1 .....   Passed    0.12 sec
+
+The following tests passed:
+	tier3.pi.wire-pair
+	tier3.pi.vanished-node.0-1
+	tier3.pi.vanished-node.0-0-1-1
+	tier3.pi.vanished-node-inflight.0-1
+	tier3.pi.keepalive.default-on.0-1
+
+100% tests passed, 0 tests failed out of 5
+
+Label Time Summary:
+internode    =  16.56 sec*proc (5 tests)
+tier3        =  16.56 sec*proc (5 tests)
+
+Total Test time (real) =  16.58 sec
