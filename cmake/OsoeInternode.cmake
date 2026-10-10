@@ -5,9 +5,10 @@
 # A test that runs a job of more than one logical node - over a node map, with
 # osoe-launch -m or OSOE_NODE_MAP, or in tier 3's network namespaces - or that
 # builds or links the internode backend's own files or liburing, carries the
-# label `internode`. So `ctest -L internode` on the full build runs exactly the
-# tests the single-node build lacks, and `ctest -LE internode` the ones both
-# run.
+# label `internode`. So `ctest -L internode` on the full build runs the tests
+# the single-node build lacks but one - shmem.single-node.configure, the full
+# build's check that the single-node build configures - and `ctest -LE
+# internode` the ones both run, and that one.
 #
 # In the single-node build (OSOE_SINGLE_NODE) such a test is not registered at
 # all, and its program not built: each sits in a block `if(OSOE_INTERNODE)`, a

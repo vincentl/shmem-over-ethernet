@@ -1,7 +1,8 @@
 # 2026-10-10: the single-node build configures again, and the full build checks it
 
 Found while making `shmem.helper-wake` wait for an owner's sleeping flag: from
-the grant fields' merge (`fcb9cf0`) the single-node build did not configure.
+the grant fields' merge (`fcb9cf0`) the single-node build did not configure, in
+every preset but ThreadSanitizer's, whose flags skipped the block.
 
 ## What it was
 
@@ -31,12 +32,24 @@ the grant fields' merge (`fcb9cf0`) the single-node build did not configure.
   own kind - its build type, its C and linker flags, its shared or static
   library and its timing pins, so each preset configures its own single-node
   counterpart - and fails on any CMake error. Configure only: compiling and
-  running the single-node build stays its own suite's, about two minutes and
-  404 tests, on the machine that runs it. Not `OSOE_TIER3`, which the
-  single-node build refuses by design.
+  running the single-node build stays its own suite's, 404 tests, on the
+  machine that runs it. Not `OSOE_TIER3`, which the single-node build refuses
+  by design. It runs where the full build's liburing and pkg-config are
+  installed, so a single-node path that asked for them would pass it; the
+  single-node build's own runs, on Rocky Linux 9 and in the VM with liburing
+  hidden, are what see that.
 - **The README:** the `cmake/` row names the check; the full build has 858
   tests, and the single-node build runs 399 of them - all but the 458 labelled
-  `internode` and this check - and five of its own.
+  `internode` and this check - and five of its own; `ctest -L internode` is the
+  tests it lacks but this one, as `cmake/OsoeInternode.cmake` says too.
+- **Read** adversarially by a fresh agent at `3541411`
+  (`docs/reviews/archive/v0.2-single-node-configure-adversarial-read.md`):
+  nothing fatal; its should-fix finding - the README's and
+  `cmake/OsoeInternode.cmake`'s sentences that said `-L internode` was exactly
+  what the single-node build lacks - and its notes
+  on ThreadSanitizer's preset and liburing were taken. It found the same
+  defect on the branch `blocking-gets`, a property on its new two-node test in
+  a block guarded against ThreadSanitizer alone, fixed there before it merges.
 
 ## The verification
 

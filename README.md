@@ -1327,8 +1327,8 @@ that one could be added without touching the OpenSHMEM layer.
   five of its own, in the same four presets, on Rocky Linux 9 and in the
   development VM with liburing hidden: 399 of the full build's 858 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
-  headers' C++ test needs. `ctest -L internode` on the full build runs exactly
-  the tests it lacks.
+  headers' C++ test needs. `ctest -L internode` on the full build runs the
+  tests it lacks but that check, `shmem.single-node.configure`.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion
