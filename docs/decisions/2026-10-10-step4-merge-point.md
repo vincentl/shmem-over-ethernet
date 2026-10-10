@@ -365,7 +365,15 @@ since `4f1014d` is the test's retries, comments and documents. So the tip ran:
   configured, built and its suite run - the one build `SHMEM_INFO`'s note
   compiles in.
 
-[the run's numbers; to be filled in]
+At `8e36752`, the tip that merges, every part passed:
+
+- **The static checks:** 12 of 12.
+- **The four presets:** each built without a warning.
+- **`shmem.helper-wake`:** three runs in each of debug, release and
+  AddressSanitizer, every one passing - ThreadSanitizer's preset leaves it out.
+- **The single-node build:** built without a warning, its 404 tests every one
+  passing, and `SHMEM_INFO`'s note in it naming the helpers', the shape's and
+  the link's settings among those it checks as values only.
 
 ## The fixes' adversarial read
 
