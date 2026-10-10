@@ -63,7 +63,7 @@ what the model did, and the model's comment says so.
 
 **At `bdb181a`, the change as first committed**
 (`<repo>/build/scratch/ladder/merge-point/verify-grant-fields.sh` and
-`verify-grant-fields/`). The merge point's verification ran with the circulant
+`verify-grant-fields/`, the lead's scratch). The merge point's verification ran with the circulant
 model and its digest for the models, the only model file changed:
 
 - the static checks: 12 of 12;
@@ -74,7 +74,9 @@ model and its digest for the models, the only model file changed:
   failing, the gate passing both;
 - tier 3: 113 of 113;
 - the circulant model and its digest: both;
-- `osoe-pacer`: [the run's numbers; to be filled in].
+- `osoe-pacer` at no helpers and two: `mix`, `mailbox` and `collectives` with
+  the Pi's link a minute each and `mix` ten minutes, every one `failures=0` and
+  no deadlock.
 
 **ThreadSanitizer's two landings of one word** are gone: one at each count,
 where the merge point's verification at `4f1014d` had 22 and 49, the change's
@@ -116,4 +118,58 @@ whole purpose.
 - the AddressSanitizer suite at no helpers, `shmem.helper-wake` run alone;
 - the divergence test as it is and against the mutant.
 
-[the run's numbers; to be filled in]
+At `4a557b1`, the commit that merges:
+
+- **The static checks:** 12 of 12.
+- **The four presets:** each built without a warning.
+- **The AddressSanitizer suite at no helpers:** 842 of 842, `shmem.helper-wake`
+  run alone at its end and passing.
+- **`shmem.circulant.4.diverge`:** passing as it is, and failing against the
+  mutant with no field checked, whose only message is the piece header's a
+  round later: "a piece of the reduce-scatter, from node 1's lead (PE 1), should
+  be round 0's piece 1 (16384 bytes) ...".
+
+**Where it stands.** Merged into `main` after this record, the branch's tree
+whole.
+
+## The adversarial read
+
+A fresh agent read `bdb181a` against this record and the review's Q2-4
+(`docs/reviews/archive/v0.2-step4-grant-fields-adversarial-read.md`).
+
+**Nothing fatal.** It checked five things:
+
+- **The layout:** every offset is inside its team number's words at every row
+  count from 1 to 16, and the region reserves what the code writes.
+- **One writer a field:** each field has one writer, the receiver the message
+  names, by a program over the real schedule for 2 to 300 leads.
+- **The handover:** it is ordered.
+- **The next collective:** a field is read and cleared before its writer can
+  write it again, since each writer waits for the reader's allgather grant.
+- **The check and the model:** no correct program can fail the check, and the
+  model needed no change.
+
+**Four should-fix, all made in the commit that merges:**
+
+1. The divergence test's pass expression, which the mutant passed by a piece's
+   header (above).
+2. README numbers the change moved: a team number 27.4 KiB at a thousand nodes
+   where it said 27.25; at 500 nodes, `OSOE_SMALL_COLLECTIVE_BYTES`'s 9.0,
+   11.3 and 27.0 KiB; and the 64 × 64 mapping's 17.1 GiB.
+3. The ThreadSanitizer paragraph, written from this run.
+4. Three comments still giving the old layout.
+
+**Of its notes, made:**
+
+- the checklist's citation of step 3's findings, now 2 and 7;
+- this record's sizes past 1,024 nodes;
+- the model's comment on the fields;
+- the design sentence, split in two.
+
+**Left as notes:**
+
+- **The model's tag names the writer and the round, which the C's field does
+  not.** The C trusts the schedule for who writes field k, and both sides
+  compute it with the same function.
+- **The model never clears a field.** The C's clearing rests on the allgather
+  grant.
