@@ -1,0 +1,19 @@
+build branch: warnings 0
+build spin200: warnings 0
+build spin30: warnings 0
+== quiet 19:23:45
+agent-quiet: 20 of 20 passed
+  the owner woken: 60x100 
+  flags not up: 0
+== beside four busy loops 19:23:48
+both-loaded: 20 of 20 passed
+  the owner woken: 60x0 61x100 3x101 1x102 1x104 1x124 2x132 1x145 2x148 1x161 2x178 1x185 1x186 1x187 2x194 1x196 4x197 7x198 5x199 23x200 
+  flags not up: 0
+== the agent mutants, each run must fail 19:23:56
+mutant-spin200: 0 of 5 passed
+  the owner woken: 11x0 4x1 
+  flags not up: 0
+mutant-spin30: 0 of 5 passed
+  the owner woken: 10x1 5x2 
+  flags not up: 0
+DONE 19:23:57

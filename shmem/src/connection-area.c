@@ -115,6 +115,18 @@ _Static_assert(offsetof(struct osoe_connection_area_header, ready) == OSOE_CACHE
                "a connection area's ready and opened words stay on its second and third "
                "lines, where every layout since 3 has them");
 
+/* test-helper-wake.c reads each owner's flag where its own process maps the
+ * area, with nothing from this directory: the helpers on the fourth line and
+ * the owners' offset after them, then an owner a line, the flag first. */
+_Static_assert(offsetof(struct osoe_connection_area_header, layout) == 8 &&
+               offsetof(struct osoe_connection_area_header, helpers) == 3 * OSOE_CACHELINE &&
+               offsetof(struct osoe_connection_area_header, owners_offset) ==
+                   3 * OSOE_CACHELINE + 8 &&
+               sizeof(struct owner_words) == OSOE_CACHELINE &&
+               offsetof(struct owner_words, sleeping) == 0,
+               "test-helper-wake.c reads the helpers, the owners' offset and each owner's flag "
+               "at these places");
+
 static uint64_t align_up(uint64_t n)
 {
     return (n + OSOE_CACHELINE - 1) / OSOE_CACHELINE * OSOE_CACHELINE;
