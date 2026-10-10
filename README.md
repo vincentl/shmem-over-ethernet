@@ -487,11 +487,13 @@ several nodes, over TCP between them as a cluster would - up to 1,024
 processes on 254 logical nodes; the single-node build refuses such a job by
 name, since it has no TCP. `-s` names the variables as `srun` does, so
 the job takes the bootstrap's Slurm path. Its logical nodes run without TCP
-keepalive unless `OSOE_KEEPALIVE` is set: the loopback, which carries every
-probe and its answer, drops them when a machine has more busy threads than
-cores, and a job of tens of logical nodes so loaded once ended after two
-minutes as "stopped answering ... The host has vanished", where nothing had
-vanished - the machine's kernel closes a dead logical node's connections itself
+keepalive unless `OSOE_KEEPALIVE` is set. Their loopback addresses put them in
+one network namespace, with no link between them to cut, and the kernel closes
+a dead logical node's connections itself, so a probe can find nothing there -
+but it can be lost: the kernel's receive backlog drops probes and answers alike
+when a machine has more busy threads than cores, and a job of tens of logical
+nodes so loaded once ended after two minutes as "stopped answering ... The host
+has vanished", where nothing had vanished
 (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-1).
 
 It fails if any process fails, if the timeout (`-t SECONDS`, 1 to 86400, default 60 -
@@ -1091,9 +1093,9 @@ specification or takes a choice the specification leaves open.
   rendezvous - that stops moving to end the job naming what it waited for. A
   node that vanishes without closing its connections is noticed in one to two
   minutes by default (`OSOE_KEEPALIVE`): by TCP keepalive when nothing was in
-  flight toward it, and by its kernel's silence when something was - between
-  machines, since one machine's logical nodes cannot vanish so, and run
-  without either.
+  flight toward it, and by its kernel's silence when something was - unless
+  every node has a loopback address, as `osoe-launch`'s logical nodes do, which
+  cannot vanish so and run without either.
 - **A program's own deadlock ends the job only once it is proved.** When
   every PE of the job waits inside the library, nothing moves on any node for
   `OSOE_DEADLOCK_SECONDS` (10 by default) and nothing is in flight between
@@ -1448,7 +1450,7 @@ both are set the `SHMEM_` one controls.
 | `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. `0` is refused. *Checked*. |
 | `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.1.0, OpenSHMEM 1.6`. |
 | `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults, under a first line naming osoe's version. |
-| `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it. |
+| `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it, and whether it probes them with TCP keepalive and checks for a silent peer (`OSOE_KEEPALIVE`). |
 
 **Limits**
 
@@ -1475,7 +1477,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A program's own waits and collectives are not timed. |
-| `OSOE_KEEPALIVE` | `60,10,6`, or `0` on one machine | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - one machine's logical nodes (`osoe-launch`) - has neither: the machine's one kernel closes a dead node's connections itself and answers for a stopped one, so a probe there can only be lost, and an overloaded machine's loopback drops them. |
+| `OSOE_KEEPALIVE` | `60,10,6`, or `0` where every node has a loopback address | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - `osoe-launch`'s logical nodes - has neither: with no link between its nodes to cut, and a kernel that closes a dead node's connections itself and answers for a stopped one, a probe can find nothing there, and an overloaded machine's receive backlog drops them. Nodes with addresses of their own keep both, tier 3's namespaces on one machine among them. `SHMEM_DEBUG` says which a node chose. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. |

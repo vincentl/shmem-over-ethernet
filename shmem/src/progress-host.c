@@ -522,11 +522,19 @@ static void say_unsent(void)
 static uint32_t silent_budget_ms;
 static uint64_t silent_interval_ns, next_silent_check_ns;
 
+/* Said under SHMEM_DEBUG, either way, so a job shows which way the default
+ * went (shmem.keepalive.*, tier3.*.keepalive.default-on). */
 static void silent_check_start(const struct osoe_bootstrap *b)
 {
     next_silent_check_ns = 0;
     if (b->keepalive_off) {
         silent_budget_ms = 0;
+        if (b->debug)
+            fprintf(stderr, "osoe: node %u sets no TCP keepalive and makes no silent-peer "
+                            "check: %s\n", b->node,
+                    b->keepalive_set ? "OSOE_KEEPALIVE=0"
+                                     : "every node has a loopback address (OSOE_KEEPALIVE "
+                                       "sets them)");
         return;
     }
     uint32_t idle = b->keepalive_idle_s ? b->keepalive_idle_s : OSOE_DEFAULT_KEEPALIVE_IDLE_S;
@@ -535,6 +543,11 @@ static void silent_check_start(const struct osoe_bootstrap *b)
     uint32_t count = b->keepalive_count ? b->keepalive_count : OSOE_DEFAULT_KEEPALIVE_COUNT;
     silent_budget_ms = (idle + interval * count) * 1000;
     silent_interval_ns = (uint64_t)interval * 1000000000;
+    if (b->debug)
+        fprintf(stderr, "osoe: node %u probes its connections with TCP keepalive at %u,%u,%u, "
+                        "and ends the job on a peer that acknowledges nothing for %u s "
+                        "(OSOE_KEEPALIVE)\n", b->node, idle, interval, count,
+                silent_budget_ms / 1000);
 }
 
 /*
@@ -780,27 +793,30 @@ void osoe_progress_host_start(uint32_t session)
     struct sockaddr_in *peers_address = calloc(osoe.job.node_count, sizeof *peers_address);
     if (!peers_address)
         osoe_fatal("out of memory for %u node addresses", osoe.job.node_count);
-    bool one_machine = true;
+    bool every_node_loopback = true;
     for (uint32_t n = 0; n < osoe.job.node_count; n++) {
         uint16_t port;
         memcpy(&port, osoe_job_backend_blob(&osoe.job, n), sizeof port);
         peers_address[n] = (struct sockaddr_in){ .sin_family = AF_INET,
                                                  .sin_port = htons(port),
                                                  .sin_addr.s_addr = osoe_job_node_address(&osoe.job, n) };
-        one_machine = one_machine && (ntohl(peers_address[n].sin_addr.s_addr) >> 24) == 127;
+        every_node_loopback = every_node_loopback &&
+                              (ntohl(peers_address[n].sin_addr.s_addr) >> 24) == 127;
     }
     /*
-     * Keepalive off by default where every node has a loopback address - one
-     * machine's logical nodes (osoe-launch, §8.1) - and OSOE_KEEPALIVE is not
-     * set: their kernel is one, which closes a dead node's connections itself
-     * and answers for a stopped one, so a probe there can only be lost, and an
-     * overloaded machine's loopback backlog loses them, ending healthy jobs of
-     * tens of logical nodes as vanished hosts (the review of v0.2 step 4's
-     * merge point, correctness Q2-1; the author, 2026-10-10). Before the wires
-     * open and the silent-peer check starts, which both read it; a job across
-     * machines, tier 3's namespaces among them, keeps it on.
+     * Keepalive off by default where every node has a loopback address -
+     * osoe-launch's logical nodes (§8.1) - and OSOE_KEEPALIVE is not set. Such
+     * a job is in one network namespace, with no link between its nodes to
+     * cut, and its kernel closes a dead node's connections itself and answers
+     * for a stopped one, so a probe there can find nothing; it can only be
+     * lost, and an overloaded machine's receive backlog loses them, which ended
+     * healthy jobs of tens of logical nodes as vanished hosts (the review of
+     * v0.2 step 4's merge point, correctness Q2-1; the author, 2026-10-10).
+     * Before the wires open and the silent-peer check starts, which both read
+     * it. Nodes with addresses of their own keep it: a cluster's, and tier 3's
+     * namespaces, whose links can be cut.
      */
-    if (one_machine && !osoe.bootstrap.keepalive_set)
+    if (every_node_loopback && !osoe.bootstrap.keepalive_set)
         osoe.bootstrap.keepalive_off = true;
     struct osoe_mesh mesh = { &mesh_listener, peers_address };
     osoe_wires_open(osoe_am.wire, rings, helpers, &osoe.bootstrap, session, &mesh);
