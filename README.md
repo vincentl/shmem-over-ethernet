@@ -299,7 +299,7 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 857 tests fail at `shmem_init` or at opening a ring -
+410 of the test suite's 858 tests fail at `shmem_init` or at opening a ring -
 every one but `env.probe` among the 458 labelled `internode`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
@@ -308,7 +308,7 @@ io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 857 tests fail, with io_uring refused as well. Give the container a
+the suite's 858 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -594,7 +594,7 @@ where to find what among the documents.
 | `shmem/src/` | the library: the OpenSHMEM routines, the runtime under them, `transport.h` and `internode.h` - the boundary a backend implements (design §4.10) - and the one backend below it, in two parts: what every job uses (`transport-am.c`), and the internode backend behind `internode-backend.h`, active messages over TCP and io_uring, which the single-node build replaces with a backend that refuses a job of more than one node (`transport-single-node.c`); `cmake/CheckBoundary.cmake` says which file is which |
 | `shmem/tests/` | the library's tests: test programs, shell scripts that start a job and break it to see how it ends, and the Slurm environments the bootstrap is tested against (`slurm-fixtures/`); its `CMakeLists.txt` registers them |
 | `tools/` | the programs beside the library, in the next table |
-| `cmake/` | CMake modules, and scripts the tests run with `cmake -P` to check the tree itself: that no file above the transport boundary includes one below it, that the library exports only OpenSHMEM's names, that every C11 atomic call names one of the three memory orders the project uses, that the tree builds as strict C11 and as a static archive |
+| `cmake/` | CMake modules, and scripts the tests run with `cmake -P` to check the tree itself: that no file above the transport boundary includes one below it, that the library exports only OpenSHMEM's names, that every C11 atomic call names one of the three memory orders the project uses, that the tree builds as strict C11 and as a static archive, and that the single-node build configures from the same lists |
 | `dev/` | `lima/`, the definitions of the Debian 13 virtual machine osoe is developed in on a Mac ([Developing on macOS](#developing-on-macos)) and of the Rocky Linux 9 one the single-node build is tested in |
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
@@ -1322,12 +1322,13 @@ that one could be added without touching the OpenSHMEM layer.
   cores it failed 9 runs of 20 (the release checklist).
 - **Two builds.** The single-node build runs the same suite less the
   458 tests labelled `internode` - those of a job of more than one node, of
-  the internode backend's own files, and of io_uring and futex2 - and with
+  the internode backend's own files, and of io_uring and futex2 - and less
+  the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 399 of the full build's 857 tests in
+  development VM with liburing hidden: 399 of the full build's 858 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
-  headers' C++ test needs. `ctest -L internode` on the full build runs exactly
-  the tests it lacks.
+  headers' C++ test needs. `ctest -L internode` on the full build runs the
+  tests it lacks but that check, `shmem.single-node.configure`.
 - **Model checking.** Every lock-free and futex protocol but one - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion
