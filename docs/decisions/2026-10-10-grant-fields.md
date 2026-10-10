@@ -129,8 +129,8 @@ At `4a557b1`, the commit that merges:
   round later: "a piece of the reduce-scatter, from node 1's lead (PE 1), should
   be round 0's piece 1 (16384 bytes) ...".
 
-**Where it stands.** Merged into `main` after this record, the branch's tree
-whole.
+**Where it stands.** Merged into `main` at `fcb9cf0` on 2026-10-10, the
+branch's tree whole.
 
 ## The adversarial read
 
