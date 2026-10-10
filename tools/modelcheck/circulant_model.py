@@ -300,7 +300,11 @@ def volume_table():
 #
 # Grants. Lead r's reduce-scatter receivers r + s_k are as many leads as there
 # are rounds, and each lends its own lane, so each grant carries a lane of its
-# own - into field k of r's grant line - and r cannot tell from one counter
+# own - into field k of r's grant line, with the collective it names, which
+# grant_tag folds in and r checks field by field; the C's field holds the
+# epoch, identity and bytes beside the lane, each receiver's alone (as built
+# since the review of v0.2 step 4's merge point, Q2-4, where the C had put one
+# head every receiver wrote) - and r cannot tell from one counter
 # which of them has come: it waits for all of them, at the reduce-scatter's
 # start, every receiver granting as it enters. The allgather's round k comes
 # from r + s_k into r's row k, which r's reduce-scatter round k used, so r
@@ -311,7 +315,7 @@ def volume_table():
 # round k's sender, which put its own lane into the field for row k of its
 # senders' lanes line before its first piece's add, and which the sender read
 # as it took that piece - the row's counter says which field is written. Every
-# put lands outside the counters a lead watches: the grant line's lanes past
+# put lands outside the counters a lead watches: the grant's fields past
 # its counter, the senders' lanes on a line of their own.
 #
 # Counters of their own. The allgather ends with no step that every lead

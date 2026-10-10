@@ -6123,11 +6123,16 @@ at its owner, in an order the schedule fixes, and copied to every lead. Its
 arithmetic is `collective-circulant.c`, its cost `osoe_shape_circulant_cost`,
 its protocol `tools/modelcheck/circulant_model.py`'s: words of its own per team
 number - an arrival counter a row, a credit counter, the allgather's grant
-count, the reduce-scatter's grant line with a lane a round, and the senders'
+count, the reduce-scatter's grant lines with a field a round, and the senders'
 lanes - because its allgather ends with no step every lead waits for, so a
 finished lead's next collective could add to a tree's counters while another
 lead still waits on them; and credits for the pieces a sender's window waits on
-alone, so that nothing lands in a lead's words once it has returned. Each lead
+alone, so that nothing lands in a lead's words once it has returned. A grant's
+field - the epoch, identity and bytes of the collective its receiver entered and
+the lane it lends - is that receiver's alone, and the lead checks every field:
+a head every receiver put was a word two progress helpers wrote at once, and the
+lead checked only the last to land (the review of v0.2 step 4's merge point,
+correctness Q2-4). Each lead
 publishes the algorithm its last such call took and the rounds Träff's made in
 the team's tree state (`team.tree.algorithm`, `circulant_rounds`; layout 33),
 which `shmem.shape.chosen.*` and `shmem.circulant.*` hold call by call. Its

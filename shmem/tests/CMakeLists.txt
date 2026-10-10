@@ -1611,9 +1611,14 @@ osoe_tier2_map_test(ack-echo 0,1)
 # helper, is off. Not under ThreadSanitizer, as the node maps above are not:
 # the helpers land the puts in heaps their PEs' own threads touch, ordered
 # through another process, and the preset runs at no helpers (the second
-# adversarial read of Part 3, S2).
+# adversarial read of Part 3, S2). Run alone: it counts wakes, which a helper
+# starved of a core by the tests beside it does not take - the suite under
+# AddressSanitizer failed it twice on 2026-10-10 at the same place, its
+# neighbours the same each run, where alone it passed 20 runs of 20
+# (docs/decisions/2026-10-10-grant-fields.md).
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
+  set_tests_properties(shmem.helper-wake.0-1-2-3 PROPERTIES RUN_SERIAL TRUE)
 endif()
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
@@ -3385,15 +3390,19 @@ if(OSOE_INTERNODE)
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     osoe_internode_label(shmem.circulant.${case})
   endforeach()
-  # Two nodes' leads in Träff's reductions of different bytes: the grants say
-  # so, and the job ends naming the difference.
+  # Two nodes' leads in Träff's reductions of different bytes: a lead's grant
+  # field from the receiver that differs says so, and the job ends naming that
+  # receiver's lead and round - matched by the field check's own words, since a
+  # piece's header ends a job with the same closing phrase a round later, and
+  # with the field check removed this test passed on it (the grant fields'
+  # adversarial read, finding 1).
   add_test(NAME shmem.circulant.4.diverge
     COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
             OSOE_LINK_BYTES_PER_SECOND=116000000
             $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 --
             $<TARGET_FILE:shmem_test_circulant-reduce> diverge)
   set_tests_properties(shmem.circulant.4.diverge PROPERTIES LABELS "tier2" TIMEOUT 90
-    PASS_REGULAR_EXPRESSION "PEs called different collectives, or the same one with different arguments"
+    PASS_REGULAR_EXPRESSION "the reduce-scatter grant of node [0-9]+'s lead \\(PE [0-9]+\\), which this node's lead \\(PE [0-9]+\\) sends round [0-9]+, is for"
     FAIL_REGULAR_EXPRESSION "a divergent reduction returned")
   osoe_internode_label(shmem.circulant.4.diverge)
 endif()

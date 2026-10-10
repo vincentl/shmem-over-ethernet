@@ -162,13 +162,11 @@ rated them (round six's readiness Q5-5).
   the call's fan-out could travel in the grant or the lane word; the link is
   measured on two and three nodes, where no fan-out differs.
 - **What v0.2 step 3 left to after its merge** (its adversarial read, findings
-  2, 5 and 7, `docs/reviews/archive/v0.2-step3-adversarial-read.md`, and its
+  2 and 7, `docs/reviews/archive/v0.2-step3-adversarial-read.md`, and its
   record, `docs/decisions/2026-10-07-circulant-data-path.md`): on two nodes the
   cost model's choice between the tree and Träff's follows how a size divides
   into 16 KiB pieces, a tree's cost charging a partial last piece whole - take
   the tree on two nodes, or charge its last piece by its bytes (step 2's fit);
-  a reduce-scatter grant's head is the last receiver's to land, so a divergence
-  among a lead's receivers can pass it - a field per receiver with its epoch;
   Träff's at the default ceiling's last row (257 to 512 nodes) only through a
   lower ceiling's tests; the cost model's Träff's optimistic against the Pi from
   256 KiB, and `osoe-bench`'s back-to-back 64 KiB reduction no faster for it -
@@ -273,11 +271,6 @@ rated them (round six's readiness Q5-5).
     the request posted last, the helpers' applied counts in the activity, the
     pass after the request - each removal failing it (correctness Q2-3):
     `deadlock_owners_model.py` alone holds the three today;
-  - one writer for a reduce-scatter grant's head, which a lead's receivers put
-    at once from different helpers, the same bytes with nothing ordering them
-    (correctness Q2-4) - with step 3's field per receiver above, one change,
-    which the author asked for right after this merge
-    (`docs/decisions/2026-10-10-step4-merge-point.md`);
   - the agent's and the PEs' waits guarded against spinning as a helper's idle
     wait is by `shmem.helper-wake` (scale S1; the step 1 review's Q3-1, half
     closed): an agent made to spin passes all but one test;
@@ -308,8 +301,8 @@ rated them (round six's readiness Q5-5).
   - the x86-64 item at the next tag run at two and three helpers too
     (portability P3);
   - `shmem.helper-wake` made to hold under sustained load before the tag's run
-    of the suite under busy loops: its retries hold it under the suite's own
-    load, but beside four busy loops on four cores it failed 9 runs of 20,
+    of the suite under busy loops: run alone, with its retries, it holds in the
+    suite, but beside four busy loops on four cores it failed 9 runs of 20,
     since a helper preempted every round looks like one that spins. PE 0
     waiting for the owner's sleeping flag before each put would tell them apart,
     the spin mutants checked against it again
