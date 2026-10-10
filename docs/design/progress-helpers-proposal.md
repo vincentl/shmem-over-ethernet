@@ -2,7 +2,7 @@
 
 **Status: a proposal, written on 2026-10-05 for v0.2's fourth step
 (`docs/decisions/2026-10-05-v0.2.md` item 8; the brief is
-`docs/prompts/v0.2-step4-progress-helpers-prompt.md`). The author's premise
+`docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`). The author's premise
 is settled: one thread is not enough to drive an HPC link - "full stop". What
 this document proposes is *which* threads, owning *what*, talking *how*, so
 that the count can grow without a lock. §8 lists what it asked the author to

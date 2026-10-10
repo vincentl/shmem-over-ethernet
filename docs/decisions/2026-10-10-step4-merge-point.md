@@ -18,6 +18,9 @@ with Parts 0 to 3 on `main` at `c897948`. It covers four things:
 Part 4, a fast link, is in 0.2's scope and not built; it waits on the link
 (item 3).
 
+**Where it stands.** Merged into `main` at `f9efd10` on 2026-10-10, the
+branch's tree whole; the brief moved to `docs/prompts/done/` after it.
+
 ## The brief's runs
 
 At `c897948`, the lead's (`docs/design/evidence/v0.2-step4/2026-10-10-merge-point/`):
