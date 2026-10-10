@@ -1,0 +1,26 @@
+base-1 exit 0 hung=no osoe-pacer failures=0 17:32:22
+tip-1 exit 0 hung=no osoe-pacer failures=0 17:33:37
+base-2 exit 0 hung=no osoe-pacer failures=0 17:34:57
+tip-2 exit 0 hung=no osoe-pacer failures=0 17:36:17
+base-3 exit 0 hung=no osoe-pacer failures=0 17:37:37
+tip-3 exit 0 hung=no osoe-pacer failures=0 17:38:52
+base-4 exit 0 hung=no osoe-pacer failures=0 17:40:12
+tip-4 exit 0 hung=no osoe-pacer failures=0 17:41:27
+base-5 exit 0 hung=no osoe-pacer failures=0 17:42:48
+tip-5 exit 0 hung=no osoe-pacer failures=0 17:44:03
+base-6 exit 0 hung=no osoe-pacer failures=0 17:45:23
+tip-6 exit 0 hung=no osoe-pacer failures=0 17:46:24
+base-7 exit 0 hung=no osoe-pacer failures=0 17:47:44
+tip-7 exit 0 hung=no osoe-pacer failures=0 17:49:04
+base-8 exit 0 hung=no osoe-pacer failures=0 17:50:24
+tip-8 exit 0 hung=no osoe-pacer failures=0 17:51:30
+base-9 exit 0 hung=no osoe-pacer failures=0 17:52:50
+tip-9 exit 0 hung=no osoe-pacer failures=0 17:54:10
+base-10 exit 0 hung=no osoe-pacer failures=0 17:55:16
+tip-10 exit 0 hung=no osoe-pacer failures=0 17:56:36
+tip-helpers2-1 exit 0 hung=no osoe-pacer failures=0 17:57:38
+tip-helpers2-2 exit 0 hung=no osoe-pacer failures=0 17:58:53
+tip-helpers2-3 exit 0 hung=no osoe-pacer failures=0 17:59:54
+tip-helpers2-4 exit 0 hung=no osoe-pacer failures=0 18:00:55
+tip-helpers2-5 exit 0 hung=no osoe-pacer failures=0 18:01:56
+DONE 18:01:56

@@ -1,0 +1,26 @@
+== build fixed debug 18:59:39
+== fixed debug changed 18:59:47
+100% tests passed, 0 tests failed out of 60
+== fixed debug: ^shmem\.helpers\.reset-stream failed 0 of 10 19:00:48
+== build unfixed-flush debug 19:00:49
+== unfixed-flush debug: ^shmem\.helpers\.reset-stream failed 1 of 10 19:01:16
+      1 osoe: PE 0: the connection to node 1 failed: Connection reset by peer; this PE was waiting in shmem_put
+      1 reset-stream: the caller left with 7: 1; its node's other ranks nonzero or killed: 0; 1 lines of a failed or ended connection
+== build no-excuse debug 19:01:17
+/tmp/helpers-checks-no-excuse-debug/shmem/src/progress.c:812:13: warning: ‘node_aborting’ defined but not used [-Wunused-function]
+== no-excuse debug: ^shmem\.helpers\.reset-stream failed 10 of 10 19:03:09
+      1 osoe: PE 0: node 0: node 1 ended its connection without its goodbye: its lead has exited or died (§6.4); this PE was waiting in shmem_put
+      8 osoe: PE 0: node 0: node 1 reset its connection without its goodbye (Connection reset by peer): its lead has exited or died (§6.4); this PE was waiting in shmem_put
+      1 osoe: PE 0: node 0: the connection to node 1 failed: Connection reset by peer; this PE was waiting in shmem_put
+     10 reset-stream: the caller left with 7: 1; its node's other ranks nonzero or killed: 0; 1 lines of a failed or ended connection
+== build unagreed debug 19:03:10
+== unagreed debug: ^tools\.pacer\.mix-end failed 3 of 3 19:04:08
+      3 osoe: deadlock: every PE of the job waits in the library, and nothing has moved on any of its 1 node for 10 s, nor is anything in flight between them: no PE can ever be woken, so the job ends (OSOE_DEADLOCK_SECONDS=0 turns this off). Where each PE waits:
+== fixed debug: ^tools\.pacer\.mix-end failed 0 of 3 19:04:24
+== build fixed tsan 19:04:24
+helper-wake under tsan: Total Tests: 0
+tests under tsan: Total Tests: 597
+== fixed tsan: ^shmem\.helpers\.reset-stream failed 0 of 3 19:04:48
+== fixed tsan: stopped-bulk at two helpers, ten minutes 19:04:48
+launcher exit 66 after 117 s; PE 0: the put returned at 15.3 s, the quiet completed at 15.3 s;STOPPED BULK OK: 67108864 bytes arrived intact after node 1 was stopped for 15000 ms, at 116.9 s;osoe-launch: rank 0 exited with status 66;
+DONE 19:06:45

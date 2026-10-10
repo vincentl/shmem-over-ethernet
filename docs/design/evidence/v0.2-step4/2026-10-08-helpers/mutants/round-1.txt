@@ -1,0 +1,32 @@
+== abort-without-helpers 17:38:23 -R 'shmem\.(global-exit|kill-after-init|abort|fatal|stopped|launcher-signals)' env: OSOE_PROGRESS_HELPERS=2 
+100% tests passed, 0 tests failed out of 65
+== deaf-unwatched 17:39:11 -R 'shmem\.helpers\.deaf' env: 
+0% tests passed, 1 tests failed out of 1
+Test #228: shmem.helpers.deaf.0-1 ...........***Failed  Required regular expression not found. Regex=[progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered
+1/1 Test #228: shmem.helpers.deaf.0-1 ...........***Failed  Required regular expression not found. Regex=[progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered
+osoe-launch: timeout after 60 s; killing 2 process(es); -t sets the timeout
+== helpers-counted 17:40:19 -R 'shmem\.deadlock\.(waits|reinit|mismatch)\.0-[01]-[01]-1' env: OSOE_PROGRESS_HELPERS=2 
+0% tests passed, 4 tests failed out of 4
+Test #525: shmem.deadlock.mismatch.0-0-1-1 ...***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.02 sec
+Test #521: shmem.deadlock.waits.0-0-1-1 ......***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.02 sec
+Test #523: shmem.deadlock.reinit.0-0-1-1 .....***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.02 sec
+Test #526: shmem.deadlock.mismatch.0-1-0-1 ...***Failed  Error regular expression found in output. Regex=[DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]] 30.03 sec
+osoe-launch: timeout after 30 s; killing 4 process(es); -t sets the timeout
+osoe-launch: timeout after 30 s; killing 4 process(es); -t sets the timeout
+osoe-launch: timeout after 30 s; killing 4 process(es); -t sets the timeout
+osoe-launch: timeout after 30 s; killing 4 process(es); -t sets the timeout
+== no-abort-excuse 17:40:58 -R 'shmem\.(global-exit|kill-after-init|abort|fatal|stopped|launcher-signals)' env: OSOE_PROGRESS_HELPERS=2 
+100% tests passed, 0 tests failed out of 65
+== unsent-agent-only 17:41:45 -R 'shmem\.unsent\.(set|by-hand|floor)' env: OSOE_PROGRESS_HELPERS=2 
+0% tests passed, 3 tests failed out of 3
+Test #110: shmem.unsent.by-hand.0-1 .........***Failed  Required regular expression not found. Regex=[UNSENT OK
+Test #107: shmem.unsent.set.0-1 .............***Failed  Required regular expression not found. Regex=[UNSENT OK
+Test #108: shmem.unsent.floor.0-1-2 .........***Failed  Required regular expression not found. Regex=[UNSENT OK
+== wake-other-owner 17:41:54 -R 'shmem\.helper-wake' env: 
+0% tests passed, 1 tests failed out of 1
+Test #227: shmem.helper-wake.0-1-2-3 ........***Failed   35.60 sec
+/tmp/helpers-mutant-wake-other-owner/shmem/tests/test-helper-wake.c:69: CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST) failed
+/tmp/helpers-mutant-wake-other-owner/shmem/tests/test-helper-wake.c:69: CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST) failed
+/tmp/helpers-mutant-wake-other-owner/shmem/tests/test-helper-wake.c:69: CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST) failed
+/tmp/helpers-mutant-wake-other-owner/shmem/tests/test-helper-wake.c:69: CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST) failed
+DONE 17:42:38

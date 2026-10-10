@@ -1242,18 +1242,19 @@ that one could be added without touching the OpenSHMEM layer.
   three.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
   well as at none, by the environment `ctest` passes on to every test. Under
-  ThreadSanitizer about fifteen tests across nodes - a different few at each
+  ThreadSanitizer about a dozen tests across nodes - a different few at each
   count - then report a put or an atomic a helper applies to a heap a local
-  thread holds, or that thread's read of what it landed: the ordering that makes
-  it safe runs through another process, which the tool cannot see - the reason
-  the multi-node maps are left out of that preset (§8.2) - and with no helpers
-  the agent that applies the put has met the local thread through the barrier's
-  handoff, which the tool does see. Every failure of those runs is checked to
-  be the tool's reports alone, each of that kind, and none of the helpers' own
-  words; one test, which reads back 64 MiB a helper landed, runs past its
-  minute in the tool's handling of eight million such reads, and finishes in
-  two given longer. The preset gates the suite at no helpers alone, without the
-  one test that sets helpers itself and lands what a local thread reads.
+  thread holds, against that thread's access to it or another helper's put to
+  the same place: the ordering that makes it safe runs through another
+  process, which the tool cannot see - the reason the multi-node maps are left
+  out of that preset (§8.2) - and with no helpers the one agent applies every
+  peer's puts and has met the local thread through the barrier's handoff,
+  which the tool does see. Every failure of those runs is checked to be the
+  tool's reports alone, each of that kind, and none of the helpers' own words;
+  one test, which reads back 64 MiB a helper landed, runs past its minute in
+  the tool's handling of eight million such reads, and finishes in two given
+  longer. The preset gates the suite at no helpers alone, without the one test
+  that sets helpers itself and lands what a local thread reads.
 - **Two builds.** The single-node build runs the same suite less the
   458 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with

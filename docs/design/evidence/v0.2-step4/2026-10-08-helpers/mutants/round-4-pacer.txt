@@ -1,0 +1,8 @@
+== fixed 17:57:37 -R 'tools\.pacer\.(mix-end|mix\.)|shmem\.(exports|boundary|memory-orders|static-link|strict-c11)' env: 
+100% tests passed, 0 tests failed out of 9
+== unagreed 17:58:12 -R 'tools\.pacer\.(mix-end|mix\.)|shmem\.(exports|boundary|memory-orders|static-link|strict-c11)' env: 
+89% tests passed, 1 tests failed out of 9
+Test #747: tools.pacer.mix-end.0-0-0-0 ......***Failed  Error regular expression found in output. Regex=[exited with status [1-9]|killed by signal|timeout after|left behind] 16.67 sec
+8/9 Test #747: tools.pacer.mix-end.0-0-0-0 ......***Failed  Error regular expression found in output. Regex=[exited with status [1-9]|killed by signal|timeout after|left behind] 16.67 sec
+osoe: deadlock: every PE of the job waits in the library, and nothing has moved on any of its 1 node for 10 s, nor is anything in flight between them: no PE can ever be woken, so the job ends (OSOE_DEADLOCK_SECONDS=0 turns this off). Where each PE waits:
+DONE 17:58:46

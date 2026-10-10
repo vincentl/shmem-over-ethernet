@@ -1,0 +1,11 @@
+base 1 exit 0 0 deadlock-lines osoe-pacer failures=0 19:46:36
+tip 1 exit 0 0 deadlock-lines osoe-pacer failures=0 19:47:49
+base 2 exit 0 0 deadlock-lines osoe-pacer failures=0 19:49:02
+tip 2 exit 0 0 deadlock-lines osoe-pacer failures=0 19:50:16
+base 3 exit 0 0 deadlock-lines osoe-pacer failures=0 19:51:29
+tip 3 exit 0 0 deadlock-lines osoe-pacer failures=0 19:52:42
+base 4 exit 0 0 deadlock-lines osoe-pacer failures=0 19:53:55
+tip 4 exit 0 0 deadlock-lines osoe-pacer failures=0 19:55:08
+base 5 exit 0 0 deadlock-lines osoe-pacer failures=0 19:56:21
+tip 5 exit 0 0 deadlock-lines osoe-pacer failures=0 19:57:33
+DONE 19:57:33
