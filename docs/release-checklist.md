@@ -67,7 +67,7 @@ done; an open one, what is left.
 ## Added by the release fixes
 
 - [x] **The four presets, `models`, `tier3` and the suite under load** on the
-  tree to be tagged (`ctest --preset models` is about half an hour; the `release`
+  tree to be tagged (`ctest --preset models` is about an hour one at a time; the `release`
   preset leaves the models out), and the six `SHMEM_THREAD_MULTIPLE` models
   once, configured with `-DOSOE_MULTIPLE_MODELS=ON`: the library provides
   `MULTIPLE`, and no preset runs them. Done for the tagged tree, 2026-10-05: the presets, tier 3 and the models on its code, the suite under eight busy loops 718 of 718, the six MULTIPLE models 6 of 6 (`docs/decisions/2026-10-05-release-point.md`).
@@ -256,3 +256,54 @@ rated them (round six's readiness Q5-5).
   once a system large enough to measure it is at hand: the author postponed it
   on 2026-10-05 (`docs/decisions/2026-10-05-before-the-tag.md` item 2), and the
   README's limits say the start-up is a chain a larger system may need changed.
+- **From the review of v0.2 step 4's merge point**
+  (`docs/reviews/archive/v0.2-step4-review.md`), each rated after the release
+  or minor, and none made before the tag:
+  - keepalive on one overloaded machine's loopback ends healthy jobs of tens of
+    logical nodes as vanished hosts (correctness Q2-1): `osoe-launch`, or the
+    bootstrap when every peer is a loopback address, turning keepalive off,
+    which on one machine loses nothing - the README tells `osoe-launch`'s users
+    so today;
+  - the ThreadSanitizer gate at a helper count tells the library's own
+    collective words in the heap mapping from a program's heap, passes a
+    report there only against a short list with a reason each, and requires a
+    helper's frame in every report it passes (correctness Q2-2): today it would
+    pass a real race in a Träff's row;
+  - a white-box test of the deadlock detector's helper half - an answer naming
+    the request posted last, the helpers' applied counts in the activity, the
+    pass after the request - each removal failing it (correctness Q2-3):
+    `deadlock_owners_model.py` alone holds the three today;
+  - one writer for a reduce-scatter grant's head, which a lead's receivers put
+    at once from different helpers, the same bytes with nothing ordering them
+    (correctness Q2-4) - with step 3's field per receiver above, one change,
+    which the author asked for right after this merge
+    (`docs/decisions/2026-10-10-step4-merge-point.md`);
+  - the agent's and the PEs' waits guarded against spinning as a helper's idle
+    wait is by `shmem.helper-wake` (scale S1; the step 1 review's Q3-1, half
+    closed): an agent made to spin passes all but one test;
+  - Träff's rounds take a lane's rows, which the fan-out ceiling sizes, so past
+    512 nodes at the default the cost model's best reduction is out of reach - by
+    its own numbers 3.2 to 4.3 times faster at 1 MiB (scale S2): rows sized
+    apart from the ceiling, before hundreds of nodes;
+  - the receive pool's re-arms grow with the peers sending into a node at once
+    (scale S3): a fan-in at many peers on the fast link, with
+    `transport.am.receive_enobufs` beside the rate - Part 4's;
+  - the mesh's accept loop rebuilding its notice of the missing nodes before
+    every accept, O(n²) on the highest lead, and the ring's own ceiling of 8,192
+    nodes refused as an io_uring error rather than by name (scale S7);
+  - the zero-copy send charging the user's locked-memory limit
+    (`RLIMIT_MEMLOCK`), a job past it ending "Cannot allocate memory" on a
+    connection (portability P1): fall back to the copy, or name the limit,
+    before Part 4 decides the setting's default;
+  - the backend's own threads named to the deadlock detector through
+    `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
+    owner's last pass shown with its age in `osoe-stat` (Q5-9);
+  - a lead with helpers writing a death twice, its agent's line and a helper's,
+    and "this PE was not waiting in the library" said of a PE in
+    `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are);
+  - Träff's on teams that are not the world, typed reductions in place at its
+    sizes, the whole-job `_to_all` at them, members' bits after a rounding sum,
+    nodes at different helper counts, and SOS at three helpers, each right by
+    the review's probes and none in the suite (conformance C3);
+  - the x86-64 item at the next tag run at two and three helpers too
+    (portability P3).

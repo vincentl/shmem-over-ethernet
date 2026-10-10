@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 3 Part 3 on the Pi (the brief's "Part 3: the measurements"): the
 # branch's tree in ~/osoe (nothing outside it), release; OSU and the e-band
 # probe built with its oshcc. Then, alternating three times, `link` (Träff's

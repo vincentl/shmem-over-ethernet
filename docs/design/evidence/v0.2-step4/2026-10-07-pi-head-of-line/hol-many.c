@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 0: several writers of small messages beside one stream, on
  * one connection. PEs in blocks of k a node over two nodes: PE 0 streams 1 MiB
  * puts to PE k; PEs 1 to k-1 each time fetch-adds to their counterpart on node

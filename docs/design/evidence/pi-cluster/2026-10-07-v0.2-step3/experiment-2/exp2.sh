@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 3 Part 3, the second experiment: a variant whose every round
 # spreads over (ceiling + 1) / rows of the lane's rows, its window that many
 # times the capacity - 16 pieces on four nodes - against the branch at `link`

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0, the fourth rung: the third adversarial read's N3, two builds
 # alternating - (1) the 1 MiB stream, eight more pairs; (2) the receiving ring's
 # counters at the defaults, 64 KiB and 1 MiB; (3) the 64 KiB stream through small

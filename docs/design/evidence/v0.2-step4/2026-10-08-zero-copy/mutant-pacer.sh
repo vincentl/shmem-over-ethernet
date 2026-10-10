@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # A mutant's release build under osoe-pacer mix with the zero-copy send on and
 # the deadlock detector off, so that a stranded wait is the launcher's timeout.
 # usage: mutant-pacer.sh TAR NAME OUT SECONDS. Takes the VM lock.

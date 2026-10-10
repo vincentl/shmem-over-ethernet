@@ -1,0 +1,29 @@
+run 1 at no helpers 22:26:43
+bytes=16384 put_quiet_us=104.4 get_us=110.7 get_nbi_quiet_us=110.8 get_over_put=1.06 nbi_over_put=1.06
+bytes=65536 put_quiet_us=141.0 get_us=233.2 get_nbi_quiet_us=148.7 get_over_put=1.65 nbi_over_put=1.05
+bytes=131072 put_quiet_us=174.7 get_us=383.7 get_nbi_quiet_us=184.7 get_over_put=2.20 nbi_over_put=1.06
+bytes=262144 put_quiet_us=267.8 get_us=727.0 get_nbi_quiet_us=468.3 get_over_put=2.71 nbi_over_put=1.75
+bytes=1048576 put_quiet_us=475.1 get_us=2884.4 get_nbi_quiet_us=1494.1 get_over_put=6.07 nbi_over_put=3.14
+bytes=4194304 put_quiet_us=5047.7 get_us=18319.4 get_nbi_quiet_us=5323.7 get_over_put=3.63 nbi_over_put=1.05
+run 2 at no helpers 22:26:44
+bytes=16384 put_quiet_us=242.8 get_us=185.0 get_nbi_quiet_us=157.7 get_over_put=0.76 nbi_over_put=0.65
+bytes=65536 put_quiet_us=191.3 get_us=383.0 get_nbi_quiet_us=178.2 get_over_put=2.00 nbi_over_put=0.93
+bytes=131072 put_quiet_us=279.3 get_us=576.5 get_nbi_quiet_us=293.8 get_over_put=2.06 nbi_over_put=1.05
+bytes=262144 put_quiet_us=292.7 get_us=1355.2 get_nbi_quiet_us=522.1 get_over_put=4.63 nbi_over_put=1.78
+bytes=1048576 put_quiet_us=892.9 get_us=4203.9 get_nbi_quiet_us=1508.7 get_over_put=4.71 nbi_over_put=1.69
+bytes=4194304 put_quiet_us=3049.6 get_us=16516.6 get_nbi_quiet_us=6287.2 get_over_put=5.42 nbi_over_put=2.06
+run 3 at no helpers 22:26:45
+bytes=16384 put_quiet_us=119.5 get_us=124.2 get_nbi_quiet_us=117.1 get_over_put=1.04 nbi_over_put=0.98
+bytes=65536 put_quiet_us=165.8 get_us=366.8 get_nbi_quiet_us=194.2 get_over_put=2.21 nbi_over_put=1.17
+bytes=131072 put_quiet_us=209.1 get_us=513.8 get_nbi_quiet_us=225.6 get_over_put=2.46 nbi_over_put=1.08
+bytes=262144 put_quiet_us=299.1 get_us=928.5 get_nbi_quiet_us=469.0 get_over_put=3.10 nbi_over_put=1.57
+bytes=1048576 put_quiet_us=684.5 get_us=3364.5 get_nbi_quiet_us=1267.7 get_over_put=4.92 nbi_over_put=1.85
+bytes=4194304 put_quiet_us=2259.8 get_us=15444.5 get_nbi_quiet_us=6227.3 get_over_put=6.83 nbi_over_put=2.76
+run at two helpers 22:26:46
+bytes=16384 put_quiet_us=319.3 get_us=203.8 get_nbi_quiet_us=170.8 get_over_put=0.64 nbi_over_put=0.54
+bytes=65536 put_quiet_us=171.0 get_us=401.5 get_nbi_quiet_us=204.3 get_over_put=2.35 nbi_over_put=1.19
+bytes=131072 put_quiet_us=258.3 get_us=542.3 get_nbi_quiet_us=335.5 get_over_put=2.10 nbi_over_put=1.30
+bytes=262144 put_quiet_us=483.0 get_us=1816.9 get_nbi_quiet_us=881.2 get_over_put=3.76 nbi_over_put=1.82
+bytes=1048576 put_quiet_us=825.3 get_us=3563.7 get_nbi_quiet_us=1548.0 get_over_put=4.32 nbi_over_put=1.88
+bytes=4194304 put_quiet_us=2794.1 get_us=13997.2 get_nbi_quiet_us=6215.1 get_over_put=5.01 nbi_over_put=2.22
+DONE 22:26:47

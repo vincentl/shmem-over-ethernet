@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: does the control wire slow the many-node tests, or did
 # the host's other VM slow smoke-2? Part 1 (TAR_A) against Part 2 (TAR_B) on
 # one VM, the host otherwise quiet: each built in debug, then ctest's own

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The adversarial read's F1: a fetch-add behind a put stream, the base (3ee3357)
 # against filling the room (8a0e2fd), both with the unsent-queue experiment, at
 # the kernel's queue uncapped and capped at 16 KiB, alternating three times.

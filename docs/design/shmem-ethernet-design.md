@@ -393,18 +393,23 @@ peer's delayed ACK it can sit on a segment for tens of milliseconds.
 > coalescing.
 
 **`TCP_NOTSENT_LOWAT`, once the link is known** (v0.2 step 4). The kernel may
-hold about the link's bandwidth times 128 µs of a connection's bytes unsent -
+hold about the link's bandwidth times 128 µs of a data wire's bytes unsent -
 about, since it takes a send whole while it holds less - and at least 16 KiB
 (`wire-settings.h`; `OSOE_WIRE_UNSENT_BYTES` sets it by hand, taken as given,
-0 leaving the system's own): what the link sends while the agent comes round to
-give it more, and no more for a small message to wait behind (§3.2). The lead's
-application thread asks for it at the end of `shmem_init`, after step 2 has
-measured the link without it, so that the measurement sees the link as it is;
-the agent, which alone owns the sockets (invariant 19), sets it on its next
-pass - the request a word taken as a dirty bit is, at a pass and again after
-the agent's `sleeping` flag is raised - and an aborting agent lifts it, so that its last
-bytes leave with the kernel even toward a peer that has stopped reading. A send
-the kernel cannot then take whole is a short write, offered again (invariant 2).
+0 leaving the system's own): what the link sends while the wire's owner comes
+round to give it more, and no more for a small message to wait behind (§3.2). A
+control wire keeps the system's own. The lead's application thread asks for it
+at the end of `shmem_init`, after step 2 has measured the link without it, so
+that the measurement sees the link as it is; each owner of the node's data
+wires - the agent, and each progress helper (§3.12), since each alone owns its
+wires' sockets (invariant 19) - sets it on its next pass, the request a word
+taken as a dirty bit is, at a pass and again after the owner's `sleeping` flag
+is raised; and an aborting owner lifts it, so that its last bytes leave with the
+kernel even toward a peer that has stopped reading. Under the shape `fixed`,
+which measures no link (§5.3), the limit is the 16 KiB floor on any link unless
+`OSOE_LINK_*` give the bandwidth (`docs/decisions/2026-10-07.md`, item 11). A
+send the kernel cannot then take whole is a short write, offered again
+(invariant 2).
 
 **Off by default:** `IORING_OP_SEND_ZC`. Two CQEs, buffer stability requirement,
 and only pays above ~10–16 KB. Revisit only on a fast NIC.
@@ -442,7 +447,9 @@ IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE` on the thread that makes the
 node's connections and **enabled by the lead's agent on its first pass**, which
 makes the agent the one task the kernel lets submit: invariant 19 enforced by the
 kernel, not by convention (another thread's submission fails `-EEXIST`, measured
-on 6.12). Both bounds are computed and asserted at open: the SQ holds `2 × wires +
+on 6.12). Since v0.2 step 4 each owner of the node's wires, the agent and every
+progress helper, has a ring of its own, made so on the same thread and enabled
+on its owner's first pass (§3.12). Both bounds are computed and asserted at open: the SQ holds `2 × wires +
 1`, a re-arm and a send per wire and the futex wait, and the CQ `buffers + 2 ×
 wires + 1` — one completion per provided buffer, because a buffer is refilled
 only after the pass that emptied it; a terminal completion per armed receive; a
@@ -2469,7 +2476,11 @@ seconds, and six probes nobody answers end it with `ETIMEDOUT`, which ends the
 job with a fatal saying which node stopped answering. A node that vanishes
 without a FIN — power lost, a cable cut, a partition — is found one to two
 minutes after its connections go quiet. Keepalive asks whether the peer's
-*kernel* is there, which contention does not stop: a stopped node's kernel still
+*kernel* is there, which contention between nodes does not stop - though on one
+overloaded machine running many logical nodes, whose loopback carries every
+probe and answer, the backlog drops both, and a healthy job can end so (the
+review of v0.2 step 4's merge point, correctness Q2-1; the README says so for
+`osoe-launch`, where `OSOE_KEEPALIVE=0` loses nothing): a stopped node's kernel still
 acknowledges, so a stopped node is waited for, as the no-fatal-timeouts decision
 requires. A host that answers nothing at all is declared dead: powered off,
 partitioned, or a virtual machine paused for longer than keepalive's bound.
@@ -8074,8 +8085,10 @@ Each is independently breakable, and each failure appears far from its cause.
 18. **Futex words are 32-bit, and `futex_wait` deadlines are absolute.** (§3.10,
     §4.9) The first is a kernel limit (`FUTEX2_SIZE_U64` returns `EINVAL`); the
     second fails silently, as a busy loop.
-19. **Only the local lead's agent submits, and it alone owns rings and sockets.**
-    (§3.12) Application threads and other agents request; they never submit.
+19. **Only an owner of the node's wires submits - the local lead's agent, or one
+    of its progress helpers - and each alone owns its ring and its wires'
+    sockets.** (§3.12) Application threads and other agents request; they never
+    submit. With no helpers, the default, the agent is the one owner.
 20. **One symmetric heap per PE, addressed as `(PE, region, offset)` everywhere
     outside the owning process.** (§4.1, §4.9) Sharing a heap between PEs makes
     one PE's puts overwrite another's data; keying by address loses cross-process

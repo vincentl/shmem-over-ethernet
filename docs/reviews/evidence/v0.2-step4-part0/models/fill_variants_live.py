@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Liveness reruns of fill_variants.py's large cases, and two breakages of the
 variant's own turnover wake that must fail (so the variant can find a lost wake)."""
 import sys

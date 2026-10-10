@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Step 2's link measurement on the Pi: the branch's tree into ~/osoe (nothing
 # outside it), a release build, then the link each start measures and what it
 # cost the start - ten starts at 4 x 1, five at 4 x 4 - read from SHMEM_DEBUG's

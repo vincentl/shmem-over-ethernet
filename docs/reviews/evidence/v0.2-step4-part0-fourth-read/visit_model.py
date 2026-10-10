@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """A reviewer's model of one connection's visits: progress.c's flush() in its
 step order, busy()/settle(), the pass's visit rule (dirty | readable | busy),
 one writer that writes and then asks for an acknowledgement (quiet), the

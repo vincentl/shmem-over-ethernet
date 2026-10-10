@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: where Part 2's small reductions lose time at 64 logical
 # nodes - the whole job's CPU time (bash's time over the launcher,
 # which waits for its PEs), and every node's engine counters twice, 2 s apart,

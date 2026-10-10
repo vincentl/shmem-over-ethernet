@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Each mutant of the fill-the-room rung, built debug, against the tests that
 # must catch it. usage: mutants.sh TAR OUT NAME... Takes the VM lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1

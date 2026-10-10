@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 1 on the Pi: owners at no helpers (the branch `owners`)
 # against the tree it starts from (main 44f24bb), which must not differ:
 # osoe-bench at 4 x 4 and 4 x 1, the 1 MiB put stream with each node's agent

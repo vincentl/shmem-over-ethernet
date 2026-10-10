@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """v0.2 step 4 part 2 on the Pi: pi-compare.sh's outputs, base (Part 1's tree)
 against tip (the control wire), three alternating runs of each.
 usage: python3 pi-compare.py OUTDIR"""

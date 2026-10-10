@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the loopback numbers for the spare, the cap and deeper
 # buffers, and the floor pin's mutant. Builds are in /tmp/ladder. Takes the lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 1: the adversarial read's S1 - each mutant tree, built in
 # debug, against shmem.owners.* and shmem.owner-map, which must fail on it.
 # usage: mutants.sh DIR (DIR holds NAME.tar for each mutant). Takes the VM lock.

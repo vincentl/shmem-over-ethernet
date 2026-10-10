@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 2: are a job's data-plane operations slower once its control
  * wires have carried barriers? One PE a node: COUNT 8-byte sum reductions,
  * COUNT barriers, COUNT reductions again, and COUNT puts with a quiet to the

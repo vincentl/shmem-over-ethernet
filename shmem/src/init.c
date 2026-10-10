@@ -291,10 +291,11 @@ static void session_start(void)
     /*
      * §6.2: init raises the soft RLIMIT_NOFILE to the hard limit, before any
      * socket or pidfd is opened. Slurm passes on the submitting shell's
-     * limits, often a soft 1,024, and a lead holds a socket per peer node and
-     * a pidfd per other local PE (liveness.h): at 256 PEs a node, 1,024 runs
-     * out short of 800 nodes. A program that ran before cannot fail for it:
-     * only a descriptor it could not have had lands above the old limit.
+     * limits, often a soft 1,024, and a lead holds two sockets per peer node,
+     * its control wire and its data wire (§3.12), and a pidfd per other local
+     * PE (liveness.h): at 256 PEs a node, 1,024 runs out at about 385 nodes.
+     * A program that ran before cannot fail for it: only a descriptor it could
+     * not have had lands above the old limit.
      */
     struct rlimit files;
     if (getrlimit(RLIMIT_NOFILE, &files) == 0 && files.rlim_cur < files.rlim_max) {

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 3's verification: the four presets at no helpers with the
 # floor pins on (release without the models); debug, asan and tsan at 2 and 3
 # helpers (tsan's failures gated test by test by tsan-gate.py: each by TSan's

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Two more breakages of the fill writer, to see the model's OVERFLOW and
 accounting checks fire on a pure length error (no seal involved)."""
 import sys

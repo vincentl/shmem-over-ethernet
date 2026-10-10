@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 3 on the Pi: the helpers (the branch helpers) at no helpers
 # against main (fc99503, Parts 0 to 2), alternating three times - a barrier
 # behind a 1 MiB put stream (barrier-behind.c), a fetch-add behind it (hol.c),

@@ -60,8 +60,9 @@ _Static_assert(OSOE_LINK_BYTES_PER_SECOND_HIGHEST <= UINT64_MAX / OSOE_WIRE_UNSE
  * wherever the copy is cheap: over loopback the kernel copies anyway and posts a
  * notification more a send; below about 10 KB, pinning the pages costs more than
  * the copy it saves; and on a fast link a buffer stays the kernel's until the
- * peer's TCP has acknowledged it, so a connection's two buffers cap one peer's
- * stream at about 512 KiB a round trip. Part 4 decides its default on a fast link.
+ * peer's TCP has acknowledged it, so one peer's stream sends at most one buffer
+ * by reference a round trip, the other turning over by copy meanwhile (below).
+ * Part 4 decides its default on a fast link.
  *
  * Only one of a connection's two buffers is lent at a time - a send by
  * reference waits for the other to owe nothing, and copies meanwhile - so that
@@ -111,9 +112,11 @@ void osoe_wire_settings_read(struct osoe_wire_settings *s, const struct osoe_boo
  * sweep. */
 void osoe_wire_settings_check(const struct osoe_bootstrap *b);
 
-/* The limit on a connection's unsent bytes for a link of `bytes_per_second`,
- * 0 when none is known: as set, or the link's OSOE_WIRE_UNSENT_NS, at least
- * OSOE_WIRE_UNSENT_FLOOR and at most OSOE_WIRE_UNSENT_MAX. 0: the system's own. */
+/* The limit on a data wire's unsent bytes for a link of `bytes_per_second`: as
+ * set, or the link's OSOE_WIRE_UNSENT_NS, at least OSOE_WIRE_UNSENT_FLOOR and at
+ * most OSOE_WIRE_UNSENT_MAX - the floor where no link is known and the bandwidth
+ * is 0, as under OSOE_COLLECTIVE_SHAPE=fixed without OSOE_LINK_*. A limit of 0,
+ * set by hand: the system's own. */
 uint32_t osoe_wire_unsent_bytes(const struct osoe_wire_settings *s, uint64_t bytes_per_second);
 
 #endif /* OSOE_WIRE_SETTINGS_H */

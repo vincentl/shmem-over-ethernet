@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # EXPERIMENT: the head-of-line wait against TCP_NOTSENT_LOWAT on the data
 # connections, 128 KiB buffers. Usage: lowat.sh TREE OUTDIR (from the Mac).
 set -u

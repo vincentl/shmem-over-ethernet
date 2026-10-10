@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The suite's sizes for the README: the full build's tests in debug and in
 # release (with and without the models), the internode-labelled ones, and the
 # single-node build's, by ctest -N on configured trees. usage: counts.sh TAR OUT.

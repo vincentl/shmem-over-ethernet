@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # shmem.floor's stream ratio, the README's "a fifth": RUNS runs of the test in
 # each NAMEd release build, alternating. usage: floor.sh OUT RUNS NAME... Takes the VM lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the tip (fill + the unsent queue capped + 256 KiB) against
 # the first rung alone (fill2), over loopback: the 64 KiB put stream, the
 # mailbox's rate, and shmem.floor's stream ratio for the tip and its poll

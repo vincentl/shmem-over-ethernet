@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The cap on each connection's unsent bytes, as built: a fetch-add behind a put
 # stream, the tree as given (its cap from the measured link, no experiment's
 # setting), three runs; and SHMEM_DEBUG's line for the cap the leads chose.

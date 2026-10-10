@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Apply one named mutation of the fill-the-room rung to a tree. usage: mutate.py TREE NAME"""
 import pathlib, sys
 tree, name = pathlib.Path(sys.argv[1]), sys.argv[2]

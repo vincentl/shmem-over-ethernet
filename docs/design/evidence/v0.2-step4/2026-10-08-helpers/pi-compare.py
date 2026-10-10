@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """v0.2 step 4 part 3 on the Pi: pi-compare.sh's outputs, base (main, fc99503)
 against tip (the helpers, at none), three alternating runs of each.
 usage: python3 pi-compare.py OUTDIR"""

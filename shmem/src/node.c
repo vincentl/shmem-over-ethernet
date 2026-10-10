@@ -1229,7 +1229,7 @@ again:;
     if (b->node_count > 1 && h->dir.owner_count != b->progress_helpers + 1) {
         char msg[256];
         snprintf(msg, sizeof msg, "OSOE_PROGRESS_HELPERS differs between PEs: the local lead "
-                 "has %u, this PE has %u (owner-map.h)",
+                 "has %u, this PE has %u (§3.12)",
                  h->dir.owner_count ? h->dir.owner_count - 1 : 0, b->progress_helpers);
         fail_rendezvous(n, msg);
     }

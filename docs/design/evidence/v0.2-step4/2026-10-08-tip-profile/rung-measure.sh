@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: a rung against the build below it, over loopback, alternating:
 # the 64 KiB and 1 MiB put streams, shmem.floor's stream ratio and the mailbox.
 # usage: rung-measure.sh OUT BASE RUNG (builds in /tmp/ladder). Takes the VM lock.

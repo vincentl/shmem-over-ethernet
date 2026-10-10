@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 3: each mutant tree - one change to the branch - built in
 # debug and run against the tests of what it breaks, which should fail on it.
 # DIR holds NAME.tar, NAME.regex (the tests) and, optionally, NAME.env (one

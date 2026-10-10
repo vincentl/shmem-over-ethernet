@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 3, the second adversarial read's answers: the fixed tree's
 # changed areas in debug - the static checks, the global-exit harness's tests
 # and the helpers', the pacer's mix tests - with the new reset-stream run ten

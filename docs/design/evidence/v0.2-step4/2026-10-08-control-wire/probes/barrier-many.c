@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 2: the control plane's cost at many logical nodes, one PE a
  * node - shmem_init (the mesh, two wires a pair after Part 2), a barrier (the
  * tree's ARRIVE and RELEASE, over the control wires after Part 2), a reduction

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Reviewer's variants of reservation_model.py's `fill` cases (not part of the tree).
 
 1. turnover: the FULL/NONE wait is the C's - the writer loads the turnover word

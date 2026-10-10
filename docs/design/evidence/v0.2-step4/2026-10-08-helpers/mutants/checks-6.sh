@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The second read's S1 answered by a white-box test too: shmem.progress.reset-
 # while-ending five times on the fixed tree (and the progress tests whose host
 # gained the aborting callback), then on each library mutant, which must fail it

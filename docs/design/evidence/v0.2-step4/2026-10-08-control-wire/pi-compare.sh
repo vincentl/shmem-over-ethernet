@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2 on the Pi, no helpers: the control wire (the branch
 # control-wire) against the tree it starts from (Part 1's tip), alternating
 # three times - a barrier behind a 1 MiB put stream (barrier-behind.c, the

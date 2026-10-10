@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0, the zero-copy send's verification on osoe: the four presets with the
 # floor pins on (release without the models), tier 3, and osoe-pacer's mix (ten
 # minutes), mailbox and collectives (a minute each). usage: verify.sh TAR OUTDIR.

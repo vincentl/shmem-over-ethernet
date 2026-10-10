@@ -54,6 +54,15 @@ add_test(NAME shmem.settings-documented
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsDocumented.cmake)
 set_tests_properties(shmem.settings-documented PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# Every source file carries the license line, as the README says, but the
+# specification's four examples: 82 evidence programs went without it until the
+# review of v0.2 step 4's merge point (readiness Q5-1), since nothing checked
+# it (CheckLicenseLines.cmake).
+add_test(NAME shmem.license-lines
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckLicenseLines.cmake)
+set_tests_properties(shmem.license-lines PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # Design §3.16's rule: every atomic access in the library names acquire,
 # release or seq_cst - no `relaxed`, no call without `_explicit`. Step D added
 # 37 relaxed accesses that all four presets passed; the review of its merge

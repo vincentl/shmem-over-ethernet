@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 2: what a control wire costs the lead, per peer node. */
 #define _GNU_SOURCE
 #include <stdio.h>

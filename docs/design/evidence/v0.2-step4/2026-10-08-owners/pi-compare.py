@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 import re, statistics, sys, glob, os
 D = sys.argv[1]
 def bench(tree, shape):
