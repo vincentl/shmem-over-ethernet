@@ -96,8 +96,11 @@ int main(void)
     osoe_ring_enable(&ring);
     struct osoe_wire *w = &wires[0];
 
-    /* Keepalive is on, at its defaults, on every node-pair socket (wire.c,
-     * §3.15) - which only tier 3's cut link would otherwise notice gone. */
+    /* wire.c sets keepalive at its defaults on a node-pair socket unless its
+     * bootstrap turns it off (§3.15). This test's bootstrap is its own, below
+     * the lead's default that turns keepalive off where every node has a
+     * loopback address (progress-host.c), so it holds wire.c's values; the
+     * default itself is shmem.keepalive.* and tier3.pi.keepalive.default-on's. */
     int keepalive = 0, idle = 0, interval = 0, count = 0;
     socklen_t length = sizeof keepalive;
     CHECK(getsockopt(w->fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, &length) == 0 &&

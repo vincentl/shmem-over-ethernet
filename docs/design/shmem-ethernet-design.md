@@ -2485,14 +2485,11 @@ job with a fatal saying which node stopped answering. A node that vanishes
 without a FIN — power lost, a cable cut, a partition — is found one to two
 minutes after its connections go quiet. Keepalive asks whether the peer's
 *kernel* is there, which contention between nodes has not been seen to stop -
-not tested at scale - though on one
-overloaded machine running many logical nodes, whose loopback carries every
-probe and answer, the backlog drops both, and a healthy job can end so (the
-review of v0.2 step 4's merge point, correctness Q2-1; the README says so for
-`osoe-launch`, where `OSOE_KEEPALIVE=0` loses nothing): a stopped node's kernel still
-acknowledges, so a stopped node is waited for, as the no-fatal-timeouts decision
-requires. A host that answers nothing at all is declared dead: powered off,
-partitioned, or a virtual machine paused for longer than keepalive's bound.
+not tested at scale. A stopped node's kernel still acknowledges, so a stopped
+node is waited for, as the no-fatal-timeouts decision requires; that is why
+keepalive was chosen over `TCP_USER_TIMEOUT` (below). A host that answers
+nothing at all is declared dead: powered off, partitioned, or a virtual machine
+paused for longer than keepalive's bound.
 `shmem.stopped-node.keepalive` stops one for 6 s against keepalive's tightest
 setting, 4 s, and the quiet completes. `TCP_USER_TIMEOUT` is not set. It bounds
 how long sent data may go unacknowledged, and Linux applies it to zero-window
@@ -2524,6 +2521,20 @@ rather than keepalive (TCP probes only a connection with nothing
 unacknowledged); the cut now comes two seconds after the job is ready.
 `tier3.*.vanished-node-inflight` puts data in flight on purpose after the cut,
 and the job ends within the same bound.
+
+*Since 2026-10-10* a job whose every node has a loopback address runs without
+keepalive, and without the silent-peer check above, which shares its setting,
+unless `OSOE_KEEPALIVE` is set (the author; `progress-host.c`). Such a job is in
+one network namespace, with no link between its nodes to cut, and its kernel
+closes a dead node's connections itself and answers for a stopped one, so a
+probe there can find nothing - but it can be lost. On one overloaded machine
+running many logical nodes the kernel's receive backlog drops probes and answers
+alike, and healthy jobs of tens of logical nodes ended so, as vanished hosts
+(the review of v0.2 step 4's merge point, correctness Q2-1); a job with
+`OSOE_KEEPALIVE` set still can. Nodes with addresses of their own keep both: a
+cluster's, and tier 3's namespaces, whose links can be cut. The lead says its
+choice under `SHMEM_DEBUG`; `shmem.keepalive.*` holds it on loopback and
+`tier3.pi.keepalive.default-on.0-1` between addresses of their own.
 
 #### The development watchdog, retired
 
@@ -7354,7 +7365,8 @@ stand-in for a wire. Now they talk over TCP on loopback, each lead on its own
 address, and everything between two leads is the code a cluster runs: the
 rendezvous tree and its hellos, the mesh on advertised ports, the ring with
 multishot receive over provided buffers, one send in flight per connection,
-the goodbye and the end of stream. Short sends, receives that split a segment,
+the goodbye and the end of stream - all but keepalive, which a job on loopback
+addresses leaves off (below). Short sends, receives that split a segment,
 `-ENOBUFS` and its re-arm, and a peer's FIN are real events on this path, not
 simulated ones. The fault injection that makes loopback produce them on every
 run (`OSOE_WIRE_BYTES`, `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED`) is kept, since
@@ -7390,6 +7402,12 @@ What loopback does not test, each named so no test is mistaken for it:
   interface a cluster's host list names is the site's configuration.
 - **IPv6**, which is not supported: an entry that resolves only to IPv6 is
   refused when it is resolved.
+- **Keepalive and the silent-peer check at their defaults.** A job whose every
+  node has a loopback address runs with neither unless `OSOE_KEEPALIVE` sets
+  them (§3.15, *since 2026-10-10*), so a loopback test meets them only as a
+  setting makes them. `tier3.pi.keepalive.default-on.0-1` holds the default
+  between nodes with addresses of their own, and tier 3's cut link holds both at
+  their tightest.
 
 Plus a **force-remote flag**. An earlier draft had it route even
 same-logical-node traffic over the network, and called that the strongest

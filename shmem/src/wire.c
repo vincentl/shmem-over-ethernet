@@ -114,8 +114,9 @@ void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, 
      * and no wait gives up because time passed. Keepalive asks whether the
      * peer's *kernel* is there, which contention between nodes does not stop
      * (on one overloaded machine's loopback it can: the backlog drops probes
-     * and answers alike - the review of v0.2 step 4's merge point, Q2-1,
-     * which the README tells osoe-launch's users of): a stopped
+     * and answers alike - the review of v0.2 step 4's merge point, Q2-1 - so
+     * a job whose every node has a loopback address runs without it unless
+     * OSOE_KEEPALIVE is set, progress-host.c): a stopped
      * node's kernel still acknowledges, so a stopped node is waited for. After
      * IDLE seconds without traffic, COUNT unanswered probes INTERVAL seconds
      * apart end the connection with ETIMEDOUT, and the job with it

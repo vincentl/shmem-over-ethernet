@@ -58,9 +58,10 @@ struct osoe_bootstrap {
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
      * so that a bootstrap built by hand, zeroed, keeps it; `keepalive_off` is
-     * OSOE_KEEPALIVE=0. */
+     * OSOE_KEEPALIVE=0, or, where it is not set, a job whose every node has a
+     * loopback address (progress-host.c), and `keepalive_set` says it was. */
     uint32_t keepalive_idle_s, keepalive_interval_s, keepalive_count;
-    bool keepalive_off;
+    bool keepalive_off, keepalive_set;
     const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */

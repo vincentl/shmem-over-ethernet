@@ -1644,6 +1644,35 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
   set_tests_properties(shmem.helper-wake.0-1-2-3 PROPERTIES RUN_SERIAL TRUE)
 endif()
+
+# Keepalive off by default where every node has a loopback address, and on as
+# OSOE_KEEPALIVE sets it there (§3.15; the review of v0.2 step 4's merge point,
+# correctness Q2-1; test-keepalive.c): each node's lead reads SO_KEEPALIVE on
+# its own node-pair sockets, and the silent-peer check, which the same setting
+# turns off and on, says its choice under SHMEM_DEBUG - the opposite line fails
+# the test. tier3.pi.keepalive.default-on.0-1 holds the default between nodes
+# with addresses of their own.
+if(OSOE_INTERNODE)
+  add_executable(shmem_test_keepalive test-keepalive.c)
+  target_link_libraries(shmem_test_keepalive PRIVATE osoe)
+  osoe_warnings(shmem_test_keepalive)
+  add_test(NAME shmem.keepalive.loopback-off.0-1
+    COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_KEEPALIVE SHMEM_DEBUG=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_keepalive> off)
+  add_test(NAME shmem.keepalive.set-on.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_KEEPALIVE=60,10,6 SHMEM_DEBUG=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_keepalive> on)
+  set_tests_properties(shmem.keepalive.loopback-off.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "KEEPALIVE OFF OK"
+    FAIL_REGULAR_EXPRESSION "probes its connections with TCP keepalive")
+  set_tests_properties(shmem.keepalive.set-on.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "KEEPALIVE ON OK"
+    FAIL_REGULAR_EXPRESSION "makes no silent-peer check")
+  osoe_internode_label(shmem.keepalive.loopback-off.0-1)
+  osoe_internode_label(shmem.keepalive.set-on.0-1)
+endif()
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
 # shmem_finalize naming it, found by its turns: nothing waits for time to pass.
@@ -4311,6 +4340,18 @@ if(OSOE_INTERNODE)
       set_tests_properties(tier3.${shape}.differential PROPERTIES LABELS "tier3" TIMEOUT 1300)
       osoe_internode_label(tier3.${shape}.differential)
     endforeach()
+
+    # Keepalive and the silent-peer check at their defaults where the nodes have
+    # addresses of their own - a cluster's default, which a job on loopback
+    # addresses turns off (§3.15, §8.1; test-keepalive.c). OSOE_KEEPALIVE is
+    # unset, since sudo resets the environment: both leads must find keepalive
+    # on, and the silent-peer check saying it is off fails the test. One shape
+    # is enough, since the choice is made from the addresses alone.
+    osoe_tier3_test(keepalive.default-on.0-1 pi 0,1 shmem_test_keepalive
+                    ENV SHMEM_DEBUG=1 ARGS on)
+    set_tests_properties(tier3.pi.keepalive.default-on.0-1 PROPERTIES
+      PASS_REGULAR_EXPRESSION "KEEPALIVE ON OK"
+      FAIL_REGULAR_EXPRESSION "makes no silent-peer check")
 
     # N1 (the round-three review): a lead that cannot reach a peer says so, where it
     # once retried in silence. Node 1's host list puts node 0 at an address no

@@ -448,6 +448,7 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
      * dead - or 0 for none. Tests make it short; nothing else should need to.
      */
     const char *keepalive = getenv("OSOE_KEEPALIVE");
+    b->keepalive_set = keepalive != NULL;
     if (keepalive && strcmp(keepalive, "0") == 0) {
         b->keepalive_off = true;
     } else if (keepalive) {

@@ -1,0 +1,108 @@
+Internal ctest changing into directory: /tmp/v02-keepalive-final/build/release
+UpdateCTestConfiguration  from :/tmp/v02-keepalive-final/build/release/DartConfiguration.tcl
+Parse Config file:/tmp/v02-keepalive-final/build/release/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/v02-keepalive-final/build/release/DartConfiguration.tcl
+Parse Config file:/tmp/v02-keepalive-final/build/release/DartConfiguration.tcl
+Test project /tmp/v02-keepalive-final/build/release
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 16
+    Start  16: shmem.settings-documented
+
+16: Test command: /usr/bin/cmake "-DSOURCE_DIR=/tmp/v02-keepalive-final" "-P" "/tmp/v02-keepalive-final/cmake/CheckSettingsDocumented.cmake"
+16: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+16: Test timeout computed to be: 30
+test 46
+    Start  46: shmem.wire-pair
+
+46: Test command: /usr/bin/cmake "-E" "env" "OSOE_WIRE_BYTES=64" "OSOE_WIRE_SPLIT=3000" "OSOE_WIRE_SEED=20260919" "/tmp/v02-keepalive-final/build/release/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "60" "--" "/tmp/v02-keepalive-final/build/release/shmem/tests/shmem_test_wire_pair"
+46: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+46: Test timeout computed to be: 90
+test 232
+    Start 232: shmem.keepalive.loopback-off.0-1
+
+232: Test command: /usr/bin/cmake "-E" "env" "--unset=OSOE_KEEPALIVE" "SHMEM_DEBUG=1" "/tmp/v02-keepalive-final/build/release/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "60" "--" "/tmp/v02-keepalive-final/build/release/shmem/tests/shmem_test_keepalive" "off"
+232: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+232: Test timeout computed to be: 90
+test 233
+    Start 233: shmem.keepalive.set-on.0-1
+
+233: Test command: /usr/bin/cmake "-E" "env" "OSOE_KEEPALIVE=60,10,6" "SHMEM_DEBUG=1" "/tmp/v02-keepalive-final/build/release/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "60" "--" "/tmp/v02-keepalive-final/build/release/shmem/tests/shmem_test_keepalive" "on"
+233: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+233: Test timeout computed to be: 90
+46: osoe: wire split 3000 per myriad, OSOE_WIRE_SEED=20260919
+46: osoe: wire split 3000 per myriad, OSOE_WIRE_SEED=20260919
+233: osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+233: osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+232: osoe: node 1 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+232: osoe: node 0 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+233: osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.369795.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 17042 ns, a message cost of 0 ns, 9629858202 bytes a second (1681 us of this start)
+233: osoe: node 0 limits the unsent bytes of each of its 1 connections to 1232621
+233: osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.369795.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 17042 ns, a message cost of 0 ns, 9629858202 bytes a second (1731 us of this start)
+233: osoe: node 1 limits the unsent bytes of each of its 1 connections to 1232621
+233: PE 1: 2 connected TCP sockets, 2 with keepalive on
+233: PE 0: 2 connected TCP sockets, 2 with keepalive on
+233: KEEPALIVE ON OK
+232: osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.369792.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 17875 ns, a message cost of 0 ns, 3619840188 bytes a second (2368 us of this start)
+232: osoe: node 0 limits the unsent bytes of each of its 1 connections to 463339
+232: osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.369792.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 17875 ns, a message cost of 0 ns, 3619840188 bytes a second (2454 us of this start)
+232: osoe: node 1 limits the unsent bytes of each of its 1 connections to 463339
+232: PE 0: 2 connected TCP sockets, 2 with keepalive off
+232: KEEPALIVE OFF OK
+232: PE 1: 2 connected TCP sockets, 2 with keepalive off
+16: -- 235 library and tool files, 59 OSOE_ settings read, every one in the README's settings or launcher sections
+1/7 Test  #16: shmem.settings-documented ..........   Passed    0.06 sec
+2/7 Test  #46: shmem.wire-pair ....................   Passed    0.06 sec
+3/7 Test #232: shmem.keepalive.loopback-off.0-1 ...   Passed    0.06 sec
+4/7 Test #233: shmem.keepalive.set-on.0-1 .........   Passed    0.06 sec
+test 244
+    Start 244: shmem.stopped-node.keepalive
+
+244: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_STOP_MS=6000" "OSOE_KEEPALIVE=1,1,3" "/tmp/v02-keepalive-final/build/release/tools/launch/osoe-launch" "-n" "3" "-m" "0,0,1" "-t" "30" "--" "/tmp/v02-keepalive-final/build/release/shmem/tests/shmem_test_stopped-node"
+244: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+244: Test timeout computed to be: 60
+test 245
+    Start 245: shmem.stopped-bulk.0-0-1
+
+245: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_STOP_MS=15000" "OSOE_KEEPALIVE=1,1,3" "SHMEM_SYMMETRIC_SIZE=128m" "/tmp/v02-keepalive-final/build/release/tools/launch/osoe-launch" "-n" "3" "-m" "0,0,1" "-t" "60" "--" "/tmp/v02-keepalive-final/build/release/shmem/tests/shmem_test_stopped-bulk"
+245: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+245: Test timeout computed to be: 90
+test 683
+    Start 683: shmem.keepalive.invalid
+
+683: Test command: /usr/bin/cmake "-E" "env" "OSOE_KEEPALIVE=5,0,3" "/tmp/v02-keepalive-final/build/release/tools/launch/osoe-launch" "-n" "1" "-t" "30" "--" "/tmp/v02-keepalive-final/build/release/shmem/tests/shmem_test_global-exit" "7"
+683: Working Directory: /tmp/v02-keepalive-final/build/release/shmem/tests
+683: Test timeout computed to be: 60
+683: osoe: PE 0: OSOE_KEEPALIVE='5,0,3' is not IDLE,INTERVAL,COUNT (seconds, seconds, probes: 1 to 32767, 1 to 32767, 1 to 127) or 0
+683: osoe-launch: rank 0 exited with status 1
+683: osoe-launch: left behind: /dev/shm/osoe.369814.0.0.0
+5/7 Test #683: shmem.keepalive.invalid ............   Passed    0.01 sec
+245: PE 0: putting 67108864 bytes toward node 1, which is stopped, at 0.3 s
+244: PE 0: quiet completed after node 1 was stopped for 6000 ms
+6/7 Test #244: shmem.stopped-node.keepalive .......   Passed    6.07 sec
+245: PE 1: continuing PE 2 (pid 369812) at 15.0 s
+245: PE 0: the put returned at 15.1 s, the quiet completed at 15.1 s
+245: STOPPED BULK OK: 67108864 bytes arrived intact after node 1 was stopped for 15000 ms, at 15.1 s
+7/7 Test #245: shmem.stopped-bulk.0-0-1 ...........   Passed   15.14 sec
+
+The following tests passed:
+	shmem.settings-documented
+	shmem.wire-pair
+	shmem.keepalive.loopback-off.0-1
+	shmem.keepalive.set-on.0-1
+	shmem.keepalive.invalid
+	shmem.stopped-node.keepalive
+	shmem.stopped-bulk.0-0-1
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+internode    =  21.40 sec*proc (5 tests)
+tier1        =   0.06 sec*proc (1 test)
+tier2        =  21.40 sec*proc (6 tests)
+
+Total Test time (real) =  15.23 sec

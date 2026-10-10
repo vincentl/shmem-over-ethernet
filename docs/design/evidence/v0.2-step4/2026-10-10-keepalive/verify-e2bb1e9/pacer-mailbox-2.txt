@@ -1,0 +1,68 @@
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=8 nodes=4 layout=2,2,2,2 hosts=lima-osoe heap=256m memory=128m seed=1 report=5 exercises=mailbox
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 seconds=60 memory=2.5k
+mailbox node_mate_us median=115.2 p99=115.2
+mailbox round_trip_us median=44.1 p99=72.5 pairs=4
+mailbox t=0.0 round=1 messages=32 messages_per_s=267034 mib_per_s=39.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+library nodes=4 bytes_sent=161464 gets_nonblocking=0 landing_full=0 reserve_stalls=0 wakes_sent=621 barrier_ns=9350098
+mailbox node_mate_us median=113.6 p99=12557.6
+mailbox round_trip_us median=68.8 p99=112.2 pairs=4
+mailbox t=0.0 round=9 messages=288 messages_per_s=18943 mib_per_s=2.5 send_s=0.013 wait_s=0.013 check_s=0.002 step_s=0.014 failures=0
+library nodes=4 bytes_sent=215560 gets_nonblocking=0 landing_full=0 reserve_stalls=5 wakes_sent=706 barrier_ns=992178
+mailbox node_mate_us median=128.7 p99=15945.7
+mailbox round_trip_us median=85.4 p99=114.7 pairs=4
+mailbox t=0.2 round=73 messages=2336 messages_per_s=17850 mib_per_s=2.3 send_s=0.084 wait_s=0.063 check_s=0.004 step_s=0.115 failures=0
+library nodes=4 bytes_sent=675312 gets_nonblocking=0 landing_full=0 reserve_stalls=30 wakes_sent=2119 barrier_ns=813259
+mailbox node_mate_us median=100.5 p99=8044.9
+mailbox round_trip_us median=87.0 p99=113.2 pairs=4
+mailbox t=0.7 round=585 messages=18720 messages_per_s=31142 mib_per_s=4.1 send_s=0.388 wait_s=0.194 check_s=0.023 step_s=0.526 failures=0
+library nodes=4 bytes_sent=4406096 gets_nonblocking=0 landing_full=0 reserve_stalls=297 wakes_sent=10889 barrier_ns=852637
+mailbox node_mate_us median=97.6 p99=7991.9
+mailbox round_trip_us median=73.7 p99=117.1 pairs=4
+mailbox t=5.1 round=4681 messages=149792 messages_per_s=29945 mib_per_s=3.9 send_s=2.901 wait_s=1.542 check_s=0.102 step_s=4.377 failures=0
+library nodes=4 bytes_sent=34397008 gets_nonblocking=0 landing_full=0 reserve_stalls=2369 wakes_sent=84280 barrier_ns=1269806
+mailbox node_mate_us median=101.5 p99=8078.7
+mailbox round_trip_us median=79.2 p99=142.0 pairs=4
+mailbox t=10.3 round=9359 messages=299488 messages_per_s=28887 mib_per_s=3.8 send_s=3.492 wait_s=1.818 check_s=0.125 step_s=5.182 failures=0
+library nodes=4 bytes_sent=38996872 gets_nonblocking=0 landing_full=0 reserve_stalls=2798 wakes_sent=94969 barrier_ns=1166013
+mailbox node_mate_us median=104.5 p99=8003.5
+mailbox round_trip_us median=84.6 p99=115.7 pairs=4
+mailbox t=15.4 round=13872 messages=443904 messages_per_s=28365 mib_per_s=3.7 send_s=3.438 wait_s=1.750 check_s=0.113 step_s=5.091 failures=0
+library nodes=4 bytes_sent=37923392 gets_nonblocking=0 landing_full=0 reserve_stalls=2602 wakes_sent=93873 barrier_ns=1146514
+mailbox node_mate_us median=103.6 p99=9916.5
+mailbox round_trip_us median=78.9 p99=112.6 pairs=4
+mailbox t=20.2 round=18304 messages=585728 messages_per_s=29167 mib_per_s=3.8 send_s=3.290 wait_s=1.792 check_s=0.134 step_s=4.862 failures=0
+library nodes=4 bytes_sent=37302520 gets_nonblocking=0 landing_full=0 reserve_stalls=2699 wakes_sent=92162 barrier_ns=1497351
+mailbox node_mate_us median=101.4 p99=7993.3
+mailbox round_trip_us median=83.0 p99=119.6 pairs=4
+mailbox t=25.3 round=22861 messages=731552 messages_per_s=28834 mib_per_s=3.7 send_s=3.367 wait_s=1.844 check_s=0.121 step_s=5.057 failures=0
+library nodes=4 bytes_sent=38351160 gets_nonblocking=0 landing_full=0 reserve_stalls=2669 wakes_sent=94351 barrier_ns=1074137
+mailbox node_mate_us median=102.0 p99=7967.8
+mailbox round_trip_us median=81.3 p99=116.0 pairs=4
+mailbox t=30.0 round=27366 messages=875712 messages_per_s=30844 mib_per_s=4.0 send_s=3.147 wait_s=1.600 check_s=0.130 step_s=4.674 failures=0
+library nodes=4 bytes_sent=37679368 gets_nonblocking=0 landing_full=0 reserve_stalls=2576 wakes_sent=92391 barrier_ns=1178806
+mailbox node_mate_us median=98.8 p99=7855.1
+mailbox round_trip_us median=86.0 p99=117.2 pairs=4
+mailbox t=35.4 round=32185 messages=1029920 messages_per_s=28831 mib_per_s=3.7 send_s=3.622 wait_s=1.837 check_s=0.123 step_s=5.349 failures=0
+library nodes=4 bytes_sent=40392672 gets_nonblocking=0 landing_full=0 reserve_stalls=2951 wakes_sent=99593 barrier_ns=1331347
+mailbox node_mate_us median=101.6 p99=8025.2
+mailbox round_trip_us median=64.6 p99=99.6 pairs=4
+mailbox t=40.3 round=36689 messages=1174048 messages_per_s=29217 mib_per_s=3.8 send_s=3.343 wait_s=1.758 check_s=0.129 step_s=4.933 failures=0
+library nodes=4 bytes_sent=37740864 gets_nonblocking=0 landing_full=0 reserve_stalls=2646 wakes_sent=93979 barrier_ns=1190306
+mailbox node_mate_us median=102.8 p99=7979.7
+mailbox round_trip_us median=87.1 p99=121.8 pairs=4
+mailbox t=45.4 round=41254 messages=1320128 messages_per_s=28728 mib_per_s=3.7 send_s=3.377 wait_s=1.798 check_s=0.131 step_s=5.085 failures=0
+library nodes=4 bytes_sent=38498808 gets_nonblocking=0 landing_full=0 reserve_stalls=2674 wakes_sent=95013 barrier_ns=16943249
+mailbox node_mate_us median=101.7 p99=8001.3
+mailbox round_trip_us median=80.6 p99=114.3 pairs=4
+mailbox t=50.5 round=45742 messages=1463744 messages_per_s=28237 mib_per_s=3.7 send_s=3.427 wait_s=1.852 check_s=0.154 step_s=5.086 failures=0
+library nodes=4 bytes_sent=37743168 gets_nonblocking=0 landing_full=0 reserve_stalls=2736 wakes_sent=93519 barrier_ns=1329976
+mailbox node_mate_us median=101.9 p99=8138.4
+mailbox round_trip_us median=77.6 p99=121.4 pairs=4
+mailbox t=55.5 round=50154 messages=1604928 messages_per_s=28308 mib_per_s=3.7 send_s=3.364 wait_s=1.655 check_s=0.115 step_s=4.987 failures=0
+library nodes=4 bytes_sent=37222296 gets_nonblocking=0 landing_full=0 reserve_stalls=2604 wakes_sent=92410 barrier_ns=11828731
+mailbox node_mate_us median=102.3 p99=8023.9
+mailbox round_trip_us median=73.7 p99=104.3 pairs=4
+mailbox t=60.1 round=54140 messages=1732480 messages_per_s=28056 mib_per_s=3.6 send_s=3.067 wait_s=1.645 check_s=0.104 step_s=4.546 failures=0
+library nodes=4 bytes_sent=33546272 gets_nonblocking=0 landing_full=0 reserve_stalls=2306 wakes_sent=83413 barrier_ns=1488353
+summary mailbox rounds=54140 messages=1732480 seconds=59.9 messages_per_s=28930 mib_per_s=3.8 failures=0
+osoe-pacer failures=0 seconds=60.1
