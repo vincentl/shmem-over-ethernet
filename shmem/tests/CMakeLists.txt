@@ -107,6 +107,30 @@ add_test(NAME shmem.strict-c11
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
 set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 600)
 
+# The single-node build is configured from these same lists, and a line that
+# holds in the full build alone - a property on a test only it registers -
+# refuses it at configure time: shmem.helper-wake's RUN_SERIAL did, from the
+# grant fields' merge (fcb9cf0) until this check, and nothing in this suite
+# looked. So the full build configures the single-node build of its own kind
+# too: configure and generate only, its suite being its own to run.
+if(NOT OSOE_SINGLE_NODE)
+  add_test(NAME shmem.single-node.configure
+    COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+            -DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/single-node-configure-check
+            -DBUILD_TYPE=${CMAKE_BUILD_TYPE}
+            "-DC_FLAGS=${CMAKE_C_FLAGS}"
+            "-DEXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
+            "-DSHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}"
+            -DSHARED_LIBS=${BUILD_SHARED_LIBS}
+            -DTEST_PINS=${OSOE_TEST_PINS}
+            -DC_COMPILER=${CMAKE_C_COMPILER}
+            "-DC_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}"
+            "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+            -P ${PROJECT_SOURCE_DIR}/cmake/CheckSingleNodeConfigure.cmake)
+  set_tests_properties(shmem.single-node.configure PROPERTIES LABELS "tier1" TIMEOUT 300)
+endif()
+
 # The allocator on its own (tier 1): compiled in, since libosoe hides it.
 add_executable(shmem_test_allocator test-allocator.c ../src/allocator.c)
 target_include_directories(shmem_test_allocator PRIVATE ../src)
@@ -1616,7 +1640,7 @@ osoe_tier2_map_test(ack-echo 0,1)
 # AddressSanitizer failed it twice on 2026-10-10 at the same place, its
 # neighbours the same each run, where alone it passed 20 runs of 20
 # (docs/decisions/2026-10-10-grant-fields.md).
-if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
   set_tests_properties(shmem.helper-wake.0-1-2-3 PROPERTIES RUN_SERIAL TRUE)
 endif()
