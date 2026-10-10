@@ -158,10 +158,10 @@ static void landed(void *context, uint32_t pe, uint64_t token, uint32_t bytes)
     (void)context;
     int32_t local = local_of(pe);
     uint32_t block = (uint32_t)((token >> OSOE_LANDING_OWNER_SHIFT) & OSOE_LANDING_OWNER_MASK);
-    if (local < 0 || block >= osoe.node.contexts_per_pe)
+    if (local < 0 || block >= osoe.node.contexts_per_pe + osoe.node.threads_per_pe)
         osoe_fatal("a nonblocking get's reply for PE %u names context block %u of %u: its "
                    "token was accepted, so this node made it, and it made none past its pool",
-                   pe, block, osoe.node.contexts_per_pe);
+                   pe, block, osoe.node.contexts_per_pe + osoe.node.threads_per_pe);
     struct osoe_landing_record *r =
         &osoe_node_landing_records(&osoe.node, (uint32_t)local)[token & OSOE_LANDING_EXTENT_MASK];
     /* seq_cst: the value of two wait-word waits, the context's and the zone's

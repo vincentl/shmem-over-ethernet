@@ -778,9 +778,13 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * Each local PE's pool of context blocks (layout 21; §4.6, §4.11): a
      * cache line per context, OSOE_MAX_CONTEXTS of them a PE, 8 KiB a PE at
      * the default. Last, so that nothing before it moved when it was added.
+     * Then one for each thread place (layout 37), the block a thread's
+     * blocking gets count in, 2.1 KiB a PE at the default 17 places, so that a
+     * blocking get's pieces go out together as a nonblocking get's do
+     * (transport-internode.c, remote_get; the author, 2026-10-10, item 2).
      */
     uint64_t contexts_offset = align_up(epochs_offset + epochs_bytes);
-    uint64_t contexts_bytes = (uint64_t)b->local_count * b->max_contexts *
+    uint64_t contexts_bytes = (uint64_t)b->local_count * (b->max_contexts + per_pe) *
                               sizeof(struct osoe_context_block);
     /* Each local PE's thread records (layout 23; §4.11 item 3): a cache line a
      * thread, OSOE_MAX_THREADS of them a PE, one per counter block. */

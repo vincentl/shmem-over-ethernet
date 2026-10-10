@@ -992,13 +992,36 @@ static uint32_t piece_limit(struct osoe_connection *connection, uint32_t peer)
     return limit < wire ? limit : wire;
 }
 
+static void complete_gets(struct osoe_transport_context *c, const char *routine,
+                          const char *what);
+static void issue_get_pieces(struct osoe_transport_context *c, int pe,
+                             enum osoe_region region, uint64_t offset, void *dst, size_t len,
+                             unsigned flags, const char *routine, bool blocking);
+
+/* A thread's own context for its blocking gets of more than one piece: its
+ * pieces and their pending list, for the call alone (remote_get). */
+static _Thread_local struct osoe_internode_context own_gets;
+
 /*
- * A blocking get, a piece at a time: each piece claims a run of extents,
- * arms this thread's slot and its record with the piece's token, goes out, and
- * waits in the slot for the lead's completion; then this thread copies the
- * bytes out, gives the extents back, and returns the credit. Under
- * THREAD_MULTIPLE every thread has its own slot, and every piece its own
- * extents, so blocking gets from several threads run at once (§4.11 item 5).
+ * A blocking get. Of more than a piece: its pieces go out together, each with
+ * extents, a record and a token of its own, on a context of the calling
+ * thread's own - its thread place's block past the pool's
+ * (osoe_node_thread_context), which no context a program makes can take - and
+ * the thread completes them as that context's quiet would, copying each piece
+ * out as it lands. The nonblocking path whole, so that the lead's landing is
+ * unchanged and a get waits about one round trip and its bytes' time, not one
+ * round trip a piece (the author, 2026-10-10, item 2;
+ * docs/design/blocking-get-proposal.md, (b)). Its pending list lives for the
+ * call alone, so that nothing outlives a thread that exits. A thread place
+ * whose block's index a token cannot carry - past OSOE_LANDING_OWNER_MASK, at
+ * OSOE_MAX_CONTEXTS near its most - takes the piece-at-a-time path below.
+ *
+ * Of one piece, and there: the piece claims a run of extents, arms this
+ * thread's slot and its record with the piece's token, goes out, and waits in
+ * the slot for the lead's completion; then this thread copies the bytes out,
+ * gives the extents back, and returns the credit. Under THREAD_MULTIPLE every
+ * thread has its own slot and its own block, and every piece its own extents,
+ * so blocking gets from several threads run at once (§4.11 item 5).
  */
 static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *dst,
                        size_t len)
@@ -1009,6 +1032,15 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
         osoe_fatal("no connection toward node %u, which holds PE %d", peer, pe);
     uint32_t limit = piece_limit(connection, peer), thread;
     struct osoe_thread_record *slot = my_thread(&thread);
+    uint32_t own = osoe_node_thread_context(&osoe.node, thread);
+    if (len > limit && own <= OSOE_LANDING_OWNER_MASK) {
+        struct osoe_transport_context c = { .block = own, .live = true, .internode = &own_gets };
+        issue_get_pieces(&c, pe, region, offset, dst, len, 0, "shmem_get", true);
+        complete_gets(&c, "shmem_get", "the bytes of its get's pieces");
+        free(own_gets.pending);
+        own_gets = (struct osoe_internode_context){ 0 };
+        return;
+    }
 
     unsigned char *at = dst;
     while (len > 0) {
@@ -1059,7 +1091,8 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
  * token, or none landed: copy_out's claim fails and the loop moves on, and the
  * count is what says it is done.
  */
-static void complete_gets(struct osoe_transport_context *c, const char *routine)
+static void complete_gets(struct osoe_transport_context *c, const char *routine,
+                          const char *what)
 {
     if (c->internode->pending_count == 0)
         return;
@@ -1096,8 +1129,7 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine)
              * none: its record says how many bytes are still to come. */
             osoe_progress_host_wake_all();
             am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
-                                 issued - copied, "the bytes its nonblocking gets have landed",
-                                 UINT32_MAX, -1, copied);
+                                 issued - copied, what, UINT32_MAX, -1, copied);
             waiting = true;
         }
         slept_on = seen;
@@ -1219,9 +1251,16 @@ static void call_extent_add(uint32_t extent, uint64_t issue)
     call_extents[call_extent_count++] = extent;
 }
 
-static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
-                                   enum osoe_region region, uint64_t offset, void *dst,
-                                   size_t len, unsigned flags)
+/*
+ * Issue a get's pieces as a nonblocking get does, on context `c`: each with
+ * extents, a record and a token of its own, out together as far as the zone
+ * and the credits allow, completed at the context's next wait (complete_gets).
+ * A blocking get of more than a piece issues its pieces so on its thread's own
+ * context, and is not counted among the nonblocking gets (remote_get).
+ */
+static void issue_get_pieces(struct osoe_transport_context *c, int pe,
+                             enum osoe_region region, uint64_t offset, void *dst, size_t len,
+                             unsigned flags, const char *routine, bool blocking)
 {
     call_extent_count = 0;
     uint32_t peer = osoe_node_of(&osoe.job, (uint32_t)pe);
@@ -1233,7 +1272,7 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
     unsigned char *at = dst;
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
-        uint32_t extent = make_room(extents_for(n), "shmem_get_nbi");
+        uint32_t extent = make_room(extents_for(n), routine);
         if (issue_stamp) {
             uint64_t issue = (atomic_fetch_add_explicit(&issue_count, 1, memory_order_seq_cst) +
                               1) & ISSUE_MASK;
@@ -1273,15 +1312,16 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
          * commit order it before any reply can exist (as arm() for a slot). */
         issue_record(extent, token, n);
 
-        take_credit(connection, peer, pe, "shmem_get_nbi");
+        take_credit(connection, peer, pe, routine);
         struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
                                          .origin_pe = osoe.bootstrap.rank,
                                          .region = (uint16_t)region, .flags = 0,
                                          .length = n, .offset = offset,
                                          .token = token };
-        send_message(connection, peer, pe, "shmem_get_nbi", OSOE_AM_GET_REQUEST, &m,
+        send_message(connection, peer, pe, routine, OSOE_AM_GET_REQUEST, &m,
                      (uint32_t)sizeof m, NULL, 0);
-        osoe_count(OSOE_C_AM_GETS_NONBLOCKING, 1);
+        if (!blocking)
+            osoe_count(OSOE_C_AM_GETS_NONBLOCKING, 1);
         at += n;
         offset += n;
         len -= n;
@@ -1312,6 +1352,14 @@ static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
         call_extent_count = call_extent_capacity = 0;
     }
 }
+
+static void remote_get_nonblocking(struct osoe_transport_context *c, int pe,
+                                   enum osoe_region region, uint64_t offset, void *dst,
+                                   size_t len, unsigned flags)
+{
+    issue_get_pieces(c, pe, region, offset, dst, len, flags, "shmem_get_nbi", false);
+}
+
 
 static uint64_t remote_rmw(struct osoe_transport_context *c, int pe,
                            enum osoe_region region, uint64_t offset,
@@ -1543,7 +1591,7 @@ static void wait_body(struct osoe_transport_context *context, const int *pes, si
      * wait names: their completion is counted per context, not per target
      * (§4.6). First, so that the stores copying them into place come before
      * quiet's fence and are ordered as every other store before it is. */
-    complete_gets(context, routine);
+    complete_gets(context, routine, "the bytes its nonblocking gets have landed");
     /* On a NOSTORE context too, for fence's reason above. */
     osoe_serializing_fence();
 
@@ -1779,5 +1827,5 @@ void osoe_internode_backend_wait_gets(struct osoe_transport_context *context,
     if (context->concurrent)
         wait_shared(context, NULL, 0, true, routine);
     else
-        complete_gets(context, routine);
+        complete_gets(context, routine, "the bytes its nonblocking gets have landed");
 }

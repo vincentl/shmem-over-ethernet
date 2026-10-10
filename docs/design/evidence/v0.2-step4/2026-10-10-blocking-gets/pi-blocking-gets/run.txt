@@ -1,0 +1,59 @@
+start 14:09:29
+branch built: 0, warnings 0
+probe branch: 0
+main built: 0
+probe main: 0
+-- main run 1
+bytes=16384 put_quiet_us=289.7 get_us=264.5 get_nbi_quiet_us=262.9 get_over_put=0.91 nbi_over_put=0.91
+bytes=65536 put_quiet_us=723.6 get_us=896.3 get_nbi_quiet_us=732.4 get_over_put=1.24 nbi_over_put=1.01
+bytes=131072 put_quiet_us=1274.6 get_us=1605.2 get_nbi_quiet_us=1333.2 get_over_put=1.26 nbi_over_put=1.05
+bytes=262144 put_quiet_us=2393.5 get_us=3019.5 get_nbi_quiet_us=2450.4 get_over_put=1.26 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9084.7 get_us=11550.3 get_nbi_quiet_us=9153.5 get_over_put=1.27 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35833.8 get_us=45753.4 get_nbi_quiet_us=35908.7 get_over_put=1.28 nbi_over_put=1.00
+-- branch run 1
+bytes=16384 put_quiet_us=287.7 get_us=263.7 get_nbi_quiet_us=263.0 get_over_put=0.92 nbi_over_put=0.91
+bytes=65536 put_quiet_us=724.9 get_us=731.0 get_nbi_quiet_us=720.6 get_over_put=1.01 nbi_over_put=0.99
+bytes=131072 put_quiet_us=1274.7 get_us=1340.0 get_nbi_quiet_us=1311.2 get_over_put=1.05 nbi_over_put=1.03
+bytes=262144 put_quiet_us=2397.8 get_us=2448.9 get_nbi_quiet_us=2455.3 get_over_put=1.02 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9084.5 get_us=9154.3 get_nbi_quiet_us=9142.9 get_over_put=1.01 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35835.6 get_us=35920.7 get_nbi_quiet_us=35908.0 get_over_put=1.00 nbi_over_put=1.00
+-- main run 2
+bytes=16384 put_quiet_us=289.4 get_us=263.5 get_nbi_quiet_us=265.1 get_over_put=0.91 nbi_over_put=0.92
+bytes=65536 put_quiet_us=729.0 get_us=893.0 get_nbi_quiet_us=721.2 get_over_put=1.22 nbi_over_put=0.99
+bytes=131072 put_quiet_us=1271.2 get_us=1597.2 get_nbi_quiet_us=1333.7 get_over_put=1.26 nbi_over_put=1.05
+bytes=262144 put_quiet_us=2397.4 get_us=3017.5 get_nbi_quiet_us=2455.0 get_over_put=1.26 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9087.7 get_us=11558.5 get_nbi_quiet_us=9136.4 get_over_put=1.27 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35836.8 get_us=45767.1 get_nbi_quiet_us=35912.1 get_over_put=1.28 nbi_over_put=1.00
+-- branch run 2
+bytes=16384 put_quiet_us=289.2 get_us=267.3 get_nbi_quiet_us=262.9 get_over_put=0.92 nbi_over_put=0.91
+bytes=65536 put_quiet_us=729.2 get_us=749.6 get_nbi_quiet_us=716.9 get_over_put=1.03 nbi_over_put=0.98
+bytes=131072 put_quiet_us=1271.3 get_us=1341.6 get_nbi_quiet_us=1290.3 get_over_put=1.06 nbi_over_put=1.01
+bytes=262144 put_quiet_us=2395.9 get_us=2451.9 get_nbi_quiet_us=2450.2 get_over_put=1.02 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9085.2 get_us=9152.0 get_nbi_quiet_us=9148.3 get_over_put=1.01 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35830.9 get_us=35913.9 get_nbi_quiet_us=35911.5 get_over_put=1.00 nbi_over_put=1.00
+-- main run 3
+bytes=16384 put_quiet_us=293.2 get_us=268.3 get_nbi_quiet_us=265.0 get_over_put=0.92 nbi_over_put=0.90
+bytes=65536 put_quiet_us=732.2 get_us=897.6 get_nbi_quiet_us=737.7 get_over_put=1.23 nbi_over_put=1.01
+bytes=131072 put_quiet_us=1264.8 get_us=1604.3 get_nbi_quiet_us=1337.0 get_over_put=1.27 nbi_over_put=1.06
+bytes=262144 put_quiet_us=2397.6 get_us=3023.9 get_nbi_quiet_us=2447.4 get_over_put=1.26 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9090.0 get_us=11554.9 get_nbi_quiet_us=9152.6 get_over_put=1.27 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35834.9 get_us=45797.3 get_nbi_quiet_us=35916.6 get_over_put=1.28 nbi_over_put=1.00
+-- branch run 3
+bytes=16384 put_quiet_us=288.7 get_us=263.6 get_nbi_quiet_us=263.9 get_over_put=0.91 nbi_over_put=0.91
+bytes=65536 put_quiet_us=725.4 get_us=730.9 get_nbi_quiet_us=710.4 get_over_put=1.01 nbi_over_put=0.98
+bytes=131072 put_quiet_us=1261.7 get_us=1334.4 get_nbi_quiet_us=1334.0 get_over_put=1.06 nbi_over_put=1.06
+bytes=262144 put_quiet_us=2392.0 get_us=2447.2 get_nbi_quiet_us=2454.3 get_over_put=1.02 nbi_over_put=1.03
+bytes=1048576 put_quiet_us=9081.4 get_us=9148.1 get_nbi_quiet_us=9141.1 get_over_put=1.01 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35835.0 get_us=35911.8 get_nbi_quiet_us=35916.4 get_over_put=1.00 nbi_over_put=1.00
+== the branch's tests of gets on one node 14:12:40
+84% tests passed, 9 tests failed out of 57
+	200 - shmem.internode.0-0-1-1-2-2 (Failed)              internode tier2
+	201 - shmem.internode.zero-copy.0-0-1-1-2-2 (Failed)    internode tier2
+	202 - shmem.internode.0-0-0-1-2-2 (Failed)              internode tier2
+	203 - shmem.internode.zero-copy.0-0-0-1-2-2 (Failed)    internode tier2
+	204 - shmem.internode.0-1-2-0-1-0 (Failed)              internode tier2
+	205 - shmem.internode.zero-copy.0-1-2-0-1-0 (Failed)    internode tier2
+	211 - shmem.internode.force-remote.0-0-1-1-2-2 (Failed) internode tier2
+	212 - shmem.internode.force-remote.0-0-0-1-2-2 (Failed) internode tier2
+	213 - shmem.internode.force-remote.0-1-2-0-1-0 (Failed) internode tier2
+end 14:12:56

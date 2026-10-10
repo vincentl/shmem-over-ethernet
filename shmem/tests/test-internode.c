@@ -112,8 +112,6 @@ int main(void)
     me = shmem_my_pe();
     npes = shmem_n_pes();
     local_id = atoi(osoe_test_launcher("LOCALID") ? osoe_test_launcher("LOCALID") : "0");
-    /* This PE's own, from here: counter() reads the blocks of `local_id`. */
-    uint64_t deferred_at_init = counter("am.wakes_deferred");
     read_local_ranks();
 
     /* One inbox per origin, so every PE may write concurrently without two
@@ -309,6 +307,9 @@ int main(void)
     CHECK_FATAL(signal != NULL);  /* NULL would be dereferenced just below */
     int partner = (me + 1) % npes;
     int sender = (me + npes - 1) % npes;
+    /* This PE's own wakes deferred, from here to the check below: counter()
+     * reads the blocks of `local_id`. */
+    uint64_t deferred_before = counter("am.wakes_deferred");
     /* SMALL in one message, and CHUNKED in parts: a put that fills the room a
      * buffer has left is cut there and goes on in the next (v0.2 step 4), and
      * its signal must still follow its last byte. */
@@ -356,10 +357,13 @@ int main(void)
      * exactly those maps - a check that was measuring the map rather than the
      * flag.
      */
-    /* Counted from the end of shmem_init: the link's measurement there is a
-     * reduction over the finalize team (v0.2 step 2, link-measure.h), whose
-     * pieces defer wakes on every lead of a job of more than one node. */
-    uint64_t deferred = counter("am.wakes_deferred") - deferred_at_init;
+    /* Counted over the rounds of put_signal alone: the link's measurement in
+     * shmem_init is a reduction over the finalize team (v0.2 step 2,
+     * link-measure.h), whose pieces defer wakes on every lead of a job of more
+     * than one node, and a blocking get of more than a piece - the CHUNKED gets
+     * above - defers its pieces' wakes as a nonblocking get does (v0.2,
+     * docs/decisions/2026-10-10-blocking-gets.md). */
+    uint64_t deferred = counter("am.wakes_deferred") - deferred_before;
     if (nodes > 1 && !is_local(partner))
         CHECK(deferred > 0);
     else

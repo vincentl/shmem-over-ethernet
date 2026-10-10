@@ -4200,8 +4200,15 @@ reused one by one, removes.
   per counter block (§3.14), each a watch range and sequence and a completion
   slot (wake, ready, length, value, token, armed token); an `active` bitmap of
   16 words a PE marks the records holding a range, and a notify bumps every
-  overlapping one. A blocking get or fetching AMO lands in its thread's slot:
-  the token names the thread in the owner bits, with a per-thread sequence.
+  overlapping one. A blocking get of one piece, or a fetching AMO, lands in
+  its thread's slot: the token names the thread in the owner bits, with a
+  per-thread sequence. A blocking get of more than a piece goes as a
+  nonblocking get on the thread's own context - a block past the pool's for
+  each thread place (node segment layout 37) - and the thread completes it as
+  that context's quiet would, so that its pieces are in flight together, as
+  far as the zone and the credits allow, rather than one round trip a piece:
+  the nonblocking path whole, the lead's landing unchanged (the author,
+  2026-10-10, item 2; `docs/design/blocking-get-proposal.md`, (b)).
 - **Landing extents** (§10's decision of 2026-09-25): the zone is 1 KiB
   extents, claimed as runs by compare-and-swap over a bitmap; a record goes
   FREE, ISSUED, LANDED, then COPYING by compare-and-swap, so exactly one of the
@@ -4270,7 +4277,8 @@ all - with a landing zone of 8 extents that the threads' pieces overfill
 |---|---|---|
 | Put, non-fetching rmw (AM) | Reservation; plain stores for `high_seg` and the dirty bit | Reservation; one load each of `high_seg` and the bit word. A CAS only when the segment number rises, and a `fetch_or` only when the bit is clear: about once per segment per node |
 | Nonblocking get | One add to `issued` | Load `gen`, locked add, load `gen` again |
-| Blocking get, fetching rmw | Per-thread slot (item 5) | The same |
+| Blocking get of one piece, fetching rmw | Per-thread slot (item 5) | The same |
+| Blocking get of more pieces | The nonblocking path on the thread's own block, then its wait | The same |
 | Quiet | §4.6 | Lock, bump `gen`, wait, clear under the lock, unlock |
 
 #### 1. Get completion

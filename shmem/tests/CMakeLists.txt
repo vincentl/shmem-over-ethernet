@@ -3027,6 +3027,16 @@ set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,0,1,1 ${osoe_get_nbi_small})
+  # A blocking get of more than a piece issues its pieces together, on its
+  # thread's own context, and copies each out as it lands (the author,
+  # 2026-10-10, item 2; test-get-pieces.c): a get of a mebibyte moves
+  # am.gets_completed by a piece at least twice, one of a piece not at all.
+  # A job of two nodes: in the single-node build the test is not registered,
+  # and a property on it would refuse that build at configure time.
+  if(OSOE_INTERNODE)
+    osoe_tier2_map_test(get-pieces 0,1)
+    set_tests_properties(shmem.get-pieces.0-1 PROPERTIES PASS_REGULAR_EXPRESSION "GET PIECES OK")
+  endif()
   osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
 endif()
 

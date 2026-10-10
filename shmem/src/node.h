@@ -31,7 +31,9 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-#define OSOE_NODE_LAYOUT 36
+/* 37: each PE's pool of context blocks followed by one for each thread place,
+ * its blocking gets' own (v0.2, the author's 2026-10-10, item 2). */
+#define OSOE_NODE_LAYOUT 37
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -1229,7 +1231,9 @@ struct osoe_node {
     _Atomic uint64_t *epochs;
     uint32_t epoch_row_words;
     /* Each local PE's pool of context blocks, `contexts_per_pe` each
-     * (OSOE_MAX_CONTEXTS), indexed by osoe_node_context. */
+     * (OSOE_MAX_CONTEXTS), then one for each of its `threads_per_pe` thread
+     * places, the blocks a thread's blocking gets count in
+     * (osoe_node_thread_context), indexed by osoe_node_context. */
     struct osoe_context_block *contexts;
     uint32_t contexts_per_pe;
     /* Each local PE's thread records, `threads_per_pe` each (OSOE_MAX_THREADS),
@@ -1245,11 +1249,20 @@ static inline struct osoe_thread_record *osoe_node_thread(const struct osoe_node
     return &n->threads[(size_t)local_id * n->threads_per_pe + index];
 }
 
-/* Local PE `local_id`'s context block `index` (§4.11; layout 21). */
+/* Local PE `local_id`'s context block `index` (§4.11; layout 21): a context's
+ * below contexts_per_pe, a thread place's own past it (layout 37). */
 static inline struct osoe_context_block *osoe_node_context(const struct osoe_node *n,
                                                            uint32_t local_id, uint32_t index)
 {
-    return &n->contexts[(size_t)local_id * n->contexts_per_pe + index];
+    return &n->contexts[(size_t)local_id * (n->contexts_per_pe + n->threads_per_pe) + index];
+}
+
+/* The context block thread place `thread` of a PE counts its blocking gets in:
+ * past the pool's, so that no context a program makes is taken for it, and the
+ * index a nonblocking get's token carries for it (transport-internode.c). */
+static inline uint32_t osoe_node_thread_context(const struct osoe_node *n, uint32_t thread)
+{
+    return n->contexts_per_pe + thread;
 }
 
 /* The node's team block at `block_index` in the pool, or NULL past the last
