@@ -1,0 +1,12 @@
+== SOS whole, 4 x 2, OSOE_PROGRESS_HELPERS=0 22:18:37
+built and exit 0 on every map: 161
+build failures: 2
+runs failing: 2
+DONE
+DONE h0 22:22:14
+== SOS whole, 4 x 2, OSOE_PROGRESS_HELPERS=2 22:22:14
+built and exit 0 on every map: 160
+build failures: 2
+runs failing: 3
+DONE
+DONE h2 22:28:30

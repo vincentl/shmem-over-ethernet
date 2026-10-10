@@ -20,7 +20,7 @@ Part 4, a fast link, is in 0.2's scope and not built; it waits on the link
 
 ## The brief's runs
 
-At `c897948`, the lead's (`<repo>/build/scratch/ladder/merge-point/`):
+At `c897948`, the lead's (`docs/design/evidence/v0.2-step4/2026-10-10-merge-point/`):
 
 - **The four presets, tier 3 and the models at no helpers, and debug, AddressSanitizer and ThreadSanitizer at two and three:**
   - Part 3's verification at `232278a`, whose code `c897948` is
@@ -101,7 +101,7 @@ The review found one (correctness Q2-4), in step 3's code:
 
 ## The fixes
 
-On the branch `step4-items`, after the author's two items (`a1c1f14`: design
+On the branch `step4-items`, after the author's two items (`cca1c3a`: design
 §3.12 rewritten as built, and `shmem.settings-documented`). The review's ones
 are:
 
@@ -218,7 +218,7 @@ author's decision; evidence in
 - **On the Pi,** a blocking get of 64 KiB or more takes 1.23 to 1.28 times a
   put's time, and a nonblocking get and a quiet 1.00 to 1.05.
 - **Over the quiet VM's loopback,** from a mebibyte a blocking get takes 6 to 10
-  times and a nonblocking get 2.6 to 3.5. The nonblocking get is held there by
+  times and a nonblocking get 2.7 to 3.5. The nonblocking get is held there by
   the landing zone's four pieces.
 
 It recommends issuing a blocking get's pieces as a nonblocking get does,
@@ -256,7 +256,7 @@ On the morning of 2026-10-10, to the synthesis's three questions:
 
 Measured again for readiness Q5-2 and portability P2, at the fixes' tree before
 its last documents, on the development VM idle (load 0.02, four cores;
-`<repo>/build/scratch/ladder/merge-point/building.sh` and `building/`).
+`docs/design/evidence/v0.2-step4/2026-10-10-merge-point/building.sh` and `building/`).
 
 - **The release workflow as the README gives it,** one file and one test at a
   time:
@@ -271,27 +271,137 @@ its last documents, on the development VM idle (load 0.02, four cores;
 - **The models four at a time:** 1,087 s, and `model.abort` was killed by the
   kernel for want of memory - 39 of 40.
   - **Peak resident memory**, sampled each second: `abort_exit` 2,542 MiB,
-    `circulant` 1,771, `abort` 1,704, `posted_bitmap` 1,174, `reservation`
-    1,063.
-  - Four at once want about 7 GiB, and the VM's 8 GiB held, besides, 2.8 GB of
+    `circulant` 1,771, `posted_bitmap` 1,174, `reservation` 1,063; `abort` at
+    1,704 when the kernel stopped it, still rising. Run alone to its end, by the
+    fixes' adversarial read, it peaked at 3,051 MiB, the largest.
+  - Four at once want about 8 GiB at their worst, and the VM's 8 GiB held, besides, 2.8 GB of
     RAM-backed `/tmp`, 1.9 GB of it Part 0's build trees, removed since.
   - **Part 3's verification ran them one at a time** in 52 minutes, the longest
     `model.deadlock_owners` at 11.
   - **The README:** 52 minutes one at a time, two at a time on 8 GiB and one at
-    a time on 4 GiB, the largest 2.5 GiB. The `models` preset is labelled
+    a time on 4 GiB, the largest 3 GiB. The `models` preset is labelled
     "about an hour, one at a time", for the half an hour of the 30 models'
     days.
 - **A container's defaults,** emulated as round five did:
   - **The emulation:** a private 64 MiB tmpfs on `/dev/shm` in a mount
     namespace, and io_uring refused by the tree's `deny-io-uring`. The release
     suite ran one test at a time.
-  - **The result:** 675 of 857 failed, every one checked of three a container's
-    refusal. `/dev/shm` "has 62 MiB free" against the 271 MiB one PE needs, or
-    io_uring "Operation not permitted" named
-    (`container-spot.sh`, `building/container-spot.txt`).
+  - **The result:** 675 of 857 failed. The run kept no test's output, so three
+    of the 675 were run again the same way with theirs, and each was a
+    container's refusal: `/dev/shm` "has 62 MiB free" against the 271 MiB one PE
+    needs, or io_uring "Operation not permitted" named (`container-spot.sh`,
+    `building/container-spot.txt`).
   - **The README:** about 680, where it said 560, an estimate on the 729-test
     suite.
 
 ## The verification
 
-[at the fixes' tree; to be filled in]
+**At `4f1014d`, the fixes' tree** (`docs/design/evidence/v0.2-step4/2026-10-10-merge-point/verify.sh`;
+its outputs in `verify-4f1014d/` beside it). The static checks ran first, then
+Part 3's verification with the release preset added at two and three helpers.
+
+- **The static checks:** 12 of 12.
+- **debug and release:** 857 of 857 at no helpers, two and three; release with
+  the floor pins on.
+- **AddressSanitizer:** 842 of 842 at two and three helpers, and 841 at none.
+  `shmem.helper-wake.0-1-2-3` failed there once: node 3's wire's owner woken
+  twice in a hundred rounds, where ten are asked, and the other helper never.
+  It is the load S1 saw (below).
+- **ThreadSanitizer:** 600 of 600 at no helpers. At two helpers 12 tests
+  failed, at three 19, every one the tool's reports alone in a heap mapping, as
+  the gate (`tsan-gate.py`, Part 3's) judged them.
+  - Of the reports, 22 of 42 at two helpers and 49 of 87 at three were two
+    helpers' landings of one word, every one in a Träff's reduction's grant:
+    correctness Q2-4's word, which the next change removes
+    (`tsan-*-classified.txt`).
+  - Three quarters to four fifths of the reports lay in the library's own words
+    at the end of the heap mapping; at `232278a`, two thirds. The README's
+    paragraph takes both runs: a dozen to twenty tests, two thirds to four
+    fifths.
+- **Tier 3:** 113 of 113.
+- **The 40 models,** one at a time: every one.
+- **`osoe-pacer` at no helpers and two:** `mix`, `mailbox` and `collectives` with
+  the Pi's link a minute each, and `mix` ten minutes, every one `failures=0` and
+  no deadlock.
+
+**`shmem.helper-wake`'s failure,** and `d91804e`.
+
+- **What happened:** the test counts each helper's wakes while PE 0 puts to
+  each peer node a hundred times with a quiet after each put. It asks the wire's
+  owner to have been woken ten times and the other helper at most twice.
+- **Why:** the owner can still be awake when the next put comes - more so on a
+  loaded machine, where it can be preempted between publishing a round's
+  acknowledgement and going to sleep. A wake sent to the wrong helper would show
+  as the other count, which stayed at 0.
+- **Why not a looser bound:** the scale review's mutant, a helper that spins
+  200 µs before it sleeps, woke its owner one to three times. That is the same
+  count, so a lower bound would lose the one test that guards a helper against
+  spinning (S1).
+- **The fix, `d91804e`:** a peer's hundred rounds that wake their owner fewer
+  than ten times are run again, three attempts in all. A spinning helper falls
+  short in each; a wake sent elsewhere fails at once.
+- **Checked** (`helper-wake-check.sh`, `helper-wake-check/`):
+  - **Alone:** 20 of 20 in release and 20 of 20 under AddressSanitizer, no run
+    needing a second attempt.
+  - **The scale review's mutant,** a helper spinning before it sleeps: at 200 µs
+    and at 30 µs, 10 of 10 failing each, every attempt short.
+  - **Under AddressSanitizer beside four busy loops on the VM's four cores:** 9
+    of 20 failed, retries and all - 66 attempts past the first.
+- **What the retries do:** they hold the test under the suite's own load, four
+  tests at a time, which is where it failed, but not on a machine its busy loops
+  overload. There a helper preempted on every round looks like one that spins,
+  and only the owner's sleeping flag could tell them apart.
+- **What follows:** the release checklist asks for a test that waits for the
+  owner to sleep before each put before the tag's run of the suite under load,
+  and the README says what the test asks of its machine.
+
+**At the tip that merges** (`verify-final.sh`, `verify-final/`). What changed
+since `4f1014d` is the test's retries, comments and documents. So the tip ran:
+
+- the static checks;
+- the four presets built, with their warnings counted;
+- `shmem.helper-wake` three times in each;
+- the single-node build, which the full verification does not build,
+  configured, built and its suite run - the one build `SHMEM_INFO`'s note
+  compiles in.
+
+[the run's numbers; to be filled in]
+
+## The fixes' adversarial read
+
+A fresh agent read `git diff c897948 4f1014d` against the synthesis and this
+record, and ran the checks broken on copies
+(`docs/reviews/archive/v0.2-step4-review-fixes-adversarial-read.md`).
+
+**Nothing fatal; nine should-fix, each a sentence or a number, all made:**
+
+1. §3.12's "application threads ask the lead", false with helpers.
+2. §3.12's helpers on the Pi, which copied the record's paragraph that left out
+   the lines that moved - the paragraph completed with a note too.
+3. The README's "no test can reach" the detector's helper half, past the 126
+   tests the review ran.
+4. The global-exit limit, which `osoe-launch` without `-k` meets too.
+5. The zero-copy send's locked-memory limit, absent from its row.
+6. Two numbers for helpers on the Pi wider than their evidence.
+7. The models' memory, taken from a run where `model.abort` was killed while
+   still growing: alone, it peaked at 3,051 MiB, the largest.
+8. This record's `a1c1f14`, which the branch holds as `cca1c3a`.
+9. "Four proposals" and the reviews row, behind the new proposal and evidence.
+
+**Of the eleven notes, made:**
+
+- N1, the comments that still put the unsent limit on every wire or in the
+  agent's hands;
+- N2, §3.12's goodbyes and owner 0's wake word;
+- N4, the suite's count given two ways;
+- N5, the synthesis's three omissions;
+- N7, the provenance's reason for `de1e2f8`;
+- N8, keepalive's claim "between nodes" made a claim of what was seen;
+- N11, 2.7 to 3.5, and the container's three looked at.
+
+**Not changed:**
+
+- **N6,** a contraction in an evidence program (`get-pieces.c`'s `reps`). The
+  evidence records what ran, and is edited only as `docs/README.md` says.
+- **N9 and N10,** a verification at the tip and the single-node build. They are
+  the tip's run above.

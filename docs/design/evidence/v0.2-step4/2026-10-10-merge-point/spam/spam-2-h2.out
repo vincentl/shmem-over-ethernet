@@ -1,0 +1,30 @@
+neighbor_put: 20000 loops of put(2048 bytes) to neighbor, 8 PEs:   0.002 secs
+  0.01003 usecs / put(), 40000 Kbytes @ 24351.9620 MB/sec
+
+neighbor_get: 20000 loops of get(2048 bytes) from neighbor, 8 PEs:   0.001 secs
+  0.00932 usecs / get(), 40000 Kbytes @ 26201.8231 MB/sec
+
+all2all_put: 20000 loops of put(2048 bytes) to all 8 PEs:   1.307 secs
+  8.17073 usecs / put(), 320000 Kbytes @ 239.0394 MB/sec
+
+all2all_get: 20000 loops of get(2048 bytes) from all 8 PEs:  81.362 secs
+  508.51361 usecs / get(), 320000 Kbytes @  3.8409 MB/sec
+
+one2many_put: 20000 loops of put(2048 bytes) to 7 PEs:   0.224 secs
+  1.59693 usecs / put(), 280000 Kbytes @ 1223.0517 MB/sec
+
+many2one_get: 20000 loops of get(2048 bytes) from 7 PEs:  20.790 secs
+  148.49910 usecs / get(), 280000 Kbytes @ 13.1524 MB/sec
+
+bcast: 20000 loops of broadcast32(2048 bytes) over 8 PEs:  84.410 secs
+  527.56191 usecs / broadcast32(), 40000 Kbytes @  0.4628 MB/sec
+
+collect: 20000 loops of collect32(2048 bytes) over 8 PEs: osoe-launch: timeout after 300 s; killing 8 process(es); -t sets the timeout
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 3 killed by signal 9
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: rank 2 killed by signal 9
+osoe-launch: rank 4 killed by signal 9
+osoe-launch: rank 5 killed by signal 9
+osoe-launch: rank 6 killed by signal 9
+osoe-launch: rank 7 killed by signal 9

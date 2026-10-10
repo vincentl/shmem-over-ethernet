@@ -1,0 +1,13 @@
+459:227/842 Test #230: shmem.helper-wake.0-1-2-3 ........................................***Failed    0.13 sec
+460-/tmp/v02-step4-merge-verify/shmem/tests/test-helper-wake.c:69: CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST) failed
+461-node 1's wire, helper 1's: helper 1 woken 87 times in 100 puts
+462-node 1's wire, helper 1's: helper 2 woken 0 times in 100 puts
+463-node 2's wire, helper 2's: helper 1 woken 0 times in 100 puts
+464-node 2's wire, helper 2's: helper 2 woken 58 times in 100 puts
+465-node 3's wire, helper 1's: helper 1 woken 2 times in 100 puts
+466-node 3's wire, helper 1's: helper 2 woken 0 times in 100 puts
+467-osoe-launch: rank 0 exited with status 1
+468-osoe-launch: rank 3 killed by signal 15
+469-osoe-launch: rank 2 killed by signal 15
+470-
+471-        Start 231: shmem.helpers.deaf.0-1

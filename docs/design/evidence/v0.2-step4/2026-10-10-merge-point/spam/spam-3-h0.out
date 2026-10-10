@@ -1,0 +1,18 @@
+neighbor_put: 20000 loops of put(2048 bytes) to neighbor, 8 PEs:   0.001 secs
+  0.00540 usecs / put(), 40000 Kbytes @ 45209.7130 MB/sec
+
+neighbor_get: 20000 loops of get(2048 bytes) from neighbor, 8 PEs:   0.002 secs
+  0.01101 usecs / get(), 40000 Kbytes @ 22170.5007 MB/sec
+
+all2all_put: 20000 loops of put(2048 bytes) to all 8 PEs:   1.168 secs
+  7.30197 usecs / put(), 320000 Kbytes @ 267.4792 MB/sec
+
+all2all_get: 20000 loops of get(2048 bytes) from all 8 PEs: osoe-launch: SIGTERM received; forwarded to 8 process(es)
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 7 killed by signal 15

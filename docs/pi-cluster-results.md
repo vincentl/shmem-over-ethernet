@@ -971,5 +971,9 @@ what.
   8 to 9% slower (1,490 to 1,498 µs at none against 1,618 to 1,632) and the
   alltoall 2 to 3% (2,507 to 2,525 against 2,567 to 2,582), and the reduction no
   faster (1,434 to 1,445 against 1,412 to 1,419), since unbound it was already
-  as fast. The 8-byte reduction and broadcast were 10 to 16% faster under both.
-  Four nodes only.
+  as fast. In the review's short run the 8-byte reduction and broadcast were
+  10 to 16% faster under both, but its runs at no helpers were slower than any
+  other day's; Part 3's run and the merge point's, three runs at none against
+  one at two, give the 8-byte reduction about 5% faster at 4 × 4 under the
+  binding and nothing at 4 × 1 (the merge point's adversarial read of its fixes,
+  finding 6). Four nodes only.

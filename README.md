@@ -166,7 +166,7 @@ full build, `ctest --preset release -j4`: every test of the full build but those
 labelled `internode`, which need more than one node or test the internode
 backend's own files, io_uring or futex2, and five of its own ("How osoe is
 tested" has the numbers); and `ctest --preset models` runs the same tests of the
-model checker, one at a time on a machine of 4 GiB, since the largest wants 2.5 GiB.
+model checker, one at a time on a machine of 4 GiB, since the largest wants 3 GiB.
 
 ## Getting started
 
@@ -260,9 +260,10 @@ tests. Both may run four at a time, as this project's own runs do (`cmake
 the model checker (`tools/modelcheck`, which needs Python 3) took 52 minutes in
 the development VM one at a time, the longest of them, `model.deadlock_owners`,
 11 of those, and check the design, which does not vary with the machine. They
-want memory more than cores: the largest holds 2.5 GiB at its peak and the next
-two 1.7 GiB each, so run them two at a time on a machine of 8 GiB and one at a
-time on 4 GiB - four at once ran the development VM, of 8 GiB, out of memory.
+want memory more than cores: the largest, `model.abort`, holds 3 GiB at its
+peak, the next 2.5 GiB and the one after 1.7 GiB, so run them two at a time on a
+machine of 8 GiB and one at a time on 4 GiB - four at once ran the development
+VM, of 8 GiB, out of memory.
 They have a label of their own, `model`, which the `release` preset leaves out
 and the `models` preset runs alone, in the same build:
 
@@ -598,10 +599,10 @@ where to find what among the documents.
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
-| `docs/design/` | the design notes, `shmem-ethernet-design.md`; four proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
+| `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
-| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds (`evidence/`) |
+| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds and of two reads of v0.2 step 4's first part (`evidence/`) |
 | `docs/reference/` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
 
 `tools/` has a directory for each program, or group of tests, it builds. Of the
@@ -1136,12 +1137,12 @@ specification or takes a choice the specification leaves open.
   specification leaves undefined too: the next object then starts at another
   place on the PE that differed, puts to it land in the wrong place, and
   nothing says so.
-- **Under `srun -K1`, PEs of more than one node calling `shmem_global_exit` at
-  once can lose a caller's output**, where the specification has every PE's
-  output flushed (§9.1.6): the first node to leave can have Slurm kill the
-  other nodes' PEs still ending, callers among them, whose handlers and
-  buffered output are then lost, and `srun` may return 143 ("How a job ends").
-  Call it from one PE.
+- **Under `srun -K1`, or `osoe-launch` without `-k`, PEs of more than one node
+  calling `shmem_global_exit` at once can lose a caller's output**, where the
+  specification has every PE's output flushed (§9.1.6): the first node to leave
+  can have the launcher end the other nodes' PEs still ending, callers among
+  them, whose handlers and buffered output are then lost, and `srun` may return
+  143 ("How a job ends"). Call it from one PE.
 
 **Transport and API**
 
@@ -1161,8 +1162,7 @@ specification or takes a choice the specification leaves open.
   the one place they have been timed, two helpers made a 64 KiB broadcast and a
   4 KiB alltoall 6 to 35% slower under Slurm's default binding, where a lead's
   threads share its core, and 2 to 9% slower with `--cpu-bind=none`; a 64 KiB
-  reduction took a sixth to a third less time bound and about the same unbound, and
-  8-byte reductions and broadcasts 10 to 16% less either way
+  reduction took 15 to 37% less time bound and about the same unbound
   (`docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4). What they
   buy with many peers at once on a link faster than one thread has not been
   measured. On the Pi
@@ -1285,7 +1285,7 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 850 tests in
+  run before every merge, on the exact tree that merges: about 860 tests in
   release, and the model checker's 40 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
@@ -1293,11 +1293,12 @@ that one could be added without touching the OpenSHMEM layer.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
   well as at none, by the environment `ctest` passes on to every test - in the
   debug, release and AddressSanitizer presets, and under ThreadSanitizer as
-  below. There about a dozen tests across nodes - a different few at each
+  below. There a dozen to twenty tests across nodes - a different few at each
   count - report a put or an atomic a helper applies in a PE's heap mapping,
   against a local thread's access to the same place or another helper's put
-  there. Two thirds are in the words the library keeps for its collectives at
-  the end of that mapping, a third in a program's heap. The ordering that makes
+  there. Two thirds to four fifths of the reports are in the words the library
+  keeps for its collectives at the end of that mapping, the rest in a program's
+  heap. The ordering that makes
   them safe runs through another process, which the tool cannot see - the
   reason the multi-node maps are left out of that preset (§8.2) - and with no
   helpers the one agent applies every peer's puts and has met the local thread
@@ -1313,7 +1314,12 @@ that one could be added without touching the OpenSHMEM layer.
   reads back 64 MiB a helper landed, runs past its minute in the tool's
   handling of eight million such reads, and finishes in two given longer. The
   preset gates the suite at no helpers alone, without the one test that sets
-  helpers itself and lands what a local thread reads.
+  helpers itself and lands what a local thread reads. That test,
+  `shmem.helper-wake`, counts each helper's wakes, and so asks of its machine
+  that a helper usually sleeps between a peer's rounds: it runs a peer's rounds
+  again when they fall short, which holds it under the suite's own load, but
+  under AddressSanitizer beside four busy loops on four cores it failed 9 runs
+  of 20 (the release checklist).
 - **Two builds.** The single-node build runs the same suite less the
   458 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
@@ -1336,11 +1342,12 @@ that one could be added without touching the OpenSHMEM layer.
   `-DOSOE_MULTIPLE_MODELS=ON`, which no preset sets; get completion's one case
   that a `SHMEM_THREAD_SERIALIZED` program meets runs in every one. Each model
   also carries deliberately broken variants that must fail: a model that cannot
-  fail proves nothing. Some of what the models hold no test can reach: the
-  deadlock detector's use of the helpers' answers - each answer naming the
-  request posted last, the helpers' work counted in the node's activity, a
-  pass after the request - can each be removed with every test passing, and
-  `deadlock_owners_model.py` alone fails without them
+  fail proves nothing. Some of what the models hold no test of the suite
+  reaches: the deadlock detector's use of the helpers' answers - each answer
+  naming the request posted last, the helpers' work counted in the node's
+  activity, a pass after the request - can each be removed with every detector,
+  helper and stress test passing at two helpers, and `deadlock_owners_model.py`
+  alone fails without them
   (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-3). The one without a model is the deprecated active-set
   collectives' (`active-set.c`). The checker runs a model under sequential
   consistency or x86-TSO, and both keep a thread's loads in order, which
@@ -1493,7 +1500,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
-| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, their notifications, and those the kernel did not send by reference after all. Each node's own. |
+| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference holds its pages against the user's locked-memory limit (`ulimit -l`, shared by every process of the user on a host) until its notification comes, and a job past it ends "Cannot allocate memory" on a connection - at the default 8 MiB, sixteen logical nodes on an emulated gigabit link, each PE putting to every other, did. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, their notifications, and those the kernel did not send by reference after all. Each node's own. |
 
 **For testing**
 
@@ -1722,7 +1729,9 @@ Claude Sonnet 5 and 5.5 took parts of some sessions and of the tasks a session
 handed off, and Claude Fable 5.1 did periodic reviews and deep planning. Every
 commit names the model that wrote it beside the author, in a `Co-Authored-By`
 line, but the first, ten merges and one work-in-progress commit, `de1e2f8`,
-kept because v0.2 step 2's comparison on the Pi ran on it; and the history is
+kept because the evidence of v0.2 step 2's comparison on the Pi names it, the
+rebased form of the commit that comparison ran on
+(`docs/design/evidence/pi-cluster/README.md`); and the history is
 published whole, as the record of how the work was done.
 
 The work ran from goals down to code, and each level is in the repository:

@@ -1,0 +1,27 @@
+== start 08:18:44, load 0.02 0.17 0.39, 4 cores
+configure 0 s, build one file at a time 67 s, tests one at a time 599 s (exit 0)
+100% tests passed, 0 tests failed out of 857
+Total Test time (real) = 598.89 sec
+== counts 08:29:50
+full build: 897 tests, 857 without the models, 458 internode, 40 models
+single-node build: 404 tests without the models
+== models four at a time 08:29:51
+models -j4: 1087 s (exit 8)
+98% tests passed, 1 tests failed out of 40
+the five longest:
+682.08 model.deadlock_owners
+560.33 model.abort_exit
+344.72 model.circulant
+319.93 model.tree_barrier
+171.27 model.reservation
+the five largest, resident MiB at the most:
+2542 /usr/bin/python3 /tmp/building-measure/tools/modelcheck/abort_exit_model.py
+1771 /usr/bin/python3 /tmp/building-measure/tools/modelcheck/circulant_model.py check
+1704 /usr/bin/python3 /tmp/building-measure/tools/modelcheck/abort_model.py
+1174 /usr/bin/python3 /tmp/building-measure/tools/modelcheck/posted_bitmap_model.py
+1063 /usr/bin/python3 /tmp/building-measure/tools/modelcheck/reservation_model.py
+== a container's defaults 08:47:57
+21% tests passed, 675 tests failed out of 857
+failed: 675
+lines naming /dev/shm: 1, naming io_uring: 4
+DONE 08:56:21

@@ -1,0 +1,173 @@
+== unit
+unit/accessible_ping                         0-0-1-1-2-2-3-3 exit 0   - | From 0: PE 7 is accessible
+unit/alltoall                                0-0-1-1-2-2-3-3 exit 0   - | A2A: pe_start = 0, pe_stride = 1, pe_size = 7
+unit/alltoalls                               0-0-1-1-2-2-3-3 exit 0   - | A2AS: dst =  1, sst =  2, nelem =  7, pe_start =  
+unit/atomic_bitwise                          0-0-1-1-2-2-3-3 exit 0   - | Passed!
+unit/atomic_inc                              0-0-1-1-2-2-3-3 exit 0   - | 8 ranks completed 10 loops
+unit/atomic_nbi                              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/barrier                                 0-0-1-1-2-2-3-3 exit 0   - | 
+unit/bcast                                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/bcast_flood                             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/bcast_in_place                          0-0-1-1-2-2-3-3 exit 0   - | 
+unit/big_reduction                           0-0-1-1-2-2-3-3 exit 0   - | 
+unit/bigget                                  0-0-1-1-2-2-3-3 exit 0   - | 
+unit/bigput                                  0-0-1-1-2-2-3-3 exit 0   - | 
+unit/broadcast_active_set                    0-0-1-1-2-2-3-3 exit 0   - |  + root 4
+unit/c11_shmem_team_collective_types         0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_shmem_team_reduce                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_shmem_test_all_any_some             BUILD FAILED  ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+unit/c11_shmem_test_vector                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_shmem_wait_until_all_any_some       BUILD FAILED  ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+unit/c11_test_shmem_atomic_add               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_and               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_cswap             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_fetch             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_inc               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_or                0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_set               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_swap              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_atomic_xor               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_g                        0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_get                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_p                        0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_put                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_put_signal               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_test                     0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_wait_until               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/c11_test_shmem_wait_until_vector        0-0-1-1-2-2-3-3 exit 0   - | 
+unit/circular_shift                          0-0-1-1-2-2-3-3 exit 0   - | 
+unit/collect                                 0-0-1-1-2-2-3-3 exit 0   - | 
+unit/collect_active_set                      0-0-1-1-2-2-3-3 exit 0   - |  + active set size 2
+unit/cswap                                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_shmem_test_all                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/fadd_nbi                                0-0-1-1-2-2-3-3 exit 0   - | fetch_add_nbi    1205.92us
+unit/fcollect64                              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/get1                                    0-0-1-1-2-2-3-3 exit 0   - | 
+unit/get_g                                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/get_nbi                                 0-0-1-1-2-2-3-3 exit 0   - | 
+unit/global_exit                             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/hello                                   0-0-1-1-2-2-3-3 exit 0   - | Hello World from 4 of 8
+unit/ipgm                                    0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput-iget                               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput128                                 0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput32                                  0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput64                                  0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput_double                             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput_float                              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput_long                               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput_longdouble                         0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput_longlong                           0-0-1-1-2-2-3-3 exit 0   - | 
+unit/iput_short                              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/lfinc                                   0-0-1-1-2-2-3-3 exit 0   - |   0.019847 usecs per shmem_long_atomic_fetch_inc()
+unit/many-ctx                                0-0-1-1-2-2-3-3 exit 0   - | 
+unit/max_reduction                           0-0-1-1-2-2-3-3 exit 0   - | 
+unit/micro_unit_shmem                        0-0-1-1-2-2-3-3 exit 0   - | This is a micro test and is only intended to run o
+unit/mt_a2a                                  0-0-1-1-2-2-3-3 exit 0   - | Success
+unit/mt_contention                           0-0-1-1-2-2-3-3 exit 0   - | Starting multithreaded test on 8 PEs, 8 threads/PE
+unit/mt_lock_test                            0-0-1-1-2-2-3-3 exit 0   - | Success
+unit/mt_membar                               0-0-1-1-2-2-3-3 exit 0   - | Starting multi-threaded test on 8 PEs, 2 threads/P
+unit/nop_collectives                         0-0-1-1-2-2-3-3 exit 0   - | Done
+unit/ns                                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/pcontrol                                0-0-1-1-2-2-3-3 exit 0   - | 
+unit/pi                                      0-0-1-1-2-2-3-3 exit 0   - | Pi from 80000 points on 8 PEs: 3.150200
+unit/ping                                    0-0-1-1-2-2-3-3 exit 0   - | 
+unit/pingpong-short                          0-0-1-1-2-2-3-3 exit 0   - | 
+unit/pingpong                                0-0-1-1-2-2-3-3 exit 0   - | 
+unit/put1                                    0-0-1-1-2-2-3-3 exit 0   - | 
+unit/put_nbi                                 0-0-1-1-2-2-3-3 exit 0   - | 
+unit/put_signal                              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/put_signal_nbi                          0-0-1-1-2-2-3-3 exit 0   - | 
+unit/query_thread                            0-0-1-1-2-2-3-3 exit 0   - | 6: Query result for thread level 2
+unit/query_thread_funneled                   0-0-1-1-2-2-3-3 exit 0   - | 6: Query result for thread level 1
+unit/reduce_active_set                       0-0-1-1-2-2-3-3 exit 0   - |  + PE_start=6, PE_stride=1, PE_size=2
+unit/reduce_in_place                         0-0-1-1-2-2-3-3 exit 0   - | 
+unit/repeated_barriers                       0-0-1-1-2-2-3-3 exit 0   - |  + iteration 2
+unit/repeated_syncs                          0-0-1-1-2-2-3-3 exit 0   - |  + iteration 0
+unit/rma_coverage                            0-0-1-1-2-2-3-3 exit 0   - | 
+unit/rma_coverage_pshmem                     0-0-1-1-2-2-3-3 exit 0   - | 
+unit/self_collectives                        0-0-1-1-2-2-3-3 exit 0   - | Done
+unit/set_fetch                               0-0-1-1-2-2-3-3 exit 0   - | 6: Finished double test
+unit/set_lock                                0-0-1-1-2-2-3-3 exit 0   - | 8 ranks completed 40 loops
+unit/shmalloc                                0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmem_calloc                            0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmem_ctx_get_team                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmem_info                              0-0-1-1-2-2-3-3 exit 0   - | 2: OpenSHMEM 1.6 -- "osoe"
+unit/shmem_malloc_with_hints                 0-0-1-1-2-2-3-3 exit 0   - | All 5 tests passed
+unit/shmem_ptr                               0-0-1-1-2-2-3-3 exit 0   - |  2: Found 2 heap segment peer(s) (6 were inaccessi
+unit/shmem_team_b2b_collectives              0-0-1-1-2-2-3-3 exit 1   control segment /osoe.236601.0.0.0 (osoe-stat /osoe.236601.0.0.0, while any PE of this node is alive | collect... osoe: PE 0: shmem_long_collect: dest ha
+unit/shmem_team_collect_active_set           0-0-1-1-2-2-3-3 exit 0   - | Shrinking team size test
+unit/shmem_team_get_config                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmem_team_max                          0-0-1-1-2-2-3-3 exit 0   - | The number of teams created for PE 4 is : 64
+unit/shmem_team_negative_stride              0-0-1-1-2-2-3-3 exit 0   - | -2 stride:
+unit/shmem_team_ptr                          0-0-1-1-2-2-3-3 exit 0   - |  3: Found 1 world team heap segment peer(s) (3 wer
+unit/shmem_team_reduce                       0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmem_team_reuse_teams                  0-0-1-1-2-2-3-3 exit 0   - |   6: creating new team (start, stride, size):   6,
+unit/shmem_team_shared                       0-0-1-1-2-2-3-3 exit 0   - | [PE: 5] SHMEM_TEAM_SHARED peers: { 4 5 } (num_peer
+unit/shmem_team_split_2d                     0-0-1-1-2-2-3-3 exit 0   - | Performing 2d split test on even team
+unit/shmem_team_translate                    0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmem_test                              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/shmemalign                              0-0-1-1-2-2-3-3 exit 1   shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8) | 
+unit/shrealloc                               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/signal_fetch                            0-0-1-1-2-2-3-3 exit 0   - | 
+unit/signal_wait_until                       0-0-1-1-2-2-3-3 exit 0   - | 
+unit/spam                                    0-0-1-1-2-2-3-3 exit 1   - | fcollect: 20000 loops of fcollect32(2048 bytes) ov
+unit/sping                                   0-0-1-1-2-2-3-3 exit 0   - |   4 pinged   5:      128 words      1.37 uSec   74
+unit/strided_put                             0-0-1-1-2-2-3-3 exit 0   - | ./strided_put: Requires 2 PEs
+unit/swap1                                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/swapm                                   0-0-1-1-2-2-3-3 exit 0   - | 
+unit/sync-size                               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/test_lock                               0-0-1-1-2-2-3-3 exit 0   - | [7] lock attempts 1112
+unit/test_lock_cswap                         0-0-1-1-2-2-3-3 exit 0   - | 
+unit/thread_wait                             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/threading                               0-0-1-1-2-2-3-3 exit 0   - | Starting threads
+unit/to_all                                  0-0-1-1-2-2-3-3 exit 0   - | 
+unit/waituntil                               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/web                                     0-0-1-1-2-2-3-3 exit 0   - | 
+unit/zero_comm                               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_add               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_and               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_cswap             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_fetch             0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_inc               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_or                0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_set               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_swap              0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_atomic_xor               0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_bitwise_reduce           0-0-1-1-2-2-3-3 exit 0   - | Test passed with ret = 0
+unit/cxx_test_shmem_complex                  0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_g                        0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_get                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_max_min_reduce           0-0-1-1-2-2-3-3 exit 0   - | Test passed with ret = 0
+unit/cxx_test_shmem_p                        0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_put                      0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_sum_prod_reduce          0-0-1-1-2-2-3-3 exit 0   - | Test passed with ret = 0
+unit/cxx_test_shmem_test                     0-0-1-1-2-2-3-3 exit 0   - | 
+unit/cxx_test_shmem_wait_until               0-0-1-1-2-2-3-3 exit 0   - | 
+== spec-example
+spec-example/shmem_ctx                       0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_ctx_pipelined_reduce      0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_reduce_example            0-0-1-1-2-2-3-3 exit 0   - | 0 1 3 5 10 17 18 19 20 22 23 24 25 26 29 30 31 
+spec-example/shmem_team_alltoall             0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_team_alltoalls            0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_team_broadcast            0-0-1-1-2-2-3-3 exit 0   - | 0: 0, 1, 2, 3
+spec-example/shmem_team_collect              0-0-1-1-2-2-3-3 exit 0   - | 6: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 1
+spec-example/shmem_team_context              0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_team_split_2D             0-0-1-1-2-2-3-3 exit 0   - | (0, 1, 1) is mype = 6
+spec-example/shmem_team_split_strided        0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_team_sync                 0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_team_translate            0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_test_any                  0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_test_some                 0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_wait_until_all            0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_wait_until_any            0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_wait_until_any_vector     0-0-1-1-2-2-3-3 exit 0   - | 
+spec-example/shmem_wait_until_some           0-0-1-1-2-2-3-3 exit 0   - | 
+== apps
+apps/binary-search                           0-0-1-1-2-2-3-3 exit 0   - | 
+apps/gups                                    0-0-1-1-2-2-3-3 exit 0   - | Found 0 errors in 8192 locations (passed).
+apps/mandelbrot                              0-0-1-1-2-2-3-3 exit 0   - | Total work rate (points/sec)           : 3.889693e
+== summary
+built and exit 0 on every map: 160
+build failures: 2
+runs failing: 3
+DONE

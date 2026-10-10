@@ -81,7 +81,7 @@ In time, at 1 MiB:
 2. **On a fast path the gap is larger, and issuing the pieces together closes
    about two thirds of it.**
    - Over loopback a blocking get of 1 MiB or more takes 6 to 10 times a put's
-     time; a nonblocking get and a quiet takes 2.6 to 3.5 times.
+     time; a nonblocking get and a quiet takes 2.7 to 3.5 times.
    - **What holds the nonblocking get there is the landing zone.** 256 KiB a PE
      holds four pieces, so at most a quarter of a mebibyte is in flight a round
      trip.

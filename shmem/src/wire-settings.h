@@ -37,8 +37,8 @@
  * gigabit, and a fetch-add behind the stream waited 14 to 22 ms for them on
  * the Pi; limited to 16 KiB, 3.3 to 3.9 ms, the stream at line rate
  * (docs/decisions/2026-10-07-one-thread-profile.md). The limit is the link's
- * bandwidth times OSOE_WIRE_UNSENT_NS - what the link sends while the lead's
- * agent comes round to give the kernel more - and at least
+ * bandwidth times OSOE_WIRE_UNSENT_NS - what the link sends while the wire's
+ * owner comes round to give the kernel more - and at least
  * OSOE_WIRE_UNSENT_FLOOR, set once the link is known, at the end of
  * shmem_init. OSOE_WIRE_UNSENT_BYTES sets it by hand, taken as given however
  * small; 0 leaves the system's own (net.ipv4.tcp_notsent_lowat, none by

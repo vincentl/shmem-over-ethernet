@@ -306,4 +306,11 @@ rated them (round six's readiness Q5-5).
     nodes at different helper counts, and SOS at three helpers, each right by
     the review's probes and none in the suite (conformance C3);
   - the x86-64 item at the next tag run at two and three helpers too
-    (portability P3).
+    (portability P3);
+  - `shmem.helper-wake` made to hold under sustained load before the tag's run
+    of the suite under busy loops: its retries hold it under the suite's own
+    load, but beside four busy loops on four cores it failed 9 runs of 20,
+    since a helper preempted every round looks like one that spins. PE 0
+    waiting for the owner's sleeping flag before each put would tell them apart,
+    the spin mutants checked against it again
+    (`docs/decisions/2026-10-10-step4-merge-point.md`, "The verification").

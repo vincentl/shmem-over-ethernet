@@ -1,0 +1,19 @@
+built c897948 at OSOE_PROGRESS_HELPERS=0 22:29:08
+shmem_team_reuse_teams one-node: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+shmem_team_reuse_teams ten-nodes: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+reduce_active_set one-node: rc=0 no-number=0 dry=0 rank-failures=0 iterations=70 | 
+reduce_active_set ten-nodes: rc=0 no-number=0 dry=0 rank-failures=0 iterations=70 | 
+broadcast_active_set one-node: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+broadcast_active_set ten-nodes: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+repeated_barriers one-node: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+repeated_barriers ten-nodes: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+shmem_team_max one-node: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | The number of teams created for PE 0 is : 64
+shmem_team_max ten-nodes: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | The number of teams created for PE 0 is : 64
+shmem_team_split_2d one-node: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+shmem_team_split_2d ten-nodes: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+collect_active_set one-node-32: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+collect_active_set four-nodes-32: rc=0 no-number=0 dry=0 rank-failures=0 iterations=0 | 
+split_shared nodes=61: rc=0 valid=61 invalid=0
+split_shared nodes=62: rc=0 valid=62 invalid=0
+split_shared nodes=64: rc=0 valid=64 invalid=0
+DONE 22:29:13

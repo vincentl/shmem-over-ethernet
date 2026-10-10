@@ -288,7 +288,7 @@ sealed behind it — plus any publication-window stall (§3.6); an earlier draft
 *Measured in v0.2 step 4, the bound left out the kernel.* Nothing limited a
 socket's unsent queue, and at a gigabit the kernel held some 2.6 MB of a put
 stream: a fetch-add behind it waited 14 to 22 ms on the Pi, whatever the
-connection buffer. Each connection now limits it (`TCP_NOTSENT_LOWAT`, §3.3) to
+connection buffer. Each data wire now limits it (`TCP_NOTSENT_LOWAT`, §3.3) to
 the link's bandwidth times 128 µs, at least 16 KiB, once the link is measured
 at the end of `shmem_init`, so the bound is two segments, the limit and what is in
 flight - 3.3 to 3.9 ms for that fetch-add, the stream at line rate
@@ -1402,8 +1402,9 @@ at every helper count, a control wire and a data wire (§3.1,
 `docs/decisions/2026-10-08-control-wire.md`).
 
 - **Owner 0 is the lead's agent.** It holds every control wire - the internode
-  tree's ARRIVE and RELEASE, the deadlock detector's messages, the goodbyes -
-  and the control plane's state, the tree's and the detector's. With no
+  tree's ARRIVE and RELEASE and the deadlock detector's messages, and nothing
+  else but the goodbyes every wire carries, its own and the abortive one - and
+  the control plane's state, the tree's and the detector's. With no
   helpers, the default, it holds every data wire too, and is the node's one
   progress thread.
 - **Owners 1 to H are helper threads**, `OSOE_PROGRESS_HELPERS` of them, at
@@ -1413,8 +1414,10 @@ at every helper count, a control wire and a data wire (§3.1,
   helper with no peer is idle. A node's PEs must agree on H in a job of more
   than one node; nodes may differ.
 - **Writers wake the owner of their wire**, not the lead: the connection area
-  holds a sleeping flag, a wake word and a dirty bitmap an owner (§3.10), so a
-  put to a peer wakes that peer's owner alone.
+  holds a sleeping flag and a dirty bitmap an owner, and a helper's wake word,
+  while the lead's agent sleeps on its PE slot's in the node segment, which stop
+  and abort bump too (§3.10; `connection-area.h`), so a put to a peer wakes that
+  peer's owner alone.
 - **The agent starts the helpers at its first pass**, so that each begins with
   its signal mask and CPUs; each places itself as the agents are placed and
   asks the agents' slice (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`, §3.11),
@@ -1456,8 +1459,10 @@ space:
   `_exit(status)` on every other (§3.15, as built).
 
 **Application threads never submit.** They reserve and copy into connection
-buffers (§3.5), and ask the lead for everything else — seal-and-flush for
-`fence` and `quiet`, a wake for new work — with a flag plus a futex wake.
+buffers (§3.5), and ask the owner of the peer's wire - the lead's agent, or with
+helpers the helper that holds it - for everything else, a seal-and-flush for
+`fence` and `quiet` and a wake for new work, with a dirty bit plus a futex wake;
+the lead's agent alone for the control plane's arrivals.
 
 **Replies land in shared memory, never at a private address.** A get's `dest`
 may be a stack or `malloc` buffer the lead's process cannot see. Each PE
@@ -1495,9 +1500,12 @@ link, not by the PE count: one thread on the Pi, perhaps four at 256 PEs on a
 fast link, all in the lead's process. Neither count is measured: no link on
 which one thread is the limit has been available (README, Limits), so the
 default is none and a count comes only from the setting
-(`docs/decisions/2026-10-07.md`, items 4 to 6). On the Pi's gigabit, two helpers
-left every line unchanged but the mailbox's, one run of which went a fifth
-faster (`2026-10-08-helpers.md`, "On the Pi").
+(`docs/decisions/2026-10-07.md`, items 4 to 6). On the Pi's gigabit, under
+Slurm's binding, two helpers made a 64 KiB broadcast and a 4 KiB alltoall 6 to
+35% slower and a 64 KiB reduction 15 to 37% faster, and the mailbox a fifth
+faster; unbound they cost the broadcast and alltoall 2 to 9% and bought the
+reduction nothing (the README's Limits; the review of v0.2 step 4's merge point,
+scale S4).
 
 **Why threads in every PE rather than a helper process:**
 
@@ -2476,7 +2484,8 @@ seconds, and six probes nobody answers end it with `ETIMEDOUT`, which ends the
 job with a fatal saying which node stopped answering. A node that vanishes
 without a FIN — power lost, a cable cut, a partition — is found one to two
 minutes after its connections go quiet. Keepalive asks whether the peer's
-*kernel* is there, which contention between nodes does not stop - though on one
+*kernel* is there, which contention between nodes has not been seen to stop -
+not tested at scale - though on one
 overloaded machine running many logical nodes, whose loopback carries every
 probe and answer, the backlog drops both, and a healthy job can end so (the
 review of v0.2 step 4's merge point, correctness Q2-1; the README says so for
