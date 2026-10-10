@@ -599,6 +599,7 @@ where to find what among the documents.
 | `dev/` | `lima/`, the definitions of the Debian 13 virtual machine osoe is developed in on a Mac ([Developing on macOS](#developing-on-macos)) and of the Rocky Linux 9 one the single-node build is tested in |
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
+| `docs/fast-link.md`, `docs/fast-link/` | the runbook for the measurements that wait for a link above a gigabit - v0.2 step 4's last part - with its scripts and probes, not yet run on such a link |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
 | `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |

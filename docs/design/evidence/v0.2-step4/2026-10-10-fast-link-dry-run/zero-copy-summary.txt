@@ -1,0 +1,21 @@
+== <repo>/build/scratch/part4/dry-run-2/dry-run/zero-copy
+
+multistream: MiB/s, and the progress threads' CPU seconds a GiB (median, range)
+  put-1048576-off pes=2 h=0            10959.5                      cpu/GiB 0.3
+  put-1048576-on-16k pes=2 h=0         9372.8                       cpu/GiB 0.3
+  put-1048576-on-256k pes=2 h=0        9275.2                       cpu/GiB 0.3
+  put-1048576-on-64k pes=2 h=0         8129.3                       cpu/GiB 0.4
+  put-65536-off pes=2 h=0              13377.8                      cpu/GiB 0.2
+  put-65536-on-16k pes=2 h=0           11488.5                      cpu/GiB 0.3
+  put-65536-on-256k pes=2 h=0          12009.3                      cpu/GiB 0.3
+  put-65536-on-64k pes=2 h=0           11672.4                      cpu/GiB 0.3
+
+counters that moved over the window (PE 0's node; median, range)
+  put-1048576-off pes=2 h=0 buffers=None: receive_enobufs 6887.0, receive_rearms 6887.0
+  put-1048576-on-16k pes=2 h=0 buffers=None: receive_enobufs 5300.0, receive_rearms 5300.0, zero_copy_copied 7408.0, zero_copy_notifications 7408.0, zero_copy_sends 7408.0
+  put-1048576-on-256k pes=2 h=0 buffers=None: receive_enobufs 6069.0, receive_rearms 6069.0, zero_copy_copied 6512.0, zero_copy_notifications 6512.0, zero_copy_sends 6512.0
+  put-1048576-on-64k pes=2 h=0 buffers=None: receive_enobufs 4843.0, receive_rearms 4843.0, zero_copy_copied 5919.0, zero_copy_notifications 5919.0, zero_copy_sends 5919.0
+  put-65536-off pes=2 h=0 buffers=None: receive_enobufs 8201.0, receive_rearms 8201.0
+  put-65536-on-16k pes=2 h=0 buffers=None: receive_enobufs 5181.0, receive_rearms 5181.0, zero_copy_copied 21772.0, zero_copy_notifications 21772.0, zero_copy_sends 21769.0
+  put-65536-on-256k pes=2 h=0 buffers=None: receive_enobufs 7241.0, receive_rearms 7241.0, zero_copy_copied 5949.0, zero_copy_notifications 5949.0, zero_copy_sends 5949.0
+  put-65536-on-64k pes=2 h=0 buffers=None: receive_enobufs 4611.0, receive_rearms 4611.0, zero_copy_copied 20901.0, zero_copy_notifications 20901.0, zero_copy_sends 20900.0
