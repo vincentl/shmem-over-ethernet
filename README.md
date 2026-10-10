@@ -299,8 +299,8 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 858 tests fail at `shmem_init` or at opening a ring -
-every one but `env.probe` among the 458 labelled `internode`, which need more
+410 of the test suite's 860 tests fail at `shmem_init` or at opening a ring -
+every one but `env.probe` among the 460 labelled `internode`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
@@ -308,7 +308,7 @@ io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 858 tests fail, with io_uring refused as well. Give the container a
+the suite's 860 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -486,13 +486,12 @@ lead listening on its own loopback address, so one machine runs a job of
 several nodes, over TCP between them as a cluster would - up to 1,024
 processes on 254 logical nodes; the single-node build refuses such a job by
 name, since it has no TCP. `-s` names the variables as `srun` does, so
-the job takes the bootstrap's Slurm path. A job of tens of logical nodes on a
-machine with more busy threads than cores can end, after a minute or two,
-"stopped answering ... The host has vanished": the loopback, which carries
-every logical node's TCP keepalive probes and their answers, drops them when
-it falls behind, and a connection that loses six in a row is ended by the
-kernel. Nothing has vanished; `OSOE_KEEPALIVE=0` loses nothing on one machine,
-whose kernel closes a dead logical node's connections itself
+the job takes the bootstrap's Slurm path. Its logical nodes run without TCP
+keepalive unless `OSOE_KEEPALIVE` is set: the loopback, which carries every
+probe and its answer, drops them when a machine has more busy threads than
+cores, and a job of tens of logical nodes so loaded once ended after two
+minutes as "stopped answering ... The host has vanished", where nothing had
+vanished - the machine's kernel closes a dead logical node's connections itself
 (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-1).
 
 It fails if any process fails, if the timeout (`-t SECONDS`, 1 to 86400, default 60 -
@@ -1092,7 +1091,9 @@ specification or takes a choice the specification leaves open.
   rendezvous - that stops moving to end the job naming what it waited for. A
   node that vanishes without closing its connections is noticed in one to two
   minutes by default (`OSOE_KEEPALIVE`): by TCP keepalive when nothing was in
-  flight toward it, and by its kernel's silence when something was.
+  flight toward it, and by its kernel's silence when something was - between
+  machines, since one machine's logical nodes cannot vanish so, and run
+  without either.
 - **A program's own deadlock ends the job only once it is proved.** When
   every PE of the job waits inside the library, nothing moves on any node for
   `OSOE_DEADLOCK_SECONDS` (10 by default) and nothing is in flight between
@@ -1321,11 +1322,11 @@ that one could be added without touching the OpenSHMEM layer.
   tests under AddressSanitizer it failed, and beside four busy loops on four
   cores it failed 9 runs of 20 (the release checklist).
 - **Two builds.** The single-node build runs the same suite less the
-  458 tests labelled `internode` - those of a job of more than one node, of
+  460 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 399 of the full build's 858 tests in
+  development VM with liburing hidden: 399 of the full build's 860 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1474,7 +1475,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A program's own waits and collectives are not timed. |
-| `OSOE_KEEPALIVE` | `60,10,6` | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. |
+| `OSOE_KEEPALIVE` | `60,10,6`, or `0` on one machine | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - one machine's logical nodes (`osoe-launch`) - has neither: the machine's one kernel closes a dead node's connections itself and answers for a stopped one, so a probe there can only be lost, and an overloaded machine's loopback drops them. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. |

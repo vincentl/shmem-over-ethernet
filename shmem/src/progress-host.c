@@ -780,13 +780,28 @@ void osoe_progress_host_start(uint32_t session)
     struct sockaddr_in *peers_address = calloc(osoe.job.node_count, sizeof *peers_address);
     if (!peers_address)
         osoe_fatal("out of memory for %u node addresses", osoe.job.node_count);
+    bool one_machine = true;
     for (uint32_t n = 0; n < osoe.job.node_count; n++) {
         uint16_t port;
         memcpy(&port, osoe_job_backend_blob(&osoe.job, n), sizeof port);
         peers_address[n] = (struct sockaddr_in){ .sin_family = AF_INET,
                                                  .sin_port = htons(port),
                                                  .sin_addr.s_addr = osoe_job_node_address(&osoe.job, n) };
+        one_machine = one_machine && (ntohl(peers_address[n].sin_addr.s_addr) >> 24) == 127;
     }
+    /*
+     * Keepalive off by default where every node has a loopback address - one
+     * machine's logical nodes (osoe-launch, §8.1) - and OSOE_KEEPALIVE is not
+     * set: their kernel is one, which closes a dead node's connections itself
+     * and answers for a stopped one, so a probe there can only be lost, and an
+     * overloaded machine's loopback backlog loses them, ending healthy jobs of
+     * tens of logical nodes as vanished hosts (the review of v0.2 step 4's
+     * merge point, correctness Q2-1; the author, 2026-10-10). Before the wires
+     * open and the silent-peer check starts, which both read it; a job across
+     * machines, tier 3's namespaces among them, keeps it on.
+     */
+    if (one_machine && !osoe.bootstrap.keepalive_set)
+        osoe.bootstrap.keepalive_off = true;
     struct osoe_mesh mesh = { &mesh_listener, peers_address };
     osoe_wires_open(osoe_am.wire, rings, helpers, &osoe.bootstrap, session, &mesh);
     free(peers_address);

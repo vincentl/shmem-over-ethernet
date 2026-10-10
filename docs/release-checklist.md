@@ -257,11 +257,6 @@ rated them (round six's readiness Q5-5).
 - **From the review of v0.2 step 4's merge point**
   (`docs/reviews/archive/v0.2-step4-review.md`), each rated after the release
   or minor, and none made before the tag:
-  - keepalive on one overloaded machine's loopback ends healthy jobs of tens of
-    logical nodes as vanished hosts (correctness Q2-1): `osoe-launch`, or the
-    bootstrap when every peer is a loopback address, turning keepalive off,
-    which on one machine loses nothing - the README tells `osoe-launch`'s users
-    so today;
   - the ThreadSanitizer gate at a helper count tells the library's own
     collective words in the heap mapping from a program's heap, passes a
     report there only against a short list with a reason each, and requires a

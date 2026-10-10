@@ -1644,6 +1644,29 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
   set_tests_properties(shmem.helper-wake.0-1-2-3 PROPERTIES RUN_SERIAL TRUE)
 endif()
+
+# Keepalive off by default where every node has a loopback address, and on as
+# OSOE_KEEPALIVE sets it there (§3.15; the review of v0.2 step 4's merge point,
+# correctness Q2-1; test-keepalive.c): PE 0, node 0's lead, reads SO_KEEPALIVE
+# on its own node-pair sockets.
+if(OSOE_INTERNODE)
+  add_executable(shmem_test_keepalive test-keepalive.c)
+  target_link_libraries(shmem_test_keepalive PRIVATE osoe)
+  osoe_warnings(shmem_test_keepalive)
+  add_test(NAME shmem.keepalive.loopback-off.0-1
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_keepalive> off)
+  add_test(NAME shmem.keepalive.set-on.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_KEEPALIVE=60,10,6
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_keepalive> on)
+  set_tests_properties(shmem.keepalive.loopback-off.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "KEEPALIVE OFF OK")
+  set_tests_properties(shmem.keepalive.set-on.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "KEEPALIVE ON OK")
+  osoe_internode_label(shmem.keepalive.loopback-off.0-1)
+  osoe_internode_label(shmem.keepalive.set-on.0-1)
+endif()
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
 # shmem_finalize naming it, found by its turns: nothing waits for time to pass.

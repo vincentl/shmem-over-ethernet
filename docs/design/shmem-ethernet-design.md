@@ -2488,8 +2488,10 @@ minutes after its connections go quiet. Keepalive asks whether the peer's
 not tested at scale - though on one
 overloaded machine running many logical nodes, whose loopback carries every
 probe and answer, the backlog drops both, and a healthy job can end so (the
-review of v0.2 step 4's merge point, correctness Q2-1; the README says so for
-`osoe-launch`, where `OSOE_KEEPALIVE=0` loses nothing): a stopped node's kernel still
+review of v0.2 step 4's merge point, correctness Q2-1), so a job whose every
+node has a loopback address runs without keepalive unless `OSOE_KEEPALIVE` is
+set - its one kernel closes a dead node's connections itself and answers for a
+stopped one, and nothing there can vanish (the author, 2026-10-10): a stopped node's kernel still
 acknowledges, so a stopped node is waited for, as the no-fatal-timeouts decision
 requires. A host that answers nothing at all is declared dead: powered off,
 partitioned, or a virtual machine paused for longer than keepalive's bound.
