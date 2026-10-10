@@ -241,8 +241,9 @@
  * piece of one round or half never passes for another's. Costs, with N nodes
  * and n bytes: 2 ceil(log2 N) rounds, each a hop, a message cost and its pieces
  * at the pace of the link or of the credits, N - 1 blocks of n / N each way a
- * half on every lead's link; ceil(log2 N) + 4 lines of words a team number, and
- * a lane's ceil(log2 N) rows a reduction.
+ * half on every lead's link; ceil(log2 N) + 3 lines of words a team number and
+ * the grant's - four more up to 32 nodes, five to 1,024 - and a lane's
+ * ceil(log2 N) rows a reduction.
  *
  * **A gather is Bruck's allgather among the team's node leads** (§5.8, "An
  * allgather for fcollect"; phase 1 step 5 slice 6), tools/modelcheck/
@@ -481,8 +482,9 @@ static uint64_t data_counter(uint32_t team, uint32_t step)
  * The reduce-scatter's words (internal-region.h): per team number, past every
  * number's allgather words, an arrival counter for each row - as many rows as
  * the job's node count takes, at most OSOE_INTERNAL_CIRCULANT_ROWS_MOST - then
- * the credit counter, the allgather's grant counter, the reduce-scatter's
- * grant line and the senders' lanes line, each on its own line.
+ * the credit counter and the allgather's grant counter, each on its own line;
+ * the reduce-scatter's grant lines, its counter and a field a row, one to four
+ * lines; and the senders' lanes line.
  */
 static uint32_t circulant_layout_rows(void)
 {
@@ -521,17 +523,18 @@ static uint64_t circulant_reduce_scatter_grant_counter(uint32_t number)
     return circulant_line(number, circulant_layout_rows() + 2);
 }
 
-/* The reduce-scatter grant's words, past its counter and so past every
- * lead's watch. */
+/* The reduce-scatter grant's fields, a round's each, past its counter and so
+ * past every lead's watch. */
 static uint64_t circulant_reduce_scatter_grant_words(uint32_t number)
 {
     return circulant_reduce_scatter_grant_counter(number) + 8;
 }
 
-/* The senders' lanes line: a lane word a row. */
+/* The senders' lanes line, past the grant's lines: a lane word a row. */
 static uint64_t circulant_senders(uint32_t number)
 {
-    return circulant_line(number, circulant_layout_rows() + 3);
+    uint32_t rows = circulant_layout_rows();
+    return circulant_line(number, rows + 2 + osoe_internal_circulant_grant_lines(rows));
 }
 
 /* This PE's own internal region, at `offset`. */
@@ -802,20 +805,24 @@ _Static_assert(sizeof(struct lane_word) <= OSOE_INTERNAL_LANE_WORD_BYTES,
 
 /*
  * What a Träff's reduction's reduce-scatter grant carries past its counter (the
- * file's comment): the epoch and the identity of the reduction, as a piece's
- * header names them, and its bytes, which every receiver of a lead puts alike;
- * then a field for each round, where that round's receiver puts the lane it
- * lends - plus one, so that a field never written, or cleared, reads as none.
- * The senders' lanes line beside it is a lane word a row.
+ * file's comment): a field for each round, where that round's receiver alone
+ * puts the epoch and the identity of the reduction it entered, as a piece's
+ * header names them, its bytes, and the lane it lends - plus one, so that a
+ * field never written, or cleared, reads as none. A field a receiver, and not
+ * one head every receiver put: with progress helpers two receivers' puts land
+ * from two threads at once, and the lead would check only the last to land
+ * (the review of v0.2 step 4's merge point, correctness Q2-4). The senders'
+ * lanes line past the grant's lines is a lane word a row.
  */
-struct circulant_grant {
+struct circulant_grant_field {
     uint32_t epoch;
     uint32_t collective;
     uint64_t bytes;
-    uint32_t lane[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
+    uint32_t lane;
+    uint32_t unused;
 };
-_Static_assert(8 + sizeof(struct circulant_grant) <= OSOE_INTERNAL_LINE_BYTES,
-               "a reduce-scatter grant's words fit its line, past the counter");
+_Static_assert(sizeof(struct circulant_grant_field) == OSOE_INTERNAL_CIRCULANT_GRANT_FIELD_BYTES,
+               "a reduce-scatter grant's field is the size the region keeps for it");
 _Static_assert(OSOE_INTERNAL_CIRCULANT_ROWS_MOST * sizeof(struct lane_word) <=
                    OSOE_INTERNAL_LINE_BYTES,
                "the senders' lanes line holds a lane word for every row");
@@ -1596,40 +1603,46 @@ static void round_take(struct round_flight *f, uint32_t own, uint32_t *sender_la
 
 /*
  * This lead's reduce-scatter grants, once its grant counter shows every one
- * of them (the file's comment): their words, put before the adds the acquire
- * load saw, must name this reduction - its epoch, its identity and its bytes -
- * and the field for each round the lane that round's receiver lends, or the
- * job ends, a hop before a piece's header would. Read, then cleared.
+ * of them (the file's comment): each round's field, put by that round's
+ * receiver before the add the acquire load saw, must name this reduction - its
+ * epoch, its identity and its bytes - and the lane the receiver lends, or the
+ * job ends naming that receiver, a hop before a piece's header would. Read,
+ * then cleared.
  */
 static void take_round_grants(const struct generic_team *team_phase, const struct pieces *pieces,
                               uint32_t rows, uint32_t *granted)
 {
-    struct circulant_grant grant;
+    struct circulant_grant_field fields[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
     unsigned char *words = internal(circulant_reduce_scatter_grant_words(pieces->number));
-    memcpy(&grant, words, sizeof grant);
-    cleared(words, sizeof grant);
-    if (grant.epoch != pieces->epoch || grant.collective != pieces->collective ||
-        grant.bytes != pieces->bytes) {
-        char theirs[160], mine[160];
-        describe_collective(grant.epoch, grant.collective, theirs, sizeof theirs);
-        describe_collective(pieces->epoch, pieces->collective, mine, sizeof mine);
-        osoe_fatal("%s: the reduce-scatter grants this node's lead (PE %u) holds are for %s, "
-                   "%llu bytes, and it is in %s, %zu bytes: PEs called different collectives, "
-                   "or the same one with different arguments", pieces->routine, osoe.job.me,
-                   theirs, (unsigned long long)grant.bytes, mine, pieces->bytes);
-    }
+    memcpy(fields, words, rows * sizeof fields[0]);
+    cleared(words, rows * sizeof fields[0]);
     for (uint32_t k = 0; k < rows; k++) {
-        if (grant.lane[k] == 0 || grant.lane[k] > OSOE_MAX_THREADS_HIGHEST) {
-            struct osoe_circulant_round round = osoe_circulant_round(
-                team_phase->index, team_phase->count, k, pieces->bytes / pieces->width);
-            uint32_t receiver = lead_of(pieces->team, round.to, pieces->routine);
-            osoe_fatal("%s: the reduce-scatter grant of node %u's lead (PE %u), which this "
-                       "node's lead (PE %u) sends round %u of epoch %u's reduction, names %s: "
-                       "PEs called different collectives", pieces->routine,
-                       osoe_node_of(&osoe.job, receiver), receiver, osoe.job.me, k,
-                       pieces->epoch, grant.lane[k] == 0 ? "no lane" : "a lane past any PE's");
+        const struct circulant_grant_field *field = &fields[k];
+        bool same = field->epoch == pieces->epoch && field->collective == pieces->collective &&
+                    field->bytes == pieces->bytes;
+        if (same && field->lane != 0 && field->lane <= OSOE_MAX_THREADS_HIGHEST) {
+            granted[k] = field->lane - 1;
+            continue;
         }
-        granted[k] = grant.lane[k] - 1;
+        struct osoe_circulant_round round = osoe_circulant_round(
+            team_phase->index, team_phase->count, k, pieces->bytes / pieces->width);
+        uint32_t receiver = lead_of(pieces->team, round.to, pieces->routine);
+        if (!same) {
+            char theirs[160], mine[160];
+            describe_collective(field->epoch, field->collective, theirs, sizeof theirs);
+            describe_collective(pieces->epoch, pieces->collective, mine, sizeof mine);
+            osoe_fatal("%s: the reduce-scatter grant of node %u's lead (PE %u), which this "
+                       "node's lead (PE %u) sends round %u, is for %s, %llu bytes, and this "
+                       "lead is in %s, %zu bytes: PEs called different collectives, or the "
+                       "same one with different arguments", pieces->routine,
+                       osoe_node_of(&osoe.job, receiver), receiver, osoe.job.me, k, theirs,
+                       (unsigned long long)field->bytes, mine, pieces->bytes);
+        }
+        osoe_fatal("%s: the reduce-scatter grant of node %u's lead (PE %u), which this "
+                   "node's lead (PE %u) sends round %u of epoch %u's reduction, names %s: "
+                   "PEs called different collectives", pieces->routine,
+                   osoe_node_of(&osoe.job, receiver), receiver, osoe.job.me, k,
+                   pieces->epoch, field->lane == 0 ? "no lane" : "a lane past any PE's");
     }
 }
 
@@ -1755,27 +1768,23 @@ static void in_rounds(struct generic_team *team_phase, const struct pieces *piec
  * enters it, before the intranode phase: this thread's lane is the reduction's
  * from here to its return, and the sender of each of its reduce-scatter rounds
  * - round k's, the lead s_k positions before it - is told so: the reduction's
- * epoch, identity and bytes and, in the field for the round, the lane, put into
- * the sender's grant line, then one more on its grant counter, fenced after
- * them.
+ * epoch, identity and bytes and the lane, put into the sender's field for the
+ * round, which this lead alone writes, then one more on its grant counter,
+ * fenced after it.
  */
 static void circulant_grants(const struct generic_team *team_phase, uint32_t team,
                              uint32_t epoch, uint32_t collective, uint64_t bytes, uint64_t count,
                              const char *routine)
 {
     uint32_t number = number_of(team), rows = osoe_circulant_rows(team_phase->count);
-    struct circulant_grant head = { epoch, collective, bytes, { 0 } };
-    uint32_t field = own_lane() + 1;
+    struct circulant_grant_field field = { epoch, collective, bytes, own_lane() + 1, 0 };
     uint64_t words = circulant_reduce_scatter_grant_words(number);
     struct osoe_transport_context *context = osoe_transport_context_default();
     for (uint32_t k = 0; k < rows; k++) {
         struct osoe_circulant_round round =
             osoe_circulant_round(team_phase->index, team_phase->count, k, count);
         int sender = (int)lead_of(team, round.from, routine);
-        osoe_transport_put(context, sender, OSOE_REGION_INTERNAL, words, &head,
-                           offsetof(struct circulant_grant, lane), OSOE_TRANSPORT_MORE);
-        osoe_transport_put(context, sender, OSOE_REGION_INTERNAL,
-                           words + offsetof(struct circulant_grant, lane) + k * sizeof field,
+        osoe_transport_put(context, sender, OSOE_REGION_INTERNAL, words + k * sizeof field,
                            &field, sizeof field, OSOE_TRANSPORT_MORE);
         osoe_transport_rmw(context, sender, OSOE_REGION_INTERNAL,
                            circulant_reduce_scatter_grant_counter(number), OSOE_RMW_ADD, 8, 1, 0,
@@ -2869,7 +2878,7 @@ void osoe_internode_generic_number_taken(uint32_t number)
                               memory_order_release);
     if (rows > 0) {
         memset(internal(circulant_reduce_scatter_grant_words(number)), 0,
-               sizeof(struct circulant_grant));
+               (size_t)rows * sizeof(struct circulant_grant_field));
         memset(internal(circulant_senders(number)), 0, OSOE_INTERNAL_LINE_BYTES);
     }
 }

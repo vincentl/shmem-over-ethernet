@@ -83,7 +83,9 @@
  *
  * Then **the reduce-scatter's words** (v0.2 step 3; below), sized the same way:
  * per team number, a line for each of the ceil(log2 N) rows of Träff's
- * reduce-scatter and allgather and four more.
+ * reduce-scatter and allgather, three more, and the grant's lines - one up to
+ * five rows, so four more lines up to 32 nodes, five to 1,024, six to 32,768
+ * and seven past.
  *
  * Then **the scans' area** (below), and last **the lanes**: one per thread
  * record of the PE (node.h), each `fanout + 1` rows of D slots, a piece's
@@ -284,24 +286,41 @@ static inline uint64_t osoe_internal_gather_offset(uint32_t fanout, uint32_t max
  *     taken that its window waits on;
  *   - the **allgather's grant counter**: one for each of its allgather
  *     receivers whose row its reduce-scatter has emptied;
- *   - the **reduce-scatter's grant line**: its counter, one for each
- *     reduce-scatter receiver that has entered, then the collective's epoch,
- *     identity and bytes, and a field per round, where that round's receiver
- *     puts the lane it lends;
+ *   - the **reduce-scatter's grant lines**: its counter, one for each
+ *     reduce-scatter receiver that has entered, then a field per round, where
+ *     that round's receiver alone puts the epoch, identity and bytes of the
+ *     collective it entered and the lane it lends - each receiver's own, so
+ *     that no word has two writers, which a head that every receiver put had
+ *     with progress helpers, and the lead checks every receiver's call, not the
+ *     last to land (the review of v0.2 step 4's merge point, correctness Q2-4);
+ *     as many lines as the counter and the fields take, one up to five rows;
  *   - the **senders' lanes line**: a lane and an epoch per row, where each
  *     reduce-scatter round's sender puts its own lane before its first piece's
  *     add, for the allgather back.
- * So every put lands outside the counters a lead watches - the grant's words
+ * So every put lands outside the counters a lead watches - the grant's fields
  * past its counter, the senders' lanes on a line of their own. Its own, and
  * no other collective's: the allgather ends with no step every lead waits
  * for, so a lead that has left can start a small collective whose child adds
  * to its parent's counters at once while another lead still waits on its last
  * pieces (tools/modelcheck/circulant_model.py, shared_counters). Sized like
- * the gather's by the job's node count, ceil(log2 N) + 4 lines, and no more
- * rows than OSOE_INTERNAL_CIRCULANT_ROWS_MOST, which the senders' lanes line
- * holds: a team of more than 65,536 nodes takes the trees.
+ * the gather's by the job's node count, ceil(log2 N) + 3 lines and the grant's,
+ * and no more rows than OSOE_INTERNAL_CIRCULANT_ROWS_MOST, which the senders'
+ * lanes line holds: a team of more than 65,536 nodes takes the trees.
  */
 enum { OSOE_INTERNAL_CIRCULANT_ROWS_MOST = 16 };
+
+/* A reduce-scatter grant's field: the epoch, identity and bytes of the
+ * receiver's collective and the lane it lends, and room to keep the next
+ * field's bytes aligned (internode-generic.c, struct circulant_grant_field). */
+enum { OSOE_INTERNAL_CIRCULANT_GRANT_FIELD_BYTES = 24 };
+
+/* The reduce-scatter's grant lines for `rows` rows: the counter's 8 bytes and
+ * a field a row. */
+static inline uint32_t osoe_internal_circulant_grant_lines(uint32_t rows)
+{
+    uint64_t bytes = 8 + (uint64_t)rows * OSOE_INTERNAL_CIRCULANT_GRANT_FIELD_BYTES;
+    return (uint32_t)((bytes + OSOE_INTERNAL_LINE_BYTES - 1) / OSOE_INTERNAL_LINE_BYTES);
+}
 
 /* The rows of the reduce-scatter's words for a job of `nodes` nodes:
  * ceil(log2 nodes), at most OSOE_INTERNAL_CIRCULANT_ROWS_MOST, 0 for one. */
@@ -311,11 +330,14 @@ static inline uint32_t osoe_internal_circulant_rows(uint32_t nodes)
     return rows < OSOE_INTERNAL_CIRCULANT_ROWS_MOST ? rows : OSOE_INTERNAL_CIRCULANT_ROWS_MOST;
 }
 
-/* One team number's reduce-scatter words: a line for each row and four more,
- * none on one node. */
+/* One team number's reduce-scatter words: a line for each row, the credit
+ * counter's and the allgather grant counter's, the grant's lines and the
+ * senders' lanes line, none on one node. */
 static inline uint64_t osoe_internal_team_circulant_bytes(uint32_t rows)
 {
-    return rows == 0 ? 0 : (uint64_t)(rows + 4) * OSOE_INTERNAL_LINE_BYTES;
+    return rows == 0 ? 0
+                     : (uint64_t)(rows + 3 + osoe_internal_circulant_grant_lines(rows)) *
+                           OSOE_INTERNAL_LINE_BYTES;
 }
 
 /* Where the reduce-scatter's words start: past every team number's allgather
