@@ -1,0 +1,11 @@
+gate-control.full: control.global-race: a race outside the heaps: global 'counter' of size 8 at 0x55d0c0a01040 (test+0x4040)
+gate-control.full: control.global-race: accesses outside the heaps' range: ['0x55d0c0a01040']
+gate-control.full: control.use-after-free: reports of another kind: ['heap-use-after-free']
+gate-control.full: control.use-after-free: accesses outside the heaps' range: ['0x7b0400000010']
+gate-control.full: control.status-1: exit statuses other than 66: ['1']
+gate-control.full: control.timeout: timed out
+gate-control.full: control.stray-access: accesses outside the heaps' range: ['0x7fff12345678']
+gate-control.full: control.no-report: no ThreadSanitizer report
+gate-control.full: control.no-report: exit statuses other than 66: ['1']
+gate-control.full: 7 failing tests read
+TSAN GATE FAILED: 6 tests

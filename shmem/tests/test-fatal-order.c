@@ -29,6 +29,7 @@
 #include "blocked.h"
 #include "check.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 
 struct osoe_state osoe;
@@ -75,6 +76,13 @@ static bool on_agent;
 bool osoe_agent_is_this_thread(void)
 {
     return on_agent;
+}
+
+/* No progress helper here (metrics.c): a helper's fatal says where its PE was
+ * as the agent's does, which on_agent stands for. */
+bool osoe_metrics_thread_unpooled(void)
+{
+    return false;
 }
 
 const char *osoe_blocked_routine(void)

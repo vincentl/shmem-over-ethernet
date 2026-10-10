@@ -17,8 +17,12 @@
 #ifndef OSOE_AM_STATE_H
 #define OSOE_AM_STATE_H
 
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdbool.h>
+#include <stdint.h>
 
+#include "base/cacheline.h"
 #include "connection-area.h"
 #include "progress.h"
 #include "reply.h"
@@ -30,10 +34,36 @@
  * created disabled by the thread that opens the job's connections, and enabled
  * by the owner's own, which is then its only submitter (ring.h) - and its half
  * of the sleep protocol, private to its thread.
+ *
+ * A helper's besides (owner 1 to H; progress-host.c; helper_request_model.py):
+ * its thread, which the lead's agent starts and joins, and the words the two
+ * ask and answer by, in the lead's process, which alone runs either. Each word
+ * has one writer: `request` is the agent's - a request's sequence above its
+ * kind - and `answer`, `stop` and `turns` the helper's: the request it last
+ * answered with its verdict, how far its stop has gone, and its turns,
+ * counted seq_cst so that the agent can tell a helper that ignores its stop
+ * from one that has not yet looked. And every owner's take of the unsent limit
+ * the application thread asks (osoe_progress_host_limit_unsent): the request
+ * it last took, its own, and, published, the one it has applied and how many
+ * of its wires that reached, which the agent says once every owner has.
+ *
+ * Each owner's on lines of its own, as its words in the connection area are:
+ * every pass of an owner writes its ring's fields, and with helpers the next
+ * owner in the array is another thread (progress-host.c allocates them so).
  */
 struct osoe_am_owner {
-    struct osoe_ring ring;
+    _Alignas(OSOE_CACHELINE) struct osoe_ring ring;
     bool flag_raised;               /* its `sleeping` is raised and not yet lowered */
+    pthread_t thread;
+    bool started;                   /* the agent's: the thread was created */
+    uint32_t posted;                /* the agent's: the request it posted last */
+    _Atomic uint32_t request;
+    _Atomic uint32_t answer;
+    _Atomic uint32_t stop;          /* 0, then acknowledged, then done (progress-host.c) */
+    _Atomic uint64_t turns;
+    uint64_t unsent_taken;
+    _Atomic uint64_t unsent_applied;
+    _Atomic uint32_t unsent_reached;
 };
 
 struct osoe_am_state {
@@ -48,7 +78,7 @@ struct osoe_am_state {
     struct osoe_am_owner *owner;                 /* the area's helpers + 1, by owner */
     struct osoe_wire *wire;                      /* 2 x (nodes - 1), grouped by ring (owner-map.h):
                                                   * the data wires, and owner 0's control wires */
-    struct osoe_progress_connection *connection; /* nodes - 1, grouped by owner */
+    struct osoe_progress_connection *connection; /* each owner's, on lines of its own (lines_of) */
     struct osoe_progress_control *control;       /* nodes - 1, owner 0's, by peer slot */
     uint64_t *control_busy;                      /* their busy bitmap */
     uint64_t *busy;                              /* each owner's bitmap in turn */

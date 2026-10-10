@@ -856,7 +856,9 @@ foreach(case_expect
     "wire-unsent-bytes|OSOE_WIRE_UNSENT_BYTES|abc|OSOE_WIRE_UNSENT_BYTES='abc' is not a byte count: 0 to leave the system's own, or up to 1073741824"
     "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes"
     "wire-zero-copy|OSOE_WIRE_ZERO_COPY|yes|OSOE_WIRE_ZERO_COPY=yes: on, to send connection buffers by reference"
-    "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1")
+    "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1"
+    "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not a number of threads from 0 to 64"
+    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -885,6 +887,20 @@ if(OSOE_INTERNODE)
     PATTERNS "osoe: PE 1: connection area /osoe[.][0-9]+[.]0[.]0[.]conn[.]0 was created with different AM sizing [(]buffer 524288 chunk [0-9]+ nodes 2, not [0-9]+/[0-9]+/2[)]: every PE of a job must set OSOE_AM_[*] the same"
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   osoe_internode_label(shmem.start-up.am-buffer.differs shmem.start-up.am-buffer.lead-larger)
+  # OSOE_PROGRESS_HELPERS differs between a node's PEs (v0.2 step 4, Part 3): the
+  # node's own rendezvous refuses the PE that differs, naming both counts, where
+  # the connection area would have refused it in the name of OSOE_AM_* (the
+  # adversarial read of Part 1, N3). On both nodes, so that every rank ends; the
+  # leads' count given too, so that a suite run with a count of its own keeps it.
+  osoe_refusal_test(shmem.start-up.progress-helpers.differs 4 0
+    LAUNCH -n 4 -m 0,0,1,1 -e 0:OSOE_PROGRESS_HELPERS=0 -e 1:OSOE_PROGRESS_HELPERS=2
+           -e 2:OSOE_PROGRESS_HELPERS=0 -e 3:OSOE_PROGRESS_HELPERS=2
+    PATTERNS "osoe: PE 1: OSOE_PROGRESS_HELPERS differs between PEs: the local lead has 0, this PE has 2"
+             "osoe: PE 3: OSOE_PROGRESS_HELPERS differs between PEs: the local lead has 0, this PE has 2"
+             "osoe: PE 0: another local PE failed during rendezvous"
+             "osoe: PE 2: another local PE failed during rendezvous"
+    PROGRAM $<TARGET_FILE:shmem_test_init>)
+  osoe_internode_label(shmem.start-up.progress-helpers.differs)
 endif()
 
 # A PE whose own environment is bad refuses it before its node has joined, and
@@ -1083,6 +1099,22 @@ if(OSOE_INTERNODE)
     FAIL_REGULAR_EXPRESSION "WROTE PAST THE LANDING ZONE")
   osoe_internode_label(shmem.progress shmem.progress.forged-get-reply
     shmem.progress.forged-get-reply-bounds)
+  # A node that is ending excuses a peer's reset and sends nothing more on the
+  # failed wire (the second adversarial read of Part 3, S1;
+  # abort_owners_model.py's reset_stream): node 1's lead resets its data wire
+  # and ends while node 0's lead, its node ending, has a send's completion still
+  # to collect, which node 0 reaps in one pass with the reset. Offering that
+  # segment again was send_from's fatal; without the node excuse the reset is
+  # one too.
+  add_test(NAME shmem.progress.reset-while-ending
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919
+            OSOE_TEST_FORGE=reset-while-ending
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 20 --
+            $<TARGET_FILE:shmem_test_progress>)
+  set_tests_properties(shmem.progress.reset-while-ending PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "RESET WHILE ENDING OK" FAIL_REGULAR_EXPRESSION "osoe_fatal")
+  osoe_internode_label(shmem.progress.reset-while-ending)
   # The planes kept apart (the progress helpers proposal's §3.1): node 0's lead
   # sends a barrier arrival on its data wire, or a get reply on its control
   # wire, and node 1 must refuse each by name - the get reply before its
@@ -1553,6 +1585,59 @@ endfunction()
 # acknowledgement protocol: 1,320 header-only segments per node in the idle
 # half second.
 osoe_tier2_map_test(ack-echo 0,1)
+
+# Progress helpers (v0.2 step 4, Part 3; owner-map.h). A PE's wake reaches the
+# owner of its wire: each put of PE 0's wakes the helper the map names for its
+# peer, and never the node's other helper (test-helper-wake.c; the wake count is
+# the owner's, layout 36). The deadlock detector, whose requests nudge every
+# helper, is off. Not under ThreadSanitizer, as the node maps above are not:
+# the helpers land the puts in heaps their PEs' own threads touch, ordered
+# through another process, and the preset runs at no helpers (the second
+# adversarial read of Part 3, S2).
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
+endif()
+# A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
+# helper_request_model.py's `deaf` case stands for - ends the job at
+# shmem_finalize naming it, found by its turns: nothing waits for time to pass.
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.helpers.deaf.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_DEAF_HELPER=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_barrier>)
+  set_tests_properties(shmem.helpers.deaf.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+      "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered")
+  osoe_internode_label(shmem.helpers.deaf.0-1)
+  # An ending node's agent waits for its helpers' abortive goodbyes before its
+  # process ends (abort_owners_model.py's no_wait): under OSOE_TEST_ABORT_DELAY_MS
+  # a helper begins its abort half a second late, and a peer acts on an abortive
+  # goodbye half a second late, so that only the data wire's own goodbye, ahead
+  # of its end, keeps the peer's helper from taking that end for a death - here a
+  # non-lead's fatal, which its lead's goodbyes carry (global-exit.sh's lost
+  # goodbyes and strays).
+  add_test(NAME shmem.helpers.abort-wait.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_ABORT_DELAY_MS=500
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 fatal 1 1 compute)
+  set_tests_properties(shmem.helpers.abort-wait.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  osoe_internode_label(shmem.helpers.abort-wait.0-0-1-1)
+  # A node that is ending excuses a peer's end, and sends nothing more on a
+  # connection that failed (abort_owners_model.py's reset_stream; the second
+  # adversarial read of Part 3, S1): node 0 ends by a non-lead's global exit, its
+  # helpers half a second behind it, while node 1 streams to it; node 1's lead
+  # dies of a fatal of its own 150 ms after the exit, and node 0's helpers read
+  # its connections' end - a reset where input was unread - before their own
+  # abort. Without the excuse, or with a send on the failed connection, node 0's
+  # helper raises a fatal and its agent waits out the grace.
+  add_test(NAME shmem.helpers.reset-stream.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_ABORT_DELAY_MS=500
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 reset-stream)
+  set_tests_properties(shmem.helpers.reset-stream.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  osoe_internode_label(shmem.helpers.reset-stream.0-0-1-1)
+endif()
 
 # A reply is not starved by puts (§3.8's DRAINING state; review round two, C7):
 # one getter on node 0, the get's target and five writers on node 1, the

@@ -95,13 +95,30 @@ void osoe_wait_ends(void)
 /* ---- A node's sample -------------------------------------------------------- */
 
 /*
+ * Whether thread `tid` of PE `s` is one of its node's progress helpers (v0.2
+ * step 4, Part 3): threads of the lead's process, each naming itself in its
+ * owner record (node.h, layout 36) before its first turn. One not yet named is
+ * counted as the program's, and a sample that sees it awake fails, as it does
+ * for any thread of the program's that runs.
+ */
+static bool progress_helper(const struct osoe_pe_slot *s, int32_t tid)
+{
+    if (s != &osoe.node.slots[0])
+        return false;
+    for (uint32_t o = 1; o < osoe.node.owner_count; o++)
+        if (atomic_load_explicit(&osoe.node.owner_metrics[o].tid, memory_order_acquire) == tid)
+            return true;
+    return false;
+}
+
+/*
  * How many of PE `s`'s threads are the application's, if every one of them
  * sleeps; -1 when one does not - it runs, it was woken and has not run yet, it
  * is stopped or traced, it waits on a disk - or /proc cannot say. The
- * application's threads are every task but the PE's agent and io_uring's
- * workers, which the kernel runs as threads of the process that submits and
- * marks PF_IO_WORKER in the flags /proc gives: by the flag, not by the
- * "iou-" name, which a thread of the program's may also take.
+ * application's threads are every task but the PE's agent, the lead's progress
+ * helpers, and io_uring's workers, which the kernel runs as threads of the
+ * process that submits and marks PF_IO_WORKER in the flags /proc gives: by the
+ * flag, not by the "iou-" name, which a thread of the program's may also take.
  */
 #define TASK_IO_WORKER 0x10u           /* the kernel's PF_IO_WORKER */
 static int threads_asleep(const struct osoe_pe_slot *s)
@@ -114,7 +131,8 @@ static int threads_asleep(const struct osoe_pe_slot *s)
         return -1;
     int count = 0;
     for (struct dirent *e; count >= 0 && (e = readdir(tasks));) {
-        if (e->d_name[0] < '0' || e->d_name[0] > '9' || atoi(e->d_name) == agent)
+        if (e->d_name[0] < '0' || e->d_name[0] > '9' || atoi(e->d_name) == agent ||
+            progress_helper(s, atoi(e->d_name)))
             continue;
         char stat_path[320], line[512];     /* d_name is at most 255 bytes */
         snprintf(stat_path, sizeof stat_path, "/proc/%" PRId32 "/task/%s/stat", s->pid,

@@ -166,11 +166,12 @@ static inline int osoe_invariants_ok(void)
 }
 
 /*
- * One node-scope metric of this PE's own node, by name, through the same reader:
+ * One node-wide metric of this PE's own node, by name, through the same reader:
  * how a test sees what the library counts but does not return, such as
- * `transport.am.header_only_sent`. Returns 0 and prints why if the segment or
- * the name cannot be read, so a test that misspells a metric fails rather than
- * reading zero.
+ * `transport.am.header_only_sent`. A node-scope field, or an owner-scope
+ * one's node-wide value (layout 36): the owners' sum, or for a high-water mark
+ * their largest. Returns 0 and prints why if the segment or the name cannot be
+ * read, so a test that misspells a metric fails rather than reading zero.
  */
 static inline int osoe_test_node_metric(const char *metric, uint64_t *value)
 {
@@ -182,9 +183,23 @@ static inline int osoe_test_node_metric(const char *metric, uint64_t *value)
         return 0;
     }
     const struct osoe_metric_descriptor *m = s.table_usable ? osoe_segment_metric(&s, metric) : NULL;
-    int ok = m && m->scope == OSOE_MSCOPE_NODE && osoe_segment_read(&s, m, 0, value);
+    int ok = 0;
+    if (m && m->scope == OSOE_MSCOPE_NODE) {
+        ok = osoe_segment_read(&s, m, 0, value);
+    } else if (m && m->scope == OSOE_MSCOPE_OWNER && s.owner_count > 0) {
+        ok = 1;
+        *value = 0;
+        for (uint32_t o = 0; ok && o < s.owner_count; o++) {
+            uint64_t v = 0;
+            ok = osoe_segment_read(&s, m, o, &v);
+            if (m->kind == OSOE_MKIND_HIGHWATER)
+                *value = v > *value ? v : *value;
+            else
+                *value += v;
+        }
+    }
     if (!ok)
-        fprintf(stderr, "node metric %s: not a readable node-scope metric of %s\n", metric, s.name);
+        fprintf(stderr, "node metric %s: not a readable node-wide metric of %s\n", metric, s.name);
     osoe_segment_close(&s);
     return ok;
 }

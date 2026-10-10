@@ -322,6 +322,16 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_MAX_THREADS='%s' is not a number of threads from 1 to %u",
                    getenv("OSOE_MAX_THREADS"), (unsigned)OSOE_MAX_THREADS_HIGHEST - 1);
 
+    /* OSOE_PROGRESS_HELPERS (bootstrap.h): by every PE, refused past 64 before
+     * anything is laid out by it - an owner past the 64th has no bit in a PE's
+     * mask (the adversarial read of Part 1, N5). */
+    b->progress_helpers = 0;
+    if (osoe_environment_u32("OSOE_PROGRESS_HELPERS", &b->progress_helpers) ==
+            OSOE_ENVIRONMENT_INVALID ||
+        b->progress_helpers > OSOE_PROGRESS_HELPERS_HIGHEST)
+        osoe_fatal("OSOE_PROGRESS_HELPERS='%s' is not a number of threads from 0 to %u",
+                   getenv("OSOE_PROGRESS_HELPERS"), OSOE_PROGRESS_HELPERS_HIGHEST);
+
     /*
      * How many pieces of a data collective each lead of the internode tree
      * keeps in flight (§5.8, "Pipelined pieces"). It fixes the internal

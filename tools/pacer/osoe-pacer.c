@@ -1081,6 +1081,36 @@ static int mix_world_period(long p)
     return p % MIX_WORLD_EVERY == MIX_WORLD_EVERY - 1;
 }
 
+/*
+ * Whether the mix's time is up, by the clock of the PE that has run longest,
+ * so that every PE stops at the same period. Each PE's own reading would not
+ * do: each reads its clock from a start of its own, at its own moment after
+ * the last period's sync, and the seed's periods can end just at --seconds - a
+ * PE that read the time as up left for the teardown, whose first rebind syncs
+ * the world, while its team's other members began the next period and synced
+ * their team, and the job hung (two PEs of eight, at 60.0 s of a 60 s run,
+ * 2026-10-08). OSOE_TEST_PACER_LATE_START puts that difference between the
+ * PEs on purpose: PE 1 starts its clock that many seconds late.
+ */
+static int mix_time_up(double start)
+{
+    max_source[0] = pacer_now() - start;
+    shmem_double_max_reduce(SHMEM_TEAM_WORLD, max_result, max_source, 1);
+    return max_result[0] >= options.seconds;
+}
+
+static double mix_late_start(int me_world)
+{
+    const char *text = getenv("OSOE_TEST_PACER_LATE_START");
+    double seconds = 0;
+    if (text && positive_number(text, &seconds) != 0) {
+        fprintf(stderr, "osoe-pacer: PE %d: OSOE_TEST_PACER_LATE_START='%s' is not a positive "
+                "number of seconds\n", me_world, text);
+        shmem_global_exit(2);
+    }
+    return me_world == 1 ? seconds : 0;
+}
+
 static void run_mix(int npes)
 {
     int teams = mix_teams(npes), me_world = shmem_my_pe();
@@ -1113,13 +1143,13 @@ static void run_mix(int npes)
             shmem_global_exit(2);
         }
 
-    double start = pacer_now();
+    double start = pacer_now() + mix_late_start(me_world);
     long q = 0;
     /* Quick: six team periods, so that each team meets every team exercise,
      * and the two world periods among them. */
     long periods = options.rounds ? options.rounds : options.quick ? 2 * MIX_WORLD_EVERY : 0;
     for (long p = 0;; p++) {
-        if (periods ? p >= periods : pacer_now() - start >= options.seconds)
+        if (periods ? p >= periods : mix_time_up(start))
             break;
         struct pacer_options period = setup_options;
         period.seed = random_mix(options.seed, random_name("mix"), (uint64_t)p, 0);

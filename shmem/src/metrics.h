@@ -182,6 +182,7 @@ enum osoe_metric_scope {
     OSOE_MSCOPE_CONNECTION,   /* a field of one connection's record (§3.14) */
     OSOE_MSCOPE_TEAM,         /* a field of one team number's block (layout 18) */
     OSOE_MSCOPE_EPOCHS,       /* one PE's published epoch for one team (layout 18) */
+    OSOE_MSCOPE_OWNER,        /* a field of one owner's AM record (layout 36) */
 };
 
 struct osoe_metric_descriptor {
@@ -220,6 +221,18 @@ uint32_t osoe_metric_checksum(const struct osoe_metric_descriptor *t, uint32_t n
  * pool per PE: the live threads that have called the library.
  */
 struct osoe_counter_block *osoe_metrics_block(void);
+
+/*
+ * For a thread of the node's progress engine beside the agent - a progress
+ * helper (progress-host.c): from here it counts into a block of its own that
+ * nobody reads, and claims none of its PE's pool, so that the helpers take
+ * nothing of OSOE_MAX_THREADS, which counts the threads the program runs. Its
+ * work is counted in its owner's record (node.h), which osoe-stat shows.
+ */
+void osoe_metrics_unpooled(void);
+
+/* Whether the calling thread is one such: a progress helper. */
+bool osoe_metrics_thread_unpooled(void);
 
 /* Bind this process to its PE's slice of the node's block pool, and release it.
  * Until osoe_metrics_init, and after osoe_metrics_fini, counting is a no-op on

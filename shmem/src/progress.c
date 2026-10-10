@@ -572,7 +572,7 @@ static void complete(void *context, const struct osoe_message_header *header,
             osoe_counter_word_add(&conn_metrics(o, i)->messages_applied, 1);
     }
     if (header->kind != OSOE_AM_DEADLOCK)
-        o->application_applied++;
+        osoe_counter_word_add(&o->application_applied, 1);
 
     switch (header->kind) {
     case OSOE_AM_PUT: {
@@ -808,6 +808,12 @@ static void segment_applied(void *context, const struct osoe_am_segment_header *
 
 /* ---- Receiving -------------------------------------------------------- */
 
+/* Whether the node's abort is declared (progress.h's host.aborting). */
+static bool node_aborting(const struct osoe_progress *p)
+{
+    return p->host.aborting && p->host.aborting(p->host.context);
+}
+
 /*
  * Take everything that has arrived on wire `w`, through `parser` and the sink
  * bound to `a`. Called for every wire the ring's reap marked readable, and it
@@ -848,9 +854,13 @@ static bool receive_wire(struct osoe_progress_owner *o, struct osoe_wire *w,
      * its control wire's abort the data wire's reset, the pass taking the
      * control wires first; the converse needs a control wire reset, and so its
      * receive window full, which nothing that rides it can fill (the second
-     * read, N1). */
-    bool aborted = *peer_aborted || (other_aborted && *other_aborted);
-    if ((o->aborting || aborted) && (w->error || osoe_wire_ended(w))) {
+     * read, N1). With helpers the other wire is another owner's, whose reading
+     * of the abort declared the node's (abort_arrived, progress-host.c): so a
+     * wire is excused while the node is ending, by any cause, too - before this
+     * owner has begun its own abort, which it does at its next turn. */
+    if ((w->error || osoe_wire_ended(w)) &&
+        (o->aborting || *peer_aborted || (other_aborted && *other_aborted) ||
+         node_aborting(o->engine))) {
         *abort_done = *abort_done || w->error || !*peer_goodbye;
         return moved;
     }
@@ -1176,8 +1186,13 @@ static bool flush(struct osoe_progress_owner *o, uint32_t i)
     if (c->peer_aborted)
         return false;
     /* Nor to a peer that has reset the connection, which reads nothing more:
-     * whether it was ending or died, its stream's end says (receive). */
-    if (w->send_error)
+     * whether it was ending or died, its stream's end says (receive). Nor on a
+     * connection that failed: every pass that fails one reads it before this
+     * flush, and receive_wire has ended the job, or excused the failure while
+     * this node is ending too - and a send would raise the fatal the excuse
+     * spared (send_from; abort_owners_model.py's reset_stream, the second
+     * adversarial read of Part 3's S1). */
+    if (w->error || w->send_error)
         return false;
     bool moved = false;
 
@@ -1486,8 +1501,9 @@ static bool flush_control(struct osoe_progress_owner *o, uint32_t slot)
     struct osoe_wire *w = &o->control_wire[slot];
     if (o->aborting)
         return flush_control_aborting(o, slot);
-    /* A peer ending, or one that reset the wire, is told nothing more (flush). */
-    if (c->peer_aborted || w->send_error)
+    /* A peer ending, or one that reset the wire, is told nothing more, nor is
+     * anything sent on a wire that failed (flush). */
+    if (c->peer_aborted || w->error || w->send_error)
         return false;
     bool moved = false;
     if (c->bytes) {
@@ -1655,14 +1671,16 @@ static bool busy(const struct osoe_progress_owner *o, uint32_t i)
            (o->closing && c->goodbye == OSOE_GOODBYE_NONE);
 }
 
-/* After a visit: keep the connection's bit while it is busy, clear it once not. */
+/* After a visit: keep the connection's bit while it is busy, clear it once not
+ * - stored only when it changes, so that a visit that leaves it as it was
+ * writes no line (the adversarial read of Part 3, S2). */
 static void settle(struct osoe_progress_owner *o, uint32_t i)
 {
     uint64_t bit = UINT64_C(1) << (i % 64);
-    if (busy(o, i))
-        o->busy[i / 64] |= bit;
-    else
-        o->busy[i / 64] &= ~bit;
+    uint64_t word = o->busy[i / 64];
+    uint64_t now = busy(o, i) ? word | bit : word & ~bit;
+    if (now != word)
+        o->busy[i / 64] = now;
 }
 
 /*
@@ -1721,6 +1739,7 @@ static void publish_ring(struct osoe_progress_owner *o)
     struct osoe_ring_counts *k = &o->ring->counts;
     if (k->completions == 0 && k->sends == 0)
         return;
+    osoe_counter_word_add(&o->metrics->wakes, k->wakes);
     osoe_counter_word_add(&o->metrics->completions, k->completions);
     osoe_counter_word_add(&o->metrics->receive_buffers, k->receives);
     osoe_counter_word_add(&o->metrics->receive_enobufs, k->enobufs);
@@ -2040,7 +2059,7 @@ void osoe_progress_check_silent(struct osoe_progress_owner *o, uint32_t budget_m
 
 bool osoe_progress_quiet(struct osoe_progress_owner *o, uint64_t *applied)
 {
-    *applied = o->application_applied;
+    *applied = osoe_counter_word_read(&o->application_applied);
     if (!osoe_progress_idle(o))
         return false;
     bool quiet = true;

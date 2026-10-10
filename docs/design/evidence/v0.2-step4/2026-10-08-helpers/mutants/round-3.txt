@@ -1,0 +1,7 @@
+== no-excuse 17:02:22 -R 'shmem\.helpers\.abort-wait|shmem\.(global-exit|kill-after-init|abort|fatal|stopped|launcher-signals)' env: OSOE_PROGRESS_HELPERS=2 
+100% tests passed, 0 tests failed out of 66
+== no-wait 17:03:11 -R 'shmem\.helpers\.abort-wait|shmem\.(global-exit|kill-after-init|abort|fatal|stopped|launcher-signals)' env: OSOE_PROGRESS_HELPERS=2 
+98% tests passed, 1 tests failed out of 66
+Test #229: shmem.helpers.abort-wait.0-0-1-1 .....................***Failed  Required regular expression not found. Regex=[GLOBAL EXIT OK
+osoe: PE 2: node 1: node 0 ended its connection without its goodbye: its lead has exited or died (§6.4); this PE was not waiting in the library
+DONE 17:04:00

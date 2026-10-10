@@ -1,0 +1,59 @@
+PE 0: putting 67108864 bytes toward node 1, which is stopped, at 0.3 s
+PE 1: continuing PE 2 (pid 2721838) at 15.0 s
+PE 0: the put returned at 15.3 s, the quiet completed at 15.3 s
+==================
+WARNING: ThreadSanitizer: data race (pid=2721838)
+  Read of size 8 at 0x010003b38fe0 by main thread:
+    #0 main /tmp/helpers-checks-fixed-tsan/shmem/tests/test-stopped-bulk.c:136 (shmem_test_stopped-bulk+0x2b50) (BuildId: a82c3529a25f86db949b379ad881dee8b1a167c8)
+
+  Previous write of size 8 at 0x010003b38fe0 by thread T2:
+    #0 memcpy ../../../../src/libsanitizer/sanitizer_common/sanitizer_common_interceptors_memintrinsics.inc:115 (libtsan.so.2+0x89788) (BuildId: 2dd156cb895feaf9fce7da0e39cec54260a6a40d)
+    #1 memcpy ../../../../src/libsanitizer/sanitizer_common/sanitizer_common_interceptors_memintrinsics.inc:107 (libtsan.so.2+0x89788)
+    #2 osoe_am_parse /tmp/helpers-checks-fixed-tsan/shmem/src/am.c:265 (libosoe.so.0+0xa9b24) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #3 receive_wire /tmp/helpers-checks-fixed-tsan/shmem/src/progress.c:843 (libosoe.so.0+0xb6668) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #4 receive /tmp/helpers-checks-fixed-tsan/shmem/src/progress.c:903 (libosoe.so.0+0xb6afc) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #5 osoe_progress_poll /tmp/helpers-checks-fixed-tsan/shmem/src/progress.c:1817 (libosoe.so.0+0xbb644) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #6 helper_main /tmp/helpers-checks-fixed-tsan/shmem/src/progress-host.c:1160 (libosoe.so.0+0xc29c4) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+
+  Location is global '<null>' at 0x000000000000 (osoe.2721833.0.1.0.heap.0 (deleted)+0x10003b38fe0)
+
+  Thread T2 'osoe-helper-1' (tid=2721844, running) created by thread T1 at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5bbbc) (BuildId: 2dd156cb895feaf9fce7da0e39cec54260a6a40d)
+    #1 start_helpers /tmp/helpers-checks-fixed-tsan/shmem/src/progress-host.c:1187 (libosoe.so.0+0xc2b78) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #2 osoe_progress_host_poll /tmp/helpers-checks-fixed-tsan/shmem/src/progress-host.c:1477 (libosoe.so.0+0xc3f1c) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #3 osoe_internode_backend_agent_pass /tmp/helpers-checks-fixed-tsan/shmem/src/transport-internode.c:314 (libosoe.so.0+0xcafc8) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #4 osoe_transport_agent_pass /tmp/helpers-checks-fixed-tsan/shmem/src/transport-am.c:207 (libosoe.so.0+0xa7e58) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #5 agent_main /tmp/helpers-checks-fixed-tsan/shmem/src/agent.c:238 (libosoe.so.0+0x3142c) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+
+SUMMARY: ThreadSanitizer: data race /tmp/helpers-checks-fixed-tsan/shmem/tests/test-stopped-bulk.c:136 in main
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=2721834)
+  Read of size 8 at 0x010000000010 by main thread:
+    #0 main /tmp/helpers-checks-fixed-tsan/shmem/tests/test-stopped-bulk.c:149 (shmem_test_stopped-bulk+0x2c10) (BuildId: a82c3529a25f86db949b379ad881dee8b1a167c8)
+
+  Previous write of size 8 at 0x010000000010 by thread T2:
+    #0 memcpy ../../../../src/libsanitizer/sanitizer_common/sanitizer_common_interceptors_memintrinsics.inc:115 (libtsan.so.2+0x89788) (BuildId: 2dd156cb895feaf9fce7da0e39cec54260a6a40d)
+    #1 memcpy ../../../../src/libsanitizer/sanitizer_common/sanitizer_common_interceptors_memintrinsics.inc:107 (libtsan.so.2+0x89788)
+    #2 osoe_am_parse /tmp/helpers-checks-fixed-tsan/shmem/src/am.c:265 (libosoe.so.0+0xa9b24) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #3 receive_wire /tmp/helpers-checks-fixed-tsan/shmem/src/progress.c:843 (libosoe.so.0+0xb6668) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #4 receive /tmp/helpers-checks-fixed-tsan/shmem/src/progress.c:903 (libosoe.so.0+0xb6afc) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #5 osoe_progress_poll /tmp/helpers-checks-fixed-tsan/shmem/src/progress.c:1817 (libosoe.so.0+0xbb644) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #6 helper_main /tmp/helpers-checks-fixed-tsan/shmem/src/progress-host.c:1160 (libosoe.so.0+0xc29c4) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+
+  Location is global '<null>' at 0x000000000000 (osoe.2721833.0.0.0.heap.0 (deleted)+0x10000000010)
+
+  Thread T2 'osoe-helper-1' (tid=2721845, running) created by thread T1 at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x5bbbc) (BuildId: 2dd156cb895feaf9fce7da0e39cec54260a6a40d)
+    #1 start_helpers /tmp/helpers-checks-fixed-tsan/shmem/src/progress-host.c:1187 (libosoe.so.0+0xc2b78) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #2 osoe_progress_host_poll /tmp/helpers-checks-fixed-tsan/shmem/src/progress-host.c:1477 (libosoe.so.0+0xc3f1c) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #3 osoe_internode_backend_agent_pass /tmp/helpers-checks-fixed-tsan/shmem/src/transport-internode.c:314 (libosoe.so.0+0xcafc8) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #4 osoe_transport_agent_pass /tmp/helpers-checks-fixed-tsan/shmem/src/transport-am.c:207 (libosoe.so.0+0xa7e58) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+    #5 agent_main /tmp/helpers-checks-fixed-tsan/shmem/src/agent.c:238 (libosoe.so.0+0x3142c) (BuildId: 50781e9a89aac2b46e2dd2e88093cbd2cfc8d7f3)
+
+SUMMARY: ThreadSanitizer: data race /tmp/helpers-checks-fixed-tsan/shmem/tests/test-stopped-bulk.c:149 in main
+==================
+STOPPED BULK OK: 67108864 bytes arrived intact after node 1 was stopped for 15000 ms, at 116.9 s
+ThreadSanitizer: reported 1 warnings
+osoe-launch: rank 0 exited with status 66
+osoe-launch: rank 2 killed by signal 15

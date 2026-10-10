@@ -1,0 +1,20 @@
+== mix at 0 helpers 18:17:19
+launcher exited 1
+osoe: deadlock: lima-osoe: PE 0 in shmem_sync_all (epoch 457), for 17 s
+osoe: deadlock: lima-osoe: PE 1 in shmem_team_sync (epoch 457), for 22 s
+osoe: deadlock: lima-osoe: PE 2 in shmem_team_sync (epoch 126941), for 22 s
+osoe: deadlock: lima-osoe: PE 3 in shmem_sync_all (epoch 457), for 13 s
+osoe: deadlock: lima-osoe: PE 6 in shmem_team_sync (epoch 457), for 22 s
+osoe: deadlock: lima-osoe: PE 7 in shmem_sync_all (epoch 457), for 13 s
+osoe: deadlock: lima-osoe: PE 4 in shmem_sync_all (epoch 457), for 17 s
+osoe: deadlock: lima-osoe: PE 5 in shmem_team_sync (epoch 127789), for 22 s
+== mailbox at 0 helpers 18:18:42
+launcher exited 0
+osoe-pacer failures=0 seconds=60.0
+== mix at 2 helpers 18:19:42
+launcher exited 0
+osoe-pacer failures=0 seconds=60.9
+== mailbox at 2 helpers 18:20:43
+launcher exited 0
+osoe-pacer failures=0 seconds=59.9
+DONE 18:21:43

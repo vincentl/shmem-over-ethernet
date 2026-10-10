@@ -208,8 +208,10 @@ void osoe_ring_reap(struct osoe_ring *r)
         if ((data & 0xf) == FUTEX) {
             /* Woken, or refused at arming because the word had moved (-EAGAIN),
              * or cancelled: either way nothing is armed now, and the next idle
-             * wait arms again (§3.10). */
+             * wait arms again (§3.10). The first two are a wake. */
             r->futex_armed = false;
+            if (cqe->res == 0 || cqe->res == -EAGAIN)
+                r->counts.wakes++;
             continue;
         }
         uint32_t index = (uint32_t)(data >> 8);

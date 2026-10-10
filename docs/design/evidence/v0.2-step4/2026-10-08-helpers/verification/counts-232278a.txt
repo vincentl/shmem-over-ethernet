@@ -1,0 +1,9 @@
+debug all: Total Tests: 855
+debug internode: Total Tests: 458
+release all: Total Tests: 895
+release models: Total Tests: 40
+release without models: Total Tests: 855
+tsan all: Total Tests: 598
+asan all: Total Tests: 840
+single-node debug all: Total Tests: 402
+DONE

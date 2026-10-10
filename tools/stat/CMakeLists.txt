@@ -16,10 +16,11 @@ osoe_version_test(stat.version $<TARGET_FILE:osoe-stat> osoe-stat)
 # different commit reads a job correctly"; running the tool against a job from
 # the same tree tests none of it. It runs the tool too, for the watch word's
 # layout range and for what --gc refuses to remove, so it is told where the
-# tool is the way shmem.stat is. Thirteen runs of the tool: a timeout of 120 s,
-# since under GCC 11's AddressSanitizer (Rocky Linux 9) every process's leak
-# check at exit takes half a second, and more under load - the test took 8 s
-# alone and over 30 in a loaded suite, where it takes 0.03 s without the check.
+# tool is the way shmem.stat is. Twenty-one runs of the tool since layout 36's
+# views of a node's owners: a timeout of 120 s, since under GCC 11's
+# AddressSanitizer (Rocky Linux 9) every process's leak check at exit takes half
+# a second, and more under load - at thirteen runs the test took 8 s alone and
+# over 30 in a loaded suite, where it takes 0.03 s without the check.
 add_executable(osoe_segment_test test-segment.c segment.c)
 target_include_directories(osoe_segment_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(osoe_segment_test PRIVATE rt)

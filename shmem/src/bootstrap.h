@@ -42,6 +42,8 @@ struct osoe_bootstrap {
                                  * three predefined teams' included (§5.7; step D) */
     uint32_t max_threads;       /* OSOE_MAX_THREADS: live threads of a PE that have called
                                  * the library, the main one included (§3.14) */
+    uint32_t progress_helpers;  /* OSOE_PROGRESS_HELPERS: the threads beside the lead's agent
+                                 * that own the data wires (owner-map.h; v0.2 step 4) */
     uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
                                      * pieces in flight per level of the tree (§5.8) */
     uint32_t small_collective_bytes;    /* OSOE_SMALL_COLLECTIVE_BYTES: the largest data
@@ -211,6 +213,17 @@ static inline const char *osoe_collective_shape_name(uint32_t shape)
  * review's R8).
  */
 #define OSOE_MAX_THREADS_DEFAULT 16u
+
+/*
+ * OSOE_PROGRESS_HELPERS (docs/design/progress-helpers-proposal.md §3.8): how
+ * many threads of the node lead's process own the data wires beside its agent,
+ * which then keeps the control wires alone (owner-map.h). 0, the default, is
+ * one thread a node, as before helpers existed. At most 64: an owner is a bit
+ * of a PE's mask of owners to wake (progress-host.c). It shapes the connection
+ * area and the node segment's owner records, so a node's PEs must agree, and
+ * the node's own rendezvous checks that they do (node.c); nodes need not.
+ */
+#define OSOE_PROGRESS_HELPERS_HIGHEST 64u
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)

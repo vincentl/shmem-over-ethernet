@@ -126,6 +126,14 @@ _Static_assert(sizeof thread_metrics / sizeof thread_metrics[0] == OSOE_COUNTER_
     { name, unit, type, kind, OSOE_MSCOPE_CONNECTION,                       \
       (uint16_t)sizeof(((struct osoe_am_connection_metrics *)0)->field),    \
       (uint32_t)offsetof(struct osoe_am_connection_metrics, field), 0 }
+/* One owner's AM record (node.h, layout 36): the index is the owner - 0 the
+ * lead's agent, 1 to OSOE_PROGRESS_HELPERS its helpers (owner-map.h) - so a
+ * reader loops over dir.owner_count of them, and a node's count is their sum,
+ * its high-water mark their largest. */
+#define OWNER(name, field, type, kind, unit)                                \
+    { name, unit, type, kind, OSOE_MSCOPE_OWNER,                            \
+      (uint16_t)sizeof(((struct osoe_am_owner_metrics *)0)->field),         \
+      (uint32_t)offsetof(struct osoe_am_owner_metrics, field), 0 }
 /*
  * A word of a team's block (node.h, layout 18), by where it is in the block:
  * an epoch counter's value - a word inside a cache-line-padded structure, and
@@ -407,51 +415,57 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.team_posted_summary", team_posted_summary[0], OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     NDDIR("node.local_count", local_count, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
     NDDIR("node.blocks_per_pe", blocks_per_pe, OSOE_MTYPE_U32, OSOE_MKIND_STATE),
-    /* The AM layer's node-wide counters (node.h, layout 8). */
-    ND("transport.am.segments_sent", am.segments_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.header_only_sent", am.header_only_sent, OSOE_MTYPE_U64,
+    /* The AM layer's counters, a record an owner (node.h, layout 36; the
+     * node's own record from layout 8 to 35). */
+    OWNER("transport.am.tid", tid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
+    OWNER("transport.am.data_wires", data_wires, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    OWNER("transport.am.control_wires", control_wires, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
+    OWNER("transport.am.segments_sent", segments_sent, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.header_only_sent", header_only_sent, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.segments_applied", am.segments_applied, OSOE_MTYPE_U64,
+    OWNER("transport.am.segments_applied", segments_applied, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.messages_applied", am.messages_applied, OSOE_MTYPE_U64,
+    OWNER("transport.am.messages_applied", messages_applied, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.reply_reservation_failures", am.reply_reservation_failures, OSOE_MTYPE_U64,
+    OWNER("transport.am.reply_reservation_failures", reply_reservation_failures, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.control_queue_high_water", am.control_queue_high_water, OSOE_MTYPE_U64,
+    OWNER("transport.am.control_queue_high_water", control_queue_high_water, OSOE_MTYPE_U64,
        OSOE_MKIND_HIGHWATER, ""),
-    ND("transport.am.bulk_queue_high_water", am.bulk_queue_high_water, OSOE_MTYPE_U64,
+    OWNER("transport.am.bulk_queue_high_water", bulk_queue_high_water, OSOE_MTYPE_U64,
        OSOE_MKIND_HIGHWATER, ""),
-    ND("transport.am.pool_high_water", am.pool_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, ""),
-    ND("transport.am.value_queue_high_water", am.value_queue_high_water, OSOE_MTYPE_U64,
+    OWNER("transport.am.pool_high_water", pool_high_water, OSOE_MTYPE_U64, OSOE_MKIND_HIGHWATER, ""),
+    OWNER("transport.am.value_queue_high_water", value_queue_high_water, OSOE_MTYPE_U64,
        OSOE_MKIND_HIGHWATER, ""),
-    ND("transport.am.control_segments_sent", am.control_segments_sent, OSOE_MTYPE_U64,
+    OWNER("transport.am.control_segments_sent", control_segments_sent, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.control_segments_applied", am.control_segments_applied, OSOE_MTYPE_U64,
+    OWNER("transport.am.control_segments_applied", control_segments_applied, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.control_messages_applied", am.control_messages_applied, OSOE_MTYPE_U64,
+    OWNER("transport.am.control_messages_applied", control_messages_applied, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
     ND("node.hostname", hostname, OSOE_MTYPE_STRING, OSOE_MKIND_STATE, ""),
-    ND("transport.am.passes", am.passes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.send_visits", am.send_visits, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+    OWNER("transport.am.passes", passes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.send_visits", send_visits, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
        "conns"),
     /* The ring's counters (node.h, layout 13; §3.3). */
-    ND("transport.am.completions", am.completions, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.receive_buffers", am.receive_buffers, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+    OWNER("transport.am.completions", completions, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.receive_buffers", receive_buffers, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
        ""),
-    ND("transport.am.receive_enobufs", am.receive_enobufs, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+    OWNER("transport.am.receive_enobufs", receive_enobufs, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
        ""),
-    ND("transport.am.receive_rearms", am.receive_rearms, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.sends", am.sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.short_sends", am.short_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.receive_rearms", receive_rearms, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.sends", sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.short_sends", short_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* Layout 30: a local release held for its forwards (node.h). */
-    ND("transport.am.releases_held", am.releases_held, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    OWNER("transport.am.releases_held", releases_held, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* Layout 34: the zero-copy send (wire-settings.h). */
-    ND("transport.am.zero_copy_sends", am.zero_copy_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
+    OWNER("transport.am.zero_copy_sends", zero_copy_sends, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
        ""),
-    ND("transport.am.zero_copy_notifications", am.zero_copy_notifications, OSOE_MTYPE_U64,
+    OWNER("transport.am.zero_copy_notifications", zero_copy_notifications, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
-    ND("transport.am.zero_copy_copied", am.zero_copy_copied, OSOE_MTYPE_U64,
+    OWNER("transport.am.zero_copy_copied", zero_copy_copied, OSOE_MTYPE_U64,
        OSOE_MKIND_COUNTER, ""),
+    /* Layout 36: the owner's waits its wake word ended (node.h). */
+    OWNER("transport.am.wakes", wakes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
 };
 
 enum {
@@ -519,6 +533,10 @@ static pthread_once_t release_once = PTHREAD_ONCE_INIT;
  */
 static _Thread_local struct osoe_counter_block orphan;
 
+/* This thread counts into `orphan` whatever the pool holds: a progress helper
+ * (osoe_metrics_unpooled). */
+static _Thread_local bool unpooled;
+
 /* Held by a thread giving its block back at exit, and by finalize while it
  * lets go of the pool, so that a thread exiting during a finalize never
  * stores into a segment that finalize is about to unmap (review of slice 2,
@@ -577,8 +595,21 @@ static void make_release_key(void)
         osoe_fatal("no thread-specific key for giving counter blocks back at thread exit");
 }
 
+void osoe_metrics_unpooled(void)
+{
+    unpooled = true;
+    my_block = &orphan;
+}
+
+bool osoe_metrics_thread_unpooled(void)
+{
+    return unpooled;
+}
+
 struct osoe_counter_block *osoe_metrics_block(void)
 {
+    if (unpooled)
+        return &orphan;
     uint64_t session = atomic_load_explicit(&pool_session, memory_order_acquire);
     if (my_block && (my_block == &orphan ? !pool : my_session == session))
         return my_block;
@@ -615,7 +646,8 @@ uint32_t osoe_metrics_thread_index(void)
 {
     struct osoe_counter_block *block = osoe_metrics_block();
     if (block == &orphan)
-        osoe_fatal("a thread asked for its record outside a session");
+        osoe_fatal(unpooled ? "a progress helper asked for a thread record, which it has none of"
+                            : "a thread asked for its record outside a session");
     return (uint32_t)(block - pool);
 }
 

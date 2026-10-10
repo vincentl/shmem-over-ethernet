@@ -13,6 +13,7 @@
 #include "agent.h"
 #include "blocked.h"
 #include "fatal.h"
+#include "metrics.h"
 #include "state.h"
 
 /*
@@ -42,9 +43,11 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
      * PE's - ends a PE whose own thread may be waiting in the library, so it
      * says where, as the agent does when it ends the process on another PE's
      * abort (abort.c): what the development watchdog named before it was
-     * retired (§3.15). A fatal on any other thread is that thread's own, and
-     * names its routine where it has one. */
-    if (osoe_agent_is_this_thread()) {
+     * retired (§3.15). So does one a progress helper raises, the death of a
+     * peer it reads on a data wire among them (the adversarial read of v0.2
+     * step 4's Part 3, N3). A fatal on any other thread is that thread's own,
+     * and names its routine where it has one. */
+    if (osoe_agent_is_this_thread() || osoe_metrics_thread_unpooled()) {
         const char *routine = osoe_blocked_routine();
         size_t used = strlen(msg);
         snprintf(msg + used, sizeof msg - used, "; this PE was %s%s",

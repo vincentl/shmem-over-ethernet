@@ -129,6 +129,16 @@ struct osoe_segment_directory {
     uint64_t team_free_offset;
     uint32_t team_map_row;
     uint32_t team_free_words;
+
+    /* Appended at layout 36 (v0.2 step 4, Part 3): the AM layer's counters, a
+     * record an owner of the node's wires - the lead's agent, then its
+     * progress helpers - the owner scope's records. Until layout 36 they were
+     * one record in the node header, read by name. A reader built before them
+     * asks and finds them absent. */
+    uint64_t owners_offset;
+    uint64_t owners_bytes;
+    uint32_t owner_bytes;
+    uint32_t owner_count;
 };
 
 /*
@@ -184,6 +194,10 @@ enum osoe_metric_scope {
      * - 32 bits until layout 30, and since 64, the block beside the epoch. */
     OSOE_MSCOPE_TEAM,
     OSOE_MSCOPE_EPOCHS,
+    /* Layout 36: an owner's AM record, the index being the owner - 0 the
+     * lead's agent, then its progress helpers; a node's count is the owners'
+     * sum, its high-water mark their largest. */
+    OSOE_MSCOPE_OWNER,
 };
 
 /* ---- An opened segment --------------------------------------------- */
@@ -217,6 +231,9 @@ struct osoe_segment {
      * on any segment written before it. */
     uint32_t team_count;
     uint32_t epoch_row_count;
+    /* And the owners' records (layout 36): zero on a job of one node, and on
+     * any segment written before it. */
+    uint32_t owner_count;
     /* Who owns the object, as the kernel says: --gc removes a name the
      * segment holds only if it is owned the same (stat.c). */
     uid_t owner;
@@ -346,12 +363,16 @@ void osoe_segment_close(struct osoe_segment *s);
  *       of the node's, and the control wires' segments and messages there,
  *       transport.am.control_segments_sent, _applied and
  *       control_messages_applied
+ *   36  progress helpers (v0.2 step 4, Part 3): the AM layer's counters a
+ *       record an owner of the node's wires, the owner scope, appended to
+ *       the directory - transport.am.* there, with each owner's tid and
+ *       wires - where they were the node record's
  *
- * None of 5 to 35 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 36 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, and 23 gave each thread a word of its own.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               35
+#define OSOE_SEGMENT_NEWEST_LAYOUT               36
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 
@@ -374,8 +395,9 @@ const struct osoe_metric_descriptor *osoe_segment_metric(const struct osoe_segme
 /*
  * Load a numeric metric with acquire. `index` selects the record within the
  * metric's scope: ignored for NODE, the local PE id for PE and EPOCHS, the
- * block number for THREAD, the peer slot for CONNECTION and the team's number
- * for TEAM. I32 metrics are sign-extended into the uint64_t.
+ * block number for THREAD, the peer slot for CONNECTION, the team's number
+ * for TEAM and the owner for OWNER. I32 metrics are sign-extended into the
+ * uint64_t.
  *
  * False when the metric is absent, is a string, is misaligned for its width, or
  * would read outside its record or the mapping - so a malformed segment is

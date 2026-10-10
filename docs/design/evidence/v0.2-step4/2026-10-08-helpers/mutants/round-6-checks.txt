@@ -1,0 +1,13 @@
+== build fixed 19:06:46
+100% tests passed, 0 tests failed out of 6
+== fixed: reset-while-ending failed 0 of 5
+== build unfixed-flush 19:08:55
+== unfixed-flush: reset-while-ending failed 5 of 5
+      3 1/1 Test #159: shmem.progress.reset-while-ending ...***Failed  Error regular expression found in output. Regex=[osoe_fatal]  0.41 sec
+      2 1/1 Test #159: shmem.progress.reset-while-ending ...***Failed  Error regular expression found in output. Regex=[osoe_fatal]  0.42 sec
+== build no-excuse 19:09:06
+/tmp/helpers-checks6-no-excuse/shmem/src/progress.c:812:13: warning: ‘node_aborting’ defined but not used [-Wunused-function]
+== no-excuse: reset-while-ending failed 5 of 5
+      3 1/1 Test #159: shmem.progress.reset-while-ending ...***Failed  Error regular expression found in output. Regex=[osoe_fatal]  0.41 sec
+      2 1/1 Test #159: shmem.progress.reset-while-ending ...***Failed  Error regular expression found in output. Regex=[osoe_fatal]  0.42 sec
+DONE 19:09:16

@@ -43,12 +43,13 @@ static const char *launcher(const char *suffix)
     return getenv(name);
 }
 
-/* A counter's total over its scope: every counter block, or every
- * connection toward a peer node. */
+/* A counter's total over its scope: every counter block, every connection
+ * toward a peer node, or every owner of the node's wires (layout 36). */
 static double total(const struct osoe_metric_descriptor *m)
 {
     uint32_t records = m->scope == OSOE_MSCOPE_CONNECTION ? library.segment.connection_count
                        : m->scope == OSOE_MSCOPE_THREAD ? library.segment.dir->block_count
+                       : m->scope == OSOE_MSCOPE_OWNER ? library.segment.owner_count
                                                         : 1;
     double sum = 0;
     for (uint32_t i = 0; i < records; i++) {

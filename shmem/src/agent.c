@@ -165,9 +165,7 @@ static void run_on_node_cpus(void)
 static void *agent_main(void *arg)
 {
     struct osoe_pe_slot *slot = arg;
-    ask_for_short_slice(slice_us);
-    if (cpus_of_node)
-        run_on_node_cpus();
+    osoe_agent_place_this_thread();
     /* So top -H, ps and a debugger name the library's thread (15 characters). */
     (void)pthread_setname_np(pthread_self(), "osoe-agent");
     /* For the deadlock detector, which counts this PE's threads but this one
@@ -251,6 +249,13 @@ static void *agent_main(void *arg)
      * and the close of every connection. */
     osoe_transport_agent_exit();
     return NULL;
+}
+
+void osoe_agent_place_this_thread(void)
+{
+    ask_for_short_slice(slice_us);
+    if (cpus_of_node)
+        run_on_node_cpus();
 }
 
 bool osoe_agent_running(void)

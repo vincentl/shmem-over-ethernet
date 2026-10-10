@@ -36,12 +36,12 @@
  * appended, and never otherwise.
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
-_Static_assert(sizeof(struct osoe_segment_directory) == 288,
+_Static_assert(sizeof(struct osoe_segment_directory) == 312,
                "frozen by §3.14: append only. 136 at layouts 6 and 7; 160 at layout 12, "
                "with the connections section; 208 at layout 18, with the team blocks and "
                "the published epochs; 232 at layout 21, with the context pools; 256 at "
                "layout 23, with the thread records; 288 at layout 29, with the team "
-               "blocks' map and free bitmap");
+               "blocks' map and free bitmap; 312 at layout 36, with the owners' records");
 
 /*
  * Candidate heap bases, tried in order by the lead; the first where its own
@@ -797,7 +797,14 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t team_free_offset = align_up(team_map_offset + team_map_bytes);
     uint64_t team_free_bytes = (uint64_t)team_free_words * sizeof(uint64_t);
     uint64_t team_posted_offset = team_posted_offset_of(team_free_offset, team_free_words);
-    n->control_bytes = page_round(team_posted_offset + team_free_bytes);
+    /* The AM layer's counters, a record an owner of the node's wires - the
+     * lead's agent and its OSOE_PROGRESS_HELPERS helpers (owner-map.h) - a
+     * cache line or two each, none on a job of one node (layout 36). Last, so
+     * that nothing before them moved. */
+    uint64_t owner_count = connection_count ? (uint64_t)b->progress_helpers + 1 : 0;
+    uint64_t owners_offset = align_up(team_posted_offset + team_free_bytes);
+    uint64_t owners_bytes = owner_count * sizeof(struct osoe_am_owner_metrics);
+    n->control_bytes = page_round(owners_offset + owners_bytes);
 
     char err[256];
     int fd = osoe_shm_create(n->control_name,
@@ -902,6 +909,10 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.threads_bytes = threads_bytes;
     h->dir.thread_record_bytes = (uint32_t)sizeof(struct osoe_thread_record);
     h->dir.threads_per_pe = per_pe;
+    h->dir.owners_offset = owners_offset;
+    h->dir.owners_bytes = owners_bytes;
+    h->dir.owner_bytes = (uint32_t)sizeof(struct osoe_am_owner_metrics);
+    h->dir.owner_count = (uint32_t)owner_count;
     h->dir.block_bytes = (uint32_t)sizeof(struct osoe_counter_block);
     memcpy((char *)p + metrics_offset, metrics, metrics_bytes);
     n->blocks = (struct osoe_counter_block *)((char *)p + blocks_offset);
@@ -920,6 +931,9 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     n->connection_metrics = connection_count
         ? (struct osoe_am_connection_metrics *)((char *)p + connections_offset) : NULL;
     n->connection_count = (uint32_t)connection_count;
+    n->owner_metrics = owner_count
+        ? (struct osoe_am_owner_metrics *)((char *)p + owners_offset) : NULL;
+    n->owner_count = (uint32_t)owner_count;
     n->team_count = b->team_blocks;
     n->team_map = (_Atomic uint32_t *)((char *)p + team_map_offset);
     n->team_map_row = b->max_teams;
@@ -1207,6 +1221,18 @@ again:;
                  "%u, this PE has %u (§3.14)", h->dir.blocks_per_pe - 1, b->max_threads);
         fail_rendezvous(n, msg);
     }
+    /* And by its OSOE_PROGRESS_HELPERS, which on a job of more than one node
+     * sizes the owner records here and the node's connection area, whose
+     * owners' words this PE would mark and wake by its own count (owner-map.h;
+     * the adversarial read of Part 1, N3, which found the area refusing such a
+     * PE in the name of OSOE_AM_*). */
+    if (b->node_count > 1 && h->dir.owner_count != b->progress_helpers + 1) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_PROGRESS_HELPERS differs between PEs: the local lead "
+                 "has %u, this PE has %u (owner-map.h)",
+                 h->dir.owner_count ? h->dir.owner_count - 1 : 0, b->progress_helpers);
+        fail_rendezvous(n, msg);
+    }
     /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
      * this PE's gets would be counted against a zone of another size. */
     struct osoe_am_configuration am;
@@ -1240,7 +1266,10 @@ again:;
         h->dir.team_free_words < (h->dir.team_count + 63) / 64 ||
         team_posted_offset_of(h->dir.team_free_offset, h->dir.team_free_words) +
                 (uint64_t)h->dir.team_free_words * sizeof(uint64_t) >
-            n->control_bytes)
+            n->control_bytes ||
+        h->dir.owner_bytes != sizeof(struct osoe_am_owner_metrics) ||
+        h->dir.owners_bytes < (uint64_t)h->dir.owner_count * h->dir.owner_bytes ||
+        h->dir.owners_offset + h->dir.owners_bytes > n->control_bytes)
         osoe_fatal("control segment %s is too small for its own directory",
                    n->control_name);
     n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->dir.slots_offset);
@@ -1259,6 +1288,10 @@ again:;
         ? (struct osoe_am_connection_metrics *)((char *)n->hdr + h->dir.connections_offset)
         : NULL;
     n->connection_count = h->dir.connection_count;
+    n->owner_metrics = h->dir.owner_count
+        ? (struct osoe_am_owner_metrics *)((char *)n->hdr + h->dir.owners_offset)
+        : NULL;
+    n->owner_count = h->dir.owner_count;
     n->team_count = h->dir.team_count;
     n->team_map = (_Atomic uint32_t *)((char *)n->hdr + h->dir.team_map_offset);
     n->team_map_row = h->dir.team_map_row;

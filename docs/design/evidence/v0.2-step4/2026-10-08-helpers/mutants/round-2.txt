@@ -1,0 +1,3 @@
+== no-excuse-no-wait 18:21:43 -R 'shmem\.(global-exit|kill-after-init|abort|fatal|stopped|launcher-signals)' env: OSOE_PROGRESS_HELPERS=2 
+100% tests passed, 0 tests failed out of 65
+DONE 18:22:31
