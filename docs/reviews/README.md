@@ -11,14 +11,25 @@ synthesis was written - fresh agents from round four.
 
 `archive/` holds the finished reviews, named for the work they reviewed
 (`CLAUDE.md` gives the rule; the first round predates it), so that a finding can
-be traced to the tree that produced it: six rounds - the first against the
+be traced to the tree that produced it: eight rounds - the first against the
 design alone, the second against the first steps built, the third before the
 first release, the fourth to sixth at merge points of its task, the sixth on
-the release candidate - and three reviews of single slices. Start with a
-round's synthesis, whose first section is its verdict:
-`archive/phase1-step7-slice4-review.md` is round six's. What the later rounds
-led to is in `docs/decisions/` (`2026-10-02-release-fixes.md`,
-`2026-10-04-review-fixes.md`, `2026-10-04-step-d-review-fixes.md` and
-`2026-10-05-step-e-review-fixes.md`).
+the release candidate, and the seventh and eighth at the merge points of v0.2's
+first and last steps (`v0.2-step1-*`, `v0.2-step4-*`); three reviews of single
+slices; and the adversarial reads of v0.2's parts, a fresh agent's read of a
+part before it merged and again after its fixes where the first found
+something serious (`v0.2-step2-adversarial-read.md` to
+`v0.2-step4-part3-second-adversarial-read.md`, each named for its part and its
+read). Start with a round's synthesis, whose first section is its verdict:
+`archive/v0.2-step4-review.md` is round eight's, and
+`archive/phase1-step7-slice4-review.md` round six's, on the first release's
+candidate. What the later rounds led to is in `docs/decisions/`
+(`2026-10-02-release-fixes.md`, `2026-10-04-review-fixes.md`,
+`2026-10-04-step-d-review-fixes.md`, `2026-10-05-step-e-review-fixes.md`,
+`2026-10-06-single-node-review-fixes.md` and
+`2026-10-10-step4-merge-point.md`), and what each part's read led to in that
+part's record.
 `evidence/` holds the programs, models, logs and notes behind the first two
-rounds' reports, kept as the record of what ran.
+rounds' reports, and behind two reads of v0.2 step 4's first part
+(`v0.2-step4-part0/`, `v0.2-step4-part0-fourth-read/`), kept as the record of
+what ran.

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The pacer's mix hung once at no helpers (pacer-7): two two-PE teams each with
 # one member left in the team's sync and the other gone on. main (fc99503) and
 # the tip, release builds, mix for 60 s at no helpers, RUNS times each,

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: after-barriers.c at 64 logical nodes, Part 1 (TAR_A)
 # against Part 2 (TAR_B), each built in release, alternating A B three times.
 # usage: after.sh TAR_A TAR_B OUTDIR [COUNT] [NODES]. Takes the VM lock.

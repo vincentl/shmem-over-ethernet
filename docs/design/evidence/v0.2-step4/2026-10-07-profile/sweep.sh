@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the put stream against the connection buffer's depth -
 # OSOE_AM_BUFFER and OSOE_AM_CHUNK by the environment alone. Takes the VM lock.
 # usage: sweep.sh NAME OUT

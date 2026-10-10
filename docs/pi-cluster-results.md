@@ -3,7 +3,8 @@
 What the sessions on the Raspberry Pi cluster measured and found, from the
 second session on, newest last.
 How to run a session is the runbook, `docs/pi-cluster.md`; the raw outputs are
-under `docs/design/evidence/pi-cluster/`, a directory a session.
+under `docs/design/evidence/pi-cluster/`, a directory a session, but for v0.2
+step 4's, which are under `docs/design/evidence/v0.2-step4/`.
 
 ## The second session (2026-09-26)
 
@@ -865,3 +866,114 @@ at 4 × 4; `analysis.txt` each line's median of three, its spread and the ratio.
   1 MiB is too high: it takes every lead's link carrying both ways at once at
   the full rate, which the Pi's leads did not reach - one progress thread a
   node moving both directions the likely reason, not measured.
+
+## v0.2 step 4: progress helpers (2026-10-07 to 09)
+
+The four nodes at a gigabit, each tree copied to `~/osoe` and built there as
+release, every comparison alternating its trees, three runs a side unless a line
+says otherwise; the probes ran under `--cpu-bind=none`, `osoe-bench` and the
+mailbox under Slurm's default binding. The records are
+`docs/decisions/2026-10-07-one-thread-profile.md` (Part 0, the one thread's
+ladder), `docs/decisions/2026-10-08-owners.md` (Part 1),
+`docs/decisions/2026-10-08-control-wire.md` (Part 2) and
+`docs/decisions/2026-10-08-helpers.md` (Part 3); the raw outputs are
+`docs/design/evidence/v0.2-step4/`, whose `README.md` says which directory holds
+what.
+
+- **The unsent limit: a fetch-add behind a 1 MiB put stream** (Part 0,
+  `2026-10-07-pi-head-of-line/`; the record's "What a small message waits behind
+  a stream, on the Pi"). On two nodes of two PEs each, PE 0 streams 1 MiB puts
+  to the other node while PE 1 times fetch-adds to it over the same connection
+  (`hol.c`), two or three runs a line. Alone a fetch-add took 171 to 173 µs.
+  Behind the stream, with nothing limiting the kernel's unsent queue, it waited
+  14.4 to 16.6 ms at the median on the tree before Part 0 (`3ee3357`) and 16.1
+  to 22.2 with a put filling the room, the kernel queueing some 2.6 MB ahead of
+  it. With the queue limited to 16 KiB (`TCP_NOTSENT_LOWAT`) it waited 3.3 to
+  3.9 ms on both trees, the 99th percentile 3.9 to 4.4 and 4.7 to 5.0, and the
+  same with the limit as built (16,384 bytes, from the 116.5 MB/s the leads
+  measured; `cap-1/`). The stream ran at 112 MiB/s in every line. At the tip of
+  the first three rungs (`compare-1/`) the wait was 3.9 ms, the 99th percentile
+  6.65 to 6.92, and `osoe-bench` was within the noise of `3ee3357` but for the
+  streams of the pairs at 4 × 4, which share the links more evenly.
+- **The zero-copy send on the Pi's NIC** (Part 0, `2026-10-08-zero-copy/`; the
+  record's "What the zero-copy send does, on the Pi and over loopback"). A 1 MiB
+  put stream between two nodes for 20 s with each node's agent CPU read from
+  `/proc` (`putstream-cpu.c`), and `osoe-bench`'s latency and atomic lines at 2
+  × 1, the setting off and on, three rounds each, alternating. The stream ran at
+  112.1 MiB/s in every case. As first built, with every send allowed by
+  reference, 87 to 89% of all sends went by reference (the kernel copying 11 to
+  14% of those after all) and the sending agent spent 0.267 to 0.271 CPU-seconds
+  a GiB against 0.30 to 0.52 off, but `osoe-bench`'s 1 MiB lines did not finish
+  in 25 minutes: with both of a connection's buffers lent a quiet waited about
+  half a second at a time. So one buffer at most is lent: 28% of sends by
+  reference, the agent 0.320 s a GiB, every `osoe-bench` line the copying
+  send's. At a gigabit the agent is 8% busy either way, so nothing here argues
+  for a default and the setting stays off.
+- **Part 1 at no helpers** (`2026-10-08-owners/`; the record's "On the Pi"):
+  `owners` at `5264aba` against `main` at `44f24bb`, alternating three times.
+  Nothing moved: every remote line of `osoe-bench` at 4 × 4 and 4 × 1 within
+  0.3% at the median but a 4 × 1 get of 8 bytes in its two modes, the stream
+  112.1 MiB/s in all six runs, a fetch-add behind it 3,859 to 3,883 µs on the
+  base and 3,845 to 3,874 on the branch.
+- **The control wire: a barrier behind a 1 MiB put stream** (Part 2,
+  `2026-10-08-control-wire/`; the record's "On the Pi"). The branch at `3d30d1c`
+  and, after the first adversarial read's answers, at `17df5ac`, each against
+  Part 1's tree (`95f3339`), no helpers: PEs 1 and 3, one on each node, sync a
+  team of the two while PE 0 streams to PE 2 (`barrier-behind.c`). **2.5 to 2.6
+  times faster at the median, 2.9 at the 99th percentile**, the medians of three
+  runs: at `17df5ac` 1,663 to 1,665 µs where Part 1's were 4,139 to 4,415, the
+  99th percentiles 2,216 to 2,224 where they were 6,089 to 6,388, the stream at
+  112 MiB/s under both. A fetch-add, which rides the data wire, still waited
+  3,853 to 3,888 µs, and the 1.7 ms left of the barrier's is the link's. Nothing
+  else moved - `osoe-bench` within 0.3%, the stream 112.1 MiB/s in all twelve
+  runs, the mailbox, start-up - and the barrier alone did not cost (165 to 174
+  µs against 174 to 175).
+- **Part 3 at no helpers** (`2026-10-08-helpers/`; the record's "On the Pi"):
+  `7903b15` against `main` at `fc99503` (Parts 0 to 2), alternating three times.
+  Nothing moved: every remote line of `osoe-bench` at 4 × 4 and 4 × 1 within
+  0.3% at the median, the put stream 112.1 MiB/s, a barrier of one PE a node 172
+  to 173 µs alone and 1,664 to 1,669 behind a 1 MiB put stream, a fetch-add
+  behind it 3,863 to 3,879 µs, in both trees; the mailbox 34,288 to 40,482
+  messages a second for `main` and 37,110 to 39,579 for the branch. At two
+  helpers, once and as information: a barrier 165 µs alone and 1,664 behind the
+  stream, a fetch-add 171 and 3,876, the 8-byte lines 167.6 to 167.8 µs, and the
+  mailbox 46,570 to 48,101 messages a second, about a fifth above no helpers'
+  three runs.
+- **Question 4: a blocking get against a put** (the exploration for the author's
+  decision, `docs/design/blocking-get-proposal.md`; `2026-10-09-question4/`).
+  `get-pieces.c` times a put and quiet, a blocking get, and a nonblocking get
+  and quiet between two PEs on two nodes: the tree of `7903b15`, three runs of
+  21 repetitions a size, the medians against the put's. A blocking get took 0.91
+  to 0.93 of a put and quiet's time at 16 KiB and 1.23 to 1.28 from 64 KiB up
+  (at 1 MiB 11.55 to 11.57 ms against 9.09 to 9.10: 2.5 ms, about seventeen of
+  its round trips), and a nonblocking get and quiet 0.89 to 0.91 at 16 KiB and
+  1.00 to 1.05 from 64 KiB up.
+- **The merge point against step 3's**, no helpers (the review of v0.2 step 4's
+  merge point, `docs/reviews/archive/v0.2-step4-review.md`): `main` at `c897948`
+  against `512e913`, alternating three times on 2026-10-09 with Part 3's script
+  (`2026-10-08-helpers/pi-compare.sh`). A barrier behind a 1 MiB put stream took
+  1,665 to 1,669 µs at the median where step 3's took 18,322 to 19,917, the 99th
+  percentile 2,225 to 2,230 against 28,776 to 29,896: the control wire's
+  purpose. A fetch-add behind the stream took 3,871 to 3,883 µs where it took
+  17,155 to 19,931: the unsent limit's. The sending agent spent 0.29 to 0.31
+  CPU-seconds a GiB against 0.38 to 0.40. Unchanged: the stream at 112.1 MiB/s,
+  and every remote line of `osoe-bench` within 0.7%, its small latencies about a
+  microsecond longer.
+- **Helpers on the Pi** (the merge point's review of scale and performance,
+  `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4):
+  `OSOE_PROGRESS_HELPERS=2` against none, the collective lines of `osoe-bench`
+  at 4 × 4 and 4 × 1 in Part 3's run (`2026-10-08-helpers/pi-7903b15/`) and the
+  merge point's, which agree to within 3%, and a short run of the review's own
+  at 4 × 4, alternating, two rounds each. Under Slurm's default binding, where a
+  lead's main thread, agent and helpers share one core, two helpers made a 64
+  KiB broadcast 6 to 30% slower, a 4 KiB alltoall 20 to 35% slower, and a 64 KiB
+  reduction take 15 to 37% less time. Under `--cpu-bind=none` the broadcast was
+  8 to 9% slower (1,490 to 1,498 µs at none against 1,618 to 1,632) and the
+  alltoall 2 to 3% (2,507 to 2,525 against 2,567 to 2,582), and the reduction no
+  faster (1,434 to 1,445 against 1,412 to 1,419), since unbound it was already
+  as fast. In the review's short run the 8-byte reduction and broadcast were
+  10 to 16% faster under both, but its runs at no helpers were slower than any
+  other day's; Part 3's run and the merge point's, three runs at none against
+  one at two, give the 8-byte reduction about 5% faster at 4 × 4 under the
+  binding and nothing at 4 × 1 (the merge point's adversarial read of its fixes,
+  finding 6). Four nodes only.

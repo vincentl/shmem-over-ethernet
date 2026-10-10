@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 0: a put stream from PE 0 to the first PE on another node,
  * with the CPU each node's agents spent over the stream's window, read from
  * /proc (no perf on the Pi) - for the zero-copy send on and off.

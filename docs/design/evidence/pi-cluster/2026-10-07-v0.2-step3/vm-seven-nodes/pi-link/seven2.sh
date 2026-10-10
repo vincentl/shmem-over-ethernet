@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 3 Part 3, the VM's half again: seven logical nodes of one PE, the
 # shapes fixed by setting the Pi's link - `link` takes Träff's (a window of 12)
 # from 8 KiB, `tree` the trees (a fan-out of 2 at 1 MiB) - measured on loopback,

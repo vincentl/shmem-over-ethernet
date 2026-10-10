@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 3 Part 3, an experiment after the main run: what holds Träff's
 # back at 1 MiB on the Pi. e-band at 4 x 1, alternating three times: the
 # branch at `link` (W 4), at `link` with OSOE_COLLECTIVE_PIPELINE=8, a variant

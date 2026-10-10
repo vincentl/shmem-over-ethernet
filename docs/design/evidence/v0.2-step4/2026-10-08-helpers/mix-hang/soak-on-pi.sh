@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Run on pi-login, in one ssh session held open throughout (systemd-logind's
 # RemoveIPC: docs/pi-cluster.md). The pacer's mix for 60 s, 4 x 2, the tip
 # (~/osoe) and main (~/osoe/build/base-src) alternating RUNS times at no

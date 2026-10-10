@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the provided buffers' size and count (OSOE_WIRE_BYTES,
 # OSOE_WIRE_BUFFERS) under a put stream, alternating, with the receiving node's
 # ring counters over 5 s of each run (osoe-stat -d -j, two dumps).

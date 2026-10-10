@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0, item 10 of 2026-10-07: on the Pi, a fetch-add's latency
 # behind a put stream on the same connection, at connection buffers of 128, 256
 # and 512 KiB, alternating three times; the branch's tree, release, in ~/osoe.

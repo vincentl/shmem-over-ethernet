@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Step 3 Part 3's Pi comparison: link (Träff's where the chooser takes it)
 against tree (step 2's trees alone), three rotations each, alternating. Per
 line: each side's median over its rotations and its spread (max/min - 1); the

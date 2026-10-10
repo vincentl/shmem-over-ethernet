@@ -1,0 +1,90 @@
+Internal ctest changing into directory: /tmp/v02-step4-merge-verify/build/release
+Test project /tmp/v02-step4-merge-verify/build/release
+      Start 727: model.get_completion.equality
+ 1/40 Test #727: model.get_completion.equality ....   Passed    0.03 sec
+      Start 728: model.wire
+ 2/40 Test #728: model.wire .......................   Passed    0.09 sec
+      Start 729: model.credit
+ 3/40 Test #729: model.credit .....................   Passed    0.08 sec
+      Start 730: model.arrival
+ 4/40 Test #730: model.arrival ....................   Passed    0.03 sec
+      Start 731: model.ack
+ 5/40 Test #731: model.ack ........................   Passed   51.64 sec
+      Start 732: model.reservation
+ 6/40 Test #732: model.reservation ................   Passed  156.15 sec
+      Start 733: model.blocked_record
+ 7/40 Test #733: model.blocked_record .............   Passed    0.02 sec
+      Start 734: model.range_watch
+ 8/40 Test #734: model.range_watch ................   Passed    0.17 sec
+      Start 735: model.chained_wake
+ 9/40 Test #735: model.chained_wake ...............   Passed    0.21 sec
+      Start 736: model.lead_wake
+10/40 Test #736: model.lead_wake ..................   Passed   57.35 sec
+      Start 737: model.rendezvous
+11/40 Test #737: model.rendezvous .................   Passed    0.03 sec
+      Start 738: model.wait_word
+12/40 Test #738: model.wait_word ..................   Passed    0.57 sec
+      Start 739: model.credit_wait
+13/40 Test #739: model.credit_wait ................   Passed    2.31 sec
+      Start 740: model.tree_barrier
+14/40 Test #740: model.tree_barrier ...............   Passed  308.11 sec
+      Start 741: model.close
+15/40 Test #741: model.close ......................   Passed  111.92 sec
+      Start 742: model.abort
+16/40 Test #742: model.abort ......................   Passed  718.04 sec
+      Start 743: model.abort_exit
+17/40 Test #743: model.abort_exit .................   Passed  484.69 sec
+      Start 744: model.lock
+18/40 Test #744: model.lock .......................   Passed    0.24 sec
+      Start 745: model.pipeline
+19/40 Test #745: model.pipeline ...................   Passed   27.01 sec
+      Start 746: model.allgather
+20/40 Test #746: model.allgather ..................   Passed   57.33 sec
+      Start 747: model.scan
+21/40 Test #747: model.scan .......................   Passed    2.94 sec
+      Start 748: model.scan_pipeline
+22/40 Test #748: model.scan_pipeline ..............   Passed   20.88 sec
+      Start 749: model.deadlock
+23/40 Test #749: model.deadlock ...................   Passed   16.65 sec
+      Start 750: model.team_block
+24/40 Test #750: model.team_block .................   Passed    3.10 sec
+      Start 751: model.split_numbers
+25/40 Test #751: model.split_numbers ..............   Passed   19.38 sec
+      Start 752: model.pool_dry
+26/40 Test #752: model.pool_dry ...................   Passed    0.04 sec
+      Start 753: model.posted_bitmap
+27/40 Test #753: model.posted_bitmap ..............   Passed   61.39 sec
+      Start 754: model.lane
+28/40 Test #754: model.lane .......................   Passed    2.08 sec
+      Start 755: model.lane_scan
+29/40 Test #755: model.lane_scan ..................   Passed   37.87 sec
+      Start 756: model.visit
+30/40 Test #756: model.visit ......................   Passed    0.05 sec
+      Start 757: model.control_ack
+31/40 Test #757: model.control_ack ................   Passed    4.08 sec
+      Start 758: model.carrier
+32/40 Test #758: model.carrier ....................   Passed    0.02 sec
+      Start 759: model.helper_request
+33/40 Test #759: model.helper_request .............   Passed   45.42 sec
+      Start 760: model.deadlock_owners
+34/40 Test #760: model.deadlock_owners ............   Passed  677.90 sec
+      Start 761: model.abort_owners
+35/40 Test #761: model.abort_owners ...............   Passed    0.01 sec
+      Start 762: model.selftest
+36/40 Test #762: model.selftest ...................   Passed   24.19 sec
+      Start 763: model.shape_timing
+37/40 Test #763: model.shape_timing ...............   Passed   40.92 sec
+      Start 764: model.shape_timing.grid
+38/40 Test #764: model.shape_timing.grid ..........   Passed    0.17 sec
+      Start 765: model.circulant
+39/40 Test #765: model.circulant ..................   Passed  312.42 sec
+      Start 766: model.circulant.digest
+40/40 Test #766: model.circulant.digest ...........   Passed    2.12 sec
+
+100% tests passed, 0 tests failed out of 40
+
+Label Time Summary:
+model    = 3247.64 sec*proc (40 tests)
+tier1    = 2935.22 sec*proc (39 tests)
+
+Total Test time (real) = 3247.69 sec

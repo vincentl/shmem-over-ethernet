@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: the circulant hang as the suite met it - the 8x2 and
 # 5.perturb cases started beside the 64-node one, ROUNDS times; a run still
 # going at 150 s (the small ones) is dumped (osoe-stat of each node).

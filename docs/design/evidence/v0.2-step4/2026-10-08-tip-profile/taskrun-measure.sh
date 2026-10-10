@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the ring's task-run flags, by OSOE_EXPERIMENT_TASKRUN in
 # one experiment build, alternating: the 64 KiB put stream, the mailbox, and
 # osoe-bench's latency and atomic round trips. usage: taskrun-measure.sh OUT NAME

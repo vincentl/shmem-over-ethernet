@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Step 2 Part 2's Pi comparison: link (the chooser) against fixed (k 4, D 2 on
 this build) and the tag (0.1.0's build), three rotations each, alternating.
 Per line: each side's median over its rotations and its spread (max/min - 1);

@@ -1,0 +1,116 @@
+Test project /tmp/building-measure/build/release
+      Start 727: model.get_completion.equality
+      Start 728: model.wire
+      Start 729: model.credit
+      Start 730: model.arrival
+ 1/40 Test #727: model.get_completion.equality ....   Passed    0.03 sec
+      Start 731: model.ack
+ 2/40 Test #730: model.arrival ....................   Passed    0.03 sec
+      Start 732: model.reservation
+ 3/40 Test #729: model.credit .....................   Passed    0.09 sec
+      Start 733: model.blocked_record
+ 4/40 Test #728: model.wire .......................   Passed    0.11 sec
+      Start 734: model.range_watch
+ 5/40 Test #733: model.blocked_record .............   Passed    0.02 sec
+      Start 735: model.chained_wake
+ 6/40 Test #734: model.range_watch ................   Passed    0.17 sec
+      Start 736: model.lead_wake
+ 7/40 Test #735: model.chained_wake ...............   Passed    0.21 sec
+      Start 737: model.rendezvous
+ 8/40 Test #737: model.rendezvous .................   Passed    0.03 sec
+      Start 738: model.wait_word
+ 9/40 Test #738: model.wait_word ..................   Passed    0.62 sec
+      Start 739: model.credit_wait
+10/40 Test #739: model.credit_wait ................   Passed    2.76 sec
+      Start 740: model.tree_barrier
+11/40 Test #731: model.ack ........................   Passed   56.71 sec
+      Start 741: model.close
+12/40 Test #736: model.lead_wake ..................   Passed   64.37 sec
+      Start 742: model.abort
+13/40 Test #732: model.reservation ................   Passed  171.27 sec
+      Start 743: model.abort_exit
+14/40 Test #741: model.close ......................   Passed  128.54 sec
+      Start 744: model.lock
+15/40 Test #744: model.lock .......................   Passed    0.27 sec
+      Start 745: model.pipeline
+16/40 Test #745: model.pipeline ...................   Passed   31.82 sec
+      Start 746: model.allgather
+17/40 Test #746: model.allgather ..................   Passed   65.64 sec
+      Start 747: model.scan
+18/40 Test #747: model.scan .......................   Passed    3.53 sec
+      Start 748: model.scan_pipeline
+19/40 Test #748: model.scan_pipeline ..............   Passed   21.17 sec
+      Start 749: model.deadlock
+20/40 Test #740: model.tree_barrier ...............   Passed  319.93 sec
+      Start 750: model.team_block
+21/40 Test #750: model.team_block .................   Passed    3.58 sec
+      Start 751: model.split_numbers
+22/40 Test #749: model.deadlock ...................   Passed   19.85 sec
+      Start 752: model.pool_dry
+23/40 Test #752: model.pool_dry ...................   Passed    0.05 sec
+      Start 753: model.posted_bitmap
+24/40 Test #751: model.split_numbers ..............   Passed   22.95 sec
+      Start 754: model.lane
+25/40 Test #754: model.lane .......................   Passed    2.46 sec
+      Start 755: model.lane_scan
+26/40 Test #755: model.lane_scan ..................   Passed   39.71 sec
+      Start 756: model.visit
+27/40 Test #756: model.visit ......................   Passed    0.11 sec
+      Start 757: model.control_ack
+28/40 Test #757: model.control_ack ................   Passed    5.23 sec
+      Start 758: model.carrier
+29/40 Test #758: model.carrier ....................   Passed    0.02 sec
+      Start 759: model.helper_request
+30/40 Test #742: model.abort ......................Subprocess killed***Exception: 339.81 sec
+abort/goodbye [0:1]                                          SC  states=    246,112 depth= 47 (miss<4e-19) -> ok +live
+abort/goodbye [1:1]                                          SC  states=    223,290 depth= 47 (miss<3e-19) -> ok +live
+abort/goodbye [0:1,2:2]                                      SC  states=    339,416 depth= 47 (miss<7e-19) -> ok +live
+    .. abort/goodbye [2:3]: 589,824 states, 38,654/s, stack 48, depth 30 (max 39), largest ('$q', 0, 2, 0)=43, 15s
+    .. abort/goodbye [2:3]: 1,204,224 states, 39,542/s, stack 57, depth 27 (max 41), largest ('$q', 1, 2, 0)=43, 30s
+    .. abort/goodbye [2:3]: 1,785,856 states, 39,213/s, stack 71, depth 33 (max 42), largest ('$q', 0, 1, 0)=32, 46s
+    .. abort/goodbye [2:3]: 2,375,680 states, 39,173/s, stack 59, depth 30 (max 43), largest ('$q', 2, 1, 0)=43, 61s
+    .. abort/goodbye [2:3]: 2,949,120 states, 38,910/s, stack 63, depth 34 (max 43), largest ('$q', 1, 2, 0)=43, 76s
+    .. abort/goodbye [2:3]: 3,514,368 states, 38,623/s, stack 57, depth 32 (max 43), largest ('$word', 0)=3, 91s
+    .. abort/goodbye [2:3]: 3,989,504 states, 37,554/s, stack 36, depth 23 (max 43), largest ('$q', 1, 2, 0)=43, 106s
+    .. abort/goodbye [2:3]: 4,243,456 states, 34,867/s, stack 66, depth 31 (max 47), largest ('$q', 0, 2, 0)=32, 122s
+    .. abort/goodbye [2:3]: 4,612,096 states, 33,695/s, stack 65, depth 33 (max 47), largest ('$q', 1, 0, 1)=32, 137s
+    .. abort/goodbye [2:3]: 4,997,120 states, 32,886/s, stack 59, depth 33 (max 47), largest ('$q', 0, 2, 0)=32, 152s
+    .. abort/goodbye [2:3]: 5,259,264 states, 31,439/s, stack 60, depth 30 (max 47), largest ('$q', 0, 1, 1)=32, 167s
+    .. abort/goodbye [2:3]: 5,627,904 states, 30,866/s, stack 65, depth 32 (max 47), largest ('$q', 1, 2, 0)=32, 182s
+    .. abort/goodbye [2:3]: 6,045,696 states, 30,604/s, stack 67, depth 30 (max 47), largest ('$q', 1, 0, 1)=32, 198s
+    .. abort/goodbye [2:3]: 6,488,064 states, 30,479/s, stack 70, depth 35 (max 47), largest ('$q', 0, 1, 0)=32, 213s
+    .. abort/goodbye [2:3]: 6,848,512 states, 30,029/s, stack 63, depth 33 (max 47), largest ('$q', 2, 1, 0)=43, 228s
+    .. abort/goodbye [2:3]: 7,282,688 states, 29,953/s, stack 64, depth 34 (max 47), largest ('$q', 2, 1, 0)=43, 243s
+    .. abort/goodbye [2:3]: 7,733,248 states, 29,930/s, stack 42, depth 27 (max 47), largest ('$q', 2, 0, 0)=43, 258s
+    .. abort/goodbye [2:3]: 8,257,536 states, 30,190/s, stack 65, depth 35 (max 47), largest ('$q', 0, 2, 1)=32, 274s
+    .. abort/goodbye [2:3]: 8,757,248 states, 30,336/s, stack 60, depth 33 (max 47), largest ('$q', 1, 0, 1)=32, 289s
+
+      Start 760: model.deadlock_owners
+31/40 Test #753: model.posted_bitmap ..............   Passed   78.22 sec
+      Start 761: model.abort_owners
+32/40 Test #761: model.abort_owners ...............   Passed    0.02 sec
+      Start 762: model.selftest
+33/40 Test #762: model.selftest ...................   Passed   30.09 sec
+      Start 763: model.shape_timing
+34/40 Test #759: model.helper_request .............   Passed   59.06 sec
+      Start 764: model.shape_timing.grid
+35/40 Test #764: model.shape_timing.grid ..........   Passed    0.22 sec
+      Start 765: model.circulant
+36/40 Test #763: model.shape_timing ...............   Passed   44.52 sec
+      Start 766: model.circulant.digest
+37/40 Test #766: model.circulant.digest ...........   Passed    2.57 sec
+38/40 Test #743: model.abort_exit .................   Passed  560.33 sec
+39/40 Test #765: model.circulant ..................   Passed  344.72 sec
+40/40 Test #760: model.deadlock_owners ............   Passed  682.08 sec
+
+98% tests passed, 1 tests failed out of 40
+
+Label Time Summary:
+model    = 3102.91 sec*proc (40 tests)
+tier1    = 2758.19 sec*proc (39 tests)
+
+Total Test time (real) = 1086.59 sec
+
+The following tests FAILED:
+	742 - model.abort (Subprocess killed)                   model tier1
+Errors while running CTest

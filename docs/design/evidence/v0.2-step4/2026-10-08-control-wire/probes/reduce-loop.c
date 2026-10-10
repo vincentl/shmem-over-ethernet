@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 2: a loop of 8-byte sum reductions over the world, one PE a
  * node - the small tree on the data plane, which Part 2's control wire slowed
  * at 64 logical nodes while a barrier did not move. PE 0 reports the mean.

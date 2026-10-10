@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: each mutant tree - one change to the branch - built in
 # debug and run against the tests of what it breaks (REGEX), which should fail
 # on it; the first failing tests and the messages they ended with.

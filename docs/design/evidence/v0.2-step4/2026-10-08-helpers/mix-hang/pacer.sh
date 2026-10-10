@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 3: osoe-pacer's mix and mailbox for a minute each, at no
 # helpers and at two, 8 PEs on four logical nodes, from a release build.
 # usage: pacer.sh TAR OUTDIR. Takes the VM lock.

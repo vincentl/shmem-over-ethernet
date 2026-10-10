@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Three writers of fetch-adds beside one put stream on one connection, four PEs
 # a node over two Pi nodes, the kernel's unsent queue capped at 16 KiB: the base
 # (3ee3357), filling the room (8a0e2fd) and filling with the spare (f643837),

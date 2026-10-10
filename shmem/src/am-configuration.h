@@ -27,7 +27,7 @@
  * gigabit, where the link is the limit, it costs a small message behind a
  * stream 1.7 ms at the 99th percentile and nothing at the median - §3.2's
  * head-of-line bound, two segments, being in bytes twice the floor's, beside
- * the kernel's unsent queue, which each connection now limits by the link
+ * the kernel's unsent queue, which each data wire now limits by the link
  * (wire-settings.h).
  *
  * The budget is a guard rail, not a routine mechanism: the default buffer holds

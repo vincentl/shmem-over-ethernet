@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the zero-copy send off and on over loopback, one build,
 # alternating: the 64 KiB and 1 MiB put streams with the receiving and sending
 # nodes' counters over 5 s of each run. usage: zc-loopback.sh OUT NAME. Takes the lock.

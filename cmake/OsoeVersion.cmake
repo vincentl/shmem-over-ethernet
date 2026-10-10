@@ -25,7 +25,7 @@ set(OSOE_VERSION_TEXT "${PROJECT_VERSION}")
 set(OSOE_BUILD_NOTE "")
 if(OSOE_SINGLE_NODE)
   string(APPEND OSOE_VERSION_TEXT " (single-node build)")
-  set(OSOE_BUILD_NOTE "  This is the single-node build: it runs a job of one node, and checks\\n  OSOE_PORT_RANGE, OSOE_JOB_SECRET and OSOE_KEEPALIVE as values only - each is\\n  a setting of the connections between nodes, which it never makes.\\n\\n")
+  set(OSOE_BUILD_NOTE "  This is the single-node build: it runs a job of one node, and checks\\n  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,\\n  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets\\n  the connections between nodes, the threads that serve them or a large\\n  collective's steps between nodes, none of which a job of one node has.\\n\\n")
 endif()
 add_compile_definitions(OSOE_VERSION_STRING="${OSOE_VERSION_TEXT}"
                         OSOE_BUILD_NOTE="${OSOE_BUILD_NOTE}")

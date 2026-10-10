@@ -1,0 +1,8 @@
+node 0   lima-osoe-load   collective shape link; link measured: a hop of 46196 ns, a message cost of 14764 ns, 1055180020 bytes a second
+node 0   lima-osoe-load    2/2  live  world      epoch 0/16  own no  children 0/3  next -    parent root  rank 1 shmem_int_broadcast (epoch 10937) 2.7 ms
+node 1   lima-osoe-load   collective shape link; link measured: a hop of 46196 ns, a message cost of 14764 ns, 1055180020 bytes a second
+node 1   lima-osoe-load    2/2  live  world      epoch 0/16  own no  children 0/0  next -    parent 0     rank 3 shmem_int_broadcast (epoch 10937) 5.4 ms
+node 2   lima-osoe-load   collective shape link; link measured: a hop of 46196 ns, a message cost of 14764 ns, 1055180020 bytes a second
+node 2   lima-osoe-load    2/2  live  world      epoch 0/16  own no  children 0/0  next -    parent 0     rank 5 shmem_int_broadcast (epoch 10938) 3.1 ms
+node 3   lima-osoe-load   collective shape link; link measured: a hop of 46196 ns, a message cost of 14764 ns, 1055180020 bytes a second
+node 3   lima-osoe-load    2/2  live  world      epoch 0/16  own no  children 0/0  next -    parent 0     rank 7 shmem_int_broadcast (epoch 10938) 6.7 ms

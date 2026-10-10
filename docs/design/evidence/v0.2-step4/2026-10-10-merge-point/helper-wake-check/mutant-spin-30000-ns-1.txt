@@ -1,0 +1,35 @@
+Internal ctest changing into directory: /tmp/helper-wake-check/mutant-30000/build/release
+Test project /tmp/helper-wake-check/mutant-30000/build/release
+    Start 230: shmem.helper-wake.0-1-2-3
+1/1 Test #230: shmem.helper-wake.0-1-2-3 ........***Failed    0.07 sec
+/tmp/helper-wake-check/mutant-30000/shmem/tests/test-helper-wake.c:88: CHECK(woken >= WOKEN_AT_LEAST) failed
+/tmp/helper-wake-check/mutant-30000/shmem/tests/test-helper-wake.c:88: CHECK(woken >= WOKEN_AT_LEAST) failed
+node 1's wire, helper 1's, attempt 1: helper 1 woken 1 times in 100 puts
+node 1's wire, helper 1's, attempt 1: helper 2 woken 0 times in 100 puts
+node 1's wire, helper 1's, attempt 2: helper 1 woken 1 times in 100 puts
+node 1's wire, helper 1's, attempt 2: helper 2 woken 0 times in 100 puts
+node 1's wire, helper 1's, attempt 3: helper 1 woken 2 times in 100 puts
+node 1's wire, helper 1's, attempt 3: helper 2 woken 0 times in 100 puts
+node 2's wire, helper 2's, attempt 1: helper 1 woken 0 times in 100 puts
+node 2's wire, helper 2's, attempt 1: helper 2 woken 80 times in 100 puts
+node 3's wire, helper 1's, attempt 1: helper 1 woken 1 times in 100 puts
+node 3's wire, helper 1's, attempt 1: helper 2 woken 0 times in 100 puts
+node 3's wire, helper 1's, attempt 2: helper 1 woken 1 times in 100 puts
+node 3's wire, helper 1's, attempt 2: helper 2 woken 0 times in 100 puts
+node 3's wire, helper 1's, attempt 3: helper 1 woken 1 times in 100 puts
+node 3's wire, helper 1's, attempt 3: helper 2 woken 0 times in 100 puts
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+internode    =   0.07 sec*proc (1 test)
+tier2        =   0.07 sec*proc (1 test)
+
+Total Test time (real) =   0.09 sec
+
+The following tests FAILED:
+	230 - shmem.helper-wake.0-1-2-3 (Failed)                internode tier2
+Errors while running CTest

@@ -1,0 +1,7 @@
+run 1 h=0 rc=0 took=28.0s dumped=no last:   21.38681 usecs / fcollect32(), 40000 Kbytes @ 11.4155 MB/sec
+run 2 h=2 rc=0 took=25.0s dumped=no last:   19.62913 usecs / fcollect32(), 40000 Kbytes @ 12.4377 MB/sec
+run 3 h=0 rc=0 took=32.1s dumped=no last:   25.34974 usecs / fcollect32(), 40000 Kbytes @  9.6309 MB/sec
+run 4 h=2 rc=0 took=27.1s dumped=no last:   19.60798 usecs / fcollect32(), 40000 Kbytes @ 12.4511 MB/sec
+run 5 h=0 rc=0 took=28.0s dumped=no last:   25.13021 usecs / fcollect32(), 40000 Kbytes @  9.7150 MB/sec
+run 6 h=2 rc=0 took=30.0s dumped=no last:   19.27910 usecs / fcollect32(), 40000 Kbytes @ 12.6635 MB/sec
+DONE 08:04:35

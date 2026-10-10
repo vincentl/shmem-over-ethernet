@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 2: how long shmem_init takes, which the mesh's two wires a
  * pair lengthen (the brief's Part 2, item 5). Each PE times its own init; PE 0
  * reports the slowest and its own. usage: startup */

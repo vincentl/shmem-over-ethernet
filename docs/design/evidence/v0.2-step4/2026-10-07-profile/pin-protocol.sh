@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # shmem.floor's stream ratio under design 8.4's protocol, for the pin: the final
 # tree four times idle, four beside a ctest -j4, four under 16 busy loops; its
 # poll mutant four times idle and twice under the loops. Release builds in

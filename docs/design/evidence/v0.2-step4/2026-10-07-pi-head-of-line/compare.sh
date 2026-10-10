@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0 on the Pi: the tip of the ladder (fill the room, the
 # kernel's unsent queue capped by the link, 256 KiB buffers) against the tree
 # before it (3ee3357): osoe-bench at 4 x 4 and 4 x 1, alternating three times;

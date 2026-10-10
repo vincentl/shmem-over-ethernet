@@ -1,0 +1,357 @@
+osoe 0.1.0 (single-node build) environment variables
+
+  This is the single-node build: it runs a job of one node, and checks
+  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,
+  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets
+  the connections between nodes, the threads that serve them or a large
+  collective's steps between nodes, none of which a job of one node has.
+
+  From the OpenSHMEM specification (§8). Each also has a deprecated SMA_
+  spelling; when both are set the SHMEM_ one controls.
+    SHMEM_SYMMETRIC_SIZE   symmetric heap bytes per PE, with an optional
+                           k, m, g or t multiplier (default 256m)
+    SHMEM_VERSION          print the library version at start-up
+    SHMEM_INFO             print this text
+    SHMEM_DEBUG            print what the library set up, per PE
+
+  Specific to osoe:
+    OSOE_MAX_THREADS       live threads of a PE that have called the library,
+                           the main thread included: a thread takes its place
+                           at its first call after init that does more than
+                           report on the job, and gives it back when it exits.
+                           1 to 1023, the same on every PE of a node; default
+                           16 (§3.14)
+    OSOE_MAX_TEAMS         teams one PE may be in at once, the three
+                           predefined teams included: a destroyed team gives
+                           its number back. 4 to 1024, the same on every node;
+                           default 256 (§5.7)
+    OSOE_TEAM_BLOCKS       teams a node can hold at once, the three
+                           predefined teams' included: its pool of team
+                           blocks. 8 to 65536, the same on every PE of a
+                           node; default 1024 (§5.7)
+    OSOE_MAX_CONTEXTS      contexts a PE may have at once, the default one
+                           included: 1 to 4096, the same on every PE of a
+                           node; default 64 (§4.11)
+    OSOE_GET_LANDING_BYTES bytes of each PE's landing zone for its gets'
+                           replies, a multiple of 1024 from 1024 to
+                           67107840, the same on every PE of a node;
+                           default 262144 (§4.6, §4.11)
+    OSOE_NO_PROGRESS_TIMEOUT
+                           seconds a wait may see no progress before it ends
+                           the job; 0, the default, means never (§3.15)
+    OSOE_HEAP_BASE         the address every PE maps its heap at (§4.1)
+    OSOE_HEAP_SHIFT        a test mode: each PE maps its own heap this many
+                           bytes times its rank past that address, so no two
+                           PEs share a symmetric address (§8.2)
+    OSOE_KEEP_CONTROL_SEGMENT
+                           1: keep the control segment's name until finalize,
+                           so a crash leaves it for post-mortem reading and
+                           osoe-stat --gc; by default no name survives init
+                           (§3.14)
+    OSOE_COLLECTIVE_FANOUT
+                           the ceiling of the internode tree collectives run
+                           over, 2 to 32, the same on every node, default 8:
+                           a barrier's and a small collective's tree take it,
+                           a large reduction's or broadcast's the fan-out up
+                           to it its size makes cheapest on the link (§5.3)
+    OSOE_COLLECTIVE_PIPELINE
+                           the capacity: the most pieces of a large data
+                           collective each node keeps in flight up and down
+                           its tree, 1 to 8, the same on every node, default
+                           4; a scan keeps 2 under link (§5.8)
+    OSOE_SMALL_COLLECTIVE_BYTES
+                           the largest reduction, broadcast or scan that
+                           moves through a team's own slots in one piece, 128
+                           to 16384, the same on every node; a larger one goes
+                           through the lanes of the threads that make it;
+                           default 1024
+                           (§5.8)
+    OSOE_COLLECTIVE_SHAPE  link, the default, tree or fixed, the same on
+                           every node: link chooses a large reduction's or
+                           broadcast's fan-out and window from the link,
+                           measured at start or set below, or for a
+                           reduction Träff's reduce-scatter and allgather
+                           where it costs less, and a scan keeps 0.1.0's 4
+                           and 2; tree chooses among the trees alone; fixed
+                           keeps the two above for every call
+    OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND
+                           the link's hop and message cost in nanoseconds
+                           and its bandwidth, all three or none, the same on
+                           every node: for tests and fabrics known in advance
+    OSOE_SHM_CAPACITY_CHECK
+                           0: report a request larger than /dev/shm's free
+                           space and continue, for testing on a small
+                           /dev/shm; by default init refuses it (§6.2)
+    OSOE_PORT_RANGE        LOW-HIGH: the ports a node's lead may listen on,
+                           within 1024-65535; default 17000-26999 (§6.2)
+    OSOE_JOB_SECRET        32 hexadecimal digits: a secret every node of the
+                           job proves it knows when it joins, never sent
+                           (§6.2)
+    OSOE_KEEPALIVE         IDLE,INTERVAL,COUNT: TCP keepalive between nodes,
+                           in seconds, seconds and probes; default 60,10,6;
+                           0 for none (§3.15)
+    OSOE_AGENT_SLICE_US    the scheduler slice each PE's agent thread asks
+                           for, 100 to 100000 microseconds, or 0 for the
+                           kernel's own; default 100, which lets a node's
+                           progress thread preempt sooner on a shared core
+                           (Linux 6.12 and later; §3.11)
+    OSOE_AGENT_CPUS        task, the default: each PE's agent thread runs on
+                           its PE's CPUs; or node: on any CPU any PE of its
+                           node may, which helps a bound job's messages on a
+                           kernel that ignores OSOE_AGENT_SLICE_US (§3.11)
+    OSOE_PROGRESS_HELPERS  threads of each node lead's process beside its
+                           agent that own the node's data wires, a share of
+                           the other nodes each, the agent keeping the
+                           control wires: 0 to 64, the same on every PE of a
+                           node; default 0 (§3.12)
+    OSOE_DEADLOCK_SECONDS  how long a job whose every PE waits in the library,
+                           nothing moving on any node and nothing in flight,
+                           is watched before it ends as deadlocked, naming
+                           where each PE waits: 1 to 86400, or 0 for never;
+                           default 10 (§3.15)
+
+  The bootstrap variables - PROCID, LOCALID, GTIDS, STEP_NUM_TASKS, NODEID,
+  STEP_NUM_NODES, STEP_NODELIST, JOB_ID and STEP_ID - are srun's, with SLURM_
+  before each, or osoe-launch's, with OSOE_; OSOE_PROCID decides which
+  (design §6.1).
+
+  A running or hung job is read with osoe-stat, which maps the control
+  segment read-only and needs no cooperation from the job (§3.14).
+osoe 0.1.0 (single-node build) environment variables
+
+  This is the single-node build: it runs a job of one node, and checks
+  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,
+  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets
+  the connections between nodes, the threads that serve them or a large
+  collective's steps between nodes, none of which a job of one node has.
+
+  From the OpenSHMEM specification (§8). Each also has a deprecated SMA_
+  spelling; when both are set the SHMEM_ one controls.
+    SHMEM_SYMMETRIC_SIZE   symmetric heap bytes per PE, with an optional
+                           k, m, g or t multiplier (default 256m)
+    SHMEM_VERSION          print the library version at start-up
+    SHMEM_INFO             print this text
+    SHMEM_DEBUG            print what the library set up, per PE
+
+  Specific to osoe:
+    OSOE_MAX_THREADS       live threads of a PE that have called the library,
+                           the main thread included: a thread takes its place
+                           at its first call after init that does more than
+                           report on the job, and gives it back when it exits.
+                           1 to 1023, the same on every PE of a node; default
+                           16 (§3.14)
+    OSOE_MAX_TEAMS         teams one PE may be in at once, the three
+                           predefined teams included: a destroyed team gives
+                           its number back. 4 to 1024, the same on every node;
+                           default 256 (§5.7)
+    OSOE_TEAM_BLOCKS       teams a node can hold at once, the three
+                           predefined teams' included: its pool of team
+                           blocks. 8 to 65536, the same on every PE of a
+                           node; default 1024 (§5.7)
+    OSOE_MAX_CONTEXTS      contexts a PE may have at once, the default one
+                           included: 1 to 4096, the same on every PE of a
+                           node; default 64 (§4.11)
+    OSOE_GET_LANDING_BYTES bytes of each PE's landing zone for its gets'
+                           replies, a multiple of 1024 from 1024 to
+                           67107840, the same on every PE of a node;
+                           default 262144 (§4.6, §4.11)
+    OSOE_NO_PROGRESS_TIMEOUT
+                           seconds a wait may see no progress before it ends
+                           the job; 0, the default, means never (§3.15)
+    OSOE_HEAP_BASE         the address every PE maps its heap at (§4.1)
+    OSOE_HEAP_SHIFT        a test mode: each PE maps its own heap this many
+                           bytes times its rank past that address, so no two
+                           PEs share a symmetric address (§8.2)
+    OSOE_KEEP_CONTROL_SEGMENT
+                           1: keep the control segment's name until finalize,
+                           so a crash leaves it for post-mortem reading and
+                           osoe-stat --gc; by default no name survives init
+                           (§3.14)
+    OSOE_COLLECTIVE_FANOUT
+                           the ceiling of the internode tree collectives run
+                           over, 2 to 32, the same on every node, default 8:
+                           a barrier's and a small collective's tree take it,
+                           a large reduction's or broadcast's the fan-out up
+                           to it its size makes cheapest on the link (§5.3)
+    OSOE_COLLECTIVE_PIPELINE
+                           the capacity: the most pieces of a large data
+                           collective each node keeps in flight up and down
+                           its tree, 1 to 8, the same on every node, default
+                           4; a scan keeps 2 under link (§5.8)
+    OSOE_SMALL_COLLECTIVE_BYTES
+                           the largest reduction, broadcast or scan that
+                           moves through a team's own slots in one piece, 128
+                           to 16384, the same on every node; a larger one goes
+                           through the lanes of the threads that make it;
+                           default 1024
+                           (§5.8)
+    OSOE_COLLECTIVE_SHAPE  link, the default, tree or fixed, the same on
+                           every node: link chooses a large reduction's or
+                           broadcast's fan-out and window from the link,
+                           measured at start or set below, or for a
+                           reduction Träff's reduce-scatter and allgather
+                           where it costs less, and a scan keeps 0.1.0's 4
+                           and 2; tree chooses among the trees alone; fixed
+                           keeps the two above for every call
+    OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND
+                           the link's hop and message cost in nanoseconds
+                           and its bandwidth, all three or none, the same on
+                           every node: for tests and fabrics known in advance
+    OSOE_SHM_CAPACITY_CHECK
+                           0: report a request larger than /dev/shm's free
+                           space and continue, for testing on a small
+                           /dev/shm; by default init refuses it (§6.2)
+    OSOE_PORT_RANGE        LOW-HIGH: the ports a node's lead may listen on,
+                           within 1024-65535; default 17000-26999 (§6.2)
+    OSOE_JOB_SECRET        32 hexadecimal digits: a secret every node of the
+                           job proves it knows when it joins, never sent
+                           (§6.2)
+    OSOE_KEEPALIVE         IDLE,INTERVAL,COUNT: TCP keepalive between nodes,
+                           in seconds, seconds and probes; default 60,10,6;
+                           0 for none (§3.15)
+    OSOE_AGENT_SLICE_US    the scheduler slice each PE's agent thread asks
+                           for, 100 to 100000 microseconds, or 0 for the
+                           kernel's own; default 100, which lets a node's
+                           progress thread preempt sooner on a shared core
+                           (Linux 6.12 and later; §3.11)
+    OSOE_AGENT_CPUS        task, the default: each PE's agent thread runs on
+                           its PE's CPUs; or node: on any CPU any PE of its
+                           node may, which helps a bound job's messages on a
+                           kernel that ignores OSOE_AGENT_SLICE_US (§3.11)
+    OSOE_PROGRESS_HELPERS  threads of each node lead's process beside its
+                           agent that own the node's data wires, a share of
+                           the other nodes each, the agent keeping the
+                           control wires: 0 to 64, the same on every PE of a
+                           node; default 0 (§3.12)
+    OSOE_DEADLOCK_SECONDS  how long a job whose every PE waits in the library,
+                           nothing moving on any node and nothing in flight,
+                           is watched before it ends as deadlocked, naming
+                           where each PE waits: 1 to 86400, or 0 for never;
+                           default 10 (§3.15)
+
+  The bootstrap variables - PROCID, LOCALID, GTIDS, STEP_NUM_TASKS, NODEID,
+  STEP_NUM_NODES, STEP_NODELIST, JOB_ID and STEP_ID - are srun's, with SLURM_
+  before each, or osoe-launch's, with OSOE_; OSOE_PROCID decides which
+  (design §6.1).
+
+  A running or hung job is read with osoe-stat, which maps the control
+  segment read-only and needs no cooperation from the job (§3.14).
+osoe 0.1.0 (single-node build) environment variables
+
+  This is the single-node build: it runs a job of one node, and checks
+  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,
+  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets
+  the connections between nodes, the threads that serve them or a large
+  collective's steps between nodes, none of which a job of one node has.
+
+  From the OpenSHMEM specification (§8). Each also has a deprecated SMA_
+  spelling; when both are set the SHMEM_ one controls.
+    SHMEM_SYMMETRIC_SIZE   symmetric heap bytes per PE, with an optional
+                           k, m, g or t multiplier (default 256m)
+    SHMEM_VERSION          print the library version at start-up
+    SHMEM_INFO             print this text
+    SHMEM_DEBUG            print what the library set up, per PE
+
+  Specific to osoe:
+    OSOE_MAX_THREADS       live threads of a PE that have called the library,
+                           the main thread included: a thread takes its place
+                           at its first call after init that does more than
+                           report on the job, and gives it back when it exits.
+                           1 to 1023, the same on every PE of a node; default
+                           16 (§3.14)
+    OSOE_MAX_TEAMS         teams one PE may be in at once, the three
+                           predefined teams included: a destroyed team gives
+                           its number back. 4 to 1024, the same on every node;
+                           default 256 (§5.7)
+    OSOE_TEAM_BLOCKS       teams a node can hold at once, the three
+                           predefined teams' included: its pool of team
+                           blocks. 8 to 65536, the same on every PE of a
+                           node; default 1024 (§5.7)
+    OSOE_MAX_CONTEXTS      contexts a PE may have at once, the default one
+                           included: 1 to 4096, the same on every PE of a
+                           node; default 64 (§4.11)
+    OSOE_GET_LANDING_BYTES bytes of each PE's landing zone for its gets'
+                           replies, a multiple of 1024 from 1024 to
+                           67107840, the same on every PE of a node;
+                           default 262144 (§4.6, §4.11)
+    OSOE_NO_PROGRESS_TIMEOUT
+                           seconds a wait may see no progress before it ends
+                           the job; 0, the default, means never (§3.15)
+    OSOE_HEAP_BASE         the address every PE maps its heap at (§4.1)
+    OSOE_HEAP_SHIFT        a test mode: each PE maps its own heap this many
+                           bytes times its rank past that address, so no two
+                           PEs share a symmetric address (§8.2)
+    OSOE_KEEP_CONTROL_SEGMENT
+                           1: keep the control segment's name until finalize,
+                           so a crash leaves it for post-mortem reading and
+                           osoe-stat --gc; by default no name survives init
+                           (§3.14)
+    OSOE_COLLECTIVE_FANOUT
+                           the ceiling of the internode tree collectives run
+                           over, 2 to 32, the same on every node, default 8:
+                           a barrier's and a small collective's tree take it,
+                           a large reduction's or broadcast's the fan-out up
+                           to it its size makes cheapest on the link (§5.3)
+    OSOE_COLLECTIVE_PIPELINE
+                           the capacity: the most pieces of a large data
+                           collective each node keeps in flight up and down
+                           its tree, 1 to 8, the same on every node, default
+                           4; a scan keeps 2 under link (§5.8)
+    OSOE_SMALL_COLLECTIVE_BYTES
+                           the largest reduction, broadcast or scan that
+                           moves through a team's own slots in one piece, 128
+                           to 16384, the same on every node; a larger one goes
+                           through the lanes of the threads that make it;
+                           default 1024
+                           (§5.8)
+    OSOE_COLLECTIVE_SHAPE  link, the default, tree or fixed, the same on
+                           every node: link chooses a large reduction's or
+                           broadcast's fan-out and window from the link,
+                           measured at start or set below, or for a
+                           reduction Träff's reduce-scatter and allgather
+                           where it costs less, and a scan keeps 0.1.0's 4
+                           and 2; tree chooses among the trees alone; fixed
+                           keeps the two above for every call
+    OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND
+                           the link's hop and message cost in nanoseconds
+                           and its bandwidth, all three or none, the same on
+                           every node: for tests and fabrics known in advance
+    OSOE_SHM_CAPACITY_CHECK
+                           0: report a request larger than /dev/shm's free
+                           space and continue, for testing on a small
+                           /dev/shm; by default init refuses it (§6.2)
+    OSOE_PORT_RANGE        LOW-HIGH: the ports a node's lead may listen on,
+                           within 1024-65535; default 17000-26999 (§6.2)
+    OSOE_JOB_SECRET        32 hexadecimal digits: a secret every node of the
+                           job proves it knows when it joins, never sent
+                           (§6.2)
+    OSOE_KEEPALIVE         IDLE,INTERVAL,COUNT: TCP keepalive between nodes,
+                           in seconds, seconds and probes; default 60,10,6;
+                           0 for none (§3.15)
+    OSOE_AGENT_SLICE_US    the scheduler slice each PE's agent thread asks
+                           for, 100 to 100000 microseconds, or 0 for the
+                           kernel's own; default 100, which lets a node's
+                           progress thread preempt sooner on a shared core
+                           (Linux 6.12 and later; §3.11)
+    OSOE_AGENT_CPUS        task, the default: each PE's agent thread runs on
+                           its PE's CPUs; or node: on any CPU any PE of its
+                           node may, which helps a bound job's messages on a
+                           kernel that ignores OSOE_AGENT_SLICE_US (§3.11)
+    OSOE_PROGRESS_HELPERS  threads of each node lead's process beside its
+                           agent that own the node's data wires, a share of
+                           the other nodes each, the agent keeping the
+                           control wires: 0 to 64, the same on every PE of a
+                           node; default 0 (§3.12)
+    OSOE_DEADLOCK_SECONDS  how long a job whose every PE waits in the library,
+                           nothing moving on any node and nothing in flight,
+                           is watched before it ends as deadlocked, naming
+                           where each PE waits: 1 to 86400, or 0 for never;
+                           default 10 (§3.15)
+
+  The bootstrap variables - PROCID, LOCALID, GTIDS, STEP_NUM_TASKS, NODEID,
+  STEP_NUM_NODES, STEP_NODELIST, JOB_ID and STEP_ID - are srun's, with SLURM_
+  before each, or osoe-launch's, with OSOE_; OSOE_PROCID decides which
+  (design §6.1).
+
+  A running or hung job is read with osoe-stat, which maps the control
+  segment read-only and needs no cooperation from the job (§3.14).

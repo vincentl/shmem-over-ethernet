@@ -1,0 +1,8 @@
+release: 20 passed, 0 failed of 20; attempts past the first: 0
+asan: 20 passed, 0 failed of 20; attempts past the first: 0
+asan-loaded: 11 passed, 9 failed of 20; attempts past the first: 66
+1
+mutant-spin-200000-ns: 0 passed, 10 failed of 10; attempts past the first: 100
+1
+mutant-spin-30000-ns: 0 passed, 10 failed of 10; attempts past the first: 84
+DONE 11:15:11

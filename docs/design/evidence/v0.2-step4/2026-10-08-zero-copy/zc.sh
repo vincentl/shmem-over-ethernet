@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0 on the Pi: the zero-copy send, off and on, alternating -
 # (a) a 1 MiB put stream between two nodes, each node's agent CPU over it
 # (putstream-cpu.c) and the sending node's counters (osoe-stat at the window's

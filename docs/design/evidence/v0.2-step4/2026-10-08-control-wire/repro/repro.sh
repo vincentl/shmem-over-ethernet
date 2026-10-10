@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: reproduce shmem.circulant.5.perturb's hang with the
 # deadlock detector on, and dump every node's segment while it hangs.
 # usage: repro.sh TAR OUTDIR CASE (CASE: 5.perturb or 8x2). Takes the VM lock.

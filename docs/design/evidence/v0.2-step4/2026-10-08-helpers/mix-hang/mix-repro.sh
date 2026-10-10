@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The pacer's mix hung at no helpers (pacer-7): a team sync completed on one
 # node of a two-PE team and not the other. Is it the tip's or older? main
 # (fc99503) and the tip, release builds, mix for 60 s at no helpers, RUNS times

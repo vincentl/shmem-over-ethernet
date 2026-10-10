@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 0: what a fetch-add waits behind a put stream on the same
  * connection (head-of-line blocking, §3.2), against the connection buffer's
  * size. Four PEs, two a node, in blocks: PE 0 streams 1 MiB puts to PE 2 while

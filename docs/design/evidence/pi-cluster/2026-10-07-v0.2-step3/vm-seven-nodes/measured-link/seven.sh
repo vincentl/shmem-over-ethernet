@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 3 Part 3, the VM's half: e-band on seven logical nodes of one PE,
 # `link` against `tree`, alternating three times, with SHMEM_DEBUG on so that
 # each run records the link it measured; and the shapes chosen at 16 and 64

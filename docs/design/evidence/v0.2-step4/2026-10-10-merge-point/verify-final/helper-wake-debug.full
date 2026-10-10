@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /tmp/v02-step4-final/build/debug
+Test project /tmp/v02-step4-final/build/debug
+    Start 230: shmem.helper-wake.0-1-2-3
+    Test #230: shmem.helper-wake.0-1-2-3 ........   Passed    0.07 sec
+    Start 230: shmem.helper-wake.0-1-2-3
+    Test #230: shmem.helper-wake.0-1-2-3 ........   Passed    0.07 sec
+    Start 230: shmem.helper-wake.0-1-2-3
+1/1 Test #230: shmem.helper-wake.0-1-2-3 ........   Passed    0.06 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+internode    =   0.06 sec*proc (1 test)
+tier2        =   0.06 sec*proc (1 test)
+
+Total Test time (real) =   0.22 sec

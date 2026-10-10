@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """A reviewer's variant of tools/modelcheck/reservation_model.py's zero-copy kernel.
 
 The tree's kernel thread delivers each part in send order and posts its

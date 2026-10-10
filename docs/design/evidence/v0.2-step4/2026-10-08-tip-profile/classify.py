@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Divide a thread's perf samples the way step 4's Part 0 asks.
 
 usage: perf script -i perf.data -F comm,tid,period,ip,sym,dso | classify.py [--tid N]

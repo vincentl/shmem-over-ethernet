@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """Part 3's mutants: each a copy of the worktree with one change, packed as
 NAME.tar beside NAME.regex (the tests that should fail on it) and NAME.env."""
 import os, shutil, subprocess, sys, tempfile

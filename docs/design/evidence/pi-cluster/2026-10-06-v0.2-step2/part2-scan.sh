@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 2 Part 2 on the Pi, the scans' fix: a scan's fan-out under link is
 # 0.1.0's 4 rather than the ceiling's 8. The branch's tree in ~/osoe, release,
 # the e-band probe rebuilt with its oshcc; then, alternating three times, link

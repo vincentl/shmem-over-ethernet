@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: the wires as registered files, by OSOE_EXPERIMENT_FIXED_FILES in
 # one experiment build, alternating: the 64 KiB put stream, the mailbox, and
 # osoe-bench's latency and atomic round trips. usage: fixed-measure.sh OUT NAME

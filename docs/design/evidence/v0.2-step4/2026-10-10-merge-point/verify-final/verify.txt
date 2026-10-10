@@ -1,0 +1,40 @@
+== static checks 11:17:09
+100% tests passed, 0 tests failed out of 12
+== debug 11:17:56
+warnings: 0
+100% tests passed, 0 tests failed out of 1
+== release 11:18:04
+warnings: 0
+100% tests passed, 0 tests failed out of 1
+== asan 11:18:04
+warnings: 0
+100% tests passed, 0 tests failed out of 1
+== tsan 11:18:19
+warnings: 0
+== the single-node build 11:18:28
+warnings: 0
+100% tests passed, 0 tests failed out of 404
+osoe 0.1.0 (single-node build) environment variables
+
+  This is the single-node build: it runs a job of one node, and checks
+  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,
+  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets
+  the connections between nodes, the threads that serve them or a large
+  collective's steps between nodes, none of which a job of one node has.
+--
+osoe 0.1.0 (single-node build) environment variables
+
+  This is the single-node build: it runs a job of one node, and checks
+  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,
+  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets
+  the connections between nodes, the threads that serve them or a large
+  collective's steps between nodes, none of which a job of one node has.
+--
+osoe 0.1.0 (single-node build) environment variables
+
+  This is the single-node build: it runs a job of one node, and checks
+  OSOE_PORT_RANGE, OSOE_JOB_SECRET, OSOE_KEEPALIVE, OSOE_PROGRESS_HELPERS,
+  OSOE_COLLECTIVE_SHAPE and the OSOE_LINK_ settings as values only - each sets
+  the connections between nodes, the threads that serve them or a large
+  collective's steps between nodes, none of which a job of one node has.
+DONE 11:19:16

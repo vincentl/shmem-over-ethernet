@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: two builds' put streams, alternating. Takes the VM lock.
 # usage: ab.sh OUT ROUNDS SECONDS BYTES NAME... (each NAME a build in /tmp/ladder)
 exec 9>/tmp/osoe-vm.lock; flock -w 10800 9 || exit 1

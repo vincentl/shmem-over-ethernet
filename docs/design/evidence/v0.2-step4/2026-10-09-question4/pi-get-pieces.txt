@@ -1,0 +1,25 @@
+Question 4's first experiment on the Pi cluster, 2026-10-09 ~19:20: get-pieces.c,
+built with the tree of 7903b15 (pi-13's ~/osoe), srun -N2 --ntasks-per-node=1,
+three runs of 21 repetitions a size, medians in microseconds.
+
+run 1
+bytes=16384 put_quiet_us=284.8 get_us=258.4 get_nbi_quiet_us=253.5 get_over_put=0.91 nbi_over_put=0.89
+bytes=65536 put_quiet_us=717.5 get_us=887.2 get_nbi_quiet_us=725.0 get_over_put=1.24 nbi_over_put=1.01
+bytes=131072 put_quiet_us=1278.0 get_us=1617.1 get_nbi_quiet_us=1335.6 get_over_put=1.27 nbi_over_put=1.05
+bytes=262144 put_quiet_us=2393.8 get_us=3022.9 get_nbi_quiet_us=2441.5 get_over_put=1.26 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9097.6 get_us=11553.3 get_nbi_quiet_us=9149.6 get_over_put=1.27 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35848.5 get_us=45786.6 get_nbi_quiet_us=35915.2 get_over_put=1.28 nbi_over_put=1.00
+run 2
+bytes=16384 put_quiet_us=287.9 get_us=266.3 get_nbi_quiet_us=261.1 get_over_put=0.93 nbi_over_put=0.91
+bytes=65536 put_quiet_us=731.1 get_us=896.1 get_nbi_quiet_us=738.0 get_over_put=1.23 nbi_over_put=1.01
+bytes=131072 put_quiet_us=1275.4 get_us=1596.3 get_nbi_quiet_us=1330.0 get_over_put=1.25 nbi_over_put=1.04
+bytes=262144 put_quiet_us=2398.3 get_us=3017.6 get_nbi_quiet_us=2442.7 get_over_put=1.26 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9092.4 get_us=11567.7 get_nbi_quiet_us=9149.2 get_over_put=1.27 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35839.7 get_us=45764.3 get_nbi_quiet_us=35917.2 get_over_put=1.28 nbi_over_put=1.00
+run 3
+bytes=16384 put_quiet_us=288.1 get_us=262.0 get_nbi_quiet_us=261.7 get_over_put=0.91 nbi_over_put=0.91
+bytes=65536 put_quiet_us=717.9 get_us=894.5 get_nbi_quiet_us=741.7 get_over_put=1.25 nbi_over_put=1.03
+bytes=131072 put_quiet_us=1275.2 get_us=1611.4 get_nbi_quiet_us=1313.9 get_over_put=1.26 nbi_over_put=1.03
+bytes=262144 put_quiet_us=2395.0 get_us=3014.7 get_nbi_quiet_us=2451.8 get_over_put=1.26 nbi_over_put=1.02
+bytes=1048576 put_quiet_us=9086.6 get_us=11563.5 get_nbi_quiet_us=9147.1 get_over_put=1.27 nbi_over_put=1.01
+bytes=4194304 put_quiet_us=35835.6 get_us=45775.6 get_nbi_quiet_us=35911.7 get_over_put=1.28 nbi_over_put=1.00

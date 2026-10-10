@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 0: profile the node leads' agents under a put stream and the
 # mailbox pattern, and the bare io_uring stream beside them. Over loopback, two
 # logical nodes in the VM. Takes the VM lock.

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 2: what a barrier waits behind a put stream between the
  * same two nodes - the control plane's own number (the brief's Part 2, item 5).
  * Four PEs, two a node, in blocks: PE 0 streams 1 MiB puts to PE 2 while PEs 1

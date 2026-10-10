@@ -1,0 +1,142 @@
+ + active set size 15
+ + root 55
+ + active set size 7
+ + root 63
+ + active set size 26
+ + root 44
+ + active set size 6
+ + root 64
+ + active set size 9
+ + root 61
+Shrinking active set test
+ + active set size 70
+Changing root test
+ + root 0
+ + active set size 55
+ + root 15
+ + active set size 34
+ + root 36
+ + active set size 24
+ + root 46
+ + active set size 13
+ + root 57
+ + active set size 2
+ + root 68
+ + active set size 47
+ + root 23
+ + active set size 66
+ + root 4
+ + active set size 33
+ + root 37
+ + active set size 30
+ + root 40
+ + active set size 4
+ + root 66
+ + active set size 49
+ + root 21
+ + active set size 22
+ + root 48
+ + active set size 52
+ + root 18
+ + active set size 57
+ + root 13
+ + active set size 64
+ + root 6
+ + active set size 3
+ + root 67
+ + active set size 50
+ + root 20
+ + active set size 25
+ + root 45
+ + active set size 48
+ + root 22
+ + active set size 56
+ + root 14
+ + active set size 46
+ + root 24
+ + active set size 23
+ + root 47
+ + active set size 42
+ + root 28
+ + active set size 63
+ + root 7
+ + active set size 54
+ + root 16
+ + active set size 40
+ + root 30
+ + active set size 21
+ + root 49
+ + active set size 16
+ + root 54
+ + active set size 17
+ + root 53
+ + active set size 62
+ + root 8
+ + active set size 51
+ + root 19
+ + active set size 43
+ + root 27
+ + active set size 1
+ + root 69
+ + active set size 39
+ + root 31
+ + active set size 18
+ + root 52
+ + active set size 11
+ + root 59
+ + active set size 31
+ + root 39
+ + active set size 27
+ + root 43
+ + active set size 5
+ + root 65
+ + active set size 60
+ + root 10
+ + active set size 61
+ + root 9
+ + active set size 36
+ + root 34
+ + active set size 69
+ + root 1
+ + active set size 35
+ + root 35
+ + active set size 20
+ + root 50
+ + active set size 10
+ + root 60
+ + active set size 29
+ + root 41
+ + active set size 67
+ + root 3
+ + active set size 41
+ + root 29
+ + active set size 12
+ + root 58
+ + active set size 28
+ + root 42
+ + active set size 59
+ + root 11
+ + active set size 68
+ + root 2
+ + active set size 44
+ + root 26
+ + active set size 38
+ + root 32
+ + active set size 19
+ + root 51
+ + active set size 32
+ + root 38
+ + active set size 8
+ + root 62
+ + active set size 53
+ + root 17
+ + active set size 45
+ + root 25
+ + active set size 14
+ + root 56
+ + active set size 65
+ + root 5
+ + active set size 37
+ + root 33
+ + active set size 58
+ + root 12

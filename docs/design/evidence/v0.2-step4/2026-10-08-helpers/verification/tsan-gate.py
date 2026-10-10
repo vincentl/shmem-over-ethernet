@@ -91,3 +91,4 @@ for fn in args:
     print(f'{fn}: {tests} failing tests read')
 print('TSAN GATE PASSED' if bad == 0 else f'TSAN GATE FAILED: {bad} tests')
 sys.exit(1 if bad else 0)
+# SPDX-License-Identifier: LGPL-3.0-or-later

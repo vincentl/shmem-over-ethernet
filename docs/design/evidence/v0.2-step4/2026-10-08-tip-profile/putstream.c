@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* v0.2 step 4 part 0: a steady put stream from PE 0 to the first PE on
  * another node, for profiling. usage: putstream [BYTES [SECONDS]] */
 #define _GNU_SOURCE

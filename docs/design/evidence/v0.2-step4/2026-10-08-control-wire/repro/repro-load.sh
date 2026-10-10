@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # v0.2 step 4 part 2: the circulant hang under load - COPIES copies of the 8x2
 # case at once (16 PEs each on 4 CPUs), ROUNDS times; a copy still running at
 # 60 s is dumped (osoe-stat of each node, and the processes' stacks).

@@ -36,9 +36,9 @@ was directed, written and reviewed; this part is where each level of it is kept.
 | `docs/decisions/<date>*.md` | the dated records: what was decided on a day or in a piece of work, by whom, why, and how to undo it, with what was built and found |
 | `docs/prompts/` | the brief each working session was given: its goal, what to read first, what to build, how to verify it, and the questions to stop and put to the author. The open briefs are in the directory, the finished ones in `done/`; the table in its `README.md` gives each, in the order the work was done, with its outcome and merge commit |
 | `CLAUDE.md` | the working agreements a session works under: when to delegate to subagents, how names are spelled, how a rename is audited, how review files are named |
-| `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds; its `README.md` is the guide |
+| `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds and of two reads of v0.2 step 4's first part; its `README.md` is the guide |
 
-**The evidence.** About a thousand files sit under `docs/design/evidence/` and
+**The evidence.** About two thousand files sit under `docs/design/evidence/` and
 `docs/reviews/evidence/` - `git ls-files | grep -c '/evidence/'` counts them:
 model runs, litmus tests, probe programs, logs, patches, and the raw output of
 each session on the Pi cluster, which
@@ -87,5 +87,10 @@ replaced there by `user`, and two Pi nodes' hardware addresses by
 `docs/design/evidence/pi-cluster/2026-09-26-night-f1/retest-new-port/`; and the
 two scripts of step D's merge point on the Pi cluster
 (`docs/design/evidence/pi-cluster/2026-10-04-step-d/`), committed without it,
-were given the license line, second after the shebang. Nothing else in those
-files was changed.
+were given the license line, second after the shebang. On 2026-10-10 so were
+the 82 programs and scripts that v0.2's steps 2 to 4 had added to the two trees
+without it, in the same places, and last in the two whose lines a review cites
+by number (`2026-10-07-profile/classify.py` and
+`2026-10-08-helpers/verification/tsan-gate.py`, under
+`docs/design/evidence/v0.2-step4/`); since then `shmem.license-lines` fails on
+any source file without it. Nothing else in those files was changed.

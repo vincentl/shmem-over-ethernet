@@ -1,0 +1,27 @@
+neighbor_put: 20000 loops of put(2048 bytes) to neighbor, 8 PEs:   0.001 secs
+  0.00622 usecs / put(), 40000 Kbytes @ 39261.9219 MB/sec
+
+neighbor_get: 20000 loops of get(2048 bytes) from neighbor, 8 PEs:   0.001 secs
+  0.00381 usecs / get(), 40000 Kbytes @ 64150.3524 MB/sec
+
+all2all_put: 20000 loops of put(2048 bytes) to all 8 PEs:   0.195 secs
+  1.21599 usecs / put(), 320000 Kbytes @ 1606.1958 MB/sec
+
+all2all_get: 20000 loops of get(2048 bytes) from all 8 PEs:   8.410 secs
+  52.56237 usecs / get(), 320000 Kbytes @ 37.1582 MB/sec
+
+one2many_put: 20000 loops of put(2048 bytes) to 7 PEs:   0.061 secs
+  0.43803 usecs / put(), 280000 Kbytes @ 4458.9073 MB/sec
+
+many2one_get: 20000 loops of get(2048 bytes) from 7 PEs:   6.567 secs
+  46.90515 usecs / get(), 280000 Kbytes @ 41.6399 MB/sec
+
+bcast: 20000 loops of broadcast32(2048 bytes) over 8 PEs:   2.932 secs
+  18.32391 usecs / broadcast32(), 40000 Kbytes @ 13.3236 MB/sec
+
+collect: 20000 loops of collect32(2048 bytes) over 8 PEs:   6.405 secs
+  40.02893 usecs / collect32(), 40000 Kbytes @  6.0991 MB/sec
+
+fcollect: 20000 loops of fcollect32(2048 bytes) over 8 PEs:   3.085 secs
+  19.27910 usecs / fcollect32(), 40000 Kbytes @ 12.6635 MB/sec
+

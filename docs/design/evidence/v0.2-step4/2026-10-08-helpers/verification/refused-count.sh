@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The full build's debug suite where io_uring is refused, as the README's
 # requirements section describes it: ctest under `deny-io-uring setup`, whose
 # seccomp filter every test inherits and which refuses io_uring_setup with
