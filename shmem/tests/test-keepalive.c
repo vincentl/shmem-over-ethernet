@@ -33,15 +33,18 @@
 
 #include "check.h"
 
-/* The PEs whose sockets were not as expected, counted at PE 0. */
-static int failed_pes;
-
 int main(int argc, char **argv)
 {
     CHECK_FATAL(argc == 2 && (strcmp(argv[1], "on") == 0 || strcmp(argv[1], "off") == 0));
     int expected = strcmp(argv[1], "on") == 0;
     shmem_init();
     CHECK_FATAL(shmem_n_pes() == 2);
+    /* The PEs whose sockets were not as expected, counted at PE 0 - on the
+     * heap, since this program's statics are not symmetric (not oshcc's). */
+    int *failed_pes = shmem_malloc(sizeof *failed_pes);
+    CHECK_FATAL(failed_pes != NULL);
+    *failed_pes = 0;
+    shmem_barrier_all();
     int sockets = 0, wrong = 0;
     DIR *d = opendir("/proc/self/fd");
     CHECK_FATAL(d != NULL);
@@ -69,11 +72,12 @@ int main(int argc, char **argv)
     CHECK(sockets >= 2);
     CHECK(wrong == 0);
     if (sockets < 2 || wrong != 0)
-        shmem_int_atomic_inc(&failed_pes, 0);
+        shmem_int_atomic_inc(failed_pes, 0);
     shmem_barrier_all();
-    if (shmem_my_pe() == 0 && shmem_int_atomic_fetch(&failed_pes, 0) == 0)
+    if (shmem_my_pe() == 0 && shmem_int_atomic_fetch(failed_pes, 0) == 0)
         printf("KEEPALIVE %s OK\n", expected ? "ON" : "OFF");
     shmem_barrier_all();
+    shmem_free(failed_pes);
     shmem_finalize();
     return CHECK_DONE();
 }
