@@ -1,0 +1,16 @@
+== static checks, release 15:38:27
+release warnings: 0
+100% tests passed, 0 tests failed out of 13
+release tests: 898
+== the mutant, configured only 15:39:17
+    set_tests_properties Can not find test to add properties to:
+0% tests passed, 1 tests failed out of 1
+	 21 - shmem.single-node.configure (Failed)              tier1
+== asan, configured only 15:39:17
+100% tests passed, 0 tests failed out of 1
+== tsan, configured only 15:39:18
+100% tests passed, 0 tests failed out of 1
+== the single-node build 15:39:19
+warnings: 0
+100% tests passed, 0 tests failed out of 404
+DONE 15:40:07

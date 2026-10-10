@@ -53,7 +53,20 @@ every preset but ThreadSanitizer's, whose flags skipped the block.
 
 ## The verification
 
-*To be filled in from `build/scratch/ladder/merge-point/single-node-configure-check/`.*
+At `3541411` in the development VM, 2026-10-10 15:38-15:40
+(`docs/design/evidence/v0.2-step4/2026-10-10-single-node-configure/`); the
+commit after it, `1326349`, changed documents and comments only:
+
+- **The release build's static checks, the new one among them:** 13 of 13, the
+  build without a warning; 898 tests registered, the suite's 858 and the 40
+  models.
+- **A mutant with the guard back to ThreadSanitizer's alone**, configured only:
+  `shmem.single-node.configure` fails, its nested configure stopping at "Can not
+  find test to add properties to", as `main` did.
+- **The check in the asan and tsan presets**, configured only, each configuring
+  its own single-node counterpart: passed.
+- **The single-node build itself**: configured, built without a warning, and
+  its suite 404 of 404 (the full build's 399 and its five).
 
 *Undo:* the guard back to ThreadSanitizer's alone, the check and its script
 removed, the README's counts and row back.
