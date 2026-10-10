@@ -45,6 +45,15 @@ add_test(NAME shmem.boundary
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckBoundary.cmake)
 set_tests_properties(shmem.boundary PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# Every OSOE_ setting the library and its tools read is in the README, as
+# `NAME` (the author, docs/decisions/2026-10-09.md, item 5): OSOE_TEST_ABORT_DELAY_MS
+# had no row until its part's own documents gave it one, and no review had
+# asked (CheckSettingsDocumented.cmake).
+add_test(NAME shmem.settings-documented
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsDocumented.cmake)
+set_tests_properties(shmem.settings-documented PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # Design §3.16's rule: every atomic access in the library names acquire,
 # release or seq_cst - no `relaxed`, no call without `_explicit`. Step D added
 # 37 relaxed accesses that all four presets passed; the review of its merge

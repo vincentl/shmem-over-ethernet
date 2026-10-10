@@ -296,7 +296,7 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 855 tests fail at `shmem_init` or at opening a ring -
+410 of the test suite's 856 tests fail at `shmem_init` or at opening a ring -
 every one but `env.probe` among the 458 labelled `internode`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
@@ -1259,7 +1259,7 @@ that one could be added without touching the OpenSHMEM layer.
   458 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 397 of the full build's 855 tests in
+  development VM with liburing hidden: 398 of the full build's 856 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs exactly
   the tests it lacks.
@@ -1361,7 +1361,10 @@ it ("How a job starts"); one marked *checked among a node's PEs* is compared
 only there. `SHMEM_INFO` prints most of this list from the library itself. In
 the single-node build the settings only a job of more than one node uses - the
 connections', the wire's, keepalive's - are still checked as values, as the full
-build checks them in a job of one node, and change nothing.
+build checks them in a job of one node, and change nothing. Every `OSOE_`
+setting the library and its tools read is in this section or the table of
+"Starting PEs without a launcher" - a test, `shmem.settings-documented`, fails
+on one that is not.
 
 **The specification's** (§8). Each also has a deprecated `SMA_` spelling; when
 both are set the `SHMEM_` one controls.

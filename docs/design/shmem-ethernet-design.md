@@ -1373,36 +1373,65 @@ words can collide on the same bucket spinlock.
 ### 3.12 Progress threads and where they run
 
 > **Every PE starts one agent thread in `shmem_init`. The local lead's agent is
-> the node's progress engine. Every other agent is a service thread that does
-> only work which must happen inside its own process.**
+> the node's control plane and, by default, its whole progress engine; with
+> `OSOE_PROGRESS_HELPERS`, helper threads of the lead's process own the data
+> wires beside it. Every other agent is a service thread that does only work
+> which must happen inside its own process.**
 
 An earlier draft said "a small fixed pool per node" without saying which process
 the pool lives in. PEs are processes, so that choice decides how every
-cross-process mechanism works.
+cross-process mechanism works: the pool is threads of the lead's process, and
+nowhere else.
 
-**The lead's agent owns the node's network state:** every io_uring ring, every
-node-pair socket, every provided buffer. It seals, submits, reaps, applies
-incoming operations to every local PE's heap (all local heaps are mapped in every
-process, §4.1), and drains the deferred reply queues. It is the sole issuer
-(§3.3).
-*As built since v0.2 step 4's owners:* that state is held an owner at a time
-(`struct osoe_progress_owner`, `progress.h`; §3.10's as-built note): a ring, the
-wires on it, their connections, busy bits, reply pool and counters, which only
-the owner's thread touches, while the control plane - the internode tree's
-state, the deadlock detector's messages - is owner 0's. With no helper threads,
-the default, the lead's agent is the one owner and the sentence above holds as
-written. *As built since v0.2 step 4's helpers:* `OSOE_PROGRESS_HELPERS` threads
-of the lead's process beside its agent, each the owner of the data wires to a
-share of the peers on a ring of its own, while the agent keeps every control
-wire (`progress-host.c`; `docs/decisions/2026-10-08-helpers.md`). The agent
-starts them after its own start, asks them - a request word it alone writes, an
-answer word each helper alone writes - for the deadlock detector's views and,
-at the end, to stop, joining each once it is done; each reads the node's abort
-word at every turn, as the agents do, and on an abort the agent waits for each
-to be done within its grace before its process ends. An abort found at a sweep
-of the agent's own close at `shmem_finalize` ends the process there, as it did
-with no helpers, telling no peer and waiting for no helper (the adversarial
-read of Part 3, N1).
+**The node's network state is held an owner at a time** (`struct
+osoe_progress_owner`, `progress.h`; v0.2 step 4,
+`docs/decisions/2026-10-08-owners.md`): an io_uring ring, the wires on it, their
+connections, busy bits, reply pool (§3.8, sized by its argument over the owner's
+own wires) and counters, which only the owner's thread touches. Each owner is
+the sole issuer of its ring (§3.3); it seals, submits, reaps, applies incoming
+operations to every local PE's heap (all local heaps are mapped in every
+process, §4.1), and drains its deferred replies. Every node pair has two wires
+at every helper count, a control wire and a data wire (§3.1,
+`docs/decisions/2026-10-08-control-wire.md`).
+
+- **Owner 0 is the lead's agent.** It holds every control wire - the internode
+  tree's ARRIVE and RELEASE, the deadlock detector's messages, the goodbyes -
+  and the control plane's state, the tree's and the detector's. With no
+  helpers, the default, it holds every data wire too, and is the node's one
+  progress thread.
+- **Owners 1 to H are helper threads**, `OSOE_PROGRESS_HELPERS` of them, at
+  most 64 (`progress-host.c`, `docs/decisions/2026-10-08-helpers.md`). The data
+  wire to the peer in slot p is owner 1 + (p mod H)'s (`owner-map.h`), so a
+  peer's traffic is always one thread's and keeps a single stream's order; a
+  helper with no peer is idle. A node's PEs must agree on H in a job of more
+  than one node; nodes may differ.
+- **Writers wake the owner of their wire**, not the lead: the connection area
+  holds a sleeping flag, a wake word and a dirty bitmap an owner (§3.10), so a
+  put to a peer wakes that peer's owner alone.
+- **The agent starts the helpers at its first pass**, so that each begins with
+  its signal mask and CPUs; each places itself as the agents are placed and
+  asks the agents' slice (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`, §3.11),
+  names itself `osoe-helper-N`, publishes its tid and enables its own ring.
+- **The agent asks and the helpers answer**, through a request word the agent
+  alone writes and an answer word each helper alone writes
+  (`helper_request_model.py`): the deadlock detector's idle and quiet views,
+  each answered after a whole pass (§3.15, `deadlock_owners_model.py`), and at
+  the end the stop, acknowledged at once and done once the helper has closed
+  its own wires. A helper that ignores its stop is found by its own count of
+  turns - two since the request without an answer ends the job naming it -
+  and no wait gives up because time has passed.
+- **An abort reaches every owner.** Each owner reads the node's abort word at
+  every turn, as the agents do; the agent nudges the helpers, aborts its own
+  wires, and waits for their done words within the grace before its process
+  ends (`abort_owners_model.py`). A reader excuses an end of stream once its
+  node's abort is declared, and sends nothing more on a connection that has
+  failed; the carrier's wait judges the peers by their control wires alone
+  (`carrier_model.py`, `control_only`). An abort found at a sweep of the
+  agent's own close at `shmem_finalize` ends the process there, telling no
+  peer and waiting for no helper, as it did with no helpers.
+- **Each owner's counters are a record of its own** in the node segment
+  (layout 36, the owner scope), which `osoe-stat` shows owner by owner and
+  every reader sums.
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address
@@ -1454,14 +1483,14 @@ This corrects the earlier claim that "the origin side never needs a helper." It
 never needs one *for progress*; it does need its private memory written by a
 thread inside it.
 
-**Progress thread count** is set by memory bandwidth, not PE count. On a Pi it is
-one: the lead's agent itself. At 256 PEs perhaps four, all in the lead process,
-sharded by peer node so each connection has exactly one owner and each stream
-keeps single-threaded ordering *(as built in v0.2 step 4: the lead's agent and
-`OSOE_PROGRESS_HELPERS` helpers, 0 by default and at most 64, a peer's data wire
-helper 1 + (its peer slot mod the count)'s and every control wire the agent's -
-`owner-map.h`. How many a node wants is not measured: no link on which one
-thread is the limit has been available - README, Limits)*.
+**How many progress threads a node wants** is set by memory bandwidth and the
+link, not by the PE count: one thread on the Pi, perhaps four at 256 PEs on a
+fast link, all in the lead's process. Neither count is measured: no link on
+which one thread is the limit has been available (README, Limits), so the
+default is none and a count comes only from the setting
+(`docs/decisions/2026-10-07.md`, items 4 to 6). On the Pi's gigabit, two helpers
+left every line unchanged but the mailbox's, one run of which went a fifth
+faster (`2026-10-08-helpers.md`, "On the Pi").
 
 **Why threads in every PE rather than a helper process:**
 
@@ -1480,18 +1509,21 @@ the lead's does.)*
 **Costs accepted:**
 
 - **The lead is special.** Pausing the lead PE in a debugger stops the node's
-  network progress; debug with non-stop mode, or read its state with `osoe-stat`
-  (§3.14), which needs no cooperation from the stopped process. A crashed lead cuts the node off. Under §3.15
-  the job aborts either way, but the other PEs must *notice*: every wait carries a
-  deadline (§3.10), and on expiry the waiter checks the lead's liveness.
+  network progress, its helpers' with it; debug with non-stop mode, or read its
+  state with `osoe-stat` (§3.14), which needs no cooperation from the stopped
+  process. A crashed lead cuts the node off. Under §3.15 the job aborts either
+  way, but the other PEs must *notice*: every wait carries a deadline (§3.10),
+  and on expiry the waiter checks the lead's liveness.
 - **The lead's cores carry the progress work.** Under Slurm CPU binding the agent
-  runs in the lead task's cpuset, competing with the lead's application thread. On
-  a Pi with one core per task this is the oversubscription case §3.11 plans for;
-  measure it (§8.4) rather than assume.
+  and the helpers run in the lead task's cpuset, competing with the lead's
+  application thread; `OSOE_AGENT_CPUS=node` lets them run on any CPU of the
+  node's tasks. On a Pi with one core per task this is the oversubscription
+  case §3.11 plans for; measure it (§8.4) rather than assume.
 - **Internal threads in an application process.** Agents block all asynchronous
-  signals before they are created, so application handlers keep running on
-  application threads. A child created by `fork()` after `shmem_init` has no
-  agents and must neither call OpenSHMEM nor run teardown (§6.4).
+  signals before they are created, and helpers inherit the agent's mask, so
+  application handlers keep running on application threads. A child created
+  by `fork()` after `shmem_init` has no agents and no helpers and must neither
+  call OpenSHMEM nor run teardown (§6.4).
 
 ### 3.13 Handler table
 
