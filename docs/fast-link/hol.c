@@ -25,12 +25,12 @@ static int compare(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
-static void report(const char *phase, double *us, size_t n, double extra)
+static void report(const char *phase, double *microseconds, size_t n, double extra)
 {
-    qsort(us, n, sizeof *us, compare);
+    qsort(microseconds, n, sizeof *microseconds, compare);
     printf("hol phase=%s fetch_adds=%zu median_us=%.0f p90_us=%.0f p99_us=%.0f max_us=%.0f "
-           "stream_mib_per_s=%.0f\n", phase, n, us[n / 2], us[n * 9 / 10], us[n * 99 / 100],
-           us[n - 1], extra);
+           "stream_mib_per_s=%.0f\n", phase, n, microseconds[n / 2], microseconds[n * 9 / 10],
+           microseconds[n * 99 / 100], microseconds[n - 1], extra);
     fflush(stdout);
 }
 
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     static double stream_rate;
     unsigned char *window = shmem_malloc(BYTES);
     unsigned char *source = malloc(BYTES);
-    double *us = malloc(MOST * sizeof *us);
+    double *microseconds = malloc(MOST * sizeof *microseconds);
     memset(source, 7, BYTES);
     shmem_barrier_all();
 
@@ -62,9 +62,9 @@ int main(int argc, char **argv)
         while (now() < end && n < MOST) {
             double t = now();
             (void)shmem_long_atomic_fetch_add(&cell, 1, 3);
-            us[n++] = (now() - t) * 1e6;
+            microseconds[n++] = (now() - t) * 1e6;
         }
-        report("alone", us, n, 0);
+        report("alone", microseconds, n, 0);
     }
     shmem_barrier_all();
 
@@ -90,15 +90,15 @@ int main(int argc, char **argv)
         while (shmem_long_atomic_fetch(&done, 1) == 0 && n < MOST) {
             double t = now();
             (void)shmem_long_atomic_fetch_add(&cell, 1, 3);
-            us[n++] = (now() - t) * 1e6;
+            microseconds[n++] = (now() - t) * 1e6;
         }
         shmem_long_wait_until(&done, SHMEM_CMP_EQ, 1);
-        report("stream", us, n, stream_rate);
+        report("stream", microseconds, n, stream_rate);
     }
     shmem_barrier_all();
     shmem_free(window);
     free(source);
-    free(us);
+    free(microseconds);
     shmem_finalize();
     return 0;
 }

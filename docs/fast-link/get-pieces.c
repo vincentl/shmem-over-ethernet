@@ -30,7 +30,7 @@ static int by_value(const void *a, const void *b)
 
 int main(int argc, char **argv)
 {
-    int reps = argc > 1 ? atoi(argv[1]) : 21;
+    int repetitions = argc > 1 ? atoi(argv[1]) : 21;
     size_t most = argc > 2 ? (size_t)strtoull(argv[2], NULL, 0) : (size_t)4 << 20;
     shmem_init();
     int me = shmem_my_pe(), npes = shmem_n_pes();
@@ -42,40 +42,41 @@ int main(int argc, char **argv)
     }
     memset(remote, me + 1, most);
     memset(local, 0, most);
-    double *times = malloc(sizeof *times * (size_t)reps);
+    double *times = malloc(sizeof *times * (size_t)repetitions);
     size_t sizes[16], count = 0;
     for (size_t n = (size_t)16 << 10; n <= most && count < 16; n *= 4)
         sizes[count++] = n;
     shmem_barrier_all();
     if (me == 0 && npes >= 2) {
         int peer = npes - 1;
-        printf("get-pieces pes=%d peer=%d reps=%d (median microseconds)\n", npes, peer, reps);
+        printf("get-pieces pes=%d peer=%d repetitions=%d (median microseconds)\n", npes, peer,
+               repetitions);
         for (size_t s = 0; s < count; s++) {
             size_t n = sizes[s];
             double put, get, nbi;
-            for (int r = 0; r < reps; r++) {
+            for (int r = 0; r < repetitions; r++) {
                 double t0 = now_us();
                 shmem_putmem(remote, local, n, peer);
                 shmem_quiet();
                 times[r] = now_us() - t0;
             }
-            qsort(times, (size_t)reps, sizeof *times, by_value);
-            put = times[reps / 2];
-            for (int r = 0; r < reps; r++) {
+            qsort(times, (size_t)repetitions, sizeof *times, by_value);
+            put = times[repetitions / 2];
+            for (int r = 0; r < repetitions; r++) {
                 double t0 = now_us();
                 shmem_getmem(local, remote, n, peer);
                 times[r] = now_us() - t0;
             }
-            qsort(times, (size_t)reps, sizeof *times, by_value);
-            get = times[reps / 2];
-            for (int r = 0; r < reps; r++) {
+            qsort(times, (size_t)repetitions, sizeof *times, by_value);
+            get = times[repetitions / 2];
+            for (int r = 0; r < repetitions; r++) {
                 double t0 = now_us();
                 shmem_getmem_nbi(local, remote, n, peer);
                 shmem_quiet();
                 times[r] = now_us() - t0;
             }
-            qsort(times, (size_t)reps, sizeof *times, by_value);
-            nbi = times[reps / 2];
+            qsort(times, (size_t)repetitions, sizeof *times, by_value);
+            nbi = times[repetitions / 2];
             printf("bytes=%zu put_quiet_us=%.1f get_us=%.1f get_nbi_quiet_us=%.1f "
                    "get_over_put=%.2f nbi_over_put=%.2f\n",
                    n, put, get, nbi, get / put, nbi / put);

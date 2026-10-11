@@ -2,14 +2,26 @@
 /*
  * Part 4's stream (docs/fast-link.md, §5): every PE puts, or gets, BYTES-byte
  * blocks to the PEs of every other node in turn for SECONDS, a quiet each time
- * 8 MiB has gone, so that every peer of every node carries traffic - a node's
- * progress helpers divide its peers, not its streams (owner-map.h), and one
- * stream between two nodes keeps one helper busy whatever their count.
+ * 8 MiB has gone, so that every peer of every node carries traffic at once - a
+ * node's progress helpers divide its peers, not its streams (owner-map.h), and
+ * one stream between two nodes keeps one helper busy whatever their count.
  *
- * PE 0 prints a line for each node and one for the job:
+ * **Consecutive blocks go to different nodes, and a node's PEs start on
+ * different ones.** For the PE of local rank r on node n of N, block i goes to
+ * node (n + 1 + (r + i) mod (N - 1)) mod N, to its PE of local rank
+ * (r + i div (N - 1)) mod its PEs. In the order (me + k) mod npes every PE of a
+ * node had the same list, starting on the same peer, and under the block
+ * layout a node's PEs moved together as a convoy, one peer node at a time: in a
+ * model, 2 to 2.8 peers of 7 busy at once at 8 PEs a node, and 1.5 at 32 (the
+ * adversarial read of the kit, finding 1). Each node's bytes to each peer node
+ * are printed, so that the spread is in the output rather than assumed.
+ *
+ * PE 0 prints a line for each node, one for each node's peers, and one for the
+ * job:
  *
  *   multistream node=N pes=P mib_per_s=R progress_cpu_s=C program_cpu_s=Q
  *               progress_cpu_s_per_gib=G
+ *   multistream node=N peer_mib=M1,M2,... (to nodes in order, itself skipped)
  *   multistream job mode=put bytes=B seconds=S nodes=N pes=P helpers=H
  *               mib_per_s=R progress_cpu_s_per_gib=G
  *
@@ -123,8 +135,13 @@ static void dump(const char *which)
 }
 
 /* Per node, at PE 0, indexed by the node's first PE: bytes moved, nanoseconds
- * of progress and of program CPU, and its PEs. */
+ * of progress and of program CPU, and its PEs; and, for jobs of at most
+ * PEER_NODES nodes, each node's bytes to each peer node, by node index. */
+enum { PEER_NODES = 64 };
 static uint64_t node_bytes[4096], node_progress[4096], node_program[4096], node_pes[4096];
+static uint64_t peer_bytes[PEER_NODES][PEER_NODES];
+/* Every PE's node, as its first PE, and its local rank there (fcollect). */
+static int my_first, my_rank, firsts[4096], ranks[4096];
 
 int main(int argc, char **argv)
 {
@@ -151,22 +168,66 @@ int main(int argc, char **argv)
     }
     memset(local, me & 0xff, bytes);
     memset(window, 0, bytes);
-    /* The PEs of other nodes, from this PE's place among them, so that the
-     * node's PEs start on different peers. */
-    int count = 0;
-    for (int k = 1; k < npes; k++) {
-        int p = (me + k) % npes;
-        if (shmem_ptr(window, p) == NULL)
-            targets[count++] = p;
-    }
     int first = shmem_team_translate_pe(SHMEM_TEAM_SHARED, 0, SHMEM_TEAM_WORLD);
     int pes_per_node = shmem_team_n_pes(SHMEM_TEAM_SHARED);
+    /* Every PE's node and local rank; the nodes in order of their first PE. */
+    my_first = first;
+    my_rank = shmem_team_my_pe(SHMEM_TEAM_SHARED);
+    shmem_int_fcollect(SHMEM_TEAM_WORLD, firsts, &my_first, 1);
+    shmem_int_fcollect(SHMEM_TEAM_WORLD, ranks, &my_rank, 1);
+    int *node_first = malloc(sizeof *node_first * (size_t)npes);
+    int *node_size = calloc((size_t)npes, sizeof *node_size);
+    int *node_of = malloc(sizeof *node_of * (size_t)npes);
+    if (!node_first || !node_size || !node_of) {
+        fprintf(stderr, "multistream: PE %d: out of memory for the node table\n", me);
+        shmem_global_exit(2);
+    }
+    int nodes_count = 0;
+    for (int p = 0; p < npes; p++)
+        if (firsts[p] == p)
+            node_first[nodes_count++] = p;
+    for (int p = 0; p < npes; p++)
+        for (int n = 0; n < nodes_count; n++)
+            if (node_first[n] == firsts[p]) {
+                node_of[p] = n;
+                node_size[n]++;
+            }
+    /* Block i's target (the comment at the top): consecutive blocks to
+     * different nodes, a node's PEs starting on different ones, and every PE
+     * of every other node in (N - 1) times the largest node's PEs. */
+    int count = 0, largest = 0, mine = node_of[me];
+    for (int n = 0; n < nodes_count; n++)
+        largest = node_size[n] > largest ? node_size[n] : largest;
+    if (nodes_count > 1) {
+        free(targets);
+        targets = malloc(sizeof *targets * (size_t)(nodes_count - 1) * (size_t)largest);
+        if (!targets) {
+            fprintf(stderr, "multistream: PE %d: out of memory for its targets\n", me);
+            shmem_global_exit(2);
+        }
+        for (int i = 0; i < (nodes_count - 1) * largest; i++) {
+            int n = (mine + 1 + (my_rank + i) % (nodes_count - 1)) % nodes_count;
+            int rank = (my_rank + i / (nodes_count - 1)) % node_size[n];
+            for (int p = 0; p < npes; p++)
+                if (node_of[p] == n && ranks[p] == rank) {
+                    targets[count++] = p;
+                    break;
+                }
+        }
+    }
+    uint64_t *to_node = calloc((size_t)nodes_count, sizeof *to_node);
+    if (!to_node) {
+        fprintf(stderr, "multistream: PE %d: out of memory\n", me);
+        shmem_global_exit(2);
+    }
     size_t window_bytes = (size_t)8 << 20;
     size_t per_quiet = bytes >= window_bytes ? 1 : window_bytes / bytes;
-    shmem_barrier_all();
-
+    /* PE 0's counters before any PE starts, so that its window and the
+     * others' begin together (the read, note 14). */
     if (me == 0)
         dump("start");
+    shmem_barrier_all();
+
     uint64_t progress0, program0;
     thread_cpu(&progress0, &program0);
     double start = now(), stop = start + seconds;
@@ -179,6 +240,7 @@ int main(int argc, char **argv)
             else
                 shmem_putmem(window, local, bytes, targets[t]);
             moved += bytes;
+            to_node[node_of[targets[t]]] += bytes;
             if (++since_quiet == per_quiet) {
                 shmem_quiet();
                 since_quiet = 0;
@@ -197,6 +259,10 @@ int main(int argc, char **argv)
     shmem_uint64_atomic_add(&node_progress[first], progress1 - progress0, 0);
     shmem_uint64_atomic_add(&node_program[first], program1 - program0, 0);
     shmem_uint64_atomic_add(&node_pes[first], 1, 0);
+    if (nodes_count <= PEER_NODES)
+        for (int n = 0; n < nodes_count; n++)
+            if (to_node[n])
+                shmem_uint64_atomic_add(&peer_bytes[mine][n], to_node[n], 0);
     /* A reduction's source and destination are symmetric. */
     static double this_elapsed, slowest;
     this_elapsed = elapsed;
@@ -222,6 +288,15 @@ int main(int argc, char **argv)
                    (double)q * 1e-9, gib > 0 ? (double)c * 1e-9 / gib : 0.0);
             total += b;
             progress += c;
+            if (nodes_count <= PEER_NODES && nodes_count > 1) {
+                printf("multistream node=%d peer_mib=", nodes - 1);
+                for (int m = 0, comma = 0; m < nodes_count; m++)
+                    if (m != nodes - 1) {
+                        uint64_t to = shmem_uint64_atomic_fetch(&peer_bytes[nodes - 1][m], 0);
+                        printf("%s%.1f", comma++ ? "," : "", (double)to / (1 << 20));
+                    }
+                printf("\n");
+            }
         }
         double gib = (double)total / (double)(1u << 30);
         printf("multistream job mode=%s bytes=%zu seconds=%.2f nodes=%d pes=%d "
@@ -234,6 +309,10 @@ int main(int argc, char **argv)
     shmem_free(window);
     free(local);
     free(targets);
+    free(to_node);
+    free(node_of);
+    free(node_size);
+    free(node_first);
     shmem_finalize();
     return 0;
 }

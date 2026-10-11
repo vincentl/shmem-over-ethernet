@@ -9,7 +9,11 @@
 #   buffer:  OSOE_AM_BUFFER 128 KiB, 256 KiB (the default), 1 MiB, 4 MiB
 #   receive: OSOE_WIRE_BYTES x OSOE_WIRE_BUFFERS 16 KiB x 64 (the default),
 #            64 KiB x 64, 16 KiB x 256
+# Every case under SHMEM_DEBUG, whose start-up line says the unsent limit its
+# own link measurement gave. The default case, buffer-256k and receive-16kx64,
+# is unsent-rule's; it runs once a round among the eleven.
 # usage: ladder.sh NODES OUTDIR
+: "${KIT_TIMEOUT:=120}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 ROUNDS=${ROUNDS:-3}
@@ -18,7 +22,7 @@ CASES="unsent-rule unsent-0 unsent-64k unsent-256k unsent-1m unsent-4m
        buffer-128k buffer-1m buffer-4m receive-64kx64 receive-16kx256"
 settings() {
     case $1 in
-        unsent-rule)     echo SHMEM_DEBUG=1 ;;
+        unsent-rule)     echo ;;
         unsent-0)        echo OSOE_WIRE_UNSENT_BYTES=0 ;;
         unsent-64k)      echo OSOE_WIRE_UNSENT_BYTES=65536 ;;
         unsent-256k)     echo OSOE_WIRE_UNSENT_BYTES=262144 ;;
@@ -34,7 +38,8 @@ settings() {
 for ((round = 1; round <= ROUNDS; round++)); do
     for c in $(rotate "$(echo $CASES)" "$round"); do
         # shellcheck disable=SC2046
-        launch 2 2 "$OUT/hol-$c-r$round.txt" $(settings "$c") -- "$KIT_BIN/hol" "$HOL_SECONDS"
+        KIT_SRUN="$KIT_SRUN $(pair)" launch 2 2 "$OUT/hol-$c-r$round.txt" SHMEM_DEBUG=1 \
+            $(settings "$c") -- "$KIT_BIN/hol" "$HOL_SECONDS"
     done
 done
 echo "# done $(date -u +%H:%M:%S)" >> "$LOG"

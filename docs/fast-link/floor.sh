@@ -1,12 +1,16 @@
 #!/bin/bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # docs/fast-link.md §4: the floor and the bare stream, between the list's first
-# two nodes. shmem_test_floor, one PE a node (design §8.4); echo-uring from the
-# second node to the first, one connection; then CONNECTIONS ("1 2 4 8 16")
-# pairs of echo-uring at once, each its own server port, each stream
-# ECHO_MEBIBYTES (1024) a trial, their rates summed; and iperf3 with as many
-# streams where it is installed.
+# two nodes. shmem_test_floor, one PE a node (design §8.4); then CONNECTIONS
+# ("1 2 4 8 16") echo-uring streams at once each way - servers on both nodes,
+# each node's clients toward the other's, unbound, so that the node's every core
+# may serve them - each stream ECHO_MEBIBYTES (1024) a trial; and iperf3 with as
+# many streams each way at once (--bidir), whose sum over its ten seconds is
+# the bare aggregate the helpers' table is set against (§5). echo-uring's
+# per-connection medians, summed, are an upper bound beside it: nothing checks
+# that its streams ran at once.
 # usage: floor.sh NODES OUTDIR
+: "${KIT_TIMEOUT:=300}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 CONNECTIONS=${CONNECTIONS:-1 2 4 8 16}
@@ -20,25 +24,45 @@ ECHO=$KIT_BUILD/tools/echo-uring/echo-uring
 
 # The one task a node every core of it, as docs/pi-cluster.md §5 gives the Pi's:
 # its main thread, its agent and the floor's echo would otherwise share one.
-KIT_SRUN="$KIT_SRUN --cpus-per-task=${FLOOR_CPUS:-4}" \
+KIT_SRUN="$KIT_SRUN $(pair) --cpus-per-task=${FLOOR_CPUS:-4}" \
     launch 2 1 "$OUT/floor.txt" -- "$KIT_BUILD/shmem/tests/shmem_test_floor"
 
-# echo-uring's servers on the first node, one a port; its clients on the second,
-# all at once; each prints its own lines, summed below by summarize.py.
+# echo-uring's servers on both nodes, one a port; each node's clients toward the
+# other's servers, both ways at once; each prints its own lines, summed below by
+# summarize.py. Servers whose client never came are ended once the clients are.
+CLIENT_ADDRESS=$CLIENT
+[ "$KIT_LAUNCHER" = osoe-launch ] && CLIENT_ADDRESS=127.0.0.1
+end_after() {   # PID SECONDS: wait for PID, ending it after SECONDS
+    ( sleep "$2"; kill "$1" 2> /dev/null ) &
+    local guard=$!
+    wait "$1"
+    kill "$guard" 2> /dev/null
+}
 for k in $CONNECTIONS; do
     f=$OUT/echo-$k.txt
-    echo "# $(date -u +%H:%M:%S) $k connections from $CLIENT to $SERVER" > "$f"
-    on "$SERVER" bash -c "for ((i = 0; i < $k; i++)); do $ECHO --server \$((18000 + i)) & done; wait" \
-        > "$OUT/echo-$k-servers.txt" 2>&1 &
-    servers=$!
-    sleep 2
-    on "$CLIENT" bash -c "for ((i = 0; i < $k; i++)); do
-            stdbuf -oL $ECHO --client $SERVER_ADDRESS \$((18000 + i)) --rounds 2000 --mebibytes $ECHO_MEBIBYTES \
-                | sed \"s/^/connection=\$i /\" &
-        done; wait" >> "$f" 2>&1
-    echo "# exit $?" >> "$f"
-    wait "$servers"
-    echo "$(date -u +%H:%M:%S) echo-uring $k connections done" >> "$LOG"
+    echo "# $(date -u +%H:%M:%S) $k connections each way between $CLIENT and $SERVER" > "$f"
+    on "$SERVER" bash "$KIT/echo-servers.sh" "$ECHO" "$k" > "$OUT/echo-$k-servers-1.txt" 2>&1 &
+    servers1=$!
+    if [ "$KIT_LAUNCHER" != osoe-launch ]; then
+        on "$CLIENT" bash "$KIT/echo-servers.sh" "$ECHO" "$k" > "$OUT/echo-$k-servers-2.txt" 2>&1 &
+        servers2=$!
+    fi
+    on "$CLIENT" bash "$KIT/echo-clients.sh" "$ECHO" "$k" "$SERVER_ADDRESS" "$ECHO_MEBIBYTES" \
+        > "$f.to-first" 2>&1 &
+    clients1=$!
+    if [ "$KIT_LAUNCHER" != osoe-launch ]; then
+        on "$SERVER" bash "$KIT/echo-clients.sh" "$ECHO" "$k" "$CLIENT_ADDRESS" "$ECHO_MEBIBYTES" \
+            > "$f.to-second" 2>&1 &
+        clients2=$!
+    fi
+    wait "$clients1"; echo "# exit toward the first node $?" >> "$f"
+    [ -n "${clients2:-}" ] && { wait "$clients2"; echo "# exit toward the second node $?" >> "$f"; }
+    cat "$f.to-first" ${clients2:+"$f.to-second"} >> "$f"
+    rm -f "$f.to-first" "$f.to-second"
+    end_after "$servers1" 30
+    [ -n "${servers2:-}" ] && end_after "$servers2" 30
+    unset clients2 servers2
+    echo "$(date -u +%H:%M:%S) echo-uring $k connections each way done" >> "$LOG"
 done
 
 if command -v iperf3 > /dev/null; then
@@ -46,9 +70,11 @@ if command -v iperf3 > /dev/null; then
         on "$SERVER" iperf3 -s -1 -p 5201 > "$OUT/iperf3-$k-server.txt" 2>&1 &
         server=$!
         sleep 2
-        on "$CLIENT" iperf3 -c "$SERVER_ADDRESS" -p 5201 -P "$k" -t 10 -J > "$OUT/iperf3-$k.json" 2>&1
-        wait "$server"
-        echo "$(date -u +%H:%M:%S) iperf3 $k streams done" >> "$LOG"
+        # The JSON alone in its file: srun's own messages would spoil it.
+        on "$CLIENT" iperf3 -c "$SERVER_ADDRESS" -p 5201 -P "$k" -t 10 --bidir -J \
+            > "$OUT/iperf3-$k.json" 2> "$OUT/iperf3-$k-client.txt"
+        end_after "$server" 30
+        echo "$(date -u +%H:%M:%S) iperf3 $k streams each way done" >> "$LOG"
     done
 else
     echo "iperf3 is not installed: no cross-check" >> "$LOG"

@@ -5,11 +5,21 @@ cluster's gigabit: v0.2 step 4's Part 4
 (`docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`, "Part 4: gated on a
 fast link"), and the questions earlier parts left to it. Written before any such
 machine exists, so that one is not paid for while scripts are written: every
-script below has run end to end on the development VM's logical nodes
-(`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`; its run of 2026-10-10
-is `docs/design/evidence/v0.2-step4/2026-10-10-fast-link-dry-run/`), and none yet
-on a cluster - `slurm-setup.sh`, and `build.sh`'s copying to other nodes, not
-at all.
+section's script has run end to end on the development VM's logical nodes
+(`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`; its runs are in
+`docs/design/evidence/v0.2-step4/2026-10-10-fast-link-dry-run/`), and none yet on
+a cluster. Never run at all: `slurm-setup.sh`, `build.sh`'s copying to other
+nodes, every `srun` the kit makes - `launch`'s, `on`'s and `facts.sh`'s
+`scontrol` and `sinfo` - and `floor.sh`'s second direction, which one machine
+cannot run. The kit was read adversarially before any node was rented
+(`docs/reviews/archive/v0.2-fast-link-kit-adversarial-read.md`), and its
+findings are in what follows.
+
+**Build the commit the run records.** Every section's `run.txt` names the
+commit (`git rev-parse HEAD` on the first node, or `KIT_COMMIT` where the tree
+has no `.git`); the kit describes the library as it is at the commit it was
+merged with, the blocking get's pieces together and the zero-copy send's copy
+when locked memory runs out among it.
 
 What Part 4 decides, and from what:
 
@@ -48,14 +58,26 @@ helpers' (§5).
 - Eight cores or more: the sweep runs up to 32 PEs a node, and 8 to 16 is where
   the cores and the helpers compete.
 - The nodes on one network, as close as the provider places them.
-- Every node able to reach every other's address on the ports osoe listens on
-  (`OSOE_PORT_RANGE`, 17000 to 26999 by default) and the run's own (§4: 18000
-  to 18063 for `echo-uring`, 5201 for `iperf3`).
+- Every node able to reach every other's address on every TCP port: osoe's
+  (`OSOE_PORT_RANGE`, 17000 to 26999 by default), the run's own (§4: 18000 to
+  18015 for `echo-uring`, 5201 for `iperf3`), Slurm's (6817 and 6818, and
+  `srun`'s own ephemeral ports back to the first node) and `ssh`. A network made
+  for the run - to choose its MTU, say - starts with no rule between its
+  instances: "allow all TCP between the nodes" is the rule to give.
+- One user, with one user id, on every node, since Slurm runs tasks by user id
+  (Google's OS Login gives it; accounts made on each instance from metadata
+  keys may not), able to `ssh` from the first node to every other - the keys
+  that reach the nodes from outside do not reach them from the first node - and
+  with `sudo` on every node.
+- The tree on the first node, by `git clone` or a copy, so that its commit is
+  known. `NODES` holds Slurm's names for the nodes: the short host names
+  `slurmd -C` reports, not addresses.
 
 **On Google Cloud** - the costing of 2026-10-09 (`docs/decisions/2026-10-09.md`,
 item 3): `c4-standard-16` (16 vCPUs, eight cores, up to 23 Gbit/s), the
-`debian-13` image, the gVNIC interface the C4 series requires, and a compact
-placement policy, at about $0.79 a node-hour on demand. Eight nodes for four
+`debian-13` image on Hyperdisk, which the C4 series boots from, the gVNIC
+interface it requires, and a compact placement policy, at about $0.79 a
+node-hour on demand. Eight nodes for four
 sessions of four hours is about $100. The account is the author's, and so is
 every launch. Note the VPC's MTU when the network is made (1460 by default,
 up to 8896); §1's facts record it, and a change between sessions makes their
@@ -70,7 +92,9 @@ numbers incomparable.
 4. The cluster at size (§10), and whatever the first three left to repeat.
 
 Bring everything back at the end of each session (§11): the machines are
-deleted between sessions, and nothing on them survives.
+deleted between sessions, and nothing on them survives - so each session
+starts with §1 and §2 again, about half an hour, which the plan above does not
+count.
 
 ## 1. Setup
 
@@ -78,16 +102,20 @@ The kit is this file's directory, `docs/fast-link/`. On the first node, which
 also runs Slurm's controller, as a user with `sudo`:
 
 ```sh
-sudo apt-get install -y build-essential cmake pkg-config liburing-dev git rsync \
-    slurm-wlm munge ethtool iperf3
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential cmake pkg-config \
+    liburing-dev git rsync slurm-wlm munge ethtool iperf3
 ```
 
 and the same on every other node (the list `NODES`, one name a line, every
-node's name as the others resolve it, the first node first):
+node's name as the others resolve it, the first node first);
+`DEBIAN_FRONTEND=noninteractive` answers `iperf3`'s question about a daemon of
+its own with no:
 
 ```sh
-for n in $(tail -n +2 NODES); do ssh $n sudo apt-get install -y build-essential cmake \
-    pkg-config liburing-dev rsync slurm-wlm munge ethtool iperf3; done
+for n in $(tail -n +2 NODES); do ssh -o StrictHostKeyChecking=accept-new $n \
+    "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+     build-essential cmake pkg-config liburing-dev rsync slurm-wlm munge ethtool iperf3"; done
 ```
 
 Then, on the first node:
@@ -98,21 +126,36 @@ docs/fast-link/build.sh NODES             # the tree to every node at the same p
 ```
 
 `slurm-setup.sh` writes one partition of every node with its cores and memory
-as `slurmd -C` reports them, `TaskPlugin=task/affinity`, and
-`PropagateResourceLimits=NONE`, so that a step takes the node's limits rather
-than the login shell's. It also sets, on every node:
+as `slurmd -C` reports them - by its path, `/usr/sbin/slurmd`, which Debian 13
+keeps off a user's `PATH`, and it stops unless every node gave its line -
+`TaskPlugin=task/affinity`, and `PropagateResourceLimitsExcept=MEMLOCK`, so
+that a step takes the login session's limits but the locked-memory one, which
+`slurmd` gives it unlimited. It also sets, on every node:
 
 - `RemoveIPC=no` for systemd-logind: with the default, a user's files in
   `/dev/shm` go ten seconds after the user's last session on a node ends, and a
   job still in `shmem_init` then waits for ever (`docs/pi-cluster.md`, §1);
-- an unlimited locked-memory limit (`memlock`) for the user: the zero-copy send
-  charges every page it lends to it until the notification, and its default of
-  8 MiB is shared by the user's processes on a host (§7);
+- an unlimited locked-memory limit (`memlock`) for the user and for `slurmd`'s
+  steps: io_uring charges a node's rings to it on Linux 6.14 and later, and the
+  zero-copy send each send it lends until the notification, against a default
+  of 8 MiB that every process of the user on a host counts toward (§7).
 
 Read what it prints. `build.sh` copies the tree with `rsync` to the same path on
 every node, builds the release preset on each in parallel, and compiles the
 kit's probes beside it, into `build/release/kit/`: everything a step runs is at
-the same path on every node, without a shared file system.
+the same path on every node, without a shared file system. A node whose build
+fails says so, removes its `build/release/kit/` so that nothing runs the last
+build unnoticed, and makes the script's status the failure.
+
+**Every job** the kit starts runs with `OSOE_NO_PROGRESS_TIMEOUT=60`, as the
+README asks while a cluster is new, so that a stalled wait ends the job and
+names what it waited for; under a timeout of about three times its length,
+each section's own (`KIT_TIMEOUT`), past which it is killed and `osoe-stat --gc`
+removes what it left in `/dev/shm` on every node; on whole nodes, unbound,
+with more PEs than CPUs allowed (`--exclusive --cpu-bind=none --overcommit`),
+since 32 PEs a node are more tasks than a `c4-standard-16` has CPUs; and with
+its input from `/dev/null`. Each section's output directory should be new: a
+second run into one overwrites its rounds by name.
 
 ## 2. The facts
 
@@ -122,22 +165,27 @@ docs/fast-link/facts.sh NODES out/facts
 
 On every node: the kernel, the CPU (`lscpu`), memory and `/dev/shm`, the page
 size, the governor, the interface's driver, speed, MTU, offloads, interrupt
-coalescing and queues (`ethtool -i/-k/-c/-l`), the TCP and core network
-settings (`net.core.netdev_max_backlog`, `rmem_max`, `wmem_max`,
-`net.ipv4.tcp_rmem`, `tcp_wmem`, `tcp_congestion_control`), the locked-memory
-limit a Slurm step sees, `io_uring_disabled`, logind's `RemoveIPC`, liburing's
-version, each node's name as every other resolves it, and Slurm's
-configuration. Kept with the results: a number without them is not comparable
+coalescing and queues (`/usr/sbin/ethtool -i/-k/-c/-l`), the TCP and core
+network settings, read from `/proc/sys` (`net.core.netdev_max_backlog`,
+`rmem_max`, `wmem_max`, `net.ipv4.tcp_rmem`, `tcp_wmem`,
+`tcp_congestion_control`, `tcp_notsent_lowat`), the locked-memory, open-file
+and stack limits a Slurm step sees, `io_uring_disabled`, logind's `RemoveIPC`,
+liburing's version, each node's name as every other resolves it, and Slurm's
+configuration. A fact that cannot be read says why in its line. Kept with the results: a number without them is not comparable
 with another.
 
 ## 3. The suite on a node, the probe on every node
 
 ```sh
 srun -N$(wc -l < NODES) --ntasks-per-node=1 build/release/tools/probe/probe
+srun -N$(wc -l < NODES) --ntasks-per-node=32 --overcommit --exclusive --cpu-bind=none \
+    build/release/kit/startup
 srun -N1 -n1 -c16 ctest --test-dir build/release -L tier2 -E '^model\.' -j8 --timeout 300 > out/suite.txt
 ```
 
-The probe must say `ok` for every facility on every node. The suite is the
+The probe must say `ok` for every facility on every node, and the second line
+must start a job of 32 PEs a node, the sweep's largest, before the sweep is
+started. The suite is the
 release build's tier 2 on one node's logical nodes; tier 1 compiles, and runs on
 the node that built it (`ctest -L tier1`). The floor pins (`shmem.floor`,
 `echo-uring`'s) were set on the VM and may fail here: a finding to keep, not a
@@ -151,13 +199,16 @@ docs/fast-link/floor.sh NODES out/floor
 
 Between the first two nodes: `shmem_test_floor`, one PE a node - the library's
 get, put and quiet, fetch-add and stream against an io_uring echo and stream
-between the same two processes (design §8.4); `echo-uring` from one node to the
-other, one connection; then 1, 2, 4, 8 and 16 `echo-uring` connections at once,
-each its own pair of processes, their rates summed - the bare aggregate a node
-with several connections can reach, which one connection's rate may not show
-where a provider limits each flow; and `iperf3` with the same counts of streams,
-as a cross-check (design §8.4: "a useful cross-check where it is installed").
-About fifteen minutes.
+between the same two processes (design §8.4); then 1, 2, 4, 8 and 16 streams
+each way at once, both nodes sending as `multistream` makes every node send:
+`iperf3 --bidir`, whose sum over its ten seconds is the bare aggregate - what a
+node with several connections can reach, which one connection's rate may not
+show where a provider limits each flow - and `echo-uring`, a pair of processes
+a connection, whose per-connection medians, summed, are an upper bound beside
+it, since nothing checks that its streams ran at once. Every process is
+unbound, free to use every core of its node; a client whose server is not yet
+listening tries again, and servers whose client never came are ended. About
+fifteen minutes.
 
 ## 5. The progress helpers
 
@@ -170,10 +221,14 @@ Each case is a fresh job at one helper count (the count shapes the node's
 connection area and is agreed at start-up), every node at once:
 
 - `multistream put 1048576 10`: every PE puts 1 MiB blocks to the PEs of every
-  other node in turn for ten seconds, a quiet every 8 MiB; the job's and each
-  node's rate, and the CPU each node's progress threads - the lead's agent and
-  its helpers, by their names `osoe-agent` and `osoe-helper-N` - and its PEs'
-  own threads spent, a GiB moved;
+  other node for ten seconds, a quiet every 8 MiB - consecutive blocks to
+  different nodes, and a node's PEs starting on different ones, so that every
+  peer of a node carries traffic at once, which is what helpers divide; the
+  job's and each node's rate, each node's bytes to each peer, and the CPU each
+  node's progress threads - its PEs' agents, by the name `osoe-agent`, the
+  lead's doing the work and the others waking ten times a second, and its
+  helpers, `osoe-helper-N` - and its PEs' own threads spent, a GiB moved. The
+  kernel's receive work in softirq context is in neither;
 - `multistream put 65536 10`, the same in 64 KiB blocks: more messages a byte;
 - `multistream get 1048576 10`: the same with nonblocking gets, a quiet every
   8 MiB;
@@ -187,11 +242,13 @@ about an hour at eight nodes. `ROUNDS`, `HELPERS`, `PES_PER_NODE` and
 `WORKLOADS` in the environment shorten it.
 
 `summarize.py` prints, for each workload, PE count and helper count, the median
-and range of the three rounds' rates and of the progress threads' CPU a GiB, and
-beside them §4's bare aggregate at the matching connection count. What decides
-the question (§8 item 3) is whether a helper count raises the rate a node
-reaches toward its bare aggregate, at what CPU, and whether that holds at every
-PE count - a rule the author may then give, for example a count that follows
+and range of the rounds' rates and of the progress threads' CPU a GiB, to three
+significant figures, with the count of rounds - a case with fewer lost one -
+and the least share any node's least-used peer had of its most-used; and,
+given §4's directory too, the bare aggregate, to be read at as many streams
+each way as a node has peers. What decides the question (§8 item 3) is whether
+a helper count raises the rate a node reaches toward its bare aggregate, at
+what CPU, and whether that holds at every PE count - a rule the author may then give, for example a count that follows
 the link's measured bandwidth and the node's peers, or the setting alone as
 today.
 
@@ -201,8 +258,10 @@ today.
 docs/fast-link/ladder.sh NODES out/ladder
 ```
 
-Part 0's rungs that a setting switches, each against the default, alternating,
-three rounds, between the first two nodes:
+Part 0's rungs that a setting switches, eleven cases among which the default
+runs once a round, in another order each round, three rounds, between the first
+two nodes; every case under `SHMEM_DEBUG`, whose start-up line records the
+unsent limit its own link measurement gave:
 
 - **The unsent limit** (`OSOE_WIRE_UNSENT_BYTES`): the default - the rule's
   limit from the measured link, which `SHMEM_DEBUG` reports and the script
@@ -228,15 +287,17 @@ docs/fast-link/zero-copy.sh NODES out/zero-copy
 ```
 
 `multistream put` at 1 MiB and 64 KiB, with `OSOE_WIRE_ZERO_COPY` off and on, and
-on at a threshold (`OSOE_WIRE_ZERO_COPY_BYTES`) of 16 KiB, 64 KiB and 256 KiB; at
-no helpers and at the count §5 found best; with the rate, the progress threads'
-CPU a GiB - which is what the zero-copy send exists to save - and the node's
-counters of sends by reference, notifications and sends the kernel copied after
-all (`osoe-stat`). It records the locked-memory limit each step saw: below
-what the lent pages need, the sends by reference are refused and the
-connections copy, which the notice "refused for want of locked memory" says;
-a run that shows it measured the copy. 24 jobs at one helper count, 48 at two:
-ten to fifteen minutes.
+on at a threshold (`OSOE_WIRE_ZERO_COPY_BYTES`) of 16 KiB, 64 KiB and 256 KiB;
+with the rate, the progress threads' CPU a GiB - which is what the zero-copy
+send exists to save - and the node's counters of its sends, those by reference
+among them, their notifications and those the kernel copied after all
+(`osoe-stat`; a refused send counted among those by reference, its
+notification among those copied). It records the locked-memory limit each step
+saw: below what a send needs, it is refused, goes again by copy, and its
+connection copies from then on, which the notice "refused for want of locked
+memory" says; a run that shows it measured the copy. `HELPERS` is no helpers
+unless given: `HELPERS="0 N"`, N the count §5 found best, makes the 48 jobs
+this section is planned as, 24 at one count: ten to fifteen minutes.
 
 ## 8. Gets, and the landing zone
 
@@ -248,10 +309,14 @@ Question 4's probe (`get-pieces`), one PE on each of two nodes: a put and
 quiet, a blocking get, and a nonblocking get and quiet, from 16 KiB to 64 MiB,
 at a landing zone (`OSOE_GET_LANDING_BYTES`) of 256 KiB (the default), 1 MiB,
 4 MiB and 16 MiB; then `multistream get` at 8 PEs a node over every node at the
-same zones. A get's pieces go out together only as far as the zone holds them -
-four pieces at the default - so on a link that a mebibyte crosses in less than
-a round trip the zone sets a get's speed; the zone's size for a fast link is the
-proposal's (d). 24 jobs: about ten minutes.
+same zones. A get's pieces, a blocking get's as a nonblocking get's, go out
+together only as far as the zone holds them - four pieces at the default - so
+where a round trip's time carries more than the zone, the zone sets a get's
+speed; the zone's size for a fast link is the proposal's (d). The pieces in
+flight toward a node are bounded by its connection's reply credits too
+(`OSOE_AM_CREDITS`, 64, shared by the node's PEs), which this does not vary: at
+8 PEs a node a zone above about 512 KiB may be held by them. 24 jobs: about ten
+minutes.
 
 ## 9. Fan-in
 
@@ -260,8 +325,9 @@ docs/fast-link/fan-in.sh NODES out/fan-in
 ```
 
 Every PE of every node but the first puts into the first node's PE 0 at once,
-at 1, 4 and 16 PEs a node and at the default receive buffers and four times
-their number; the rate, and the receive pool's `-ENOBUFS` completions and
+at 1, 4 and 16 PEs a node - 320, 80 and 20 iterations, so that each job moves
+about as much - and at the default receive buffers and four times their
+number; the rate, and the receive pool's `-ENOBUFS` completions and
 re-arms on the first node (`transport.am.receive_enobufs`, read by `osoe-stat`
 while the job sleeps): the shared pool's re-arms grow with the peers sending
 into a node at once (scale S3). 36 short jobs: about five minutes.
@@ -272,12 +338,16 @@ into a node at once (scale S3). 36 short jobs: about five minutes.
 docs/fast-link/scale.sh NODES out/scale
 ```
 
-`osoe-bench` at every node with 8 and 16 PEs a node, at no helpers and at §5's
-best count; `osoe-pacer` `mix` for ten minutes at both; start-up time at 1, 8
-and 32 PEs a node; and the SOS test suite at two PEs a node if its build is
-given (`SOS_BUILD`, as `docs/pi-cluster.md` §8 builds it). The first runs of osoe
-on x86-64 hardware and on more than four nodes: a failure here is the first
-finding to bring back. About an hour.
+`osoe-bench` at every node with 8 and 16 PEs a node, at the counts of `HELPERS`
+- no helpers unless given, so `HELPERS="0 N"` with §5's best; `osoe-pacer`
+`mix` for ten minutes at each; start-up time at 1, 8 and 32 PEs a node - the
+slowest PE's, which is the launcher's spread and init, and the fastest's,
+nearer init's own; and the SOS test suite at two PEs a node if `SOS_BUILD`
+names the directory of its programs, built as `docs/pi-cluster.md` §8 builds
+them, at the same path on every node: inside the tree but not under `build/`,
+so that `build.sh` copies it. The first runs of osoe on x86-64 hardware and on
+more than four nodes: a failure here is the first finding to bring back. About
+an hour.
 
 ## 11. What to bring back, and what it replaces
 
@@ -288,8 +358,10 @@ in the form of `docs/pi-cluster-results.md`.
 
 The README's sentences the numbers replace or confirm:
 
-- **The helpers:** the `OSOE_PROGRESS_HELPERS` row, "When to use progress
-  helpers", and "No faster link has been measured" (§5);
+- **The helpers:** the `OSOE_PROGRESS_HELPERS` row, the "What does not scale"
+  entry on helpers, "What they buy with many peers at once ... has not been
+  measured", the wake's cost at many PEs a node, and "No faster link has been
+  measured" (§5);
 - **The zero-copy send:** the `OSOE_WIRE_ZERO_COPY` row's "Not timed on a fast
   link: v0.2 step 4's last part, on one, decides its default and whether a
   connection needs more than two buffers" (§7);
@@ -299,5 +371,10 @@ The README's sentences the numbers replace or confirm:
   `OSOE_GET_LANDING_BYTES` row (§8);
 - **The platforms:** "aarch64 only" where it says so of measured hardware, and
   the Pi cluster as the only real cluster (§3, §10).
+
+Not measured by the kit, and left open: a barrier or a fetch-add behind the
+stream at each helper count - the control wires stay on the agent - TCP's
+retransmissions around a stream (`nstat`), which would explain a cloud link's
+rate, and a profile of the progress threads on x86-64.
 
 The decisions are the author's, each in a dated record beside the results.

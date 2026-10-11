@@ -4,8 +4,12 @@
 # list's first two nodes, one PE each, from 16 KiB by fours to LARGEST (64 MiB),
 # at each landing zone of ZONES (256 KiB, the default; 1, 4 and 16 MiB); then
 # multistream's get stream in 1 MiB blocks over every node, PES_PER_NODE (8) PEs
-# each, at the same zones; ROUNDS (3) times in another order each round.
+# each, at the same zones; ROUNDS (3) times in another order each round. The
+# reply credits (OSOE_AM_CREDITS, 64 a connection, shared by a node's PEs), the
+# other bound on a get's pieces in flight, are not varied: at 8 PEs a node a
+# zone above about 512 KiB may be held by them, not by the zone.
 # usage: gets.sh NODES OUTDIR
+: "${KIT_TIMEOUT:=300}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 ROUNDS=${ROUNDS:-3}
@@ -15,8 +19,8 @@ PES_PER_NODE=${PES_PER_NODE:-8}
 SECONDS_EACH=${STREAM_SECONDS:-10}
 for ((round = 1; round <= ROUNDS; round++)); do
     for z in $(rotate "$ZONES" "$round"); do
-        launch 2 1 "$OUT/get-pieces-zone$z-r$round.txt" OSOE_GET_LANDING_BYTES="$z" -- \
-            "$KIT_BIN/get-pieces" 21 "$LARGEST"
+        KIT_SRUN="$KIT_SRUN $(pair)" launch 2 1 "$OUT/get-pieces-zone$z-r$round.txt" \
+            OSOE_GET_LANDING_BYTES="$z" -- "$KIT_BIN/get-pieces" 21 "$LARGEST"
         launch "$NODE_COUNT" "$PES_PER_NODE" "$OUT/get-1m-pes$PES_PER_NODE-zone$z-r$round.txt" \
             OSOE_GET_LANDING_BYTES="$z" -- "$KIT_BIN/multistream" get 1048576 "$SECONDS_EACH"
     done

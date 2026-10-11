@@ -7,27 +7,39 @@
 # on every node and ssh from this node to each; slurm-wlm and munge already
 # installed (§1). On every node it also sets logind's RemoveIPC=no and the
 # user's locked-memory limit unlimited, for slurmd's steps too (§1 says why).
+# NODES holds Slurm's names for the nodes - the short host names slurmd -C
+# reports - not addresses. Every node's host key is taken on first contact.
 # usage: slurm-setup.sh NODES
 set -eu
 NODES_FILE=$1
 FIRST=$(sed -n 1p "$NODES_FILE")
+COUNT=$(grep -c . "$NODES_FILE")
 [ "$(hostname -s)" = "${FIRST%%.*}" ] || echo "note: running on $(hostname -s), not the list's first node $FIRST"
-everywhere() { for n in $(grep . "$NODES_FILE"); do ssh "$n" "$@"; done; }
+SSH="ssh -o StrictHostKeyChecking=accept-new"
+everywhere() { for n in $(grep . "$NODES_FILE"); do $SSH "$n" "$@"; done; }
 
-# munge: the first node's key, on every node.
+# munge: the first node's key, on every node, by its standard input rather
+# than its command line, where ps would show it.
 sudo test -s /etc/munge/munge.key || sudo mungekey --create
-KEY=$(sudo base64 -w0 /etc/munge/munge.key)
 for n in $(grep . "$NODES_FILE"); do
-    ssh "$n" "echo '$KEY' | base64 -d | sudo tee /etc/munge/munge.key > /dev/null &&
-              sudo chown munge:munge /etc/munge/munge.key && sudo chmod 400 /etc/munge/munge.key &&
-              sudo systemctl enable munge && sudo systemctl restart munge"
+    sudo cat /etc/munge/munge.key |
+        $SSH "$n" "sudo tee /etc/munge/munge.key > /dev/null &&
+                   sudo chown munge:munge /etc/munge/munge.key && sudo chmod 400 /etc/munge/munge.key &&
+                   sudo systemctl enable munge && sudo systemctl restart munge"
 done
 
-# Each node as slurmd -C sees it, less 512 MiB of memory for the system.
+# Each node as slurmd -C sees it, less 512 MiB of memory for the system; by its
+# path, since Debian 13 keeps /usr/sbin off a user's PATH, and the setup stops
+# unless every node gave its line.
 NODE_LINES=$(for n in $(grep . "$NODES_FILE"); do
-    ssh "$n" slurmd -C | sed -n 's/^\(NodeName=[^ ]*.*\) RealMemory=\([0-9]*\).*/\1 RealMemory=\2/p' |
+    $SSH "$n" /usr/sbin/slurmd -C | sed -n 's/^\(NodeName=[^ ]*.*\) RealMemory=\([0-9]*\).*/\1 RealMemory=\2/p' |
         awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^RealMemory=/) { split($i, m, "="); $i = "RealMemory=" (m[2] - 512) } print }'
 done)
+if [ "$(printf '%s\n' "$NODE_LINES" | grep -c '^NodeName=')" -ne "$COUNT" ]; then
+    echo "slurmd -C gave $(printf '%s\n' "$NODE_LINES" | grep -c '^NodeName=') node lines for $COUNT nodes:" >&2
+    printf '%s\n' "$NODE_LINES" >&2
+    exit 1
+fi
 CONF=$(cat <<CONF
 # The fast-link cluster's Slurm (docs/fast-link/slurm-setup.sh).
 ClusterName=fastlink
@@ -38,10 +50,10 @@ TaskPlugin=task/affinity
 SelectType=select/cons_tres
 SelectTypeParameters=CR_Core
 SchedulerType=sched/backfill
-PropagateResourceLimits=NONE
+PropagateResourceLimitsExcept=MEMLOCK
 ReturnToService=2
 SlurmUser=slurm
-SlurmctldPidFile=/run/slurmctld.pid
+SlurmctldPidFile=/run/slurmctld/slurmctld.pid
 SlurmdPidFile=/run/slurmd.pid
 SlurmdSpoolDir=/var/lib/slurm/slurmd
 StateSaveLocation=/var/lib/slurm/slurmctld
@@ -54,7 +66,7 @@ CONF
 echo "$CONF"
 ENCODED=$(echo "$CONF" | base64 -w0)
 for n in $(grep . "$NODES_FILE"); do
-    ssh "$n" "sudo mkdir -p /var/lib/slurm/slurmctld /var/lib/slurm/slurmd /var/log/slurm &&
+    $SSH "$n" "sudo mkdir -p /var/lib/slurm/slurmctld /var/lib/slurm/slurmd /var/log/slurm &&
               sudo chown -R slurm:slurm /var/lib/slurm /var/log/slurm &&
               echo '$ENCODED' | base64 -d | sudo tee /etc/slurm/slurm.conf > /dev/null"
 done
@@ -67,7 +79,7 @@ everywhere "sudo mkdir -p /etc/systemd/logind.conf.d /etc/security/limits.d /etc
             printf '[Service]\nLimitMEMLOCK=infinity\n' | sudo tee /etc/systemd/system/slurmd.service.d/memlock.conf > /dev/null &&
             sudo systemctl daemon-reload && sudo systemctl restart systemd-logind"
 
-ssh "$FIRST" "sudo systemctl enable slurmctld && sudo systemctl restart slurmctld"
+$SSH "$FIRST" "sudo systemctl enable slurmctld && sudo systemctl restart slurmctld"
 everywhere "sudo systemctl enable slurmd && sudo systemctl restart slurmd"
 sleep 5
 sinfo -N -l

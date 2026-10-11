@@ -8,6 +8,7 @@
 #   ROUNDS (3), HELPERS ("0 1 2 4"), PES_PER_NODE ("8 16 32"),
 #   WORKLOADS ("put-1m put-64k get-1m mailbox"), STREAM_SECONDS (10)
 # usage: helpers.sh NODES OUTDIR
+: "${KIT_TIMEOUT:=120}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 ROUNDS=${ROUNDS:-3}

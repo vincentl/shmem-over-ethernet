@@ -5,11 +5,15 @@
 # OSOE_WIRE_ZERO_COPY off, and on at a threshold of 16 KiB (the default),
 # 64 KiB and 256 KiB; at each count of HELPERS ("0", and §5's best beside it),
 # ROUNDS (3) times in another order each round, PE 0 printing its node's
-# counters around each window (sends by reference, their notifications, those
-# the kernel copied after all, those refused). The locked-memory limit each
-# node's steps see is recorded first: below what the lent pages need, the sends
-# are refused and copy.
+# counters around each window (its sends, those by reference among them - a
+# refused one counted there too - their notifications, and those the kernel
+# copied after all, a refused one's among them). The locked-memory limit each
+# node's steps see is recorded first: below what the lent pages need, a send is
+# refused, goes again by copy, and its connection copies from then on, which
+# each process says once ("refused for want of locked memory"). HELPERS is "0"
+# unless given: set it to "0 N", N §5's best, for the runbook's 48 jobs.
 # usage: zero-copy.sh NODES OUTDIR
+: "${KIT_TIMEOUT:=120}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 ROUNDS=${ROUNDS:-3}

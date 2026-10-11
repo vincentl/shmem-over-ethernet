@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # docs/fast-link.md §2: what each node is, gathered on every node at once by
 # one task a node, into OUTDIR/facts.txt, each line prefixed by its node's name.
-# The interface is the one the node's route to the first node uses.
+# The interface is the one the node's route to the first node uses. The kernel's
+# settings are read from /proc/sys and ethtool by its path: Debian 13 keeps
+# /usr/sbin off a user's PATH, and sysctl and ethtool are there. A fact that
+# cannot be read says why, in its line, rather than going missing.
 # usage: facts.sh NODES OUTDIR
+: "${KIT_TIMEOUT:=120}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 FIRST=$(node 1)
@@ -18,8 +22,8 @@ lscpu | say cpu
 free -b | say memory
 df -B1 /dev/shm | say dev-shm
 getconf PAGESIZE | say page-size
-cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null | say governor
-numactl --hardware 2>/dev/null | say numa
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>&1 | say governor
+numactl --hardware 2>&1 | say numa
 address=$(getent ahostsv4 "$first" | awk 'NR == 1 { print $1 }')
 interface=$(ip route get "$address" 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }' | head -1)
 if [ -z "$interface" ] || [ "$interface" = lo ]; then
@@ -27,17 +31,17 @@ if [ -z "$interface" ] || [ "$interface" = lo ]; then
 fi
 echo "$interface" | say interface
 ip -d link show "$interface" | say link
-cat "/sys/class/net/$interface/speed" 2>/dev/null | say speed
-for option in -i -k -c -l -g; do ethtool $option "$interface" 2>&1 | say "ethtool$option"; done
+cat "/sys/class/net/$interface/speed" 2>&1 | say speed
+for option in -i -k -c -l -g; do /usr/sbin/ethtool $option "$interface" 2>&1 | say "ethtool$option"; done
 for key in net.core.netdev_max_backlog net.core.rmem_max net.core.wmem_max net.ipv4.tcp_rmem \
            net.ipv4.tcp_wmem net.ipv4.tcp_congestion_control net.ipv4.tcp_notsent_lowat \
            net.ipv4.tcp_mtu_probing net.core.default_qdisc kernel.io_uring_disabled; do
-    sysctl "$key" 2>/dev/null | say sysctl
+    echo "$key = $(cat "/proc/sys/${key//.//}" 2>&1)" | say sysctl
 done
-echo "memlock $(ulimit -l), open files $(ulimit -n)" | say limits
-loginctl show-user "$(id -un)" -p Linger 2>/dev/null | say linger
-grep -h '^ *RemoveIPC' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>/dev/null | say logind
-dpkg-query -W liburing2 liburing-dev 2>/dev/null | say packages
+echo "memlock $(ulimit -l), open files $(ulimit -n), stack $(ulimit -s)" | say limits
+loginctl show-user "$(id -un)" -p Linger 2>&1 | say linger
+grep -h '^ *RemoveIPC' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>&1 | say logind
+dpkg-query -W liburing2 liburing-dev 2>&1 | say packages
 for n in $nodes; do echo "$n $(getent ahostsv4 "$n" | awk 'NR == 1 { print $1 }')"; done | say resolves
 EOF
 )"

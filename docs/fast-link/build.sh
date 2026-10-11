@@ -5,18 +5,25 @@
 # kit's probes compiled into build/release/kit with the build's own oshcc - so
 # that everything a step runs is at the same path on every node, without a
 # shared file system. Run on the first node, from the tree. Under
-# KIT_LAUNCHER=osoe-launch, one machine: the build here alone.
+# KIT_LAUNCHER=osoe-launch, one machine: the build here alone. Each node's
+# configure and build log lands in its build-release.txt, whose failing lines
+# come back here; a build that fails removes the node's build/release/kit, so
+# that no section runs the last build's probes and library unnoticed, and the
+# script's status is the failure.
 # usage: build.sh NODES
+: "${KIT_TIMEOUT:=1800}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "${OUT:-$REPOSITORY/build/fast-link}"
 PROBES="multistream hol get-pieces fan-in startup"
 build_here() {
-    cmake --preset release > /dev/null && cmake --build build/release -j"$(nproc)" > build-release.txt 2>&1 \
-        || { echo "$(hostname): the build failed (build-release.txt)"; return 1; }
+    { cmake --preset release && cmake --build build/release -j"$(nproc)"; } > build-release.txt 2>&1 \
+        || { rm -rf build/release/kit
+             echo "$(hostname): the build failed:"; grep -E 'error|Error' build-release.txt | head -5
+             return 1; }
     mkdir -p build/release/kit
     for p in $PROBES; do
         build/release/tools/wrapper/oshcc -O2 -o "build/release/kit/$p" "docs/fast-link/$p.c" \
-            || { echo "$(hostname): $p did not compile"; return 1; }
+            || { rm -rf build/release/kit; echo "$(hostname): $p did not compile"; return 1; }
     done
     echo "$(hostname): built, $(grep -c 'warning:' build-release.txt) warnings"
 }
@@ -33,4 +40,7 @@ done
 export -f build_here
 export PROBES
 srun -N"$NODE_COUNT" --ntasks-per-node=1 --cpus-per-task="$(nproc)" \
-    bash -c "cd '$REPOSITORY' && build_here" 2>&1 | tee -a "$LOG"
+    bash -c "cd '$REPOSITORY' && build_here" 2>&1 < /dev/null | tee -a "$LOG"
+status=${PIPESTATUS[0]}
+[ "$status" -eq 0 ] || echo "the build failed on a node: status $status" | tee -a "$LOG"
+exit "$status"
