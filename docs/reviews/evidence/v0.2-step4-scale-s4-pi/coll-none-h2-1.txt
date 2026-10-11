@@ -1,0 +1,9 @@
+osoe-bench pes=16 remote_target=4 local_target=1
+reduce pes=16 bytes=8 median_us=186.9 fastest_us=164.7
+broadcast pes=16 bytes=8 median_us=186.8 fastest_us=157.0
+reduce pes=16 bytes=65536 median_us=1412.4 fastest_us=1290.5
+broadcast pes=16 bytes=65536 median_us=1618.1 fastest_us=1193.3
+fcollect pes=16 block=8 median_us=271.6 fastest_us=132.2
+alltoall pes=16 block=8 median_us=343.6 fastest_us=275.3
+fcollect pes=16 block=4096 median_us=702.2 fastest_us=562.0
+alltoall pes=16 block=4096 median_us=2582.1 fastest_us=1974.5

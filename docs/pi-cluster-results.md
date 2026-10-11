@@ -977,3 +977,25 @@ what.
   one at two, give the 8-byte reduction about 5% faster at 4 × 4 under the
   binding and nothing at 4 × 1 (the merge point's adversarial read of its fixes,
   finding 6). Four nodes only.
+
+## v0.2 after step 4's merge point (2026-10-10)
+
+- **A blocking get's pieces together** (`docs/decisions/2026-10-10-blocking-gets.md`,
+  "The measurements"; `docs/design/evidence/v0.2-step4/2026-10-10-blocking-gets/pi-blocking-gets/`):
+  question 4's probe, `get-pieces.c`, on two nodes of one PE, 21 repetitions a
+  size, the medians, `main` at `7a42c92` against the branch alternating three
+  times. A blocking get of a mebibyte took 11,550 to 11,559 µs on `main` and
+  9,148 to 9,154 on the branch - a fifth less, the nonblocking get's time - and
+  from 64 KiB up 1.00 to 1.06 times a put and quiet where `main`'s took 1.22 to
+  1.28; a get of one piece, 16 KiB, was as it was. The branch's tests of gets
+  on one Pi node's logical nodes passed 57 of 57 once the internode test's count
+  was corrected, 48 of 57 before.
+- **The zero-copy send refused for want of locked memory**
+  (`docs/decisions/2026-10-10-zero-copy-locked-memory.md`, "The verification";
+  `docs/design/evidence/v0.2-step4/2026-10-10-zero-copy-locked-memory/`,
+  `pi-zero-copy-refused/` and `pi-zero-copy-refused-e53c9e2/`): on the Pi's
+  Linux 6.18, which charges rings to the limit too, the seven zero-copy tests
+  passed at `e53c9e2`, after the change's second read, each node saying its
+  refusal once - one 6.18 gives at submission - and a job of two logical nodes
+  under `ulimit -l 0` was refused at start-up, naming the limit. The first
+  build's run had failed one of the seven, by the test's own defect.

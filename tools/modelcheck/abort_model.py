@@ -383,10 +383,14 @@ def case(variant, starts):
 
 
 def run(variant, starts, out=sys.stdout):
+    # Liveness is checked only under liveness_max_states (engine.py): the
+    # largest case, goodbye [2:3], is 11.8 million states, and 12 million left
+    # it 2% from a result that says liveness was not checked (the ninth
+    # review's C9-5), so the bound has room above it.
     name, threads, mem = case(variant, starts)
     return explore(name, threads, mem, out=out,
                    done=lambda M: all(M[ENDED(x)] for x in NODES),
-                   liveness=True, max_seconds=1800, liveness_max_states=12_000_000)
+                   liveness=True, max_seconds=1800, liveness_max_states=16_000_000)
 
 
 ONE_CALLER = {0: (1,)}                  # the root calls shmem_global_exit(1)

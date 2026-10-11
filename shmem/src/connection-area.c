@@ -88,7 +88,8 @@ struct osoe_connection_area_header {
  * Each owner's dirty bitmap starts a line of its own too, since each is taken
  * by another thread; within one, the words share lines, as nothing yet
  * measures contention between them (step 2's rule: a line a word only if
- * measurement says so). One line holds 512 connections' bits.
+ * measurement says so). 64 bytes hold 512 connections' bits: a line on
+ * x86-64, half of one on aarch64 (base/cacheline.h).
  */
 struct owner_words {
     _Alignas(OSOE_CACHELINE) _Atomic uint32_t sleeping;

@@ -420,7 +420,12 @@ and its default decided on one (`docs/decisions/2026-10-07.md` item 7). Over
 TCP the buffer is released by the notification once the peer has acknowledged
 its bytes, so with it on a connection's two buffers cap one peer's stream at
 about 512 KiB a round trip - some 100 Gb/s at 40 µs (256 KiB and some 50 Gb/s
-while the default buffer was 128 KiB; `docs/decisions/2026-10-07.md` item 12).*
+while the default buffer was 128 KiB; `docs/decisions/2026-10-07.md` item 12).
+That was the arithmetic of both buffers lent at once, which the build below
+does not do: only one buffer of a connection is lent at a time, so a peer's
+stream sends at most one buffer by reference a round trip, the other turning
+over by copy meanwhile - no figure bounds it, and nothing has timed it on a
+fast link (the ninth review's S6).*
 *As built (v0.2 step 4):* `OSOE_WIRE_ZERO_COPY=on` sends a connection buffer
 by reference wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`
 (16 KiB by default), with `IORING_SEND_ZC_REPORT_USAGE`; the completion frees the
@@ -1502,7 +1507,11 @@ a value written into the calling thread's reply slot, and takes no extent of the
 zone: `transport-am.c`, `OSOE_LANDING_NO_EXTENT`)*:
 
 - blocking get or fetching AMO: the calling thread, already waiting in the
-  library;
+  library *(as built since 2026-10-10, a blocking get of one piece only: one of
+  more goes out as a nonblocking get's pieces on its thread's own context, and
+  whichever thread of the PE claims a landed piece copies it - another thread's
+  wait, or an issue that finds the zone full - as for a nonblocking get, below;
+  `docs/decisions/2026-10-10-blocking-gets.md`)*;
 - nonblocking get: that PE's agent, or the application thread at `quiet`,
   whichever comes first *(as built, the thread at its next wait, or at an issue
   that finds the zone full; §4.6)*.
@@ -3974,7 +3983,7 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
-| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get's reply lands in the landing slot and the calling thread copies it out (§3.12); a nonblocking one's in the landing arena, copied out by the wait (§4.6, as built) |
+| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get of one piece: its reply lands in the landing slot and the calling thread copies it out (§3.12); of more, and a nonblocking get: its pieces land in the landing arena, each copied out by whichever thread of the PE claims it - the wait, or another (§4.6, §4.11 item 3, as built) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
 | fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
 | wait | Every write on the context — to listed PEs, or to all — and every nonblocking get the PE has issued is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes, after the nonblocking gets |

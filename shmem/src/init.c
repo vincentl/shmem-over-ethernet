@@ -152,7 +152,7 @@ OSOE_BUILD_NOTE
 "                           the capacity: the most pieces of a large data\n"
 "                           collective each node keeps in flight up and down\n"
 "                           its tree, 1 to 8, the same on every node, default\n"
-"                           4; a scan keeps 2 under link (§5.8)\n"
+"                           4; a scan keeps 2 under link and tree (§5.8)\n"
 "    OSOE_SMALL_COLLECTIVE_BYTES\n"
 "                           the largest reduction, broadcast or scan that\n"
 "                           moves through a team's own slots in one piece, 128\n"

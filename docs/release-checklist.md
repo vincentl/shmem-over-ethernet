@@ -132,12 +132,15 @@ until the tree to be tagged has them; the author tags.
 - [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
   two PEs at no helpers and at two, and its team programs at 70 PEs, as at step
   4's merge point (`docs/decisions/2026-10-10-step4-merge-point.md`), which ran
-  them before its review's fixes and every change since.
+  them before its review's fixes and every change since; and the README's
+  sentence on Sandia OpenSHMEM's suite "on the tree tagged 0.1.0" made the
+  tree tagged 0.2's (the ninth review's readiness Q5-4).
 - [ ] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
   for 0.1.0 (above): the sixteen cases in the development VM's Slurm, and
   `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on.
 - [ ] **The x86-64 item at two and three helpers too** (portability P3, under
-  "After the release").
+  "After the release"), and the README's sentence on what "the tagged tree"
+  did on x86-64 made 0.2's (readiness Q5-4).
 - [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
 - [ ] **The README's commands on the Pi cluster, and its quick start on Raspberry
@@ -154,9 +157,18 @@ until the tree to be tagged has them; the author tags.
   `SHMEM_VERSION`'s row - and the README's Status linking the new note.
 - [x] **The soname**: `libosoe.so.0`, as 0.1.0's (the author,
   `docs/decisions/2026-10-10.md` item 4) - the installed headers and the
-  exported names are 0.1.0's, so a program built against 0.1.0 should link and
-  run against 0.2, which no one has tried. The library's file is
-  `libosoe.so.0.2.0`.
+  exported names are 0.1.0's, so a program built against 0.1.0 links and runs
+  against 0.2: the ninth review's investigators built the README's ring against
+  a 0.1.0 install and ran it once 0.2 was installed over it, on one node and
+  two, with the right lines. The library's file is `libosoe.so.0.2.0`.
+- [ ] **The upgrade run again on the tree tagged**: a program built against the
+  0.1.0 install, run against the tagged library installed over it (readiness
+  Q5-3, Q5-4).
+- [ ] **If Part 4 turns the zero-copy send on by default**, its locked-memory
+  questions are the tag's, since every user with a low `ulimit -l` then meets
+  them: whether a connection that met the limit lends again after a while,
+  where today it copies for the rest of the job (readiness Q5-4; `shmem_init`
+  raises the soft limit to the hard one since 2026-10-11).
 
 ## After the release
 
@@ -346,7 +358,10 @@ rated them (round six's readiness Q5-5).
     owner's last pass shown with its age in `osoe-stat` (Q5-9);
   - a lead with helpers writing a death twice, its agent's line and a helper's,
     and "this PE was not waiting in the library" said of a PE in
-    `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are);
+    `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are) -
+    and a non-lead at no helpers wrote "the job is aborting on behalf of PE 0"
+    twice once in about 25 failing runs, since `fatal.c` has no guard of once a
+    process (the ninth review's readiness Q5-4);
   - Träff's on teams that are not the world, typed reductions in place at its
     sizes, the whole-job `_to_all` at them, members' bits after a rounding sum,
     nodes at different helper counts, and SOS at three helpers, each right by

@@ -34,7 +34,7 @@
  * The bytes the kernel may hold unsent on a connection (TCP_NOTSENT_LOWAT;
  * v0.2 step 4, design §3.2) - about, since the kernel takes a send whole while
  * it holds less. Left to the system, it held some 2.6 MB of a put stream at a
- * gigabit, and a fetch-add behind the stream waited 14 to 22 ms for them on
+ * gigabit, and a fetch-add behind the stream waited 17 to 20 ms for them on
  * the Pi; limited to 16 KiB, 3.3 to 3.9 ms, the stream at line rate
  * (docs/decisions/2026-10-07-one-thread-profile.md). The limit is the link's
  * bandwidth times OSOE_WIRE_UNSENT_NS - what the link sends while the wire's

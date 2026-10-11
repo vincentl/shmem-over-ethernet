@@ -42,6 +42,7 @@ candidate. What the later rounds led to is in `docs/decisions/`
 `2026-10-10-step4-merge-point.md`), and what each part's read led to in that
 part's record.
 `evidence/` holds the programs, models, logs and notes behind the first two
-rounds' reports, and behind two reads of v0.2 step 4's first part
-(`v0.2-step4-part0/`, `v0.2-step4-part0-fourth-read/`), kept as the record of
+rounds' reports, behind two reads of v0.2 step 4's first part
+(`v0.2-step4-part0/`, `v0.2-step4-part0-fourth-read/`), and behind round
+eight's scale S4 on the Pi (`v0.2-step4-scale-s4-pi/`), kept as the record of
 what ran.
