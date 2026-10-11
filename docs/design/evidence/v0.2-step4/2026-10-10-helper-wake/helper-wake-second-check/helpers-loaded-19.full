@@ -1,0 +1,44 @@
+Internal ctest changing into directory: /tmp/helper-wake-second-check/branch/build/release
+UpdateCTestConfiguration  from :/tmp/helper-wake-second-check/branch/build/release/DartConfiguration.tcl
+Parse Config file:/tmp/helper-wake-second-check/branch/build/release/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/helper-wake-second-check/branch/build/release/DartConfiguration.tcl
+Parse Config file:/tmp/helper-wake-second-check/branch/build/release/DartConfiguration.tcl
+Test project /tmp/helper-wake-second-check/branch/build/release
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 233
+    Start 233: shmem.helper-wake.0-1-2-3
+
+233: Test command: /usr/bin/cmake "-E" "env" "OSOE_PROGRESS_HELPERS=2" "OSOE_DEADLOCK_SECONDS=0" "/tmp/helper-wake-second-check/branch/build/release/tools/launch/osoe-launch" "-n" "4" "-m" "0,1,2,3" "-t" "60" "--" "/tmp/helper-wake-second-check/branch/build/release/shmem/tests/shmem_test_helper-wake"
+233: Working Directory: /tmp/helper-wake-second-check/branch/build/release/shmem/tests
+233: Test timeout computed to be: 90
+233: /tmp/helper-wake-second-check/branch/shmem/tests/test-helper-wake.c:179: CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST) failed
+233: node 1's wire, owner 1's: owner 0 woken 0 times in 100 rounds
+233: node 1's wire, owner 1's: owner 1 woken 200 times in 100 rounds
+233: node 1's wire, owner 1's: owner 2 woken 0 times in 100 rounds
+233: node 2's wire, owner 2's: owner 0 woken 0 times in 100 rounds
+233: node 2's wire, owner 2's: owner 1 woken 0 times in 100 rounds
+233: node 2's wire, owner 2's: owner 2 woken 200 times in 100 rounds
+233: node 3's wire, owner 1's: owner 0 woken 0 times in 100 rounds
+233: node 3's wire, owner 1's: owner 1 woken 155 times in 100 rounds
+233: node 3's wire, owner 1's: owner 2 woken 0 times in 100 rounds
+233: osoe-launch: rank 0 exited with status 1
+1/1 Test #233: shmem.helper-wake.0-1-2-3 ........***Failed    0.85 sec
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+internode    =   0.85 sec*proc (1 test)
+tier2        =   0.85 sec*proc (1 test)
+
+Total Test time (real) =   0.88 sec
+
+The following tests FAILED:
+	233 - shmem.helper-wake.0-1-2-3 (Failed)                internode tier2
+Errors while running CTest
+Output from these tests are in: /tmp/helper-wake-second-check/branch/build/release/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

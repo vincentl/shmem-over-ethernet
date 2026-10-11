@@ -1,0 +1,5 @@
+osoe: PE 1: osoe needs io_uring with an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE for a job of 2 nodes (it fails with "Cannot allocate memory", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, 0 KiB here); this kernel is 6.18.50+rpt-rpi-2712
+osoe: PE 0: osoe needs io_uring with an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE for a job of 2 nodes (it fails with "Cannot allocate memory", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, 0 KiB here); this kernel is 6.18.50+rpt-rpi-2712
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 0 exited with status 1
+srun: error: pi-001: task 0: Exited with exit code 1

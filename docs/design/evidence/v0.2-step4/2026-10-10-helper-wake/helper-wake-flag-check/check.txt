@@ -1,0 +1,37 @@
+build main: warnings 0
+build branch: warnings 0
+build spin200: warnings 0
+build spin30: warnings 0
+build misroute: warnings 0
+== quiet 15:38:10
+main-quiet: 20 of 20 passed
+  the owner woken: 1x40 1x42 1x44 1x45 55x100 1x101 
+  the other helper woken: 60x0 
+  flags not up: 0
+branch-quiet: 20 of 20 passed
+  the owner woken: 57x100 3x101 
+  the other helper woken: 60x0 
+  flags not up: 0
+== beside four busy loops 15:38:15
+main-loaded: 12 of 20 passed
+  the owner woken: 9x0 2x1 3x2 1x3 7x4 4x6 2x8 1x11 1x13 1x15 1x23 1x26 1x27 1x38 1x43 1x52 1x62 1x75 1x79 1x96 2x99 33x100 3x101 1x126 
+  the other helper woken: 80x0 
+  flags not up: 0
+branch-loaded: 20 of 20 passed
+  the owner woken: 25x100 1x101 1x102 1x114 1x120 1x140 1x157 1x169 1x180 1x184 1x190 1x194 3x195 2x196 3x197 2x198 7x199 7x200 
+  the other helper woken: 60x0 
+  flags not up: 0
+== mutants, each run must fail 15:38:23
+mutant-spin200: 0 of 5 passed
+  the owner woken: 6x1 2x2 1x13 1x14 1x19 2x24 1x32 1x112 
+  the other helper woken: 15x0 
+  flags not up: 0
+mutant-spin30: 0 of 5 passed
+  the owner woken: 7x1 2x2 1x43 1x53 1x94 1x100 1x197 1x198 
+  the other helper woken: 15x0 
+  flags not up: 0
+mutant-misroute: 0 of 5 passed
+  the owner woken: 15x100 
+  the other helper woken: 1x98 14x100 
+  flags not up: 0
+DONE 15:38:27

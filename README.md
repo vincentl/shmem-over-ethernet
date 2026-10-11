@@ -299,8 +299,8 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 860 tests fail at `shmem_init` or at opening a ring -
-every one but `env.probe` among the 460 labelled `internode`, which need more
+410 of the test suite's 867 tests fail at `shmem_init` or at opening a ring -
+every one but `env.probe` among the 467 labelled `internode`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
@@ -308,7 +308,7 @@ io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 860 tests fail, with io_uring refused as well. Give the container a
+the suite's 867 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -782,7 +782,7 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 |---|---|---|---|---|---|
 | A PE's heap object: the symmetric heap, then the library's internal region | in `/dev/shm`, one a PE, mapped by every PE of the node | `SHMEM_SYMMETRIC_SIZE`, then about 26 KiB a team number (`OSOE_MAX_TEAMS`) and a 577 KiB lane a thread place (`OSOE_MAX_THREADS` + 1) | 272 MiB, the region 15.63 | 272 MiB, 16.04 | 272 MiB, 16.32 |
 | What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.1 GiB | 68.4 GiB |
-| The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 285 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`) - 128 bytes a peer node, and 256 bytes an owner of the node's wires: the lead's agent and each progress helper | 2.1 MiB | 18.8 MiB | 72.3 MiB, 1.5 written at start |
+| The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 287 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`), and a 128-byte context block for each context and each thread place (`OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS` + 1) - 128 bytes a peer node, and 256 bytes an owner of the node's wires: the lead's agent and each progress helper | 2.1 MiB | 18.9 MiB | 72.8 MiB, 1.5 written at start |
 | The connection area | in `/dev/shm`, one a node | 512 KiB of buffers and 1.25 KiB of state a peer node | 1.5 MiB | 31.6 MiB | 250 MiB, 0.6 written at start |
 | The node lead's own | its private memory | about 0.8 MiB and 8.1 KB a peer node - the reply pool, and 4.6 KB of it the peer's control wire, 4 KiB its private send buffer - and 1 MiB of receive buffers as traffic comes; with progress helpers, as much again of receive buffers each, and an io_uring ring and a thread's stack | 1.8 MiB | 2.3 MiB | 5.7 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
@@ -804,7 +804,7 @@ times these:
 |---|---|
 | `OSOE_MAX_TEAMS` | every PE 24.25 KiB of address space at 4 nodes to 27.4 KiB at a thousand - the allgather's and reduce-scatter's words grow with log₂ n - and 12 bytes of the control segment |
 | `OSOE_TEAM_BLOCKS` | the node a kilobyte of `/dev/shm`, written at start; its lead about 760 bytes; every PE about 500 bytes of address space |
-| `OSOE_MAX_THREADS` | every PE a 577 KiB lane of address space and 768 bytes of the control segment |
+| `OSOE_MAX_THREADS` | every PE a 577 KiB lane of address space and 896 bytes of the control segment on aarch64, 768 on x86-64, 128 of them the context block its blocking gets of more than one piece go on |
 | `OSOE_MAX_CONTEXTS` | every PE 128 bytes of the control segment and about 180 bytes, and each context in use 21 bytes a peer node |
 | `OSOE_PROGRESS_HELPERS` | each node's lead a thread, an io_uring ring and `OSOE_WIRE_BYTES` × `OSOE_WIRE_BUFFERS` of receive buffers, 1 MiB at the defaults; the control segment 256 bytes |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | a team number eighteen bytes for each byte of the value, on about 9.0 KiB: 11.3 KiB at 128, 27.0 KiB at the default 1 KiB, 297 KiB at 16 KiB, a PE (at 500 nodes) |
@@ -992,13 +992,24 @@ specification or takes a choice the specification leaves open.
   takes whole extents, at least one, so 256 small gets in flight fill it as 256
   KiB of data does, and past it a new get waits for earlier ones to land -
   backpressure, never an error.
-- **A blocking get from another node moves a piece at a time.** Each piece of
-  up to 64 KiB - seventeen to a mebibyte - waits its round trip before the next
-  is asked for, so on the Pi cluster a `shmem_get` of 64 KiB or more took a
-  quarter longer than a put and quiet of the same size, and over a fast loopback
-  path six to ten times longer from a mebibyte. `shmem_get_nbi` and
-  `shmem_quiet` issue the pieces together, as far as the landing zone allows,
-  and on the Pi matched the put (`docs/design/blocking-get-proposal.md`).
+- **A large get from another node is held by its PE's landing zone.** A get's
+  pieces of up to 64 KiB - seventeen to a mebibyte - go out together, a
+  blocking get's as a nonblocking get's, but no more of them than the landing
+  zone holds: four at the default 256 KiB (`OSOE_GET_LANDING_BYTES`). The zone
+  is the PE's, shared by its threads and contexts, so while one large get
+  fills it another thread's get of any size waits for a piece to land; and the
+  pieces in flight toward a node are bounded by its connection's reply credits
+  too (`OSOE_AM_CREDITS`, 64, shared by the node's PEs), from sixteen PEs of a
+  node getting at once. On the Pi cluster's gigabit a blocking get of 64 KiB
+  or more took 1.00 to 1.06 times a put and quiet of the same size, and a
+  nonblocking one 0.98 to 1.06; over the development VM's loopback, where a
+  round trip's time carries about the zone's 256 KiB, about 2.7 times at a
+  mebibyte and 3.3 at 4 MiB. The zone's size for a fast link waits for one
+  (`docs/decisions/2026-10-10-blocking-gets.md`;
+  `docs/design/blocking-get-proposal.md`, (d)). A thread whose place's
+  context block lies past block 4,095, the last a get's token can name - as
+  the last places' do from `OSOE_MAX_CONTEXTS` 4,080 at the default
+  `OSOE_MAX_THREADS` - gets a piece at a time, a round trip each.
 - **A nonblocking fetching atomic completes before it returns.**
   `shmem_atomic_fetch_add_nbi` and its kin issue the same round trip as the
   blocking forms and leave the value in place at once - the earliest the
@@ -1019,7 +1030,11 @@ specification or takes a choice the specification leaves open.
   holds two sockets for every other node - its control wire and its data wire -
   and a descriptor for every other PE of its node, beside the program's own, so
   the hard limit on open files (`ulimit -Hn`) must leave room for them;
-  `shmem_init` raises the soft limit to it.
+  `shmem_init` raises the soft limit to it. On Linux 6.14 and later io_uring
+  also charges a node's rings to its user's locked memory, every process of the
+  user on the host together, against each one's `ulimit -l` (8 MiB by
+  default), zero copy or not: a ring the limit refuses ends the job at
+  start-up, naming it.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
   statics.
@@ -1316,19 +1331,25 @@ that one could be added without touching the OpenSHMEM layer.
   (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-2). One test, which
   reads back 64 MiB a helper landed, runs past its minute in the tool's
   handling of eight million such reads, and finishes in two given longer. The
-  preset gates the suite at no helpers alone, without the one test that sets
-  helpers itself and lands what a local thread reads. That test,
-  `shmem.helper-wake`, counts each helper's wakes, and so asks of its machine
-  that a helper usually sleeps between a peer's rounds. So the suite runs it
-  alone, and it runs a peer's rounds again when they fall short; beside other
-  tests under AddressSanitizer it failed, and beside four busy loops on four
-  cores it failed 9 runs of 20 (the release checklist).
+  preset gates the suite at no helpers alone, without `shmem.helper-wake`,
+  which, like every map of more than one node, the preset leaves out. That
+  test counts each owner's wakes - a helper's, and in a second run at no
+  helpers the lead's agent's - putting to a peer only once the owner of its
+  wire has raised the flag it raises before it sleeps, and checks that the put
+  claimed that owner's wake itself: a wake sent to another owner or held back
+  fails it, and so does an owner that spins after raising its flag for longer
+  than an acknowledgement's round trip, a shorter spin being caught alone but
+  less surely under load. Beside four busy loops on four cores it passed 20
+  runs of 20, at two helpers and at none, in the release build and under
+  AddressSanitizer, where counting wakes without the flag failed 8 of 20 in the
+  release build and 9 of 20 under AddressSanitizer
+  (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  460 tests labelled `internode` - those of a job of more than one node, of
+  467 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 399 of the full build's 860 tests in
+  development VM with liburing hidden: 399 of the full build's 867 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1504,7 +1525,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
-| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference holds its pages against the user's locked-memory limit (`ulimit -l`, shared by every process of the user on a host) until its notification comes, and a job past it ends "Cannot allocate memory" on a connection - at the default 8 MiB, sixteen logical nodes on an emulated gigabit link, each PE putting to every other, did. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, their notifications, and those the kernel did not send by reference after all. Each node's own. |
+| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". To keep sending by reference, raise it for the job - `ulimit -l` in its batch script, as far as the hard limit allows. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
 
 **For testing**
 

@@ -1,0 +1,52 @@
+build branch: warnings 0
+build keeps-lending: warnings 0
+build later-pass: warnings 0
+build no-fallback: warnings 0
+== static checks 15:44:44
+100% tests passed, 0 tests failed out of 12
+== the branch: the wire's and the internode tests 15:45:10
+100% tests passed, 0 tests failed out of 20
+      1 1/2 Test  #43: shmem.wire.zero-copy-refused ..............   Passed    0.01 sec
+      1 2/2 Test #207: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.07 sec
+      1 osoe: PE 0: node 0: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+      1 osoe: PE 1: node 1: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+      1 osoe: PE 2: node 2: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+      1 zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+== mutant keeps-lending 15:45:11
+zero copy: 17815 sends by reference, 17815 refused, 17815 notifications, 17815 copied
+1/2 Test  #43: shmem.wire.zero-copy-refused ..............***Failed   26.15 sec
+2/2 Test #207: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.16 sec
+The following tests passed:
+50% tests passed, 1 tests failed out of 2
+== mutant later-pass 15:45:37
+zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+1/2 Test  #43: shmem.wire.zero-copy-refused ..............   Passed    0.02 sec
+2/2 Test #207: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.30 sec
+The following tests passed:
+100% tests passed, 0 tests failed out of 2
+== mutant no-fallback 15:45:37
+osoe_fatal: the connection to node 1 failed: Cannot allocate memory
+1/2 Test  #43: shmem.wire.zero-copy-refused ..............***Failed    0.00 sec
+osoe: PE 1: node 1: the connection to node 0 failed: Cannot allocate memory; this PE was waiting in shmem_int_max_reduce
+osoe: PE 2: node 2: the connection to node 0 failed: Cannot allocate memory; this PE was waiting in shmem_int_max_reduce
+2/2 Test #207: shmem.internode.zero-copy-refused.0-1-2 ...***Failed  Error regular expression found in output. Regex=[Cannot allocate memory]  0.07 sec
+0% tests passed, 2 tests failed out of 2
+== the refused internode test, five times each, timed 15:45:37
+branch 1: Passed    0.07 sec
+later-pass 1: Passed    0.30 sec
+branch 2: Passed    0.08 sec
+later-pass 2: Passed    0.28 sec
+branch 3: Passed    0.08 sec
+later-pass 3: Passed    0.30 sec
+branch 4: Passed    0.08 sec
+later-pass 4: Passed    0.18 sec
+branch 5: Passed    0.07 sec
+later-pass 5: Passed    0.30 sec
+== the probe 15:45:39
+probe: 0
+info locked-memory limit (ulimit -l): 8192 KiB
+PROBE PASSED (0 failures)
+probe under ulimit -l 0: 0
+info locked-memory limit (ulimit -l): 0 KiB
+PROBE PASSED (0 failures)
+DONE 15:45:41

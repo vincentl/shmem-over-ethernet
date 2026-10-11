@@ -1,0 +1,32 @@
+Internal ctest changing into directory: /tmp/v02-zero-copy-second-read/build/tsan
+UpdateCTestConfiguration  from :/tmp/v02-zero-copy-second-read/build/tsan/DartConfiguration.tcl
+Parse Config file:/tmp/v02-zero-copy-second-read/build/tsan/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/v02-zero-copy-second-read/build/tsan/DartConfiguration.tcl
+Parse Config file:/tmp/v02-zero-copy-second-read/build/tsan/DartConfiguration.tcl
+Test project /tmp/v02-zero-copy-second-read/build/tsan
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 43
+    Start 43: shmem.wire.zero-copy-refused
+
+43: Test command: /tmp/v02-zero-copy-second-read/build/tsan/shmem/tests/shmem_test_wire "zero-copy-refused"
+43: Working Directory: /tmp/v02-zero-copy-second-read/build/tsan/shmem/tests
+43: Test timeout computed to be: 120
+43: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+43: zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+1/1 Test #43: shmem.wire.zero-copy-refused .....   Passed    0.02 sec
+
+The following tests passed:
+	shmem.wire.zero-copy-refused
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+internode    =   0.02 sec*proc (1 test)
+tier1        =   0.02 sec*proc (1 test)
+
+Total Test time (real) =   0.03 sec

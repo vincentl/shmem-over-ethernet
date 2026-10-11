@@ -68,8 +68,11 @@ struct osoe_ring {
     struct osoe_ring_counts {
         uint64_t completions, receives, enobufs, rearms, sends, short_sends;
         /* The zero-copy send (wire-settings.h): sends by reference, their
-         * notifications, and the ones that said the kernel copied after all. */
+         * notifications, and the ones that said the kernel copied after all;
+         * and those the user's locked-memory limit refused (ring.c), which the
+         * owner's pass reports once (progress.c). */
         uint64_t zero_copy_sends, zero_copy_notifications, zero_copy_copied;
+        uint64_t zero_copy_refused;
         /* The armed futex wait's completions that saw the word move - woken,
          * or refused at arming because it already had: the owner's wakes,
          * where a timeout or a socket's completion is not one. */

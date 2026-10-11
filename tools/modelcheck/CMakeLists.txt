@@ -10,7 +10,9 @@
 # release preset only, which keeps it from being skipped. The large ones -
 # tree_barrier (five logical nodes, every node's thread real; 11 minutes),
 # close (a million states with the trapped-state check), abort (a fatal's case
-# of 5.7 million states; 18 minutes) and abort_exit (a case of ten million; 17)
+# of 5.7 million states; 18 minutes), abort_exit (a case of ten million; 17)
+# and, since v0.2 step 4's zero-copy send, reservation (15 minutes in the
+# development VM on 2026-10-10, one case of 23 million states under x86-TSO)
 # - made the 24 models 55 minutes of the 61 the release workflow took (the
 # release-fixes plan's measurement, in the review's VM; one at a time on
 # 2026-10-03 they took 29 minutes in the development VM). So every model carries

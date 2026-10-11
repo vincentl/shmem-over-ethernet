@@ -1,5 +1,14 @@
 # A blocking get, a piece at a time: what question 4's exploration found
 
+**Decided, and built as (b).** On 2026-10-10 the author accepted the
+recommendation below, (a) (`docs/decisions/2026-10-10.md`, item 2). The closer
+look the build began with found (b) the smaller change. (a) needs a new kind of
+token and a new landing path on the lead, since the lead accepts a blocking
+piece only into the slot its thread armed for that one token; (b) leaves the
+lead's landing as it is. So (b) was built, the author told
+(`docs/decisions/2026-10-10-blocking-gets.md`); (d), the landing zone sized to
+the link, is Part 4's.
+
 **For the author's decision.** On 2026-10-09 the author asked for a short
 exploration of question 4 before deciding it (`docs/decisions/2026-10-09.md`,
 item 1). This is that exploration: what a blocking get does today, what two

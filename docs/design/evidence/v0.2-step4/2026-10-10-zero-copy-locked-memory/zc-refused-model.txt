@@ -1,0 +1,57 @@
+reservation/zc_refused writers=1 msgs=2 cap=2                SC  states=     13,511 depth=106 (miss<1e-21) -> ok +live
+reservation/zc_refused writers=2 msgs=1 cap=2                SC  states=     48,216 depth=108 (miss<1e-20) -> ok +live
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 761,856 states, 50,477/s, stack 128, depth 75 (max 182), largest ('$q', 0)=36704391, 15s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 1,515,520 states, 50,088/s, stack 147, depth 95 (max 189), largest ('$q', 0)=8322, 30s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 2,260,992 states, 49,922/s, stack 54, depth 50 (max 189), largest ('$q', 0)=4227, 45s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 2,990,080 states, 49,531/s, stack 127, depth 80 (max 189), largest ('$q', 0)=3150027, 60s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 3,629,056 states, 48,098/s, stack 120, depth 73 (max 189), largest ('$q', 2)=36708488, 75s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 4,284,416 states, 47,333/s, stack 138, depth 115 (max 189), largest ('$q', 1)=1112551620, 91s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 5,013,504 states, 47,465/s, stack 205, depth 130 (max 189), largest ('$q', 1)=36712583, 106s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 5,677,056 states, 47,016/s, stack 121, depth 74 (max 189), largest ('$q', 0)=3149957, 121s
+reservation/zc_refused writers=2 msgs=2 cap=2                SC  states=  6,236,896 depth=189 (miss<2e-16) -> ok +live
+reservation/zc_refused writers=1 msgs=2 cap=2 replies=1      SC  states=    142,638 depth=147 (miss<1e-19) -> ok +live
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 622,592 states, 41,043/s, stack 227, depth 143 (max 214), largest ('$q', 2)=38805640, 15s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 1,318,912 states, 43,466/s, stack 198, depth 114 (max 220), largest ('$q', 0)=3154056, 30s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 2,015,232 states, 44,350/s, stack 284, depth 192 (max 220), largest ('$q', 0)=5259400, 45s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 2,719,744 states, 44,961/s, stack 252, depth 162 (max 220), largest ('$q', 3)=38809736, 60s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 3,391,488 states, 44,854/s, stack 177, depth 169 (max 220), largest ('$q', 4)=38809732, 76s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 4,087,808 states, 45,030/s, stack 212, depth 140 (max 222), largest ('$q', 0)=3158147, 91s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 4,792,320 states, 45,239/s, stack 272, depth 185 (max 222), largest ('$q', 0)=5259399, 106s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 5,464,064 states, 45,174/s, stack 248, depth 161 (max 222), largest ('head', 0)=67, 121s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 6,045,696 states, 44,429/s, stack 159, depth 102 (max 222), largest ('$q', 0)=1056834, 136s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 6,627,328 states, 43,816/s, stack 238, depth 181 (max 222), largest ('$q', 0)=38805636, 151s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 7,168,000 states, 43,090/s, stack 222, depth 182 (max 222), largest ('$q', 3)=38813831, 166s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 7,692,288 states, 42,415/s, stack 219, depth 150 (max 222), largest ('$q', 2)=38809736, 181s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 8,192,000 states, 41,698/s, stack 282, depth 200 (max 222), largest ('head', 0)=66, 196s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 8,642,560 states, 40,830/s, stack 158, depth 124 (max 222), largest ('$q', 1)=5255300, 212s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 9,199,616 states, 40,549/s, stack 163, depth 125 (max 222), largest ('$q', 1)=38801611, 227s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 9,691,136 states, 40,024/s, stack 157, depth 145 (max 222), largest ('$q', 1)=9700380871, 242s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 10,371,072 states, 40,332/s, stack 120, depth 107 (max 222), largest ('$q', 0)=573575363, 257s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 11,083,776 states, 40,714/s, stack 134, depth 84 (max 222), largest ('$q', 1)=573575367, 272s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 11,755,520 states, 40,903/s, stack 83, depth 54 (max 222), largest ('$q', 0)=4291, 287s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 12,484,608 states, 41,268/s, stack 264, depth 133 (max 222), largest ('$q', 0)=38809731, 303s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 13,180,928 states, 41,492/s, stack 215, depth 139 (max 222), largest ('$q', 1)=36708484, 318s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 13,901,824 states, 41,777/s, stack 216, depth 113 (max 222), largest ('$q', 1)=36708484, 333s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 14,622,720 states, 42,036/s, stack 312, depth 184 (max 222), largest ('$q', 0)=38813831, 348s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 15,343,616 states, 42,278/s, stack 237, depth 125 (max 222), largest ('$q', 0)=8324, 363s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 16,089,088 states, 42,554/s, stack 232, depth 147 (max 222), largest ('$q', 0)=36708488, 378s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 16,777,216 states, 42,664/s, stack 138, depth 145 (max 222), largest ('$q', 0)=36708486, 393s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 17,498,112 states, 42,862/s, stack 155, depth 110 (max 228), largest ('$q', 1)=5251204, 408s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 18,210,816 states, 43,023/s, stack 141, depth 155 (max 234), largest ('$q', 4)=38809804, 423s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 18,874,368 states, 43,062/s, stack 241, depth 138 (max 234), largest ('$q', 0)=36712579, 438s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 19,496,960 states, 43,001/s, stack 254, depth 160 (max 234), largest ('$q', 0)=36712584, 453s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 20,111,360 states, 42,928/s, stack 210, depth 162 (max 234), largest ('$q', 1)=36712584, 468s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 20,619,264 states, 42,631/s, stack 153, depth 100 (max 234), largest ('$q', 1)=36704459, 484s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 21,176,320 states, 42,450/s, stack 157, depth 97 (max 234), largest ('$q', 0)=4229, 499s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 21,733,376 states, 42,287/s, stack 95, depth 76 (max 234), largest ('$q', 2)=36704459, 514s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 22,413,312 states, 42,371/s, stack 249, depth 147 (max 234), largest ('$q', 0)=12353, 529s
+    .. reservation/zc_refused writers=2 msgs=2 cap=2: 23,109,632 states, 42,480/s, stack 65, depth 53 (max 234), largest ('$q', 0)=3149955, 544s
+reservation/zc_refused writers=2 msgs=2 cap=2                TSO states= 23,158,348 depth=234 (miss<3e-15) -> ok [liveness not checked: over 7,000,000 states]
+    .. reservation/zc_refused_owes_none writers=2 msgs=2 cap=2: 712,704 states, 47,085/s, stack 134, depth 83 (max 174), largest ('$q', 2)=38805640, 15s
+    .. reservation/zc_refused_owes_none writers=2 msgs=2 cap=2: 1,466,368 states, 48,505/s, stack 89, depth 54 (max 195), largest ('head', 0)=66, 30s
+    .. reservation/zc_refused_owes_none writers=2 msgs=2 cap=2: 2,228,224 states, 49,095/s, stack 173, depth 105 (max 195), largest ('$q', 0)=36704391, 45s
+    .. reservation/zc_refused_owes_none writers=2 msgs=2 cap=2: 2,949,120 states, 48,744/s, stack 158, depth 104 (max 195), largest ('$q', 3)=575676616, 61s
+reservation/zc_refused_owes_none writers=2 msgs=2 cap=2      SC  states=  3,390,982 depth=195 (miss<7e-17) -> VIOLATION
+    SEQ: message 2 left in segment 1 but its writer recorded 0
+    trace: T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:pre-open drain: 0 replies into buffer 0 ; T2:store ('filled', 0)=1 ; T2:store ('seq', 0)=1 ; T2:store ('head', 0)=1 ; T1:load ('head', 0)->1 ; T1:cas ('head', 0) 1->2 True ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:load ('head', 0)->2 ; T1:load ('seq', 0)->1 ; T1:ghost ('$slot', 0, 1)=17 ; T1:add ('filled', 0)->2 ; T1:load ('head', 0)->2 ; T1:cas ('head', 0) 2->3 True ; T2:or ('head', 0) 3->67 ; T2:pre-open drain: 0 replies into buffer 1 ; T2:store ('filled', 1)=1 ; T2:store ('seq', 1)=2 ; T2:store ('head', 1)=1 ; T1:load ('seq', 0)->1 ; T1:ghost ('$slot', 0, 2)=18 ; T1:add ('filled', 0)->3 ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:load ('head', 0)->67 ; T2:load ('filled', 0)->3 ; T2:load ('seq', 0)->1 ; T2:load ('head', 1)->1 ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:send units 0..2 of buffer 0 ; T3:await ok ; T2:load ('head', 1)->1 ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:send of units 2.. of buffer 0 refused ; T3:post buffer 0 refusal notification ; T3:await ok ; T3:look ; T2:load ('head', 1)->1 ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:send units 2..3 of buffer 0 by copy ; T2:store ('head', 0)=64 ; T2:store ('filled', 0)=0 ; T2:load ('head', 1)->1 ; T0:load ('head', 0)->64 ; T0:load ('head', 1)->1 ; T0:cas ('head', 1) 1->2 True ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:load ('head', 1)->2 ; T2:or ('head', 1) 2->66 ; T2:pre-open drain: 0 replies into buffer 0 ; T2:store ('filled', 0)=1 ; T2:store ('seq', 0)=3 ; T2:store ('head', 0)=1 ; T0:load ('seq', 1)->2 ; T0:ghost ('$slot', 1, 1)=1 ; T0:add ('filled', 1)->2 ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:load ('head', 1)->66 ; T2:load ('filled', 1)->2 ; T2:load ('seq', 1)->2 ; T2:load ('head', 0)->1 ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:send units 0..2 of buffer 1 by copy ; T2:store ('head', 1)=64 ; T2:store ('filled', 1)=0 ; T2:load ('head', 0)->1 ; T0:load ('head', 0)->1 ; T0:cas ('head', 0) 1->2 True ; T2:await ok ; T2:pass ; T2:reap ; T2:look ; T2:load ('head', 0)->2 ; T2:or ('head', 0) 2->66 ; T2:pre-open drain: 0 replies into buffer 1 ; T2:store ('filled', 1)=1 ; T2:store ('seq', 1)=4 ; T2:store ('head', 1)=1 ; T0:load ('seq', 0)->3 ; T0:ghost ('$slot', 0, 1)=2 ; T3: CHECK FAILED: SEQ: message 2 left in segment 1 but its writer recorded 0
+python3 reservation_model.py zc_refused  755.60s user 2.51s system 99% cpu 12:40.23 total

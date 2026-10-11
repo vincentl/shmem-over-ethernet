@@ -111,9 +111,11 @@ for the next buffer at once; the buffer it sent is LENT until every
 notification of its parts has come, and only then released and free to open.
 Its breakages, each of which must fail:
   zc_release_on_send     the buffer is released when its last send completes,
-                         as the copying send releases it: a writer, or the
-                         pre-open drain, writes into it before the kernel has
-                         read it (TORN, ONCE, ORDER or SEQ)
+                         as the copying send releases it: a writer writes into
+                         it before the kernel has read it (TORN, ONCE, ORDER or
+                         SEQ) - in the library the pre-open drain could too,
+                         which the zero-copy designs leave out (PREOPEN): the
+                         rule it would break is the writers'
   zc_first_notification  released at the first notification of a buffer sent
                          in parts: the later parts are read after the buffer
                          was reopened
@@ -126,6 +128,19 @@ for the peer's TCP to acknowledge, which it delays while it has nothing to send:
 osoe-bench's 1 MiB lines stalled for seconds. BOTH LENT checks it:
   zc_both_lent           every part by reference, as first built: both buffers
                          lent at once (BOTH LENT)
+**A send by reference the kernel refuses** (the locked-memory limit: io_uring
+charges each one's pages until its notification, and says -ENOMEM; the review
+of v0.2 step 4's merge point, portability P1): nothing moves, the refused
+send's notification is still owed (IORING_CQE_F_MORE) and comes when the kernel
+posts it - ahead of, or behind, the notifications of the buffer's earlier parts,
+which wait for the peer's acknowledgement - and the connection copies from then
+on (ring.c). `zc_refused` is the zero-copy send with any send by reference
+refusable, once a connection, BOTH LENT checked as in `zero_copy`:
+  zc_refused_owes_none   the refusal not counted owed: its notification then
+                         takes the place of an earlier part's, and the buffer
+                         is released and written again while the kernel still
+                         has that part to read (SEQ or TORN; it takes two
+                         writers - with one, no part is left to read)
 
 `current` is the tree before slice 2: no pre-open drain. It passes every
 safety check - starving a reply is a liveness property of the *policy*, and a
@@ -152,12 +167,15 @@ REPLY_BASE = 1 + 7 * PER_WRITER
 PREOPEN = ('design', 'open_resets', 'filled_short', 'drain_no_pop', 'drain_lifo')
 FREE, OPEN, SEALEDST, SENDING = 0, 1, 2, 3
 LENT = 4                    # sent by reference, its notifications still owed
-ZERO_COPY = ('zero_copy', 'zc_release_on_send', 'zc_first_notification', 'zc_both_lent')
+ZERO_COPY = ('zero_copy', 'zc_release_on_send', 'zc_first_notification', 'zc_both_lent',
+             'zc_refused', 'zc_refused_owes_none')
+REFUSALS = ('zc_refused', 'zc_refused_owes_none')
 
 
 def QCELL(j): return ('$q', j)          # the kernel's parts, oldest first; 0 is empty
 def OWED(k): return ('$owed', k)        # buffer k's notifications still to come
 def NOTES(k): return ('$notes', k)      # buffer k's notifications come (a breakage's)
+def REFUSED(k): return ('$refused', k)  # buffer k's refused sends' notifications to post
 
 
 def pack_part(k, last, first, end, seq, units=None):
@@ -410,7 +428,20 @@ def kernel(design, total, qlen):
     notes = design == 'zc_first_notification'
 
     def look(M, L):
-        return [({}, {'more': 1 if M[QCELL(0)] else 0}, 'look')]
+        """The next part, or a refused send's notification, which the kernel posts
+        when it will: before the notifications of parts sent earlier, or after."""
+        alts = [({}, {'more': 1}, 'look')] if M[QCELL(0)] else []
+        for k in (0, 1):
+            if M[REFUSED(k)]:
+                alts.append(({}, {'more': 2 + k}, f'post buffer {k} refusal notification'))
+        return alts or [({}, {'more': 0}, 'look')]
+
+    def post_refusal(M, L):
+        k = L['more'] - 2
+        upd = {REFUSED(k): M[REFUSED(k)] - 1, OWED(k): M[OWED(k)] - 1}
+        if notes:
+            upd[NOTES(k)] = M[NOTES(k)] + 1
+        return upd, {}
 
     def check(M, L):
         k, last, first, end, seq, units = unpack_part(M[QCELL(0)])
@@ -458,9 +489,14 @@ def kernel(design, total, qlen):
                 upd[NOTES(k)] = M[NOTES(k)] + 1
         return upd, {'ack': seq if last else DEL}
 
-    B = [('K0', ('await', lambda M, L, t=total: M[QCELL(0)] != 0 or M[NAPPLIED] >= t, '@K1')),
+    B = [('K0', ('await', lambda M, L, t=total: (M[QCELL(0)] != 0 or M[NAPPLIED] >= t or
+                                                M[REFUSED(0)] != 0 or M[REFUSED(1)] != 0),
+                 '@K1')),
          ('K1', ('nd', look, '@K2')),
-         ('K2', ('br', lambda L: L['more'] == 1, '@K3', '@KEND')),
+         ('K2', ('br', lambda L: L['more'] == 0, '@KEND', '@K2r')),
+         ('K2r', ('br', lambda L: L['more'] == 1, '@K3', '@KR')),
+         ('KR', ('gpost', post_refusal, '@KR2')),
+         ('KR2', ('set', 'more', lambda L: DEL, '@K0')),
          ('K3', ('set', 'more', lambda L: DEL, '@K4')),
          # What the check reads is what is delivered: one read of the buffer, as a
          # NIC's transmission is, so the delivery folds into the check's step.
@@ -558,7 +594,7 @@ def progress(design, total, cap, replies):
         # short send's prefix; nothing yet, or the send pending. The last part's
         # completion frees the wire, and the buffer is LENT.
         # zero_copy: by reference only while the other buffer owes nothing.
-        one_lent = design == 'zero_copy'
+        one_lent = design in ('zero_copy',) + REFUSALS
 
         def send_parts(M, L):
             k = find(L, SENDING)
@@ -568,7 +604,7 @@ def progress(design, total, cap, replies):
             if 0 not in cells:
                 return alts
             free = cells.index(0)
-            by_reference = not one_lent or (L[f'ow{1 - k}'] or 0) == 0
+            by_reference = (not one_lent or (L[f'ow{1 - k}'] or 0) == 0) and not L['nolend']
             for end in range(first + 1, length + 1):
                 last = 1 if end == length else 0
                 if by_reference:
@@ -587,6 +623,15 @@ def progress(design, total, cap, replies):
                        'sentall': 1 if owes or not one_lent else 2} if last else {'from': end})
                 alts.append((mu, lu, f'send units {first}..{end} of buffer {k}' +
                              ('' if by_reference else ' by copy')))
+            if by_reference and design in REFUSALS:
+                # Refused: nothing moves, so the rest goes again from `first`; the
+                # notification is owed, and comes when the kernel posts it; this
+                # connection copies from here on.
+                mu = {REFUSED(k): M[REFUSED(k)] + 1}
+                if design != 'zc_refused_owes_none':
+                    mu[OWED(k)] = M[OWED(k)] + 1
+                alts.append((mu, {'nolend': 1}, f'send of units {first}.. of buffer {k} '
+                                                  'refused'))
             return alts
         B += [('F1', ('br', lambda L: find(L, SENDING) is not None, '@Y1', '@F2')),
               ('Y1', ('nd', send_parts, '@Y2')),
@@ -612,7 +657,8 @@ def progress(design, total, cap, replies):
             both = 'BOTH LENT: a connection lent both its buffers to the kernel'
             B += [('Y4', ('set', 'st0', lambda L: LENT if L['st0'] == SENDING else L['st0'], '@Y5')),
                   ('Y5', ('set', 'st1', lambda L: LENT if L['st1'] == SENDING else L['st1'],
-                          '@Y6' if design in ('zero_copy', 'zc_both_lent') else '@F2')),
+                          '@Y6' if design in ('zero_copy', 'zc_both_lent') + REFUSALS
+                          else '@F2')),
                   ('Y6', ('check', lambda M, L, m=both: m if (L['st0'] == LENT and
                                                               L['st1'] == LENT) else None,
                           '@F2'))]
@@ -798,13 +844,20 @@ CASES = [
     ('zero_copy', 2, 1, 2, 0, False, True),
     ('zero_copy', 2, 2, 1, 0, False, True),
     ('zero_copy', 2, 2, 2, 0, False, True),
-    ('zero_copy', 1, 2, 2, 1, False, True),   # beside the pre-open drain's reply
+    ('zero_copy', 1, 2, 2, 1, False, True),   # beside a reply, by the opportunistic drain
     ('zero_copy', 2, 1, 2, 1, False, True),
     ('zero_copy', 2, 2, 2, 0, True, True),    # x86-TSO
     ('zc_release_on_send', 2, 2, 1, 0, False, False),
     ('zc_release_on_send', 1, 2, 2, 1, False, False),
     ('zc_first_notification', 2, 2, 2, 0, False, False),
     ('zc_both_lent', 2, 2, 2, 0, False, False),
+    # a send by reference refused (the locked-memory limit), once a connection
+    ('zc_refused', 1, 2, 2, 0, False, True),
+    ('zc_refused', 2, 1, 2, 0, False, True),
+    ('zc_refused', 2, 2, 2, 0, False, True),
+    ('zc_refused', 1, 2, 2, 1, False, True),  # beside a reply, by the opportunistic drain
+    ('zc_refused', 2, 2, 2, 0, True, True),   # x86-TSO
+    ('zc_refused_owes_none', 2, 2, 2, 0, False, False),
 
     ('open_resets', 1, 1, 2, 1, False, False),
     ('filled_short', 1, 1, 2, 1, False, False),
@@ -848,8 +901,13 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         zc = design in ZERO_COPY
-        res = explore(name, threads, mem0, tso=tso, max_seconds=600 if zc else 240,
-                      liveness_max_states=6_000_000 if zc else 400_000)
+        # The zero-copy cases are the large ones: two of two under x86-TSO
+        # is 22.5 million states, 506 s on the Mac against the 600 it had, and
+        # two of two refusable is 6.2 million with BOTH LENT checked, past the
+        # 6 million under which the engine checks liveness (the second
+        # adversarial read of the refusal, finding 3 and N2).
+        res = explore(name, threads, mem0, tso=tso, max_seconds=1500 if zc else 240,
+                      liveness_max_states=7_000_000 if zc else 400_000)
         ok &= report(res, expect_ok=expect, tso=tso)
     for variant, writers, sizes, cap, least, replies, tso, expect in FILL_CASES:
         name, threads, mem0 = fill_case(variant, writers, sizes, cap, least, replies)

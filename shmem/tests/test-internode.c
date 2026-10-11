@@ -25,6 +25,8 @@
  * after a quiet that covered remote peers, transport.wait.dirty_peers must have
  * counted them.
  */
+#define _GNU_SOURCE
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +35,7 @@
 
 #include "check.h"
 #include "invariants.h"
+#include "locked-memory.h"
 
 enum { SMALL = 64, CHUNKED = 5000, TINY = 1, PATTERN_MOD = 251 };
 
@@ -111,9 +114,29 @@ int main(void)
     shmem_init();
     me = shmem_my_pe();
     npes = shmem_n_pes();
+    /* OSOE_TEST_LOCKED_MEMORY=0: every PE lowers its locked-memory limit to
+     * nothing, its node's rings made, so that each send by reference from here
+     * on is refused and goes again by copy (shmem.internode.zero-copy-refused;
+     * locked-memory.h). Where any PE may lock memory whatever its limit, no
+     * send would be refused, and every PE skips alike. */
+    const char *locked = getenv("OSOE_TEST_LOCKED_MEMORY");
+    if (locked && strcmp(locked, "0") == 0) {
+        /* On the heap: this program's statics are not symmetric (not oshcc's). */
+        int *may_lock = shmem_malloc(2 * sizeof *may_lock);
+        CHECK_FATAL(may_lock != NULL);
+        may_lock[0] = !osoe_test_no_locked_memory();
+        shmem_int_max_reduce(SHMEM_TEAM_WORLD, &may_lock[1], &may_lock[0], 1);
+        bool skip = may_lock[1] != 0;
+        shmem_free(may_lock);
+        if (skip) {
+            if (me == 0)
+                printf("SKIPPED: a PE may lock memory whatever its limit (CAP_IPC_LOCK), so "
+                       "no send by reference is refused\n");
+            shmem_finalize();
+            return 0;
+        }
+    }
     local_id = atoi(osoe_test_launcher("LOCALID") ? osoe_test_launcher("LOCALID") : "0");
-    /* This PE's own, from here: counter() reads the blocks of `local_id`. */
-    uint64_t deferred_at_init = counter("am.wakes_deferred");
     read_local_ranks();
 
     /* One inbox per origin, so every PE may write concurrently without two
@@ -309,6 +332,9 @@ int main(void)
     CHECK_FATAL(signal != NULL);  /* NULL would be dereferenced just below */
     int partner = (me + 1) % npes;
     int sender = (me + npes - 1) % npes;
+    /* This PE's own wakes deferred, from here to the check below: counter()
+     * reads the blocks of `local_id`. */
+    uint64_t deferred_before = counter("am.wakes_deferred");
     /* SMALL in one message, and CHUNKED in parts: a put that fills the room a
      * buffer has left is cut there and goes on in the next (v0.2 step 4), and
      * its signal must still follow its last byte. */
@@ -356,10 +382,13 @@ int main(void)
      * exactly those maps - a check that was measuring the map rather than the
      * flag.
      */
-    /* Counted from the end of shmem_init: the link's measurement there is a
-     * reduction over the finalize team (v0.2 step 2, link-measure.h), whose
-     * pieces defer wakes on every lead of a job of more than one node. */
-    uint64_t deferred = counter("am.wakes_deferred") - deferred_at_init;
+    /* Counted over the rounds of put_signal alone: the link's measurement in
+     * shmem_init is a reduction over the finalize team (v0.2 step 2,
+     * link-measure.h), whose pieces defer wakes on every lead of a job of more
+     * than one node, and a blocking get of more than a piece - the CHUNKED gets
+     * above - defers its pieces' wakes as a nonblocking get does (v0.2,
+     * docs/decisions/2026-10-10-blocking-gets.md). */
+    uint64_t deferred = counter("am.wakes_deferred") - deferred_before;
     if (nodes > 1 && !is_local(partner))
         CHECK(deferred > 0);
     else

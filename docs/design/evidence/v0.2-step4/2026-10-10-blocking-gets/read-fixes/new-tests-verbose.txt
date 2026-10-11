@@ -1,0 +1,14 @@
+249: osoe: PE 0: shmem_get: no progress toward node 1 (PE 1) for 5 s (OSOE_NO_PROGRESS_TIMEOUT): the thread's reply slot has stayed at 0
+1/5 Test #249: shmem.get-no-progress.0-1 .............   Passed    7.31 sec
+250: osoe: PE 0: shmem_get: no progress toward node 1 (PE 1) for 5 s (OSOE_NO_PROGRESS_TIMEOUT): the bytes of its get's pieces has stayed at 0
+2/5 Test #250: shmem.get-no-progress.pieces-3.0-1 ....   Passed    7.32 sec
+251: osoe: PE 0: shmem_get: no progress toward node 1 (PE 1) for 5 s (OSOE_NO_PROGRESS_TIMEOUT): the landing zone's released extents has stayed at 0
+3/5 Test #251: shmem.get-no-progress.pieces-20.0-1 ...   Passed    7.37 sec
+496: a get of 1000 bytes: 0 pieces copied out
+496: a get of 1048579 bytes: 17 pieces copied out, 0 counted nonblocking, 7 issues found no room
+496: GET PIECES OK
+4/5 Test #496: shmem.get-pieces.0-1 ..................   Passed    0.08 sec
+497: a get of 1000 bytes: 0 pieces copied out
+497: a get of 1048579 bytes: 0 pieces copied out, 0 counted nonblocking, 0 issues found no room
+497: GET PIECES FALLBACK OK
+5/5 Test #497: shmem.get-pieces.fallback.0-1 .........   Passed    0.07 sec

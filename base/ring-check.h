@@ -24,4 +24,16 @@ int osoe_ring_check(const char **facility);
  * kernel.io_uring_disabled sysctl refuses, with EPERM. */
 extern const char osoe_ring_check_creating[];
 
+/*
+ * The locked-memory limit this process has (RLIMIT_MEMLOCK, `ulimit -l`), in
+ * KiB, or -1 where it has none, which the messages call "unlimited", as
+ * `ulimit -l` does. io_uring charges against it each send by reference - the
+ * length it offers, and two pages - until its notification, and on Linux 6.14
+ * and later its rings too, counting every process of the user on the host
+ * together against each process's own limit, and where one meets it says only
+ * -ENOMEM; so the messages that report one say this number (ring.c,
+ * progress.c, the probe).
+ */
+long long osoe_locked_memory_kib(void);
+
 #endif /* OSOE_BASE_RING_CHECK_H */

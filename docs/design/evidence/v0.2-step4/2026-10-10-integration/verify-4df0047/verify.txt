@@ -1,0 +1,112 @@
+== static checks 20:25:59
+100% tests passed, 0 tests failed out of 13
+== build debug 20:26:47
+== debug OSOE_PROGRESS_HELPERS=0 20:26:56
+100% tests passed, 0 tests failed out of 867
+== debug OSOE_PROGRESS_HELPERS=2 20:31:11
+100% tests passed, 0 tests failed out of 867
+== debug OSOE_PROGRESS_HELPERS=3 20:35:19
+100% tests passed, 0 tests failed out of 867
+== build release 20:39:31
+== release OSOE_PROGRESS_HELPERS=0 20:39:31
+100% tests passed, 0 tests failed out of 867
+== release OSOE_PROGRESS_HELPERS=2 20:42:28
+100% tests passed, 0 tests failed out of 867
+== release OSOE_PROGRESS_HELPERS=3 20:45:19
+100% tests passed, 0 tests failed out of 867
+== build asan 20:48:07
+== asan OSOE_PROGRESS_HELPERS=0 20:48:23
+100% tests passed, 0 tests failed out of 852
+== asan OSOE_PROGRESS_HELPERS=2 20:51:43
+100% tests passed, 0 tests failed out of 852
+== asan OSOE_PROGRESS_HELPERS=3 20:54:54
+100% tests passed, 0 tests failed out of 852
+== build tsan 20:58:04
+== tsan OSOE_PROGRESS_HELPERS=0 20:58:14
+100% tests passed, 0 tests failed out of 606
+== tsan OSOE_PROGRESS_HELPERS=2 21:01:09
+  7/606 Test #376: shmem.lanes.threads ...................................***Failed   13.09 sec
+ 13/606 Test #222: shmem.stopped-bulk.0-0-1 ..............................***Failed  Error regular expression found in output. Regex=[stopped answering|CHECK[(]|osoe-launch: (rank|timeout)] 60.02 sec
+ 37/606 Test #439: shmem.circulant.7 .....................................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 7 nodes
+ 58/606 Test #445: shmem.circulant.4.max-teams-4 .........................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 4 nodes
+ 67/606 Test #449: shmem.circulant.5.capacity-1 ..........................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 5 nodes
+ 71/606 Test #436: shmem.circulant.4 .....................................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 4 nodes
+ 87/606 Test #396: shmem.multiple.checked.0-1 ............................***Failed    0.92 sec
+ 95/606 Test #446: shmem.circulant.7.lanes ...............................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 7 nodes
+125/606 Test #395: shmem.multiple.0-1 ....................................***Failed    0.74 sec
+175/606 Test #595: tools.pacer.threads.0-1 ...............................***Failed  Error regular expression found in output. Regex=[exited with status [1-9]|killed by signal|timeout after|left behind|OSOE_CHECK_QUIET:]  0.23 sec
+193/606 Test #364: shmem.lanes.rotation ..................................***Failed    0.54 sec
+196/606 Test #210: shmem.ack-echo.0-1 ....................................***Failed    0.60 sec
+205/606 Test #191: shmem.work-discovery ..................................***Failed    0.34 sec
+222/606 Test #368: shmem.lanes.reuse .....................................***Failed    0.29 sec
+223/606 Test #371: shmem.lanes.scan-reuse ................................***Failed    0.29 sec
+98% tests passed, 15 tests failed out of 606
+	191 - shmem.work-discovery (Failed)                     internode tier2
+	210 - shmem.ack-echo.0-1 (Failed)                       internode tier2
+	222 - shmem.stopped-bulk.0-0-1 (Failed)                 internode tier2
+	364 - shmem.lanes.rotation (Failed)                     internode tier2
+	368 - shmem.lanes.reuse (Failed)                        internode tier2
+	371 - shmem.lanes.scan-reuse (Failed)                   internode tier2
+	376 - shmem.lanes.threads (Failed)                      internode tier2
+	395 - shmem.multiple.0-1 (Failed)                       internode tier2
+	396 - shmem.multiple.checked.0-1 (Failed)               internode tier2
+	436 - shmem.circulant.4 (Failed)                        internode tier2
+	439 - shmem.circulant.7 (Failed)                        internode tier2
+	445 - shmem.circulant.4.max-teams-4 (Failed)            internode tier2
+	446 - shmem.circulant.7.lanes (Failed)                  internode tier2
+	449 - shmem.circulant.5.capacity-1 (Failed)             internode tier2
+	595 - tools.pacer.threads.0-1 (Failed)                  internode tier2
+== tsan OSOE_PROGRESS_HELPERS=3 21:04:00
+  2/606 Test #364: shmem.lanes.rotation ..................................***Failed    0.60 sec
+  3/606 Test #368: shmem.lanes.reuse .....................................***Failed    0.30 sec
+  4/606 Test #210: shmem.ack-echo.0-1 ....................................***Failed    0.66 sec
+  5/606 Test #371: shmem.lanes.scan-reuse ................................***Failed    0.36 sec
+  6/606 Test #395: shmem.multiple.0-1 ....................................***Failed    1.15 sec
+  7/606 Test #396: shmem.multiple.checked.0-1 ............................***Failed    2.63 sec
+ 10/606 Test #445: shmem.circulant.4.max-teams-4 .........................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 4 nodes
+ 12/606 Test #595: tools.pacer.threads.0-1 ...............................***Failed  Error regular expression found in output. Regex=[exited with status [1-9]|killed by signal|timeout after|left behind|OSOE_CHECK_QUIET:]  0.68 sec
+ 14/606 Test #376: shmem.lanes.threads ...................................***Failed   15.90 sec
+ 23/606 Test #222: shmem.stopped-bulk.0-0-1 ..............................***Failed  Error regular expression found in output. Regex=[stopped answering|CHECK[(]|osoe-launch: (rank|timeout)] 60.03 sec
+ 45/606 Test #438: shmem.circulant.6 .....................................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 6 nodes
+ 66/606 Test #440: shmem.circulant.8 .....................................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 8 nodes
+120/606 Test #447: shmem.circulant.5.lanes ...............................***Failed  Required regular expression not found. Regex=[CIRCULANT REDUCE: .* on 5 nodes
+98% tests passed, 13 tests failed out of 606
+	210 - shmem.ack-echo.0-1 (Failed)                       internode tier2
+	222 - shmem.stopped-bulk.0-0-1 (Failed)                 internode tier2
+	364 - shmem.lanes.rotation (Failed)                     internode tier2
+	368 - shmem.lanes.reuse (Failed)                        internode tier2
+	371 - shmem.lanes.scan-reuse (Failed)                   internode tier2
+	376 - shmem.lanes.threads (Failed)                      internode tier2
+	395 - shmem.multiple.0-1 (Failed)                       internode tier2
+	396 - shmem.multiple.checked.0-1 (Failed)               internode tier2
+	438 - shmem.circulant.6 (Failed)                        internode tier2
+	440 - shmem.circulant.8 (Failed)                        internode tier2
+	445 - shmem.circulant.4.max-teams-4 (Failed)            internode tier2
+	447 - shmem.circulant.5.lanes (Failed)                  internode tier2
+	595 - tools.pacer.threads.0-1 (Failed)                  internode tier2
+python3: can't open file '/tmp/v02-verify-integration/./tsan-gate.py': [Errno 2] No such file or directory
+python3: can't open file '/tmp/v02-verify-integration/./tsan-gate.py': [Errno 2] No such file or directory
+== tier3 21:07:00
+100% tests passed, 0 tests failed out of 114
+== models 21:11:19
+100% tests passed, 0 tests failed out of 40
+== pacer mix at 0 helpers 22:15:00
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mailbox at 0 helpers 22:16:13
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer collectives at 0 helpers 22:17:13
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix-ten-minutes at 0 helpers 22:18:13
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix at 2 helpers 22:28:20
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mailbox at 2 helpers 22:29:21
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer collectives at 2 helpers 22:30:21
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix-ten-minutes at 2 helpers 22:31:21
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== the single-node build 22:41:25
+warnings: 0
+100% tests passed, 0 tests failed out of 404
+DONE 22:42:14

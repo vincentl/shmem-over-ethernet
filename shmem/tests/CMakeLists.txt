@@ -296,6 +296,14 @@ if(OSOE_INTERNODE)
   add_test(NAME shmem.wire.zero-copy COMMAND shmem_test_wire zero-copy)
   set_tests_properties(shmem.wire.zero-copy PROPERTIES LABELS "tier1" TIMEOUT 120)
   osoe_internode_label(shmem.wire.zero-copy)
+  # And with every send by reference refused for want of locked memory, the
+  # ring made first (locked-memory.h; ring.c): each sending wire refused once,
+  # lending nothing after, and every byte arriving by copy. Skipped where the
+  # process may lock memory whatever its limit (CAP_IPC_LOCK).
+  add_test(NAME shmem.wire.zero-copy-refused COMMAND shmem_test_wire zero-copy-refused)
+  set_tests_properties(shmem.wire.zero-copy-refused PROPERTIES LABELS "tier1" TIMEOUT 120
+    SKIP_REGULAR_EXPRESSION "SKIPPED: this process may lock memory")
+  osoe_internode_label(shmem.wire.zero-copy-refused)
   # The peek's misuses (wire.h), each asserted by its message as the parser's
   # malformed segments are: a consume past the peek, a second consume of it, and
   # in the ASan preset alone, which poisons a provided buffer while it is the
@@ -1418,6 +1426,37 @@ foreach(map IN LISTS osoe_internode_maps)
     osoe_internode_label(shmem.internode.zero-copy.${label})
   endif()
 endforeach()
+# The zero-copy send refused for want of locked memory (the review of v0.2
+# step 4's merge point, portability P1; ring.c): every PE lowers its own
+# locked-memory limit to nothing once its rings are made
+# (OSOE_TEST_LOCKED_MEMORY=0, locked-memory.h), so that every send by reference
+# after shmem_init is refused, on any kernel and whatever else the user holds -
+# a limit set before the job would have to leave room for rings, which Linux
+# 6.14 and later charge too, and none for the sends. Each refused send goes
+# again by copy, the job ends well, and each process says so once, naming its
+# limit - where the job once ended "Cannot allocate memory" on a connection. A
+# wire that went on lending after a refusal still ends this job well - a region
+# owing the refused send's notification makes the next send copy - so
+# shmem.wire.zero-copy-refused, which counts the refusals, is the test of that.
+# Skipped where a process may lock memory whatever its
+# limit (CAP_IPC_LOCK, which io_uring does not charge). Not under
+# ThreadSanitizer, as this program's other multi-node maps are not (above).
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.internode.zero-copy-refused.0-1-2
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048
+            OSOE_AM_CREDITS=2
+            OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919
+            OSOE_WIRE_ZERO_COPY=on OSOE_WIRE_ZERO_COPY_BYTES=64 OSOE_DEADLOCK_SECONDS=0
+            OSOE_TEST_LOCKED_MEMORY=0
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 60 --
+            $<TARGET_FILE:shmem_test_internode>)
+  set_tests_properties(shmem.internode.zero-copy-refused.0-1-2 PROPERTIES LABELS "tier2"
+    TIMEOUT 90 PASS_REGULAR_EXPRESSION "refused for want of locked memory"
+    FAIL_REGULAR_EXPRESSION
+      "Cannot allocate memory;exited with status [1-9];killed by signal;timeout after;left behind"
+    SKIP_REGULAR_EXPRESSION "SKIPPED: a PE may lock memory")
+  osoe_internode_label(shmem.internode.zero-copy-refused.0-1-2)
+endif()
 # The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the
 # launcher's variables as srun does, SLURM_ in place of OSOE_. One node, one PE
 # a node, the block map, and the cyclic one, whose ranks are not contiguous per
@@ -1629,20 +1668,32 @@ endfunction()
 osoe_tier2_map_test(ack-echo 0,1)
 
 # Progress helpers (v0.2 step 4, Part 3; owner-map.h). A PE's wake reaches the
-# owner of its wire: each put of PE 0's wakes the helper the map names for its
-# peer, and never the node's other helper (test-helper-wake.c; the wake count is
-# the owner's, layout 36). The deadlock detector, whose requests nudge every
-# helper, is off. Not under ThreadSanitizer, as the node maps above are not:
-# the helpers land the puts in heaps their PEs' own threads touch, ordered
-# through another process, and the preset runs at no helpers (the second
-# adversarial read of Part 3, S2). Run alone: it counts wakes, which a helper
-# starved of a core by the tests beside it does not take - the suite under
-# AddressSanitizer failed it twice on 2026-10-10 at the same place, its
-# neighbours the same each run, where alone it passed 20 runs of 20
-# (docs/decisions/2026-10-10-grant-fields.md).
+# owner of its wire: each put of PE 0's, made once the owner has raised the flag
+# it raises before it sleeps, claims that owner's wake and wakes the helper the
+# map names for its peer, and no other owner of the node (test-helper-wake.c;
+# the wake count is the owner's, layout 36; the flag read where PE 0's process
+# maps the connection area, base/cacheline.h giving the line). The deadlock
+# detector, whose requests nudge every helper, is off. Not under
+# ThreadSanitizer, as no map of more than one node is: the helpers land the
+# puts in heaps their PEs' own threads touch, ordered through another process,
+# and the preset runs at no helpers (the second adversarial read of Part 3, S2).
+# Not run alone any more: waiting for the flag, both runs hold beside four busy
+# loops on four cores, 20 runs of 20 in the release build and under
+# AddressSanitizer, where counting wakes without it failed 8 of 20 in the first
+# and 9 of 20 in the second (docs/decisions/2026-10-10-helper-wake.md). The same
+# at no helpers, where the lead's agent is owner 0 and holds every wire: a spin
+# before its idle wait shows as a helper's does (scale S1, the agent's half) -
+# a spin longer than an acknowledgement's round trip surely, a shorter one alone
+# but less surely under load.
 if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
-  set_tests_properties(shmem.helper-wake.0-1-2-3 PROPERTIES RUN_SERIAL TRUE)
+  target_include_directories(shmem_test_helper-wake PRIVATE ${PROJECT_SOURCE_DIR})
+  add_test(NAME shmem.helper-wake.agent.0-1-2-3
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=0 OSOE_DEADLOCK_SECONDS=0
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 --
+            $<TARGET_FILE:shmem_test_helper-wake>)
+  set_tests_properties(shmem.helper-wake.agent.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 90)
+  osoe_internode_label(shmem.helper-wake.agent.0-1-2-3)
 endif()
 
 # Keepalive off by default where every node has a loopback address, and on as
@@ -1866,6 +1917,28 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
     PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
     FAIL_REGULAR_EXPRESSION "GET RETURNED")
+  # And a get of more than a piece, whose pieces go out together (remote_get):
+  # three pieces of a default chunk's payload, which the landing zone holds, wait
+  # for their bytes; twenty wait for room at the fifth, the zone holding four.
+  # Each wait must name node and PE as a piece's reply does - which both named
+  # neither before the adversarial read of v0.2's blocking gets (finding 2) -
+  # and the expression names the wait, so that each test pins its own.
+  foreach(case IN ITEMS "3;150000;the bytes of its get's pieces"
+                        "20;1300000;the landing zone's released extents")
+    list(GET case 0 pieces)
+    list(GET case 1 bytes)
+    list(GET case 2 watching)
+    add_test(NAME shmem.get-no-progress.pieces-${pieces}.0-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=5 OSOE_TEST_GET_BYTES=${bytes}
+              $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+              $<TARGET_FILE:shmem_test_get-no-progress>)
+    set_tests_properties(shmem.get-no-progress.pieces-${pieces}.0-1 PROPERTIES
+      LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION
+        "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: ${watching} has stayed at"
+      FAIL_REGULAR_EXPRESSION "GET RETURNED")
+    osoe_internode_label(shmem.get-no-progress.pieces-${pieces}.0-1)
+  endforeach()
 endif()
 
 # A loud failure ends the job without joining a collective (§3.15; review round
@@ -3027,6 +3100,30 @@ set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
     OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2)
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,0,1,1 ${osoe_get_nbi_small})
+  # A blocking get of more than a piece issues its pieces together, on its
+  # thread's own context, and copies each out as it lands
+  # (docs/decisions/2026-10-10-blocking-gets.md; test-get-pieces.c): a get of a
+  # mebibyte moves am.gets_completed by a piece at least twice, one of a piece
+  # not at all, and its pieces fill the zone before any is copied out. The
+  # failure expression, since a pass expression makes CTest ignore the exit
+  # status, and the banner comes before the invariants' check and finalize.
+  # A job of two nodes: in the single-node build the test is not registered,
+  # and a property on it would refuse that build at configure time.
+  if(OSOE_INTERNODE)
+    osoe_tier2_map_test(get-pieces 0,1)
+    set_tests_properties(shmem.get-pieces.0-1 PROPERTIES PASS_REGULAR_EXPRESSION "GET PIECES OK"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]|invariants:|osoe-launch: (rank|timeout)")
+    # And the fallback: at OSOE_MAX_CONTEXTS 4096 every thread place's block is
+    # past what a token names, so the get goes a piece at a time, as before the
+    # change - the one path no other test takes since.
+    add_test(NAME shmem.get-pieces.fallback.0-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_GET_PIECES=fallback OSOE_MAX_CONTEXTS=4096
+              $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_get-pieces>)
+    set_tests_properties(shmem.get-pieces.fallback.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "GET PIECES FALLBACK OK"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]|invariants:|osoe-launch: (rank|timeout)")
+    osoe_internode_label(shmem.get-pieces.fallback.0-1)
+  endif()
   osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
 endif()
 
@@ -3034,8 +3131,9 @@ endif()
 # test-multiple.c): worker threads of every PE in the library at once, on
 # private contexts and on the default one, waiting several at a time; on one
 # node, and across nodes on a block and an interleaved map, with a landing zone
-# of 8 extents that each thread's 12 pieces in flight overfill; and a full
-# thread table ending the job by name. Under tsan the cross-node case that
+# of 8 extents that each thread's 12 pieces in flight overfill, and that each
+# thread's blocking get of 20 KiB takes in three pieces, copied out by whichever
+# thread finds them landed; and a full thread table ending the job by name. Under tsan the cross-node case that
 # counts is 0,1: one PE a node, so everything that writes a PE's memory - its
 # agent's landings, its threads' copy-outs, its replies - is a thread of the
 # one process tsan instruments, and a race among them is a report, not the

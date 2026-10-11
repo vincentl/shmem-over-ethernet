@@ -15,6 +15,13 @@
  *     landing zone's extents, so that each thread's own pieces overfill it
  *     however the scheduler runs the threads, and an issue must copy out
  *     landed pieces, its own or other threads', and wait for room);
+ *   - a blocking get of several pieces, LARGE_WORDS longs from a start of its
+ *     own - 20 KiB, three pieces at a landing zone of 8 KiB - on the private
+ *     context and the default one by turns, every word checked: its pieces go
+ *     out together, on this thread's own context block, and any of the PE's
+ *     threads that finds no room for its own copies a landed one out, into
+ *     this worker's buffer (remote_get; the adversarial read of v0.2's
+ *     blocking gets, finding 3);
  *   - on the default context, which every thread shares: a fetch-add on one
  *     counter at PE 0, a blocking get and a nonblocking one;
  *   - on the default context too, a put of its own words to the right
@@ -50,11 +57,12 @@
 #include "invariants.h"
 #include "launcher.h"
 
-enum { THREADS = 4, ROUNDS = 50, WORDS = 8, PIECES = 12 };
+enum { THREADS = 4, ROUNDS = 50, WORDS = 8, PIECES = 12, LARGE_WORDS = 2560, STARTS = 8 };
 
 static int me, npes, left, right;
 static long *words;             /* [THREADS][WORDS]: each worker's own */
 static long *fixed;             /* [THREADS][WORDS]: written once, before the workers */
+static long *large;             /* [LARGE_WORDS + THREADS * STARTS]: written once too */
 static long *landing;           /* [THREADS][WORDS]: where the left neighbour puts */
 static uint64_t *flags;         /* [THREADS]: each worker's wait word */
 static uint64_t *shared_flag;   /* one word two workers of each PE wait on */
@@ -95,6 +103,11 @@ static long value(int pe, int thread, int round, int i)
     return ((long)pe << 32) | ((long)thread << 24) | ((long)round << 8) | i;
 }
 
+static long large_value(int pe, int i)
+{
+    return ((long)pe << 32) | i;
+}
+
 static void fail(const char *what, int thread, int round, long got, long want)
 {
     pthread_mutex_lock(&report);
@@ -116,6 +129,11 @@ static void *work(void *argument)
     shmem_ctx_t ctx = SHMEM_CTX_INVALID;
     if (shmem_ctx_create(SHMEM_CTX_PRIVATE, &ctx) != 0) {
         fail("shmem_ctx_create", t, 0, 1, 0);
+        return NULL;
+    }
+    long *big = malloc(sizeof *big * LARGE_WORDS);
+    if (!big) {
+        fail("malloc", t, 0, 1, 0);
         return NULL;
     }
     for (int round = 0; round < ROUNDS; round++) {
@@ -147,6 +165,21 @@ static void *work(void *argument)
                          got[k][i], value(right, (t + k) % THREADS, 0, i));
                     break;
                 }
+        /* A blocking get of several pieces, from a start no other worker of
+         * this round shares, so that a piece copied into the wrong buffer
+         * reads wrong. */
+        int start = t * STARTS + round % STARTS;
+        memset(big, 0, sizeof *big * LARGE_WORDS);
+        if (round % 2)
+            shmem_getmem(big, &large[start], sizeof *big * LARGE_WORDS, right);
+        else
+            shmem_ctx_getmem(ctx, big, &large[start], sizeof *big * LARGE_WORDS, right);
+        for (int i = 0; i < LARGE_WORDS; i++)
+            if (big[i] != large_value(right, start + i)) {
+                fail("a blocking get of several pieces", t, round, big[i],
+                     large_value(right, start + i));
+                break;
+            }
         /* The shared default context: an increment at PE 0 and a get. */
         shmem_uint64_atomic_inc(counter, 0);
         long shared_get = shmem_long_g(&fixed[t * WORDS + 3], right);
@@ -202,6 +235,7 @@ static void *work(void *argument)
     if (t < 2)
         shmem_uint64_wait_until(shared_flag, SHMEM_CMP_GE, (uint64_t)w->wave + 1);
     shmem_ctx_destroy(ctx);
+    free(big);
     return NULL;
 }
 
@@ -257,6 +291,7 @@ int main(void)
     right = (me + 1) % npes;
     words = shmem_calloc(THREADS * WORDS, sizeof *words);
     fixed = shmem_calloc(THREADS * WORDS, sizeof *fixed);
+    large = shmem_calloc(LARGE_WORDS + THREADS * STARTS, sizeof *large);
     landing = shmem_calloc(THREADS * WORDS, sizeof *landing);
     flags = shmem_calloc(THREADS, sizeof *flags);
     shared_flag = shmem_calloc(1, sizeof *shared_flag);
@@ -265,11 +300,13 @@ int main(void)
     locked_count = shmem_calloc(THREADS, sizeof *locked_count);
     shared_rows = shmem_calloc(THREADS * WORDS, sizeof *shared_rows);
     shared_rows_back = shmem_calloc(THREADS * WORDS, sizeof *shared_rows_back);
-    CHECK_FATAL(words && fixed && landing && flags && shared_flag && counter && locks &&
-                locked_count && shared_rows && shared_rows_back);
+    CHECK_FATAL(words && fixed && large && landing && flags && shared_flag && counter &&
+                locks && locked_count && shared_rows && shared_rows_back);
     for (int t = 0; t < THREADS; t++)
         for (int i = 0; i < WORDS; i++)
             fixed[t * WORDS + i] = value(me, t, 0, i);
+    for (int i = 0; i < LARGE_WORDS + THREADS * STARTS; i++)
+        large[i] = large_value(me, i);
     shmem_barrier_all();
 
     const char *mode = getenv("OSOE_TEST_MULTIPLE");
@@ -351,6 +388,7 @@ int main(void)
     shmem_free(shared_flag);
     shmem_free(flags);
     shmem_free(landing);
+    shmem_free(large);
     shmem_free(fixed);
     shmem_free(words);
     CHECK_INVARIANTS();

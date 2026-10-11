@@ -1,0 +1,34 @@
+Internal ctest changing into directory: /tmp/zero-copy-refused-check/branch/build/release
+Test project /tmp/zero-copy-refused-check/branch/build/release
+      Start  12: shmem.exports
+      Start  14: shmem.version.library
+      Start  15: shmem.boundary
+      Start  16: shmem.settings-documented
+ 1/12 Test  #14: shmem.version.library ............   Passed    0.01 sec
+      Start  17: shmem.license-lines
+ 2/12 Test  #17: shmem.license-lines ..............   Passed    0.05 sec
+      Start  18: shmem.memory-orders
+ 3/12 Test  #16: shmem.settings-documented ........   Passed    0.06 sec
+      Start  19: shmem.static-link
+ 4/12 Test  #12: shmem.exports ....................   Passed    0.06 sec
+      Start  20: shmem.strict-c11
+ 5/12 Test  #18: shmem.memory-orders ..............   Passed    0.05 sec
+      Start 698: shmem.version.start-up
+ 6/12 Test #698: shmem.version.start-up ...........   Passed    0.01 sec
+      Start 699: shmem.version.info
+ 7/12 Test #699: shmem.version.info ...............   Passed    0.00 sec
+      Start 700: shmem.version.start-up.sma
+ 8/12 Test #700: shmem.version.start-up.sma .......   Passed    0.00 sec
+      Start 701: shmem.version.info.sma
+ 9/12 Test #701: shmem.version.info.sma ...........   Passed    0.01 sec
+10/12 Test  #15: shmem.boundary ...................   Passed    0.59 sec
+11/12 Test  #19: shmem.static-link ................   Passed    3.14 sec
+12/12 Test  #20: shmem.strict-c11 .................   Passed   26.41 sec
+
+100% tests passed, 0 tests failed out of 12
+
+Label Time Summary:
+tier1    =  30.37 sec*proc (8 tests)
+tier2    =   0.02 sec*proc (4 tests)
+
+Total Test time (real) =  26.49 sec

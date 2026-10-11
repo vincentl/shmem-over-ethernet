@@ -1,0 +1,138 @@
+Internal ctest changing into directory: /tmp/v02-zero-copy-second-read/build/debug
+UpdateCTestConfiguration  from :/tmp/v02-zero-copy-second-read/build/debug/DartConfiguration.tcl
+Parse Config file:/tmp/v02-zero-copy-second-read/build/debug/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/v02-zero-copy-second-read/build/debug/DartConfiguration.tcl
+Parse Config file:/tmp/v02-zero-copy-second-read/build/debug/DartConfiguration.tcl
+Test project /tmp/v02-zero-copy-second-read/build/debug
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 42
+      Start  42: shmem.wire
+
+42: Test command: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_wire
+42: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+42: Test timeout computed to be: 120
+42: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+ 1/11 Test  #42: shmem.wire ................................   Passed    0.01 sec
+test 43
+      Start  43: shmem.wire.zero-copy
+
+43: Test command: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_wire "zero-copy"
+43: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+43: Test timeout computed to be: 120
+43: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+43: zero copy: 578 sends by reference, 0 refused, 578 notifications, 578 copied
+ 2/11 Test  #43: shmem.wire.zero-copy ......................   Passed    0.01 sec
+test 44
+      Start  44: shmem.wire.zero-copy-refused
+
+44: Test command: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_wire "zero-copy-refused"
+44: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+44: Test timeout computed to be: 120
+44: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+44: zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+ 3/11 Test  #44: shmem.wire.zero-copy-refused ..............   Passed    0.01 sec
+test 45
+      Start  45: shmem.wire.misuse.consume-past-peek
+
+45: Test command: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_wire "consume-past-peek"
+45: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+45: Test timeout computed to be: 60
+45: osoe_fatal: 49 bytes from node 0 were consumed where the last peek showed 48 (wire.h)
+ 4/11 Test  #45: shmem.wire.misuse.consume-past-peek .......   Passed    0.01 sec
+test 46
+      Start  46: shmem.wire.misuse.consume-twice
+
+46: Test command: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_wire "consume-twice"
+46: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+46: Test timeout computed to be: 60
+46: osoe_fatal: 1 bytes from node 0 were consumed where the last peek showed 0 (wire.h)
+ 5/11 Test  #46: shmem.wire.misuse.consume-twice ...........   Passed    0.00 sec
+test 47
+      Start  47: shmem.wire-pair
+
+47: Test command: /usr/bin/cmake "-E" "env" "OSOE_WIRE_BYTES=64" "OSOE_WIRE_SPLIT=3000" "OSOE_WIRE_SEED=20260919" "/tmp/v02-zero-copy-second-read/build/debug/tools/launch/osoe-launch" "-n" "2" "-m" "0,1" "-t" "60" "--" "/tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_wire_pair"
+47: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+47: Test timeout computed to be: 90
+47: osoe: wire split 3000 per myriad, OSOE_WIRE_SEED=20260919
+47: osoe: wire split 3000 per myriad, OSOE_WIRE_SEED=20260919
+ 6/11 Test  #47: shmem.wire-pair ...........................   Passed    0.06 sec
+test 201
+      Start 201: shmem.internode.zero-copy.0-1-2
+
+201: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/tmp/v02-zero-copy-second-read/build/debug/tools/launch/osoe-launch" "-n" "3" "-m" "0,1,2" "-t" "60" "--" "/tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_internode"
+201: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+201: Test timeout computed to be: 90
+201: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+201: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+201: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+ 7/11 Test #201: shmem.internode.zero-copy.0-1-2 ...........   Passed    0.07 sec
+test 203
+      Start 203: shmem.internode.zero-copy.0-0-1-1-2-2
+
+203: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/tmp/v02-zero-copy-second-read/build/debug/tools/launch/osoe-launch" "-n" "6" "-m" "0,0,1,1,2,2" "-t" "60" "--" "/tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_internode"
+203: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+203: Test timeout computed to be: 90
+203: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+203: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+203: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+ 8/11 Test #203: shmem.internode.zero-copy.0-0-1-1-2-2 .....   Passed    0.08 sec
+test 205
+      Start 205: shmem.internode.zero-copy.0-0-0-1-2-2
+
+205: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/tmp/v02-zero-copy-second-read/build/debug/tools/launch/osoe-launch" "-n" "6" "-m" "0,0,0,1,2,2" "-t" "60" "--" "/tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_internode"
+205: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+205: Test timeout computed to be: 90
+205: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+205: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+205: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+ 9/11 Test #205: shmem.internode.zero-copy.0-0-0-1-2-2 .....   Passed    0.08 sec
+test 207
+      Start 207: shmem.internode.zero-copy.0-1-2-0-1-0
+
+207: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/tmp/v02-zero-copy-second-read/build/debug/tools/launch/osoe-launch" "-n" "6" "-m" "0,1,2,0,1,0" "-t" "60" "--" "/tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_internode"
+207: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+207: Test timeout computed to be: 90
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+10/11 Test #207: shmem.internode.zero-copy.0-1-2-0-1-0 .....   Passed    0.08 sec
+test 208
+      Start 208: shmem.internode.zero-copy-refused.0-1-2
+
+208: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "OSOE_TEST_LOCKED_MEMORY=0" "/tmp/v02-zero-copy-second-read/build/debug/tools/launch/osoe-launch" "-n" "3" "-m" "0,1,2" "-t" "60" "--" "/tmp/v02-zero-copy-second-read/build/debug/shmem/tests/shmem_test_internode"
+208: Working Directory: /tmp/v02-zero-copy-second-read/build/debug/shmem/tests
+208: Test timeout computed to be: 90
+208: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+208: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+208: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+208: osoe: PE 1: node 1: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+208: osoe: PE 2: node 2: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+208: osoe: PE 0: node 0: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+11/11 Test #208: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.08 sec
+
+The following tests passed:
+	shmem.wire
+	shmem.wire.zero-copy
+	shmem.wire.zero-copy-refused
+	shmem.wire.misuse.consume-past-peek
+	shmem.wire.misuse.consume-twice
+	shmem.wire-pair
+	shmem.internode.zero-copy.0-1-2
+	shmem.internode.zero-copy.0-0-1-1-2-2
+	shmem.internode.zero-copy.0-0-0-1-2-2
+	shmem.internode.zero-copy.0-1-2-0-1-0
+	shmem.internode.zero-copy-refused.0-1-2
+
+100% tests passed, 0 tests failed out of 11
+
+Label Time Summary:
+internode    =   0.48 sec*proc (11 tests)
+tier1        =   0.04 sec*proc (5 tests)
+tier2        =   0.44 sec*proc (6 tests)
+
+Total Test time (real) =   0.52 sec

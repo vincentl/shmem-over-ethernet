@@ -1,0 +1,51 @@
+Internal ctest changing into directory: /tmp/zero-copy-refused-check/branch/build/release
+Test project /tmp/zero-copy-refused-check/branch/build/release
+      Start  41: shmem.wire
+      Start  42: shmem.wire.zero-copy
+      Start  43: shmem.wire.zero-copy-refused
+      Start  44: shmem.wire.misuse.consume-past-peek
+ 1/20 Test  #44: shmem.wire.misuse.consume-past-peek ........   Passed    0.00 sec
+      Start  45: shmem.wire.misuse.consume-twice
+ 2/20 Test  #41: shmem.wire .................................   Passed    0.01 sec
+      Start  46: shmem.wire-pair
+ 3/20 Test  #45: shmem.wire.misuse.consume-twice ............   Passed    0.00 sec
+      Start 198: shmem.internode.0-0-0-0
+ 4/20 Test  #42: shmem.wire.zero-copy .......................   Passed    0.01 sec
+      Start 199: shmem.internode.0-1-2
+ 5/20 Test  #43: shmem.wire.zero-copy-refused ...............   Passed    0.01 sec
+      Start 200: shmem.internode.zero-copy.0-1-2
+ 6/20 Test #198: shmem.internode.0-0-0-0 ....................   Passed    0.02 sec
+      Start 201: shmem.internode.0-0-1-1-2-2
+ 7/20 Test  #46: shmem.wire-pair ............................   Passed    0.05 sec
+      Start 202: shmem.internode.zero-copy.0-0-1-1-2-2
+ 8/20 Test #200: shmem.internode.zero-copy.0-1-2 ............   Passed    0.08 sec
+      Start 203: shmem.internode.0-0-0-1-2-2
+ 9/20 Test #199: shmem.internode.0-1-2 ......................   Passed    0.09 sec
+      Start 204: shmem.internode.zero-copy.0-0-0-1-2-2
+10/20 Test #201: shmem.internode.0-0-1-1-2-2 ................   Passed    0.09 sec
+      Start 205: shmem.internode.0-1-2-0-1-0
+11/20 Test #202: shmem.internode.zero-copy.0-0-1-1-2-2 ......   Passed    0.07 sec
+      Start 206: shmem.internode.zero-copy.0-1-2-0-1-0
+12/20 Test #203: shmem.internode.0-0-0-1-2-2 ................   Passed    0.08 sec
+      Start 207: shmem.internode.zero-copy-refused.0-1-2
+13/20 Test #204: shmem.internode.zero-copy.0-0-0-1-2-2 ......   Passed    0.08 sec
+      Start 212: shmem.internode.force-remote.0-1-2
+14/20 Test #205: shmem.internode.0-1-2-0-1-0 ................   Passed    0.08 sec
+      Start 213: shmem.internode.force-remote.0-0-1-1-2-2
+15/20 Test #206: shmem.internode.zero-copy.0-1-2-0-1-0 ......   Passed    0.08 sec
+      Start 214: shmem.internode.force-remote.0-0-0-1-2-2
+16/20 Test #207: shmem.internode.zero-copy-refused.0-1-2 ....   Passed    0.07 sec
+      Start 215: shmem.internode.force-remote.0-1-2-0-1-0
+17/20 Test #212: shmem.internode.force-remote.0-1-2 .........   Passed    0.08 sec
+18/20 Test #213: shmem.internode.force-remote.0-0-1-1-2-2 ...   Passed    0.08 sec
+19/20 Test #214: shmem.internode.force-remote.0-0-0-1-2-2 ...   Passed    0.08 sec
+20/20 Test #215: shmem.internode.force-remote.0-1-2-0-1-0 ...   Passed    0.07 sec
+
+100% tests passed, 0 tests failed out of 20
+
+Label Time Summary:
+internode    =   1.10 sec*proc (19 tests)
+tier1        =   0.03 sec*proc (5 tests)
+tier2        =   1.09 sec*proc (15 tests)
+
+Total Test time (real) =   0.34 sec

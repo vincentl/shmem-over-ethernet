@@ -1,0 +1,22 @@
+start 20:08:25
+built: 0, warnings 0
+zero copy: 578 sends by reference, 0 refused, 578 notifications, 578 copied
+1/7 Test  #43: shmem.wire.zero-copy ......................   Passed    0.02 sec
+zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+2/7 Test  #44: shmem.wire.zero-copy-refused ..............   Passed    0.02 sec
+3/7 Test #201: shmem.internode.zero-copy.0-1-2 ...........   Passed    0.11 sec
+4/7 Test #203: shmem.internode.zero-copy.0-0-1-1-2-2 .....   Passed    0.11 sec
+5/7 Test #205: shmem.internode.zero-copy.0-0-0-1-2-2 .....   Passed    0.10 sec
+6/7 Test #207: shmem.internode.zero-copy.0-1-2-0-1-0 .....   Passed    0.11 sec
+osoe: PE 2: node 2: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+osoe: PE 1: node 1: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+osoe: PE 0: node 0: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+7/7 Test #208: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.10 sec
+The following tests passed:
+100% tests passed, 0 tests failed out of 7
+== two logical nodes under ulimit -l 0
+osoe: PE 1: osoe needs io_uring with an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE for a job of 2 nodes (it fails with "Cannot allocate memory", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, 0 KiB here); this kernel is 6.18.50+rpt-rpi-2712
+osoe: PE 0: osoe needs io_uring with an io_uring created SINGLE_ISSUER, R_DISABLED and CQSIZE for a job of 2 nodes (it fails with "Cannot allocate memory", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, 0 KiB here); this kernel is 6.18.50+rpt-rpi-2712
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 0 exited with status 1
+end 20:09:54

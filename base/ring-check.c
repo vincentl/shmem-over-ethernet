@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <liburing.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 
 #include "base/ring-check.h"
 
@@ -66,4 +67,12 @@ int osoe_ring_check(const char **facility)
     }
     io_uring_queue_exit(&ring);
     return result;
+}
+
+long long osoe_locked_memory_kib(void)
+{
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_MEMLOCK, &limit) != 0 || limit.rlim_cur == RLIM_INFINITY)
+        return -1;
+    return (long long)(limit.rlim_cur / 1024);
 }

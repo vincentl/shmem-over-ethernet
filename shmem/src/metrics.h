@@ -101,7 +101,10 @@ enum osoe_counter {
      * step 8: a wait completes its own context's gets, so the two differ by
      * what other contexts still have in flight); and the times an
      * issue found the landing records or arena used up and completed what was
-     * in flight first - the zone's bound, working. */
+     * in flight first - the zone's bound, working. A blocking get of more
+     * than one piece issues its pieces as a nonblocking get does (layout 37):
+     * they count in the second and the third, and not in the first, so the
+     * first two differ by those pieces too. */
     OSOE_C_AM_GETS_NONBLOCKING, OSOE_C_AM_GETS_COMPLETED, OSOE_C_AM_LANDING_FULL,
     /* A shared context (§4.11 item 1): a nonblocking get's issue that found
      * the generation moved under it and counted again in the other pair; and

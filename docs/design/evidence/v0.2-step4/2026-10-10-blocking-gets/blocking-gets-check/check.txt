@@ -1,0 +1,61 @@
+build main: warnings 0
+build branch: warnings 0
+build mutant: warnings 0
+== the branch's tests of gets 15:28:13
+100% tests passed, 0 tests failed out of 57
+== the mutant, the pipelined path out 15:28:28
+a get of 1000 bytes: 0 pieces copied out
+a get of 1048579 bytes: 0 pieces copied out, 0 counted nonblocking
+0% tests passed, 1 tests failed out of 1
+	488 - shmem.get-pieces.0-1 (Failed)                     internode tier2
+== question 4's probe, alternating 15:28:28
+-- main run 1
+bytes=16384 put_quiet_us=36.3 get_us=37.3 get_nbi_quiet_us=35.7 get_over_put=1.03 nbi_over_put=0.99
+bytes=65536 put_quiet_us=43.6 get_us=76.8 get_nbi_quiet_us=41.1 get_over_put=1.76 nbi_over_put=0.94
+bytes=131072 put_quiet_us=43.3 get_us=108.1 get_nbi_quiet_us=44.8 get_over_put=2.50 nbi_over_put=1.04
+bytes=262144 put_quiet_us=59.0 get_us=335.1 get_nbi_quiet_us=147.7 get_over_put=5.68 nbi_over_put=2.51
+bytes=1048576 put_quiet_us=162.7 get_us=1164.2 get_nbi_quiet_us=422.1 get_over_put=7.16 nbi_over_put=2.59
+bytes=4194304 put_quiet_us=467.1 get_us=4441.6 get_nbi_quiet_us=1518.7 get_over_put=9.51 nbi_over_put=3.25
+-- branch run 1
+bytes=16384 put_quiet_us=60.0 get_us=59.8 get_nbi_quiet_us=56.9 get_over_put=1.00 nbi_over_put=0.95
+bytes=65536 put_quiet_us=71.5 get_us=75.8 get_nbi_quiet_us=71.6 get_over_put=1.06 nbi_over_put=1.00
+bytes=131072 put_quiet_us=75.3 get_us=78.2 get_nbi_quiet_us=77.3 get_over_put=1.04 nbi_over_put=1.03
+bytes=262144 put_quiet_us=94.0 get_us=153.3 get_nbi_quiet_us=150.9 get_over_put=1.63 nbi_over_put=1.61
+bytes=1048576 put_quiet_us=160.1 get_us=425.2 get_nbi_quiet_us=423.3 get_over_put=2.66 nbi_over_put=2.64
+bytes=4194304 put_quiet_us=467.6 get_us=1526.1 get_nbi_quiet_us=1512.7 get_over_put=3.26 nbi_over_put=3.24
+-- main run 2
+bytes=16384 put_quiet_us=37.5 get_us=37.5 get_nbi_quiet_us=35.8 get_over_put=1.00 nbi_over_put=0.95
+bytes=65536 put_quiet_us=43.8 get_us=106.2 get_nbi_quiet_us=64.4 get_over_put=2.43 nbi_over_put=1.47
+bytes=131072 put_quiet_us=66.6 get_us=191.5 get_nbi_quiet_us=79.6 get_over_put=2.87 nbi_over_put=1.20
+bytes=262144 put_quiet_us=91.2 get_us=334.7 get_nbi_quiet_us=152.3 get_over_put=3.67 nbi_over_put=1.67
+bytes=1048576 put_quiet_us=157.9 get_us=1147.4 get_nbi_quiet_us=417.6 get_over_put=7.27 nbi_over_put=2.64
+bytes=4194304 put_quiet_us=473.8 get_us=4462.1 get_nbi_quiet_us=1528.0 get_over_put=9.42 nbi_over_put=3.23
+-- branch run 2
+bytes=16384 put_quiet_us=38.4 get_us=62.5 get_nbi_quiet_us=62.2 get_over_put=1.63 nbi_over_put=1.62
+bytes=65536 put_quiet_us=70.5 get_us=74.3 get_nbi_quiet_us=68.8 get_over_put=1.05 nbi_over_put=0.98
+bytes=131072 put_quiet_us=74.2 get_us=77.4 get_nbi_quiet_us=78.5 get_over_put=1.04 nbi_over_put=1.06
+bytes=262144 put_quiet_us=90.5 get_us=152.4 get_nbi_quiet_us=149.3 get_over_put=1.68 nbi_over_put=1.65
+bytes=1048576 put_quiet_us=160.4 get_us=421.6 get_nbi_quiet_us=422.6 get_over_put=2.63 nbi_over_put=2.63
+bytes=4194304 put_quiet_us=462.8 get_us=1525.9 get_nbi_quiet_us=1510.9 get_over_put=3.30 nbi_over_put=3.26
+-- main run 3
+bytes=16384 put_quiet_us=41.5 get_us=42.1 get_nbi_quiet_us=41.2 get_over_put=1.01 nbi_over_put=0.99
+bytes=65536 put_quiet_us=48.9 get_us=75.7 get_nbi_quiet_us=40.9 get_over_put=1.55 nbi_over_put=0.84
+bytes=131072 put_quiet_us=46.4 get_us=191.0 get_nbi_quiet_us=76.5 get_over_put=4.11 nbi_over_put=1.65
+bytes=262144 put_quiet_us=91.8 get_us=339.6 get_nbi_quiet_us=148.9 get_over_put=3.70 nbi_over_put=1.62
+bytes=1048576 put_quiet_us=161.4 get_us=1169.9 get_nbi_quiet_us=423.5 get_over_put=7.25 nbi_over_put=2.62
+bytes=4194304 put_quiet_us=466.5 get_us=4437.8 get_nbi_quiet_us=1516.9 get_over_put=9.51 nbi_over_put=3.25
+-- branch run 3
+bytes=16384 put_quiet_us=35.8 get_us=36.0 get_nbi_quiet_us=35.3 get_over_put=1.00 nbi_over_put=0.99
+bytes=65536 put_quiet_us=44.1 get_us=72.4 get_nbi_quiet_us=73.5 get_over_put=1.64 nbi_over_put=1.67
+bytes=131072 put_quiet_us=75.0 get_us=77.4 get_nbi_quiet_us=77.9 get_over_put=1.03 nbi_over_put=1.04
+bytes=262144 put_quiet_us=90.9 get_us=150.5 get_nbi_quiet_us=152.3 get_over_put=1.66 nbi_over_put=1.68
+bytes=1048576 put_quiet_us=158.3 get_us=423.6 get_nbi_quiet_us=427.1 get_over_put=2.68 nbi_over_put=2.70
+bytes=4194304 put_quiet_us=452.6 get_us=1521.8 get_nbi_quiet_us=1533.9 get_over_put=3.36 nbi_over_put=3.39
+== the control segment, bytes 15:28:30
+main P=4: 
+main P=64: 
+main P=128: 
+branch P=4: 
+branch P=64: 
+branch P=128: 
+DONE 15:28:30

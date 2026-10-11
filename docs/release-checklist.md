@@ -266,9 +266,10 @@ rated them (round six's readiness Q5-5).
     the request posted last, the helpers' applied counts in the activity, the
     pass after the request - each removal failing it (correctness Q2-3):
     `deadlock_owners_model.py` alone holds the three today;
-  - the agent's and the PEs' waits guarded against spinning as a helper's idle
-    wait is by `shmem.helper-wake` (scale S1; the step 1 review's Q3-1, half
-    closed): an agent made to spin passes all but one test;
+  - the PEs' waits guarded against spinning, as the helpers' and, since
+    2026-10-10, the agent's idle waits are by `shmem.helper-wake`'s two runs
+    (scale S1; the step 1 review's Q3-1, half closed;
+    `docs/decisions/2026-10-10-helper-wake.md`);
   - Träff's rounds take a lane's rows, which the fan-out ceiling sizes, so past
     512 nodes at the default the cost model's best reduction is out of reach - by
     its own numbers 3.2 to 4.3 times faster at 1 MiB (scale S2): rows sized
@@ -279,10 +280,13 @@ rated them (round six's readiness Q5-5).
   - the mesh's accept loop rebuilding its notice of the missing nodes before
     every accept, O(n²) on the highest lead, and the ring's own ceiling of 8,192
     nodes refused as an io_uring error rather than by name (scale S7);
-  - the zero-copy send charging the user's locked-memory limit
-    (`RLIMIT_MEMLOCK`), a job past it ending "Cannot allocate memory" on a
-    connection (portability P1): fall back to the copy, or name the limit,
-    before Part 4 decides the setting's default;
+  - with the zero-copy send's default, Part 4 decides what its refusal for
+    want of locked memory keeps (portability P1, built 2026-10-10:
+    `docs/decisions/2026-10-10-zero-copy-locked-memory.md`): whether a
+    connection that met the limit lends again after a while, where now it
+    copies for the rest of the job; and whether `shmem_init` raises the soft
+    locked-memory limit to the hard one with zero copy on, as it does for open
+    files;
   - the backend's own threads named to the deadlock detector through
     `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
     owner's last pass shown with its age in `osoe-stat` (Q5-9);
@@ -295,10 +299,3 @@ rated them (round six's readiness Q5-5).
     the review's probes and none in the suite (conformance C3);
   - the x86-64 item at the next tag run at two and three helpers too
     (portability P3);
-  - `shmem.helper-wake` made to hold under sustained load before the tag's run
-    of the suite under busy loops: run alone, with its retries, it holds in the
-    suite, but beside four busy loops on four cores it failed 9 runs of 20,
-    since a helper preempted every round looks like one that spins. PE 0
-    waiting for the owner's sleeping flag before each put would tell them apart,
-    the spin mutants checked against it again
-    (`docs/decisions/2026-10-10-step4-merge-point.md`, "The verification").
