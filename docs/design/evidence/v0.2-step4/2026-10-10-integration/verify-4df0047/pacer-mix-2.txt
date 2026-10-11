@@ -1,0 +1,206 @@
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=8 nodes=4 layout=2,2,2,2 hosts=lima-osoe heap=256m memory=128m seed=1 report=5 exercises=mailbox,atomics,rma,locks,collectives,waits,sort,alltoall
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 seconds=60 memory=2.5k
+exercise atomics cases=71 contexts=default,private,serialized slots=16 operations=64 claims=16 seconds=60 memory=704
+exercise rma halo=8..1m cases=198 kinds=29 flags=atomic_add,signal_add,signal_set puts=putmem,putmem_nbi,uint64_put,putmem_signal,putmem_signal_nbi seconds=60 memory=1.2m
+exercise locks locks=8 acquisitions=4 seconds=60 memory=336
+exercise collectives typed=319 timed=87 sizes=8..128k teams=world,even seconds=60 memory=2.1m
+exercise waits types=12 forms=14 comparisons=6 words=4 cases=168 seconds=60 memory=64
+exercise sort mode=rounds exchange=fetch-add ptr=yes keys=524288 asked=4194304 capacity=593920 local_sort=lsd-scratch private=9.2m seconds=60 memory=9.1m
+exercise alltoall teams=world,even blocks=8,64,512,4096,65536 variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput seconds=60 memory=2562k
+mix teams=4 period=10 world_every=4
+mix period=0 mix0=mailbox mix1=atomics mix2=rma mix3=locks
+mix0 mailbox node_mate_us median=65.2 p99=65.2
+mix1 atomics local_per_s=155100 remote_per_s=150328
+mix0 mailbox t=0.0 round=1 messages=4 messages_per_s=60529 mib_per_s=9.9 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mix1 atomics t=0.0 round=1 updates=128 updates_per_s=313949 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mix2 rma t=0.0 round=1 transfers=4 transfers_per_s=4639 mib_per_s=0.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix3 locks longest_wait_us=124.5
+mix3 locks t=0.0 round=1 acquisitions=8 acquisitions_per_s=7083 wait_s=0.000 held_s=0.001 step_s=0.001 failures=0
+mix0 mailbox node_mate_us median=60.7 p99=2247.6
+mix0 mailbox t=0.0 round=9 messages=36 messages_per_s=6753 mib_per_s=0.9 send_s=0.003 wait_s=0.002 check_s=0.000 step_s=0.005 failures=0
+mix1 atomics local_per_s=70990 remote_per_s=75866
+mix1 atomics t=0.0 round=9 updates=1152 updates_per_s=160127 issue_s=0.000 sync_s=0.006 check_s=0.000 step_s=0.006 failures=0
+mix2 rma t=0.0 round=9 transfers=36 transfers_per_s=3183 mib_per_s=256.5 halo_s=0.006 transfer_s=0.001 ptr_s=0.000 check_s=0.002 step_s=0.010 failures=0
+mix3 locks longest_wait_us=4325.6
+mix3 locks t=0.0 round=9 acquisitions=72 acquisitions_per_s=4311 wait_s=0.007 held_s=0.014 step_s=0.015 failures=0
+mix0 mailbox node_mate_us median=54.8 p99=5443.7
+mix0 mailbox t=0.0 round=73 messages=292 messages_per_s=10176 mib_per_s=1.3 send_s=0.019 wait_s=0.016 check_s=0.001 step_s=0.025 failures=0
+mix3 locks longest_wait_us=4055.4
+mix3 locks t=0.1 round=73 acquisitions=584 acquisitions_per_s=8041 wait_s=0.030 held_s=0.044 step_s=0.064 failures=0
+mix2 rma t=0.1 round=73 transfers=292 transfers_per_s=3643 mib_per_s=329.9 halo_s=0.024 transfer_s=0.008 ptr_s=0.000 check_s=0.017 step_s=0.070 failures=0
+mix0 mailbox node_mate_us median=65.0 p99=2354.5
+mix0 mailbox t=0.1 round=585 messages=2340 messages_per_s=20262 mib_per_s=2.6 send_s=0.077 wait_s=0.030 check_s=0.002 step_s=0.101 failures=0
+mix1 atomics local_per_s=16470 remote_per_s=16191
+mix1 atomics t=0.2 round=73 updates=6760 updates_per_s=32713 issue_s=0.103 sync_s=0.032 check_s=0.031 step_s=0.171 failures=0
+mix3 locks longest_wait_us=6684.9
+mix3 locks t=0.5 round=585 acquisitions=4680 acquisitions_per_s=8810 wait_s=0.155 held_s=0.314 step_s=0.465 failures=0
+mix2 rma t=0.7 round=585 transfers=2340 transfers_per_s=3478 mib_per_s=319.6 halo_s=0.169 transfer_s=0.103 ptr_s=0.000 check_s=0.137 step_s=0.589 failures=0
+mix0 mailbox node_mate_us median=67.4 p99=2480.5
+mix0 mailbox t=0.9 round=4681 messages=18724 messages_per_s=21605 mib_per_s=2.8 send_s=0.580 wait_s=0.172 check_s=0.010 step_s=0.758 failures=0
+mix1 atomics local_per_s=24616 remote_per_s=24931
+mix1 atomics t=1.1 round=585 updates=54250 updates_per_s=49566 issue_s=0.587 sync_s=0.183 check_s=0.151 step_s=0.958 failures=0
+mix3 locks longest_wait_us=7336.7
+mix3 locks t=4.3 round=4681 acquisitions=37448 acquisitions_per_s=8848 wait_s=1.312 held_s=2.390 step_s=3.703 failures=0
+mix1 atomics local_per_s=30458 remote_per_s=30415
+mix1 atomics t=5.2 round=3256 updates=298706 updates_per_s=60877 issue_s=2.602 sync_s=0.605 check_s=0.658 step_s=4.016 failures=0
+mix2 rma t=5.2 round=4681 transfers=18724 transfers_per_s=3613 mib_per_s=332.5 halo_s=1.462 transfer_s=0.707 ptr_s=0.000 check_s=1.057 step_s=4.535 failures=0
+mix0 mailbox node_mate_us median=58.9 p99=1372.0
+mix0 mailbox t=5.3 round=31687 messages=126748 messages_per_s=24714 mib_per_s=3.2 send_s=3.382 wait_s=0.959 check_s=0.067 step_s=4.371 failures=0
+mix3 locks longest_wait_us=8586.5
+mix3 locks t=8.7 round=10210 acquisitions=81680 acquisitions_per_s=9899 wait_s=1.618 held_s=2.849 step_s=4.468 failures=0
+mix1 atomics local_per_s=32883 remote_per_s=32753
+mix1 atomics t=9.0 round=5987 updates=549844 updates_per_s=65642 issue_s=2.426 sync_s=0.621 check_s=0.615 step_s=3.826 failures=0
+mix1 summary atomics rounds=5987 updates=549844 seconds=9.0 updates_per_s=61245 failures=0
+mix0 mailbox node_mate_us median=55.4 p99=903.9
+mix0 mailbox t=10.0 round=62579 messages=250316 messages_per_s=26352 mib_per_s=3.4 send_s=3.668 wait_s=0.989 check_s=0.078 step_s=4.689 failures=0
+mix2 rma t=10.2 round=9197 transfers=36788 transfers_per_s=3635 mib_per_s=334.6 halo_s=1.597 transfer_s=0.821 ptr_s=0.000 check_s=1.164 step_s=4.970 failures=0
+mix0 mailbox node_mate_us median=63.6 p99=1807.4
+mix0 mailbox t=10.4 round=65653 messages=262612 messages_per_s=26442 mib_per_s=3.4 send_s=0.380 wait_s=0.088 check_s=0.010 step_s=0.465 failures=0
+mix0 summary mailbox rounds=65653 messages=262612 seconds=10.4 messages_per_s=25216 mib_per_s=3.3 failures=0
+mix2 rma t=11.9 round=11092 transfers=44368 transfers_per_s=4473 mib_per_s=411.9 halo_s=0.483 transfer_s=0.303 ptr_s=0.000 check_s=0.419 step_s=1.695 failures=0
+mix2 summary rma rounds=11092 transfers=44368 seconds=11.9 transfers_per_s=3738 mib_per_s=344.0 failures=0
+mix3 locks longest_wait_us=10162.4
+mix3 locks t=13.8 round=16396 acquisitions=131168 acquisitions_per_s=9819 wait_s=1.573 held_s=3.465 step_s=5.040 failures=0
+mix3 locks longest_wait_us=821.0
+mix3 locks t=14.7 round=17657 acquisitions=141256 acquisitions_per_s=10870 wait_s=0.260 held_s=0.675 step_s=0.928 failures=0
+mix3 summary locks rounds=17657 acquisitions=141256 seconds=14.7 acquisitions_per_s=9620 failures=0
+mix period=1 mix0=atomics mix1=rma mix2=locks mix3=collectives
+mix0 atomics local_per_s=140777 remote_per_s=180999
+mix0 atomics t=0.0 round=1 updates=128 updates_per_s=668114 issue_s=0.000 sync_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mix2 locks longest_wait_us=89.9
+mix1 rma t=0.0 round=1 transfers=4 transfers_per_s=4456 mib_per_s=0.6 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix2 locks t=0.0 round=1 acquisitions=8 acquisitions_per_s=10981 wait_s=0.000 held_s=0.001 step_s=0.001 failures=0
+mix3 collectives t=0.0 round=1 calls=15 calls_per_s=14685 mib_per_s=0.1 typed_s=0.000 timed_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix0 atomics local_per_s=243050 remote_per_s=252733
+mix0 atomics t=0.0 round=9 updates=1152 updates_per_s=581514 issue_s=0.000 sync_s=0.001 check_s=0.000 step_s=0.002 failures=0
+mix1 rma t=0.0 round=9 transfers=36 transfers_per_s=3949 mib_per_s=318.1 halo_s=0.003 transfer_s=0.001 ptr_s=0.000 check_s=0.002 step_s=0.008 failures=0
+mix2 locks longest_wait_us=2618.4
+mix2 locks t=0.0 round=9 acquisitions=72 acquisitions_per_s=7105 wait_s=0.004 held_s=0.006 step_s=0.009 failures=0
+mix3 collectives t=0.0 round=9 calls=131 calls_per_s=8309 mib_per_s=0.3 typed_s=0.002 timed_s=0.008 check_s=0.000 step_s=0.014 failures=0
+mix2 locks longest_wait_us=2068.3
+mix2 locks t=0.1 round=73 acquisitions=584 acquisitions_per_s=8282 wait_s=0.018 held_s=0.044 step_s=0.062 failures=0
+mix1 rma t=0.1 round=73 transfers=292 transfers_per_s=3968 mib_per_s=359.3 halo_s=0.022 transfer_s=0.006 ptr_s=0.000 check_s=0.016 step_s=0.065 failures=0
+mix3 collectives t=0.1 round=73 calls=779 calls_per_s=8444 mib_per_s=65.1 typed_s=0.016 timed_s=0.018 check_s=0.024 step_s=0.077 failures=0
+mix0 atomics local_per_s=20638 remote_per_s=20557
+mix0 atomics t=0.1 round=73 updates=6789 updates_per_s=41331 issue_s=0.092 sync_s=0.022 check_s=0.023 step_s=0.136 failures=0
+mix2 locks longest_wait_us=4820.1
+mix2 locks t=0.5 round=585 acquisitions=4680 acquisitions_per_s=9538 wait_s=0.150 held_s=0.286 step_s=0.429 failures=0
+mix3 collectives t=0.6 round=585 calls=5828 calls_per_s=9398 mib_per_s=54.0 typed_s=0.134 timed_s=0.144 check_s=0.146 step_s=0.537 failures=0
+mix1 rma t=0.6 round=585 transfers=2340 transfers_per_s=3652 mib_per_s=335.6 halo_s=0.163 transfer_s=0.093 ptr_s=0.000 check_s=0.133 step_s=0.561 failures=0
+mix0 atomics local_per_s=29358 remote_per_s=29254
+mix0 atomics t=0.9 round=585 updates=54293 updates_per_s=58633 issue_s=0.484 sync_s=0.161 check_s=0.115 step_s=0.810 failures=0
+mix2 locks longest_wait_us=6125.7
+mix2 locks t=3.2 round=4681 acquisitions=37448 acquisitions_per_s=12255 wait_s=0.962 held_s=1.723 step_s=2.674 failures=0
+mix3 collectives t=4.7 round=4681 calls=46150 calls_per_s=10021 mib_per_s=58.6 typed_s=1.027 timed_s=1.101 check_s=1.219 step_s=4.024 failures=0
+mix0 atomics local_per_s=33698 remote_per_s=33626
+mix0 atomics t=4.7 round=3340 updates=306472 updates_per_s=67329 issue_s=2.253 sync_s=0.729 check_s=0.570 step_s=3.745 failures=0
+mix0 summary atomics rounds=3340 updates=306472 seconds=4.7 updates_per_s=65290 failures=0
+mix1 rma t=5.1 round=4681 transfers=18724 transfers_per_s=3670 mib_per_s=337.8 halo_s=1.372 transfer_s=0.614 ptr_s=0.000 check_s=1.118 step_s=4.464 failures=0
+mix3 collectives t=7.6 round=7538 calls=74281 calls_per_s=9592 mib_per_s=56.1 typed_s=0.782 timed_s=0.772 check_s=0.798 step_s=2.933 failures=0
+mix3 summary collectives rounds=7538 calls=74281 seconds=7.6 calls_per_s=9793 mib_per_s=57.3 failures=0
+mix2 locks longest_wait_us=6386.9
+mix2 locks t=8.0 round=10859 acquisitions=86872 acquisitions_per_s=10344 wait_s=1.599 held_s=3.244 step_s=4.778 failures=0
+mix2 summary locks rounds=10859 acquisitions=86872 seconds=8.0 acquisitions_per_s=10924 failures=0
+mix1 rma t=9.1 round=9233 transfers=36932 transfers_per_s=4505 mib_per_s=415.2 halo_s=1.151 transfer_s=0.630 ptr_s=0.000 check_s=1.014 step_s=4.041 failures=0
+mix1 summary rma rounds=9233 transfers=36932 seconds=9.1 transfers_per_s=4041 mib_per_s=372.0 failures=0
+mix period=2 mix0=rma mix1=locks mix2=collectives mix3=waits
+mix3 waits t=0.0 round=1 words=8 words_per_s=23423 write_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mix0 rma t=0.0 round=1 transfers=4 transfers_per_s=4004 mib_per_s=0.5 halo_s=0.000 transfer_s=0.000 ptr_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix1 locks longest_wait_us=120.0
+mix2 collectives t=0.0 round=1 calls=15 calls_per_s=14781 mib_per_s=0.2 typed_s=0.000 timed_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix1 locks t=0.0 round=1 acquisitions=8 acquisitions_per_s=6420 wait_s=0.000 held_s=0.001 step_s=0.001 failures=0
+mix3 waits t=0.0 round=9 words=72 words_per_s=39739 write_s=0.001 wait_s=0.000 check_s=0.000 step_s=0.002 failures=0
+mix0 rma t=0.0 round=9 transfers=36 transfers_per_s=3943 mib_per_s=317.7 halo_s=0.003 transfer_s=0.001 ptr_s=0.000 check_s=0.002 step_s=0.008 failures=0
+mix2 collectives t=0.0 round=9 calls=131 calls_per_s=12479 mib_per_s=0.4 typed_s=0.001 timed_s=0.005 check_s=0.000 step_s=0.009 failures=0
+mix1 locks longest_wait_us=891.8
+mix1 locks t=0.0 round=9 acquisitions=72 acquisitions_per_s=6630 wait_s=0.003 held_s=0.006 step_s=0.010 failures=0
+mix3 waits t=0.0 round=73 words=584 words_per_s=42095 write_s=0.009 wait_s=0.001 check_s=0.000 step_s=0.012 failures=0
+mix0 rma t=0.1 round=73 transfers=292 transfers_per_s=3064 mib_per_s=277.5 halo_s=0.025 transfer_s=0.010 ptr_s=0.000 check_s=0.020 step_s=0.084 failures=0
+mix1 locks longest_wait_us=4681.3
+mix1 locks t=0.1 round=73 acquisitions=584 acquisitions_per_s=5374 wait_s=0.039 held_s=0.057 step_s=0.095 failures=0
+mix2 collectives t=0.1 round=73 calls=779 calls_per_s=6656 mib_per_s=51.3 typed_s=0.024 timed_s=0.023 check_s=0.027 step_s=0.097 failures=0
+mix3 waits t=0.2 round=585 words=4680 words_per_s=26219 write_s=0.106 wait_s=0.038 check_s=0.000 step_s=0.156 failures=0
+mix1 locks longest_wait_us=4970.4
+mix1 locks t=0.5 round=585 acquisitions=4680 acquisitions_per_s=10144 wait_s=0.155 held_s=0.261 step_s=0.404 failures=0
+mix0 rma t=0.7 round=585 transfers=2340 transfers_per_s=3499 mib_per_s=321.5 halo_s=0.178 transfer_s=0.092 ptr_s=0.000 check_s=0.130 step_s=0.585 failures=0
+mix2 collectives t=0.7 round=585 calls=5828 calls_per_s=8030 mib_per_s=46.2 typed_s=0.167 timed_s=0.150 check_s=0.155 step_s=0.629 failures=0
+mix3 waits t=1.1 round=4681 words=37448 words_per_s=35787 write_s=0.634 wait_s=0.176 check_s=0.000 step_s=0.916 failures=0
+mix1 locks longest_wait_us=6766.7
+mix1 locks t=4.1 round=4681 acquisitions=37448 acquisitions_per_s=9009 wait_s=1.203 held_s=2.433 step_s=3.637 failures=0
+mix0 rma t=5.3 round=4681 transfers=18724 transfers_per_s=3560 mib_per_s=327.7 halo_s=1.410 transfer_s=0.725 ptr_s=0.000 check_s=1.093 step_s=4.602 failures=0
+mix3 waits t=6.2 round=27047 words=216376 words_per_s=35082 write_s=3.333 wait_s=1.129 check_s=0.002 step_s=5.100 failures=0
+mix2 collectives t=6.3 round=4656 calls=45912 calls_per_s=7262 mib_per_s=42.6 typed_s=1.520 timed_s=1.356 check_s=1.303 step_s=5.520 failures=0
+mix2 collectives t=6.4 round=4754 calls=46873 calls_per_s=6858 mib_per_s=35.8 typed_s=0.045 timed_s=0.037 check_s=0.027 step_s=0.140 failures=0
+mix2 summary collectives rounds=4754 calls=46873 seconds=6.4 calls_per_s=7328 mib_per_s=42.9 failures=0
+mix3 waits t=7.9 round=34821 words=278568 words_per_s=37095 write_s=1.119 wait_s=0.341 check_s=0.001 step_s=1.677 failures=0
+mix3 summary waits rounds=34821 words=278568 seconds=7.9 words_per_s=35428 failures=0
+mix1 locks longest_wait_us=7786.1
+mix1 locks t=9.5 round=10311 acquisitions=82488 acquisitions_per_s=8424 wait_s=1.792 held_s=3.663 step_s=5.347 failures=0
+mix0 rma t=9.5 round=9131 transfers=36524 transfers_per_s=4179 mib_per_s=384.8 halo_s=1.247 transfer_s=0.689 ptr_s=0.000 check_s=1.062 step_s=4.260 failures=0
+mix0 rma t=11.8 round=11794 transfers=47176 transfers_per_s=4805 mib_per_s=442.1 halo_s=0.628 transfer_s=0.362 ptr_s=0.000 check_s=0.584 step_s=2.217 failures=0
+mix0 summary rma rounds=11794 transfers=47176 seconds=11.8 transfers_per_s=4013 mib_per_s=369.3 failures=0
+mix1 locks longest_wait_us=4255.8
+mix1 locks t=13.2 round=14548 acquisitions=116384 acquisitions_per_s=9154 wait_s=1.157 held_s=2.544 step_s=3.703 failures=0
+mix1 summary locks rounds=14548 acquisitions=116384 seconds=13.2 acquisitions_per_s=8819 failures=0
+mix period=3 world=sort
+world sort t=0.0 round=1 keys=4194304 keys_per_s=109316357 mib_per_s=834.0 imbalance=1.002 generate_s=0.001 bin_s=0.006 exchange_s=0.017 sort_s=0.018 check_s=0.010 sync_s=0.000 step_s=0.038 failures=0
+world library nodes=4 bytes_sent=13086627176 gets_nonblocking=441744 landing_full=0 reserve_stalls=63286 wakes_sent=1570570 barrier_ns=104120617021
+world sort t=0.3 round=9 keys=37748736 keys_per_s=155122128 mib_per_s=1183.5 imbalance=1.000 generate_s=0.020 bin_s=0.033 exchange_s=0.088 sort_s=0.117 check_s=0.022 sync_s=0.000 step_s=0.216 failures=0
+world library nodes=4 bytes_sent=201518560 gets_nonblocking=0 landing_full=0 reserve_stalls=618 wakes_sent=743 barrier_ns=309232542
+world sort t=2.0 round=73 keys=306184192 keys_per_s=150300594 mib_per_s=1146.7 imbalance=1.000 generate_s=0.121 bin_s=0.202 exchange_s=0.730 sort_s=0.988 check_s=0.135 sync_s=0.000 step_s=1.786 failures=0
+world library nodes=4 bytes_sent=1611990056 gets_nonblocking=0 landing_full=0 reserve_stalls=4864 wakes_sent=5765 barrier_ns=2576623382
+world sort t=7.3 round=252 keys=1056964608 keys_per_s=143355105 mib_per_s=1093.7 imbalance=1.000 generate_s=0.269 bin_s=0.423 exchange_s=2.097 sort_s=2.800 check_s=0.353 sync_s=0.000 step_s=5.237 failures=0
+world library nodes=4 bytes_sent=4508601872 gets_nonblocking=0 landing_full=0 reserve_stalls=13597 wakes_sent=16189 barrier_ns=8076909345
+world sort t=10.1 round=345 keys=1447034880 keys_per_s=137516269 mib_per_s=1049.2 imbalance=1.000 generate_s=0.147 bin_s=0.248 exchange_s=1.169 sort_s=1.571 check_s=0.171 sync_s=0.000 step_s=2.837 failures=0
+world library nodes=4 bytes_sent=2342429264 gets_nonblocking=0 landing_full=0 reserve_stalls=7031 wakes_sent=8420 barrier_ns=4110101937
+world summary sort rounds=345 keys=1447034880 seconds=10.1 keys_per_s=143066586 mib_per_s=1091.5 imbalance=1.000 failures=0
+mix period=4 mix0=locks mix1=collectives mix2=waits mix3=mailbox
+mix3 mailbox node_mate_us median=114.0 p99=114.0
+mix2 waits t=0.0 round=1 words=8 words_per_s=54951 write_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mix3 mailbox t=0.0 round=1 messages=4 messages_per_s=33391 mib_per_s=5.2 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+mix3 mailbox node_mate_us median=58.1 p99=76.8
+mix3 mailbox t=0.0 round=9 messages=36 messages_per_s=50427 mib_per_s=6.6 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix0 locks longest_wait_us=553.2
+mix1 collectives t=0.0 round=1 calls=15 calls_per_s=13647 mib_per_s=0.1 typed_s=0.000 timed_s=0.000 check_s=0.000 step_s=0.001 failures=0
+mix0 locks t=0.0 round=1 acquisitions=8 acquisitions_per_s=7596 wait_s=0.001 held_s=0.001 step_s=0.001 failures=0
+mix2 waits t=0.0 round=9 words=72 words_per_s=23119 write_s=0.002 wait_s=0.000 check_s=0.000 step_s=0.003 failures=0
+mix1 collectives t=0.0 round=9 calls=131 calls_per_s=23850 mib_per_s=0.8 typed_s=0.001 timed_s=0.002 check_s=0.000 step_s=0.005 failures=0
+mix0 locks longest_wait_us=807.9
+mix0 locks t=0.0 round=9 acquisitions=72 acquisitions_per_s=12702 wait_s=0.002 held_s=0.003 step_s=0.005 failures=0
+mix3 mailbox node_mate_us median=67.2 p99=3361.7
+mix3 mailbox t=0.0 round=73 messages=292 messages_per_s=21498 mib_per_s=2.7 send_s=0.010 wait_s=0.006 check_s=0.000 step_s=0.012 failures=0
+mix2 waits t=0.0 round=73 words=584 words_per_s=28486 write_s=0.013 wait_s=0.003 check_s=0.000 step_s=0.018 failures=0
+mix1 collectives t=0.1 round=73 calls=779 calls_per_s=9850 mib_per_s=76.0 typed_s=0.015 timed_s=0.018 check_s=0.026 step_s=0.066 failures=0
+mix0 locks longest_wait_us=3273.3
+mix0 locks t=0.1 round=73 acquisitions=584 acquisitions_per_s=7488 wait_s=0.025 held_s=0.043 step_s=0.068 failures=0
+mix3 mailbox node_mate_us median=58.4 p99=1479.8
+mix3 mailbox t=0.1 round=585 messages=2340 messages_per_s=25852 mib_per_s=3.4 send_s=0.068 wait_s=0.024 check_s=0.001 step_s=0.079 failures=0
+mix2 waits t=0.1 round=585 words=4680 words_per_s=51132 write_s=0.062 wait_s=0.002 check_s=0.000 step_s=0.080 failures=0
+mix0 locks longest_wait_us=6061.6
+mix0 locks t=0.5 round=585 acquisitions=4680 acquisitions_per_s=8986 wait_s=0.167 held_s=0.308 step_s=0.456 failures=0
+mix1 collectives t=0.6 round=585 calls=5828 calls_per_s=9790 mib_per_s=56.3 typed_s=0.136 timed_s=0.141 check_s=0.145 step_s=0.516 failures=0
+mix3 mailbox node_mate_us median=55.4 p99=894.3
+mix3 mailbox t=0.7 round=4681 messages=18724 messages_per_s=26611 mib_per_s=3.5 send_s=0.488 wait_s=0.129 check_s=0.012 step_s=0.616 failures=0
+mix2 waits t=0.9 round=4681 words=37448 words_per_s=41318 write_s=0.556 wait_s=0.106 check_s=0.000 step_s=0.793 failures=0
+mix0 locks longest_wait_us=7647.3
+mix0 locks t=4.2 round=4681 acquisitions=37448 acquisitions_per_s=8860 wait_s=1.349 held_s=2.384 step_s=3.698 failures=0
+mix1 collectives t=4.6 round=4681 calls=46150 calls_per_s=10078 mib_per_s=59.0 typed_s=1.095 timed_s=1.011 check_s=1.182 step_s=4.001 failures=0
+mix3 mailbox node_mate_us median=56.0 p99=813.1
+mix3 mailbox t=5.9 round=37449 messages=149796 messages_per_s=25394 mib_per_s=3.3 send_s=4.106 wait_s=0.981 check_s=0.097 step_s=5.161 failures=0
+mix2 waits t=6.8 round=30504 words=244032 words_per_s=34718 write_s=4.251 wait_s=1.077 check_s=0.002 step_s=5.950 failures=0
+mix0 locks longest_wait_us=7333.2
+mix0 locks t=9.3 round=10218 acquisitions=81744 acquisitions_per_s=8673 wait_s=1.846 held_s=3.259 step_s=5.107 failures=0
+mix2 waits t=9.4 round=39770 words=318160 words_per_s=29423 write_s=1.838 wait_s=0.548 check_s=0.001 step_s=2.519 failures=0
+mix2 summary waits rounds=39770 words=318160 seconds=9.4 words_per_s=33978 failures=0
+mix1 collectives t=9.8 round=9799 calls=96541 calls_per_s=9701 mib_per_s=56.7 typed_s=1.337 timed_s=1.293 check_s=1.500 step_s=5.194 failures=0
+mix3 mailbox node_mate_us median=60.4 p99=2120.0
+mix3 mailbox t=10.9 round=69191 messages=276764 messages_per_s=25434 mib_per_s=3.3 send_s=4.009 wait_s=0.944 check_s=0.094 step_s=4.992 failures=0
+mix1 collectives t=12.6 round=12720 calls=125310 calls_per_s=10354 mib_per_s=59.8 typed_s=0.779 timed_s=0.675 check_s=0.766 step_s=2.779 failures=0
+mix1 summary collectives rounds=12720 calls=125310 seconds=12.6 calls_per_s=9976 mib_per_s=58.2 failures=0
+mix3 mailbox node_mate_us median=68.2 p99=763.8
+mix3 mailbox t=12.9 round=84554 messages=338216 messages_per_s=30065 mib_per_s=3.9 send_s=1.716 wait_s=0.312 check_s=0.050 step_s=2.044 failures=0
+mix3 summary mailbox rounds=84554 messages=338216 seconds=12.9 messages_per_s=26208 mib_per_s=3.4 failures=0
+mix0 locks longest_wait_us=5969.6
+mix0 locks t=13.5 round=14836 acquisitions=118688 acquisitions_per_s=8975 wait_s=1.372 held_s=2.742 step_s=4.116 failures=0
+mix0 summary locks rounds=14836 acquisitions=118688 seconds=13.5 acquisitions_per_s=8823 failures=0
+osoe-pacer failures=0 seconds=60.6

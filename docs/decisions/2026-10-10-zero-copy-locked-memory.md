@@ -210,6 +210,25 @@ taken.
   job of two logical nodes under `ulimit -l 0` was refused at start-up, naming
   the limit, as before.
 
+- **The integration branch's full verification** (the development VM, the
+  branch at `4df0047` - the blocking gets, the zero-copy refusal and
+  `shmem.helper-wake`, each with its read's fixes - 2026-10-10 20:26 to 22:42;
+  `docs/design/evidence/v0.2-step4/2026-10-10-integration/`): the static checks
+  13 of 13; debug and release 867 of 867 at no helpers, two and three, the
+  release build with the timing pins on; AddressSanitizer 852 of 852 at each,
+  `shmem.helper-wake` and the two refused zero-copy tests among them, none
+  skipped in any preset; ThreadSanitizer 606 of 606 at no helpers -
+  `shmem.multiple.0-1`'s gets of three pieces from four threads at once among
+  them - and at two and three helpers 15 and 13 failures, every one the tool's
+  reports of landings through another process (`tsan-gate.py`, run by hand
+  after the script's path to it failed): `shmem.multiple.0-1` new among them,
+  its 20 KiB gets giving the helpers heap to read that the main thread zeroed,
+  ordered by a barrier through another process; tier 3 114 of 114; the models
+  40 of 40, `model.reservation` in 902 s; `osoe-pacer`'s mix, mailbox and
+  collectives a minute each and ten minutes of mix at no helpers and at two,
+  `failures=0` and no deadlock line; the single-node build, without warnings,
+  404 of 404.
+
 *Undo:* the refusal's branch in `ring.c`, the notice, the limit in the ring's
 and the start-up check's messages and in the probe, the model's cases and its
 limits, the two tests and `locked-memory.h`, and the README's, design's and

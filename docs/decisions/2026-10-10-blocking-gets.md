@@ -26,10 +26,10 @@ models first - question 4, explored in `docs/design/blocking-get-proposal.md`.
   blocking piece only into the slot its thread armed for that one token, so (a)
   needs a new kind of token and a new landing path on the lead; (b) leaves the
   lead's landing as it is. The author was told (b) was being built, and why.
-  No answer on (b) itself has come: his next word, that evening, was to finish
-  and merge the work in hand, this among it. So (b) is Claude's choice inside
-  his acceptance of the question's direction, not his - which is why the code
-  and design §4.11 cite this record for it, and not item 2.
+  No answer on (b) itself has come; later that evening the author asked for the
+  work in hand, this among it, to be finished and merged. So (b) is Claude's
+  choice inside his acceptance of the question's direction, not his - which is
+  why the code and design §4.11 cite this record for it, and not item 2.
 - **The proposal's reasons against (b)**
   (`docs/design/blocking-get-proposal.md`) do not hold as it was built. A pool
   of hidden contexts counted against `OSOE_MAX_CONTEXTS`: the blocks are past
@@ -179,7 +179,24 @@ over the rounds of put-with-signal alone. The other tests that read
 
 ## The verification
 
-*To be filled in.*
+- **The integration branch's full verification** (the development VM, the
+  branch at `4df0047` - the blocking gets, the zero-copy refusal and
+  `shmem.helper-wake`, each with its read's fixes - 2026-10-10 20:26 to 22:42;
+  `docs/design/evidence/v0.2-step4/2026-10-10-integration/`): the static checks
+  13 of 13; debug and release 867 of 867 at no helpers, two and three, the
+  release build with the timing pins on; AddressSanitizer 852 of 852 at each,
+  `shmem.helper-wake` and the two refused zero-copy tests among them, none
+  skipped in any preset; ThreadSanitizer 606 of 606 at no helpers -
+  `shmem.multiple.0-1`'s gets of three pieces from four threads at once among
+  them - and at two and three helpers 15 and 13 failures, every one the tool's
+  reports of landings through another process (`tsan-gate.py`, run by hand
+  after the script's path to it failed): `shmem.multiple.0-1` new among them,
+  its 20 KiB gets giving the helpers heap to read that the main thread zeroed,
+  ordered by a barrier through another process; tier 3 114 of 114; the models
+  40 of 40, `model.reservation` in 902 s; `osoe-pacer`'s mix, mailbox and
+  collectives a minute each and ten minutes of mix at no helpers and at two,
+  `failures=0` and no deadlock line; the single-node build, without warnings,
+  404 of 404.
 
 *Undo:* `remote_get`'s pipelined path, the thread places' blocks (layout 36),
 `landed()`'s bound, the test, and the README's, design §4.11's and the
