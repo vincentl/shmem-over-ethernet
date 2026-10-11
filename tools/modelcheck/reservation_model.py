@@ -111,9 +111,11 @@ for the next buffer at once; the buffer it sent is LENT until every
 notification of its parts has come, and only then released and free to open.
 Its breakages, each of which must fail:
   zc_release_on_send     the buffer is released when its last send completes,
-                         as the copying send releases it: a writer, or the
-                         pre-open drain, writes into it before the kernel has
-                         read it (TORN, ONCE, ORDER or SEQ)
+                         as the copying send releases it: a writer writes into
+                         it before the kernel has read it (TORN, ONCE, ORDER or
+                         SEQ) - in the library the pre-open drain could too,
+                         which the zero-copy designs leave out (PREOPEN): the
+                         rule it would break is the writers'
   zc_first_notification  released at the first notification of a buffer sent
                          in parts: the later parts are read after the buffer
                          was reopened
@@ -133,7 +135,7 @@ send's notification is still owed (IORING_CQE_F_MORE) and comes when the kernel
 posts it - ahead of, or behind, the notifications of the buffer's earlier parts,
 which wait for the peer's acknowledgement - and the connection copies from then
 on (ring.c). `zc_refused` is the zero-copy send with any send by reference
-refusable, once a connection:
+refusable, once a connection, BOTH LENT checked as in `zero_copy`:
   zc_refused_owes_none   the refusal not counted owed: its notification then
                          takes the place of an earlier part's, and the buffer
                          is released and written again while the kernel still
@@ -655,7 +657,8 @@ def progress(design, total, cap, replies):
             both = 'BOTH LENT: a connection lent both its buffers to the kernel'
             B += [('Y4', ('set', 'st0', lambda L: LENT if L['st0'] == SENDING else L['st0'], '@Y5')),
                   ('Y5', ('set', 'st1', lambda L: LENT if L['st1'] == SENDING else L['st1'],
-                          '@Y6' if design in ('zero_copy', 'zc_both_lent') else '@F2')),
+                          '@Y6' if design in ('zero_copy', 'zc_both_lent') + REFUSALS
+                          else '@F2')),
                   ('Y6', ('check', lambda M, L, m=both: m if (L['st0'] == LENT and
                                                               L['st1'] == LENT) else None,
                           '@F2'))]
@@ -841,7 +844,7 @@ CASES = [
     ('zero_copy', 2, 1, 2, 0, False, True),
     ('zero_copy', 2, 2, 1, 0, False, True),
     ('zero_copy', 2, 2, 2, 0, False, True),
-    ('zero_copy', 1, 2, 2, 1, False, True),   # beside the pre-open drain's reply
+    ('zero_copy', 1, 2, 2, 1, False, True),   # beside a reply, by the opportunistic drain
     ('zero_copy', 2, 1, 2, 1, False, True),
     ('zero_copy', 2, 2, 2, 0, True, True),    # x86-TSO
     ('zc_release_on_send', 2, 2, 1, 0, False, False),
@@ -852,7 +855,7 @@ CASES = [
     ('zc_refused', 1, 2, 2, 0, False, True),
     ('zc_refused', 2, 1, 2, 0, False, True),
     ('zc_refused', 2, 2, 2, 0, False, True),
-    ('zc_refused', 1, 2, 2, 1, False, True),  # beside the pre-open drain's reply
+    ('zc_refused', 1, 2, 2, 1, False, True),  # beside a reply, by the opportunistic drain
     ('zc_refused', 2, 2, 2, 0, True, True),   # x86-TSO
     ('zc_refused_owes_none', 2, 2, 2, 0, False, False),
 
@@ -898,8 +901,13 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         zc = design in ZERO_COPY
-        res = explore(name, threads, mem0, tso=tso, max_seconds=600 if zc else 240,
-                      liveness_max_states=6_000_000 if zc else 400_000)
+        # The zero-copy cases are the large ones: two of two under x86-TSO
+        # is 22.5 million states, 506 s on the Mac against the 600 it had, and
+        # two of two refusable is 6.2 million with BOTH LENT checked, past the
+        # 6 million under which the engine checks liveness (the second
+        # adversarial read of the refusal, finding 3 and N2).
+        res = explore(name, threads, mem0, tso=tso, max_seconds=1500 if zc else 240,
+                      liveness_max_states=7_000_000 if zc else 400_000)
         ok &= report(res, expect_ok=expect, tso=tso)
     for variant, writers, sizes, cap, least, replies, tso, expect in FILL_CASES:
         name, threads, mem0 = fill_case(variant, writers, sizes, cap, least, replies)

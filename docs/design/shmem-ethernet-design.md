@@ -447,9 +447,10 @@ logical nodes on one machine passed the default 8 MiB (the review of v0.2 step
 4's merge point, portability P1). The same bytes then go again by copy, in the
 same pass, and the wire lends no more for the rest of the job; the refused
 send's notification is still owed, and counted. Each process says so once,
-naming its limit. `reservation_model.py`'s `zc_refused` cases hold it, with the
-refused send's notification coming before or after those of the buffer's
-earlier parts, and a refusal not counted owed fails. On Linux 6.14 and later
+naming its limit. `reservation_model.py`'s `zc_refused` cases hold it, BOTH
+LENT among what they check, with the refused send's notification coming before
+or after those of the buffer's earlier parts, and a refusal not counted owed
+fails. On Linux 6.14 and later
 io_uring charges its rings to the same count too, so a ring's creation past the
 limit fails `-ENOMEM`, which the library's message and the probe now name.
 

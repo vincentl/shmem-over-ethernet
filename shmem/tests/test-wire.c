@@ -222,7 +222,15 @@ static void stream_lent(struct osoe_ring *ring, struct osoe_wire *tx, struct oso
                 k ^= 1;
             }
         }
+        uint64_t refused = ring->counts.zero_copy_refused;
         osoe_ring_reap(ring);
+        /* A refused send leaves its wire free of it at once - not sending, no
+         * result - so that the pass that reaped it offers the bytes again; a
+         * wire left in flight would be collected there and its bytes wait for
+         * a later pass, which an idle owner sleeps up to OSOE_SWEEP_NS before
+         * (ring.c; the second adversarial read of the change, finding 4). */
+        if (ring->counts.zero_copy_refused != refused)
+            CHECK(!tx->sending && tx->sent == -1);
         moved |= drain(rx, &got);
         if (!moved) {
             osoe_ring_wait(ring, UINT64_C(1000000));

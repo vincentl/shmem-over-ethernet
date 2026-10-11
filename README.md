@@ -1030,7 +1030,11 @@ specification or takes a choice the specification leaves open.
   holds two sockets for every other node - its control wire and its data wire -
   and a descriptor for every other PE of its node, beside the program's own, so
   the hard limit on open files (`ulimit -Hn`) must leave room for them;
-  `shmem_init` raises the soft limit to it.
+  `shmem_init` raises the soft limit to it. On Linux 6.14 and later io_uring
+  also charges a node's rings to its user's locked memory, every process of the
+  user on the host together, against each one's `ulimit -l` (8 MiB by
+  default), zero copy or not: a ring the limit refuses ends the job at
+  start-up, naming it.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
   statics.

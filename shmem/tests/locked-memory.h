@@ -14,7 +14,14 @@
  *
  * Except where the process may lock memory whatever its limit: one with
  * CAP_IPC_LOCK, root's, which io_uring does not charge at all. A page that locks
- * with the limit at nothing says so, and the test skips.
+ * with the limit at nothing says so, and the test skips. The page is locked by
+ * the system call itself: AddressSanitizer's and ThreadSanitizer's runtimes
+ * take mlock() and return 0 without locking anything, which made every process
+ * of theirs look like one with the capability, and both tests skip in both
+ * presets (the second adversarial read of the change, finding 1). The kernel
+ * asks the capability of the initial user namespace for both, as io_uring
+ * does; a process's own CapEff, which a rootless container's root has, would
+ * not say what io_uring will charge.
  */
 #ifndef OSOE_TEST_LOCKED_MEMORY_H
 #define OSOE_TEST_LOCKED_MEMORY_H
@@ -22,6 +29,7 @@
 #include <stdbool.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #include "check.h"
@@ -37,9 +45,9 @@ static inline bool osoe_test_no_locked_memory(void)
     long page = sysconf(_SC_PAGESIZE);
     void *p = mmap(NULL, (size_t)page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     CHECK_FATAL(p != MAP_FAILED);
-    bool locked = mlock(p, (size_t)page) == 0;
+    bool locked = syscall(SYS_mlock, p, (size_t)page) == 0;
     if (locked)
-        munlock(p, (size_t)page);
+        syscall(SYS_munlock, p, (size_t)page);
     munmap(p, (size_t)page);
     return !locked;
 }

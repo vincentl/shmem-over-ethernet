@@ -280,6 +280,13 @@ rated them (round six's readiness Q5-5).
   - the mesh's accept loop rebuilding its notice of the missing nodes before
     every accept, O(n²) on the highest lead, and the ring's own ceiling of 8,192
     nodes refused as an io_uring error rather than by name (scale S7);
+  - with the zero-copy send's default, Part 4 decides what its refusal for
+    want of locked memory keeps (portability P1, built 2026-10-10:
+    `docs/decisions/2026-10-10-zero-copy-locked-memory.md`): whether a
+    connection that met the limit lends again after a while, where now it
+    copies for the rest of the job; and whether `shmem_init` raises the soft
+    locked-memory limit to the hard one with zero copy on, as it does for open
+    files;
   - the backend's own threads named to the deadlock detector through
     `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
     owner's last pass shown with its age in `osoe-stat` (Q5-9);

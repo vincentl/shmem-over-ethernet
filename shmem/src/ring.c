@@ -293,6 +293,13 @@ void osoe_ring_reap(struct osoe_ring *r)
                  * a pass nothing brings (the adversarial read of this change,
                  * 3). A notification still owed (IORING_CQE_F_MORE, above) is
                  * counted as for any send, and says the bytes were copied.
+                 * Linux 6.12 and 6.14 charge the send when it is issued; 6.18
+                 * charges it as the submission prepares it, where a failure
+                 * stops the submission at that entry: the entries behind it
+                 * stay queued until the next submit, within the queue's bound
+                 * (one send and one re-arm a wire, one futex wait), and an idle
+                 * wait whose own submit stopped returns at once, with this
+                 * completion to reap (the second adversarial read, finding 2).
                  */
                 w->zero_copy = false;
                 w->sending = false;

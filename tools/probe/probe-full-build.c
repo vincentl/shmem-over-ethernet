@@ -43,7 +43,7 @@ void probe_build_info(void)
      * merge point, portability P1). */
     long long kib = osoe_locked_memory_kib();
     if (kib < 0)
-        printf("info locked-memory limit (ulimit -l): none\n");
+        printf("info locked-memory limit (ulimit -l): unlimited\n");
     else
         printf("info locked-memory limit (ulimit -l): %lld KiB\n", kib);
 }
