@@ -9,8 +9,9 @@ section's script has run end to end on the development VM's logical nodes
 (`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`, at every helper count
 the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
 `2026-10-10-fast-link-dry-run/` for the kit as its two reads left it and
-`2026-10-11-fast-link-kit-fixes/` for the kit as it is), and none yet on a
-cluster. In the development VM's Slurm, one node of four CPUs, the kit's
+`2026-10-11-fast-link-kit-fixes/` for the kit as round nine left it, and
+`2026-10-11-kit-c2-standard-8/` for the kit as it is, set for `c2-standard-8`),
+and none yet on a cluster. In the development VM's Slurm, one node of four CPUs, the kit's
 `launch`, `on` and `spawn` have run, with `facts.sh`'s `scontrol` and `sinfo`,
 `helpers.sh`'s jobs and `slurm-setup.sh`'s reading of `slurmd -C`. Never run at
 all: the rest of `slurm-setup.sh`, `build.sh`'s copying to other nodes, a job
@@ -19,7 +20,10 @@ cannot run. The kit was read adversarially twice before any node was rented
 (`docs/reviews/archive/v0.2-fast-link-kit-adversarial-read.md` and
 `v0.2-fast-link-kit-second-adversarial-read.md`) and again in round nine's
 review (`v0.2-before-part4-review.md`, its third change), and their findings
-are in what follows.
+are in what follows. Its change for `c2-standard-8` - the PE counts, the
+machine, the MTU - was checked against the brief by a Sonnet agent in place of
+a fourth read, the author's choice of 2026-10-11
+(`v0.2-fast-link-kit-c2-standard-8-check.md`).
 
 **Build the commit the run records.** Every section's `run.txt` names the
 commit (`git rev-parse HEAD` on the first node, or `KIT_COMMIT` where the tree
@@ -31,7 +35,7 @@ What Part 4 decides, and from what:
 
 | Question | Where it was left | What decides it here |
 |---|---|---|
-| Whether a node should run progress helpers by default, and how many | the progress helpers proposal's §8 item 3: no helpers by default, a count from `OSOE_PROGRESS_HELPERS` alone, until a fast link has been measured (`docs/decisions/2026-10-07.md`, items 4 to 6) | §5: the put and get streams and the mailbox at 0, 1, 2 and 4 helpers and 8 to 32 PEs a node, against the bare stream (§4) |
+| Whether a node should run progress helpers by default, and how many | the progress helpers proposal's §8 item 3: no helpers by default, a count from `OSOE_PROGRESS_HELPERS` alone, until a fast link has been measured (`docs/decisions/2026-10-07.md`, items 4 to 6) | §5: the put and get streams and the mailbox at 0, 1, 2 and 4 helpers and 4 to 16 PEs a node, against the bare stream (§4) |
 | The zero-copy send's default, and whether a connection needs a third buffer with it on | `OSOE_WIRE_ZERO_COPY`'s row: "Not timed on a fast link" | §7 |
 | The ladder's rungs on a fast link: the unsent limit and its rule, the connection buffer, the receive buffers | Part 0's ladder, measured on the Pi and the VM (`docs/decisions/2026-10-07.md`, item 12) | §6 |
 | The landing zone's size, which holds a large get | `docs/design/blocking-get-proposal.md`, (d) | §8 |
@@ -61,14 +65,14 @@ helpers' (§5).
   newer: Debian 13 (liburing 2.9), Ubuntu 25.10 (2.11) or 26.04 LTS (2.14) as
   shipped; Debian 12 (2.3) and Ubuntu 24.04 (2.5) do not configure
   (`CMakeLists.txt`'s `liburing>=2.6`).
-- Eight cores or more: the sweep runs up to 32 PEs a node, and 8 to 16 is where
+- Four cores or more: the sweep runs up to 16 PEs a node, and 4 to 8 is where
   the cores and the helpers compete.
 - The nodes on one network, as close as the provider places them.
 - Every node able to reach every other's address on every TCP port: osoe's
   (`OSOE_PORT_RANGE`, 17000 to 26999 by default), the run's own (§4: 18000 to
   18015 for `echo-uring`, 5201 for `iperf3`), Slurm's (6817 and 6818, and
   `srun`'s own ephemeral ports back to the first node) and `ssh`. A network made
-  for the run - to choose its MTU, say - starts with no rule between its
+  for the run - for the MTU chosen below - starts with no rule between its
   instances: "allow all TCP between the nodes" is the rule to give.
 - One user, with one user id, on every node, since Slurm runs tasks by user id
   (Google's OS Login gives it; accounts made on each instance from metadata
@@ -79,15 +83,20 @@ helpers' (§5).
   known. `NODES` holds Slurm's names for the nodes: the short host names
   `slurmd -C` reports, not addresses.
 
-**On Google Cloud** - the costing of 2026-10-09 (`docs/decisions/2026-10-09.md`,
-item 3): `c4-standard-16` (16 vCPUs, eight cores, up to 23 Gbit/s), the
-`debian-13` image on Hyperdisk, which the C4 series boots from, the gVNIC
-interface it requires, and a compact placement policy, at about $0.79 a
-node-hour on demand. Eight nodes for four
-sessions of four hours is about $100. The account is the author's, and so is
-every launch. Note the VPC's MTU when the network is made (1460 by default,
-up to 8896); §1's facts record it, and a change between sessions makes their
-numbers incomparable.
+**On Google Cloud** - the author's choice of 2026-10-11: eight `c2-standard-8`
+(8 vCPUs, four cores, 32 GB, Intel Cascade Lake, up to 16 Gbit/s by Google's
+per-vCPU rule, which §4's bare stream measures), the `debian-13` image, the
+gVNIC interface and a compact placement policy, at about $0.42 a node-hour on
+demand in `us-central1` - a list price recalled, not looked up, and to be
+checked. Eight nodes for four sessions of four hours is 8 × 16 node-hours, about
+$54 at that price. The account is the author's, and so is every launch. The
+sweep's 4, 8 and 16 PEs a node are one PE a core, one a vCPU and two a vCPU on
+it, as 8, 16 and 32 were on the 16-vCPU, eight-core machine the kit was first
+written for, so that each count loads the cores as its predecessor did. Make the
+VPC with an MTU of 8896, the largest Google allows (its default is 1460): the
+author's decision of 2026-10-11 (`docs/decisions/2026-10-11.md`, item 13), the
+same in every session, since a change between sessions makes their numbers
+incomparable. §2's facts record the MTU each node has.
 
 **Sessions.** Each section says how long it takes; in four-hour sessions:
 
@@ -189,7 +198,7 @@ salloc -J osoe-kit -N<nodes> --exclusive \
     srun -K1 --cpu-bind=none --overcommit -N<nodes> --ntasks-per-node=<PEs> PROGRAM
 ```
 
-32 PEs a node are more tasks than a `c4-standard-16` has CPUs, and Slurm
+16 PEs a node are more tasks than a `c2-standard-8` has CPUs, and Slurm
 refuses a job that many, whatever `--overcommit` says - `select/cons_tres`
 tests a node's tasks against its CPUs before it looks at the overcommit - where
 a step of an allocation may have them (round nine's review, P9-2; measured in
@@ -223,17 +232,18 @@ with another.
 ```sh
 srun -N$(wc -l < NODES) --ntasks-per-node=1 build/release/tools/probe/probe
 salloc -N$(wc -l < NODES) --exclusive srun --cpu-bind=none --overcommit -N$(wc -l < NODES) \
-    --ntasks-per-node=32 build/release/kit/startup
-srun -N1 -n1 -c16 ctest --test-dir build/release -L tier2 -E '^model\.' -j8 --timeout 300 > out/suite.txt
+    --ntasks-per-node=16 build/release/kit/startup
+srun -N1 -n1 -c8 ctest --test-dir build/release -L tier2 -E '^model\.' -j4 --timeout 300 > out/suite.txt
 ```
 
 The probe must say `ok` for every facility on every node, and the second line
-must start a job of 32 PEs a node, the sweep's largest, as the kit starts every
-job (§1), before the sweep is started. The suite is the
-release build's tier 2 on one node's logical nodes; tier 1 compiles, and runs on
-the node that built it (`ctest -L tier1`). The floor pins (`shmem.floor`,
-`echo-uring`'s) were set on the VM and may fail here: a finding to keep, not a
-reason to stop. About twenty minutes.
+must start a job of 16 PEs a node, the sweep's largest, as the kit starts every
+job (§1), before the sweep is started. The suite is the release build's tier 2
+on one node's logical nodes, given the whole node (`-c`, its vCPUs) and run a
+test a core (`-j`); tier 1 compiles, and runs on the node that built it
+(`ctest -L tier1`). The floor pins (`shmem.floor`, `echo-uring`'s) were set on
+the VM and may fail here: a finding to keep, not a reason to stop. About twenty
+minutes.
 
 ## 4. The floor and the bare stream
 
@@ -258,7 +268,7 @@ are ended. About fifteen minutes.
 ## 5. The progress helpers
 
 ```sh
-docs/fast-link/helpers.sh NODES out/helpers          # three rounds, 0 1 2 4 helpers, 8 16 32 PEs a node
+docs/fast-link/helpers.sh NODES out/helpers          # three rounds, 0 1 2 4 helpers, 4 8 16 PEs a node
 docs/fast-link/summarize.py out/floor out/helpers
 ```
 
@@ -285,21 +295,24 @@ connection area and is agreed at start-up), every node at once:
   Appendix), which counts every PE on the wire of its current block, with no
   quiets and no buffers: `peers_in_calls` is a lower bound of it, pulled down by
   the PEs' time in quiets and by a put's bytes still draining after its call
-  returns, and the count with quiets comes nearer. So the model's numbers go
-  beside the pair - at eight nodes about four of seven at 8 PEs a node, five at
-  16, six at 32; at five, 2.7 to 3.0 of four at 8 PEs a node and 3.6 to 3.9 at
-  32 - where the first order of the kit's had two to three at 8 PEs a node and
-  under two at 16 and 32. In the development VM at eight nodes of 8 PEs they
-  sat near or within the pair at 1 MiB, and near the count with quiets at
-  64 KiB, whose quiets took a quarter to a third of the PEs' time and left
-  `peers_in_calls` at 2.4 to 3.0 (round nine's read of these changes, finding
-  1): a convoy lowers both figures, long quiets only the first. Four helpers
-  are then about three quarters busy at 8 PEs a node, and nearly all at 32.
-  §8's rows of the same figures fall as the zone grows, a get's wait moving
-  from its calls to its quiets, and are not read there. (The figure the kit
-  printed before, a bit a block in the millisecond its call returned, counted
-  the blocks a node finishes in a millisecond, its rate, and is gone: round
-  nine's review, S1.)
+  returns, and the count with quiets comes nearer. So the model's numbers, run
+  again at the sweep's counts (three seeds, blocks jittered by 10%; the model
+  rebuilt from the two reads' appendices, reproducing the second read's table,
+  in `docs/design/evidence/v0.2-step4/2026-10-11-kit-c2-standard-8/`), go beside
+  the pair - at eight nodes about three of seven at 4 PEs a node, four at 8 and
+  five at 16; at five, 2.3 to 2.5 of four at 4 PEs a node, 2.7 to 3.0 at 8 and
+  3.4 to 3.7 at 16 - where the first order of the kit's had, at eight nodes,
+  two to three at 4 and 8 PEs a node and under two at 16. In the development VM at eight nodes of
+  8 PEs they sat near or within the pair at 1 MiB, and near the count with
+  quiets at 64 KiB, whose quiets took a quarter to a third of the PEs' time and
+  left `peers_in_calls` at 2.4 to 3.0 (round nine's read of these changes,
+  finding 1): a convoy lowers both figures, long quiets only the first. At
+  eight nodes four helpers are then about three fifths busy at 4 PEs a node, four fifths at 8 and
+  nine tenths at 16. §8's rows of the same figures fall as the zone grows, a
+  get's wait moving from its calls to its quiets, and are not read there. (The
+  figure the kit printed before, a bit a block in the millisecond its call
+  returned, counted the blocks a node finishes in a millisecond, its rate, and
+  is gone: round nine's review, S1.)
 - `multistream put 65536 10`, the same in 64 KiB blocks: more messages a byte;
 - `multistream get 1048576 10`: the same with nonblocking gets, a quiet every
   8 MiB;
@@ -324,8 +337,8 @@ The order of the helper counts changes each round, so that a drift in the
 machines does not read as a helper count's. Three rounds of 4 helper counts × 3
 PE counts × 5 workloads are 180 jobs and their start-ups: 144 of 10 to 20
 seconds, and 36 of the collectives, which take seconds - their longest line, the
-4 KiB alltoall at 32 PEs a node, sends 28 MiB from each node a call, some 10 ms
-at 23 Gbit/s, 4 s over its 400 calls. About an hour and a quarter at eight
+4 KiB alltoall at 16 PEs a node, sends 7 MiB from each node a call, some 3.7 ms
+at 16 Gbit/s, 1.5 s over its 400 calls. About an hour and a quarter at eight
 nodes. `ROUNDS`, `HELPERS`, `PES_PER_NODE` and `WORKLOADS` in the environment
 shorten it.
 
@@ -404,7 +417,7 @@ docs/fast-link/gets.sh NODES out/gets
 Question 4's probe (`get-pieces`), one PE on each of two nodes: a put and
 quiet, a blocking get, and a nonblocking get and quiet, from 16 KiB to 64 MiB,
 at a landing zone (`OSOE_GET_LANDING_BYTES`) of 256 KiB (the default), 1 MiB,
-4 MiB and 16 MiB; then `multistream get` at 8 PEs a node over every node at the
+4 MiB and 16 MiB; then `multistream get` at 4 PEs a node over every node at the
 same zones. A get's pieces, a blocking get's as a nonblocking get's, go out
 together only as far as the zone holds them - four pieces at the default - so
 where a round trip's time carries more than the zone, the zone sets a get's
@@ -412,11 +425,11 @@ speed; the zone's size for a fast link is the proposal's (d). The pieces in
 flight toward a node are bounded by its connection's reply credits too
 (`OSOE_AM_CREDITS`, 64 a connection, shared by the node's PEs), which this
 does not vary: with the stream's blocks spread over the peers, a connection
-carries about 8/7 of one PE's pieces at once at eight nodes of 8 PEs, so the
-credits
-hold a zone back only from a few MiB. `get-pieces`' one PE, alone on its
-connection, has at most 64 pieces of 64 KiB, 4 MiB, in flight: past a zone of
-4 MiB its line is the credits', not the zone's. 24 jobs: about ten minutes.
+carries about 4/7 of one PE's pieces at once at eight nodes of 4 PEs, so the
+credits hold a zone back only from about 7 MiB at eight nodes, and from 4 MiB at
+five. `get-pieces`' one PE, alone on its connection, has at most 64 pieces of
+64 KiB, 4 MiB, in flight: past a zone of 4 MiB its line is the credits', not the
+zone's. 24 jobs: about ten minutes.
 
 ## 9. Fan-in
 
@@ -425,7 +438,7 @@ docs/fast-link/fan-in.sh NODES out/fan-in
 ```
 
 Every PE of every node but the first puts into the first node's PE 0 at once,
-at 1, 4 and 16 PEs a node - 320, 80 and 20 iterations, so that each job moves
+at 1, 2 and 8 PEs a node - 320, 160 and 40 iterations, so that each job moves
 about as much - and at the default receive buffers and four times their
 number; the rate, and the receive pool's `-ENOBUFS` completions and
 re-arms on the first node (`transport.am.receive_enobufs`, read by `osoe-stat`
@@ -438,9 +451,9 @@ into a node at once (scale S3). 36 short jobs: about five minutes.
 docs/fast-link/scale.sh NODES out/scale
 ```
 
-`osoe-bench` at every node with 8 and 16 PEs a node, at the counts of `HELPERS`
+`osoe-bench` at every node with 4 and 8 PEs a node, at the counts of `HELPERS`
 - no helpers unless given, so `HELPERS="0 N"` with §5's best; `osoe-pacer`
-`mix` for ten minutes at each; start-up time at 1, 8 and 32 PEs a node - the
+`mix` for ten minutes at each; start-up time at 1, 4 and 16 PEs a node - the
 slowest PE's, which is the launcher's spread and init, and the fastest's,
 nearer init's own; and the SOS test suite at two PEs a node if `SOS_BUILD`
 names the directory of its programs, built as `docs/pi-cluster.md` §8 builds

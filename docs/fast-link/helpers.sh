@@ -9,8 +9,10 @@
 # The collectives are here because a helper count is not decided without them:
 # their payloads go on the data wires the helpers hold, and on the Pi two
 # helpers made the mailbox about a fifth faster and a 64 KiB broadcast and a
-# 4 KiB alltoall 2 to 35% slower (round nine's review, S3).
-#   ROUNDS (3), HELPERS ("0 1 2 4"), PES_PER_NODE ("8 16 32"),
+# 4 KiB alltoall 2 to 35% slower (round nine's review, S3). The PE counts are
+# one a core, one a vCPU and two a vCPU of a c2-standard-8 (docs/fast-link.md,
+# §0).
+#   ROUNDS (3), HELPERS ("0 1 2 4"), PES_PER_NODE ("4 8 16"),
 #   WORKLOADS ("put-1m put-64k get-1m mailbox collectives"), STREAM_SECONDS (10)
 # usage: helpers.sh NODES OUTDIR
 : "${KIT_TIMEOUT:=120}"
@@ -18,7 +20,7 @@ source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 ROUNDS=${ROUNDS:-3}
 HELPERS=${HELPERS:-0 1 2 4}
-PES_PER_NODE=${PES_PER_NODE:-8 16 32}
+PES_PER_NODE=${PES_PER_NODE:-4 8 16}
 WORKLOADS=${WORKLOADS:-put-1m put-64k get-1m mailbox collectives}
 SECONDS_EACH=${STREAM_SECONDS:-10}
 [ "$NODE_COUNT" -ge 5 ] || echo "note: $NODE_COUNT nodes; four helpers need four peers, five nodes" | tee -a "$LOG"

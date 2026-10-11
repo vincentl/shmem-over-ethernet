@@ -53,11 +53,12 @@ author's.
   each session's window.
 - **A custom image** after the first setup - the packages, Slurm's daemons
   stopped, `RemoveIPC=no`, the limits - saves each later session its half hour.
-- **The kit is written for `c4-standard-16`** (eight cores): on four cores its
-  sweep's 32 PEs a node are four a vCPU and its timings and costs are another
-  machine's. Its first slice (below) sets the PE counts to 4, 8 and 16 (`helpers.sh`'s
-  `PES_PER_NODE`; `scale.sh`'s `for pes in 1 8 32`), the sessions' times and
-  §0's costing to `c2-standard-8`'s, and says why.
+- **The kit was written for `c4-standard-16`** (eight cores): on four cores its
+  sweep's 32 PEs a node would be four a vCPU, and its timings and costs another
+  machine's. Its first slice (branch `kit-c2-standard-8`) set the PE counts to
+  4, 8 and 16 - one PE a core, one a vCPU and two a vCPU, as 8, 16 and 32 were
+  there - and §0's costing to `c2-standard-8`'s; the sessions' times, checked,
+  stand.
 
 **The Pi cluster** for its items (P4, H21, H22, T6, T9 to T12): only `~/osoe`;
 `ssh` through the Mac; never to the compute nodes; one session held open while
@@ -202,7 +203,7 @@ Part 4 is four cluster sessions of four hours and their analysis; the Pi's items
 a day; round ten and its fixes two days; the tag's checks a day or two. The
 cluster's cost is the author's to set: at about $0.42 a node-hour on demand
 (`c2-standard-8`'s list price in `us-central1` as the lead recalled it - check
-it), eight nodes for sixteen hours is about $55.
+it), eight nodes for sixteen hours is about $54.
 
 ## Done means
 

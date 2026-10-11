@@ -1,0 +1,18 @@
+N=8 P=8 blocks=400 order=multistream  peers=[2.02, 2.84, 2.14] h4=[1.85, 2.45, 1.93] expected=[2.02, 2.84, 2.14] OK (1.9s)
+N=8 P=8 blocks=400 order=c            peers=[4.19, 3.92, 4.33] h4=[3.17, 3.05, 3.23] expected=[4.19, 3.92, 4.33] OK (1.6s)
+N=8 P=8 blocks=400 order=interleaved  peers=[4.19, 3.92, 4.33] h4=[3.17, 3.05, 3.23] expected=None  (1.6s)
+   expected h4: [3.17, 3.05, 3.23]
+N=8 P=16 blocks=200 order=multistream  peers=[1.82, 1.91, 1.84] h4=[1.69, 1.76, 1.7] expected=[1.82, 1.91, 1.84] OK (4.5s)
+N=8 P=16 blocks=200 order=c            peers=[5.25, 5.37, 5.37] h4=[3.61, 3.61, 3.62] expected=[5.25, 5.37, 5.37] OK (3.0s)
+N=8 P=16 blocks=200 order=interleaved  peers=[5.25, 5.37, 5.37] h4=[3.61, 3.61, 3.62] expected=None  (3.0s)
+   expected h4: [3.61, 3.61, 3.62]
+N=8 P=32 blocks=100 order=multistream  peers=[1.46, 1.47, 1.32] h4=[1.37, 1.38, 1.24] expected=[1.46, 1.47, 1.32] OK (7.3s)
+N=8 P=32 blocks=100 order=c            peers=[6.43, 6.23, 6.41] h4=[3.91, 3.85, 3.9] expected=[6.43, 6.23, 6.41] OK (6.2s)
+N=8 P=32 blocks=100 order=interleaved  peers=[6.43, 6.23, 6.41] h4=[3.91, 3.85, 3.9] expected=None  (5.9s)
+   expected h4: [3.91, 3.85, 3.9]
+N=5 P=8 blocks=400 order=multistream  peers=[1.75, 1.75, 2.11] h4=[1.75, 1.75, 2.11] expected=[1.75, 1.75, 2.11] OK (0.7s)
+N=5 P=8 blocks=400 order=c            peers=[2.72, 3.0, 2.67] h4=[2.72, 3.0, 2.67] expected=[2.72, 3.0, 2.67] OK (0.7s)
+N=5 P=8 blocks=400 order=interleaved  peers=[2.72, 3.0, 2.67] h4=[2.72, 3.0, 2.67] expected=None  (0.7s)
+N=5 P=32 blocks=100 order=multistream  peers=[1.22, 1.29, 1.24] h4=[1.22, 1.29, 1.24] expected=[1.22, 1.29, 1.24] OK (2.6s)
+N=5 P=32 blocks=100 order=c            peers=[3.76, 3.86, 3.63] h4=[3.76, 3.86, 3.63] expected=[3.76, 3.86, 3.63] OK (2.3s)
+N=5 P=32 blocks=100 order=interleaved  peers=[3.76, 3.86, 3.63] h4=[3.76, 3.86, 3.63] expected=None  (2.2s)
