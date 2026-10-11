@@ -1,0 +1,30 @@
+== <repo>/build/scratch/ladder/merge-point/dry-run-3/dry-run/gets
+jobs: 4, of which 0 failed (run.txt)
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node fed at once
+(median, range, count)
+  get-1m     pes=2 h=None zone=262144  job 6200 (n=1)
+                                       node 1222 (1175-1369, n=5)
+                                       cpu/GiB 0.425 (n=1)
+                                       peers at once 1.29 (1.27-1.47, n=5)
+                                       each node's least peer over its most, the least of all: 0.997
+  get-1m     pes=2 h=None zone=1048576 job 6392 (n=1)
+                                       node 1284 (1263-1291, n=5)
+                                       cpu/GiB 0.451 (n=1)
+                                       peers at once 1.49 (1.45-1.52, n=5)
+                                       each node's least peer over its most, the least of all: 0.998
+
+get-pieces: medians of the rounds' medians, microseconds; a get's and a nonblocking get's time over a put's
+  zone 262144
+         16384 B  put     62.2  get     61.5 (0.99x)  nbi     61.0 (0.98x)  n=1
+         65536 B  put     66.3  get     68.0 (1.03x)  nbi     65.8 (0.99x)  n=1
+        262144 B  put     91.6  get      149 (1.63x)  nbi      147 (1.61x)  n=1
+       1048576 B  put      159  get      427 (2.68x)  nbi      425 (2.67x)  n=1
+       4194304 B  put      453  get     1524 (3.37x)  nbi     1520 (3.36x)  n=1
+  zone 1048576
+         16384 B  put     40.6  get     40.9 (1.01x)  nbi     40.8 (1.00x)  n=1
+         65536 B  put     48.9  get     45.0 (0.92x)  nbi     41.6 (0.85x)  n=1
+        262144 B  put     61.1  get     59.8 (0.98x)  nbi     59.5 (0.97x)  n=1
+       1048576 B  put      161  get      204 (1.27x)  nbi      202 (1.25x)  n=1
+       4194304 B  put      461  get      644 (1.40x)  nbi      639 (1.39x)  n=1

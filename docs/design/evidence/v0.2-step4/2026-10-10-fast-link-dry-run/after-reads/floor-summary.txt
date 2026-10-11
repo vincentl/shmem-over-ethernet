@@ -1,0 +1,22 @@
+== <repo>/build/scratch/ladder/merge-point/dry-run-3/dry-run/floor
+jobs: 1, of which 0 failed (run.txt)
+
+the floor test's ratios, the median of its pairs (range)
+  fastest get/floor=2.074 (1.90-2.27)
+  fastest put_quiet/floor=2.077 (1.91-2.31)
+  fastest fetch_add/floor=2.031 (1.89-2.25)
+  median put_quiet/get=1.004 (1.00-1.01)
+  median fetch_add/get=0.997 (0.99-1.00)
+  stream library/floor=0.751 (0.674-0.778)
+  reported: median get/floor=1.894 (1.88-1.96)
+  reported: median put_quiet/floor=1.902 (1.89-1.96)
+  reported: median fetch_add/floor=1.891 (1.88-1.95)
+
+the bare aggregate, MiB/s, between two nodes both ways at once: iperf3's sum
+over its ten seconds, a node's share each way half of it, and echo-uring's
+per-connection medians summed over both ways - an upper bound, since nothing
+checks that its streams ran at once. A node's rate in the helpers' table is
+what it sent, one way, to all its peers: set it beside a node's share each
+way at as many streams as a node has peers
+    1 each way  iperf3         -   echo-uring     17595 (1 connection)
+    2 each way  iperf3         -   echo-uring     32471 (2 connections)

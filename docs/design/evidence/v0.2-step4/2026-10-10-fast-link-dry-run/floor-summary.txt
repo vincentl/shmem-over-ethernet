@@ -1,0 +1,5 @@
+== <repo>/build/scratch/part4/dry-run-2/dry-run/floor
+
+the bare aggregate, MiB/s (echo-uring: each connection's median stream, summed)
+    1 connections  echo-uring   18461.1   iperf3         -
+    2 connections  echo-uring   28138.4   iperf3         -

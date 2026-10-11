@@ -1,0 +1,19 @@
+== <repo>/build/scratch/part4/dry-run-2/dry-run/gets
+
+multistream: MiB/s, and the progress threads' CPU seconds a GiB (median, range)
+  get-1m     pes=2 h=None zone=262144  7241.8                       cpu/GiB 0.4
+  get-1m     pes=2 h=None zone=1048576 7259.2                       cpu/GiB 0.4
+
+get-pieces: medians of the rounds' medians, microseconds; a get's and a nonblocking get's time over a put's
+  zone 262144
+         16384 B  put       40.8  get       42.2 (1.03x)  nbi       41.5 (1.02x)
+         65536 B  put       49.5  get       74.4 (1.50x)  nbi       40.0 (0.81x)
+        262144 B  put       59.1  get      214.4 (3.63x)  nbi      150.6 (2.55x)
+       1048576 B  put      161.1  get     1166.8 (7.24x)  nbi      424.4 (2.63x)
+       4194304 B  put      448.0  get     4384.1 (9.79x)  nbi     1515.8 (3.38x)
+  zone 1048576
+         16384 B  put       35.6  get       35.9 (1.01x)  nbi       34.6 (0.97x)
+         65536 B  put       44.0  get       74.5 (1.69x)  nbi       49.3 (1.12x)
+        262144 B  put       60.3  get      191.3 (3.17x)  nbi       61.2 (1.01x)
+       1048576 B  put      126.6  get      692.1 (5.47x)  nbi      158.9 (1.26x)
+       4194304 B  put      339.8  get     4332.3 (12.75x)  nbi      634.5 (1.87x)

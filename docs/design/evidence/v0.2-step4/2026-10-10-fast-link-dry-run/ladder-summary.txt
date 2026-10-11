@@ -1,0 +1,25 @@
+== <repo>/build/scratch/part4/dry-run-2/dry-run/ladder
+
+hol: a fetch-add's round trip, microseconds, alone and behind the stream; the stream's MiB/s
+  hol-buffer-128k    alone  median 56.0                   p99 61.0                  
+  hol-buffer-128k    stream median 75.0                   p99 183.0                  stream 4809.0
+  hol-buffer-1m      alone  median 56.0                   p99 65.0                  
+  hol-buffer-1m      stream median 718.0                  p99 924.0                  stream 12350.0
+  hol-buffer-4m      alone  median 56.0                   p99 64.0                  
+  hol-buffer-4m      stream median 576.0                  p99 1149.0                 stream 12256.0
+  hol-receive-16kx256 alone  median 57.0                   p99 74.0                  
+  hol-receive-16kx256 stream median 197.0                  p99 1117.0                 stream 10290.0
+  hol-receive-64kx64 alone  median 56.0                   p99 85.0                  
+  hol-receive-64kx64 stream median 119.0                  p99 444.0                  stream 9308.0
+  hol-unsent-0       alone  median 57.0                   p99 62.0                  
+  hol-unsent-0       stream median 125.0                  p99 291.0                  stream 9461.0
+  hol-unsent-1m      alone  median 57.0                   p99 66.0                  
+  hol-unsent-1m      stream median 183.0                  p99 401.0                  stream 9809.0
+  hol-unsent-256k    alone  median 55.0                   p99 62.0                  
+  hol-unsent-256k    stream median 126.0                  p99 302.0                  stream 9399.0
+  hol-unsent-4m      alone  median 55.0                   p99 77.0                  
+  hol-unsent-4m      stream median 154.0                  p99 320.0                  stream 9558.0
+  hol-unsent-64k     alone  median 57.0                   p99 65.0                  
+  hol-unsent-64k     stream median 155.0                  p99 314.0                  stream 9858.0
+  hol-unsent-rule    alone  median 56.0                   p99 64.0                  
+  hol-unsent-rule    stream median 159.0                  p99 317.0                  stream 9941.0

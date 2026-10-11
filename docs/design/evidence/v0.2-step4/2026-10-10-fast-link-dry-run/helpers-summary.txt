@@ -1,0 +1,13 @@
+== <repo>/build/scratch/part4/dry-run-2/dry-run/helpers
+
+multistream: MiB/s, and the progress threads' CPU seconds a GiB (median, range)
+  get-1m     pes=2 h=0                 7463.4                       cpu/GiB 0.4
+  put-1m     pes=2 h=0                 9988.4                       cpu/GiB 0.3
+  put-64k    pes=2 h=0                 13559.0                      cpu/GiB 0.2
+  get-1m     pes=2 h=2                 5912.3                       cpu/GiB 0.5
+  put-1m     pes=2 h=2                 7102.1                       cpu/GiB 0.4
+  put-64k    pes=2 h=2                 7493.2                       cpu/GiB 0.4
+
+mailbox: messages a second (median, range)
+  pes=2 h=0  32709.0
+  pes=2 h=2  22007.0

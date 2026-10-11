@@ -1,0 +1,22 @@
+== <repo>/build/scratch/ladder/merge-point/dry-run-3/dry-run/fan-in
+jobs: 8, of which 0 failed (run.txt)
+
+fan-in: MiB/s into PE 0
+  pes=1 h=0 buffers=64  8354 (n=1)
+  pes=1 h=0 buffers=256  7686 (n=1)
+  pes=1 h=2 buffers=64  10094 (n=1)
+  pes=1 h=2 buffers=256  7533 (n=1)
+  pes=2 h=0 buffers=64  9643 (n=1)
+  pes=2 h=0 buffers=256  9182 (n=1)
+  pes=2 h=2 buffers=64  11856 (n=1)
+  pes=2 h=2 buffers=256  7598 (n=1)
+
+counters that moved over the window (PE 0's node; median, range)
+  fan-in pes=1 h=0 buffers=64: receive_enobufs 2279 (n=1), receive_rearms 2279 (n=1), sends 2566 (n=1)
+  fan-in pes=1 h=0 buffers=256: receive_enobufs 42.0 (n=1), receive_rearms 42.0 (n=1), sends 2564 (n=1)
+  fan-in pes=1 h=2 buffers=64: receive_enobufs 793 (n=1), receive_rearms 793 (n=1), sends 2566 (n=1)
+  fan-in pes=1 h=2 buffers=256: sends 2564 (n=1)
+  fan-in pes=2 h=0 buffers=64: receive_enobufs 3108 (n=1), receive_rearms 3108 (n=1), sends 1533 (n=1)
+  fan-in pes=2 h=0 buffers=256: receive_enobufs 496 (n=1), receive_rearms 496 (n=1), sends 1428 (n=1)
+  fan-in pes=2 h=2 buffers=64: receive_enobufs 1213 (n=1), receive_rearms 1213 (n=1), sends 1539 (n=1)
+  fan-in pes=2 h=2 buffers=256: receive_enobufs 49.0 (n=1), receive_rearms 49.0 (n=1), sends 1436 (n=1)

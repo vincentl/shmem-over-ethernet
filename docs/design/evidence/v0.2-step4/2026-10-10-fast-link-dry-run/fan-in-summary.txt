@@ -1,0 +1,20 @@
+== <repo>/build/scratch/part4/dry-run-2/dry-run/fan-in
+
+fan-in: MiB/s into PE 0
+  pes=1 h=0 buffers=64  8079.0
+  pes=1 h=0 buffers=256  5632.3
+  pes=1 h=2 buffers=64  9594.7
+  pes=1 h=2 buffers=256  2719.3
+  pes=2 h=0 buffers=64  9327.5
+  pes=2 h=0 buffers=256  8525.0
+  pes=2 h=2 buffers=64  12028.7
+  pes=2 h=2 buffers=256  9415.0
+
+counters that moved over the window (PE 0's node; median, range)
+  fan-in pes=1 h=0 buffers=64: receive_enobufs 149.0, receive_rearms 149.0
+  fan-in pes=1 h=0 buffers=256: receive_enobufs 2.0, receive_rearms 2.0
+  fan-in pes=1 h=2 buffers=64: receive_enobufs 55.0, receive_rearms 55.0
+  fan-in pes=2 h=0 buffers=64: receive_enobufs 372.0, receive_rearms 372.0
+  fan-in pes=2 h=0 buffers=256: receive_enobufs 50.0, receive_rearms 50.0
+  fan-in pes=2 h=2 buffers=64: receive_enobufs 123.0, receive_rearms 123.0
+  fan-in pes=2 h=2 buffers=256: receive_enobufs 3.0, receive_rearms 3.0

@@ -13,6 +13,7 @@ you want; each names the `README.md` of the directories that go with it.
 | `README.md` | what osoe is; building, installing and running a program, under `srun` or on one machine; every limit and every environment variable |
 | `docs/pi-cluster.md` | the runbook for the four Raspberry Pi 5 nodes osoe was measured on, under Slurm: checking the nodes, building, the smoke tests, the library against its floor, `osoe-bench`, how jobs end, and programs from the reading corpus |
 | `docs/pi-cluster-results.md` | what the sessions on that cluster measured and found, newest last |
+| `docs/fast-link.md`, `docs/fast-link/` | the runbook for v0.2 step 4's Part 4, written before its machines exist: five to eight x86-64 nodes on a link above a gigabit, set up under Slurm, and the measurements that decide the progress helpers' default, the zero-copy send's, the ladder's settings and the landing zone's size; beside it the kit's scripts and probes, which run on one machine's logical nodes too (`dry-run.sh`) |
 | `docs/release-checklist.md` | what a release needs - the release point, what every tag needs, and what the reviews rated for after it - ticked where it is done |
 | `docs/reference/README.md` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
 
