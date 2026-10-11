@@ -7,8 +7,9 @@ fast link"), and the questions earlier parts left to it. Written before any such
 machine exists, so that one is not paid for while scripts are written: every
 section's script has run end to end on the development VM's logical nodes
 (`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`; its runs are in
-`docs/design/evidence/v0.2-step4/2026-10-10-fast-link-dry-run/`), and none yet on
-a cluster. Never run at all: `slurm-setup.sh`, `build.sh`'s copying to other
+`docs/design/evidence/v0.2-step4/2026-10-10-fast-link-dry-run/`, the kit as it is
+in `after-reads/`, at every helper count the sweep runs), and none yet on a
+cluster. Never run at all: `slurm-setup.sh`, `build.sh`'s copying to other
 nodes, every `srun` the kit makes - `launch`'s, `on`'s and `facts.sh`'s
 `scontrol` and `sinfo` - and `floor.sh`'s second direction, which one machine
 cannot run. The kit was read adversarially before any node was rented

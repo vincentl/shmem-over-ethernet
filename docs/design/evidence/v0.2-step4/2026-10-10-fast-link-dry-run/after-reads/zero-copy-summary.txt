@@ -1,0 +1,56 @@
+== <repo>/build/scratch/ladder/merge-point/dry-run-3/dry-run/zero-copy
+jobs: 9, of which 0 failed (run.txt)
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node fed at once
+(median, range, count)
+  put-1048576-off pes=2 h=0            job 9362 (n=1)
+                                       node 1875 (1829-1891, n=5)
+                                       cpu/GiB 0.334 (n=1)
+                                       peers at once 2.32 (2.30-2.36, n=5)
+                                       each node's least peer over its most, the least of all: 0.999
+  put-1048576-on-16k pes=2 h=0         job 8074 (n=1)
+                                       node 1568 (1484-1786, n=5)
+                                       cpu/GiB 0.396 (n=1)
+                                       peers at once 2.06 (2.00-2.19, n=5)
+                                       each node's least peer over its most, the least of all: 0.997
+  put-1048576-on-256k pes=2 h=0        job 7811 (n=1)
+                                       node 1540 (1475-1687, n=5)
+                                       cpu/GiB 0.410 (n=1)
+                                       peers at once 2.09 (1.99-2.17, n=5)
+                                       each node's least peer over its most, the least of all: 0.999
+  put-1048576-on-64k pes=2 h=0         job 7825 (n=1)
+                                       node 1576 (1528-1597, n=5)
+                                       cpu/GiB 0.409 (n=1)
+                                       peers at once 2.12 (2.07-2.18, n=5)
+                                       each node's least peer over its most, the least of all: 0.997
+  put-65536-off pes=2 h=0              job 12170 (n=1)
+                                       node 2416 (2313-2550, n=5)
+                                       cpu/GiB 0.258 (n=1)
+                                       peers at once 3.95 (3.94-3.96, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+  put-65536-on-16k pes=2 h=0           job 9515 (n=1)
+                                       node 1880 (1795-2025, n=5)
+                                       cpu/GiB 0.347 (n=1)
+                                       peers at once 3.87 (3.87-3.90, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+  put-65536-on-256k pes=2 h=0          job 10287 (n=1)
+                                       node 2054 (2018-2098, n=5)
+                                       cpu/GiB 0.313 (n=1)
+                                       peers at once 3.90 (3.88-3.90, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+  put-65536-on-64k pes=2 h=0           job 9252 (n=1)
+                                       node 1853 (1636-1967, n=5)
+                                       cpu/GiB 0.356 (n=1)
+                                       peers at once 3.88 (3.85-3.90, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+
+counters that moved over the window (PE 0's node; median, range)
+  put-1048576-off pes=2 h=0 buffers=None: receive_enobufs 6090 (n=1), receive_rearms 6090 (n=1), sends 20226 (n=1)
+  put-1048576-on-16k pes=2 h=0 buffers=None: receive_enobufs 4313 (n=1), receive_rearms 4313 (n=1), sends 18832 (n=1), zero_copy_copied 7471 (n=1), zero_copy_notifications 7471 (n=1), zero_copy_sends 7471 (n=1)
+  put-1048576-on-256k pes=2 h=0 buffers=None: receive_enobufs 4879 (n=1), receive_rearms 4879 (n=1), sends 15793 (n=1), zero_copy_copied 5926 (n=1), zero_copy_notifications 5926 (n=1), zero_copy_sends 5926 (n=1)
+  put-1048576-on-64k pes=2 h=0 buffers=None: receive_enobufs 4752 (n=1), receive_rearms 4752 (n=1), sends 17079 (n=1), zero_copy_copied 7024 (n=1), zero_copy_notifications 7024 (n=1), zero_copy_sends 7024 (n=1)
+  put-65536-off pes=2 h=0 buffers=None: receive_enobufs 6380 (n=1), receive_rearms 6380 (n=1), sends 37543 (n=1)
+  put-65536-on-16k pes=2 h=0 buffers=None: receive_enobufs 4379 (n=1), receive_rearms 4379 (n=1), sends 33069 (n=1), zero_copy_copied 19145 (n=1), zero_copy_notifications 19145 (n=1), zero_copy_sends 19145 (n=1)
+  put-65536-on-256k pes=2 h=0 buffers=None: receive_enobufs 5856 (n=1), receive_rearms 5856 (n=1), sends 33790 (n=1), zero_copy_copied 3516 (n=1), zero_copy_notifications 3516 (n=1), zero_copy_sends 3516 (n=1)
+  put-65536-on-64k pes=2 h=0 buffers=None: receive_enobufs 4159 (n=1), receive_rearms 4159 (n=1), sends 32981 (n=1), zero_copy_copied 19026 (n=1), zero_copy_notifications 19026 (n=1), zero_copy_sends 19026 (n=1)

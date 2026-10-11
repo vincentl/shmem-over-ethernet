@@ -1,0 +1,78 @@
+== <repo>/build/scratch/ladder/merge-point/dry-run-3/dry-run/helpers
+jobs: 16, of which 0 failed (run.txt)
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node fed at once
+(median, range, count)
+  get-1m     pes=2 h=0                 job 5947 (n=1)
+                                       node 1177 (1115-1286, n=5)
+                                       cpu/GiB 0.457 (n=1)
+                                       peers at once 1.32 (1.25-1.38, n=5)
+                                       each node's least peer over its most, the least of all: 0.998
+  put-1m     pes=2 h=0                 job 9373 (n=1)
+                                       node 1885 (1841-1896, n=5)
+                                       cpu/GiB 0.328 (n=1)
+                                       peers at once 2.33 (2.31-2.36, n=5)
+                                       each node's least peer over its most, the least of all: 0.998
+  put-64k    pes=2 h=0                 job 11857 (n=1)
+                                       node 2334 (2234-2620, n=5)
+                                       cpu/GiB 0.260 (n=1)
+                                       peers at once 3.94 (3.93-3.95, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+  get-1m     pes=2 h=1                 job 6351 (n=1)
+                                       node 1268 (1222-1325, n=5)
+                                       cpu/GiB 0.413 (n=1)
+                                       peers at once 1.35 (1.33-1.40, n=5)
+                                       each node's least peer over its most, the least of all: 0.997
+  put-1m     pes=2 h=1                 job 8897 (n=1)
+                                       node 1773 (1675-1880, n=5)
+                                       cpu/GiB 0.342 (n=1)
+                                       peers at once 2.34 (2.26-2.38, n=5)
+                                       each node's least peer over its most, the least of all: 0.998
+  put-64k    pes=2 h=1                 job 11890 (n=1)
+                                       node 2252 (2187-2743, n=5)
+                                       cpu/GiB 0.258 (n=1)
+                                       peers at once 3.93 (3.92-3.95, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+  get-1m     pes=2 h=2                 job 6005 (n=1)
+                                       node 1201 (1186-1215, n=5)
+                                       cpu/GiB 0.514 (n=1)
+                                       peers at once 1.37 (1.34-1.39, n=5)
+                                       each node's least peer over its most, the least of all: 0.997
+  put-1m     pes=2 h=2                 job 7605 (n=1)
+                                       node 1526 (1450-1586, n=5)
+                                       cpu/GiB 0.426 (n=1)
+                                       peers at once 1.87 (1.80-1.93, n=5)
+                                       each node's least peer over its most, the least of all: 0.999
+  put-64k    pes=2 h=2                 job 9123 (n=1)
+                                       node 1813 (1785-1887, n=5)
+                                       cpu/GiB 0.377 (n=1)
+                                       peers at once 3.92 (3.91-3.94, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+  get-1m     pes=2 h=4                 job 5741 (n=1)
+                                       node 1146 (1132-1168, n=5)
+                                       cpu/GiB 0.565 (n=1)
+                                       peers at once 1.37 (1.35-1.42, n=5)
+                                       each node's least peer over its most, the least of all: 0.998
+  put-1m     pes=2 h=4                 job 7339 (n=1)
+                                       node 1485 (1398-1497, n=5)
+                                       cpu/GiB 0.467 (n=1)
+                                       peers at once 1.74 (1.70-1.78, n=5)
+                                       each node's least peer over its most, the least of all: 0.999
+  put-64k    pes=2 h=4                 job 8020 (n=1)
+                                       node 1591 (1583-1664, n=5)
+                                       cpu/GiB 0.447 (n=1)
+                                       peers at once 3.89 (3.88-3.92, n=5)
+                                       each node's least peer over its most, the least of all: 1.000
+
+mailbox: messages a second (median, range)
+  pes=2 h=0  30182 (n=1)
+  pes=2 h=1  27827 (n=1)
+  pes=2 h=2  22601 (n=1)
+  pes=2 h=4  18693 (n=1)
+
+outcomes
+  mailbox-pes2-h0-r1.txt: osoe-pacer failures=0 seconds=3.8
+  mailbox-pes2-h1-r1.txt: osoe-pacer failures=0 seconds=3.7
+  mailbox-pes2-h2-r1.txt: osoe-pacer failures=0 seconds=4.5
+  mailbox-pes2-h4-r1.txt: osoe-pacer failures=0 seconds=4.2
