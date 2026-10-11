@@ -13,8 +13,8 @@
 #                  the nodes
 #   KIT_SRUN       srun's options beside -N and --ntasks-per-node, for the
 #                  allocation's one step (default: -K1 --cpu-bind=none
-#                  --overcommit: no binding, and more PEs than CPUs - 32 PEs a
-#                  node of 16 - which a step may have only with --overcommit)
+#                  --overcommit: no binding, and more PEs than CPUs - 16 PEs a
+#                  node of 8 - which a step may have only with --overcommit)
 #   KIT_TIMEOUT    seconds a job may take before it is ended, SIGKILL 30 s
 #                  after SIGTERM; each section sets its own, a few times its
 #                  longest job's length (default 900)

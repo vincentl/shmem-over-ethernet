@@ -1,0 +1,12 @@
+N=8 P= 4 order=multistream peers=[2.077, 2.23, 2.557] mean=2.29 h4=[1.89, 2.018, 2.206] h4 mean=2.04 share of 4=0.51
+N=8 P= 4 order=c           peers=[2.749, 3.21, 2.485] mean=2.81 h4=[2.369, 2.683, 2.183] h4 mean=2.41 share of 4=0.60
+N=8 P= 8 order=multistream peers=[2.016, 2.839, 2.139] mean=2.33 h4=[1.852, 2.45, 1.934] h4 mean=2.08 share of 4=0.52
+N=8 P= 8 order=c           peers=[4.19, 3.924, 4.327] mean=4.15 h4=[3.17, 3.048, 3.231] h4 mean=3.15 share of 4=0.79
+N=8 P=16 order=multistream peers=[1.818, 1.908, 1.838] mean=1.85 h4=[1.688, 1.763, 1.702] h4 mean=1.72 share of 4=0.43
+N=8 P=16 order=c           peers=[5.248, 5.365, 5.373] mean=5.33 h4=[3.612, 3.608, 3.62] h4 mean=3.61 share of 4=0.90
+N=5 P= 4 order=multistream peers=[1.979, 1.977, 1.685] mean=1.88 h4=[1.979, 1.977, 1.685] h4 mean=1.88 share of 4=0.47
+N=5 P= 4 order=c           peers=[2.256, 2.491, 2.525] mean=2.42 h4=[2.256, 2.491, 2.525] h4 mean=2.42 share of 4=0.61
+N=5 P= 8 order=multistream peers=[1.746, 1.75, 2.107] mean=1.87 h4=[1.746, 1.75, 2.107] h4 mean=1.87 share of 4=0.47
+N=5 P= 8 order=c           peers=[2.724, 2.996, 2.666] mean=2.80 h4=[2.724, 2.996, 2.666] h4 mean=2.80 share of 4=0.70
+N=5 P=16 order=multistream peers=[1.621, 1.566, 1.516] mean=1.57 h4=[1.621, 1.566, 1.516] h4 mean=1.57 share of 4=0.39
+N=5 P=16 order=c           peers=[3.45, 3.483, 3.66] mean=3.53 h4=[3.45, 3.483, 3.66] h4 mean=3.53 share of 4=0.88
