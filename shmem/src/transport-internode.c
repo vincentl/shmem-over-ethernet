@@ -814,6 +814,19 @@ static uint32_t copy_out_any(void)
     return copied;
 }
 
+/* The bytes the zone's held extents can land: the PE's gets in flight, the
+ * detail of a nonblocking issue's wait for room (OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT
+ * counts bytes, not extents). */
+static uint64_t zone_bytes_held(void)
+{
+    uint32_t words = (osoe.node.landing_requests + 63) / 64;
+    uint64_t held = 0;
+    for (uint32_t w = 0; w < words; w++)
+        held += (uint64_t)__builtin_popcountll(
+            atomic_load_explicit(&my_zone()->bits[w], memory_order_acquire));
+    return held * OSOE_LANDING_EXTENT_BYTES;
+}
+
 /*
  * A run of `count` extents for a piece, waiting if the zone has none: an
  * issue that finds no room first copies out every landed piece it can claim,
@@ -823,7 +836,7 @@ static uint32_t copy_out_any(void)
  * it read before it looked (landing_extent_model.py). A get whose pieces are
  * this PE's own, none landed yet, wakes when the first lands.
  */
-static uint32_t make_room(uint32_t count, const char *routine)
+static uint32_t make_room(uint32_t count, const char *routine, uint32_t peer, int pe)
 {
     uint32_t first = claim_run(count);
     if (first != UINT32_MAX)
@@ -842,8 +855,17 @@ static uint32_t make_room(uint32_t count, const char *routine)
         if (copy_out_any())
             continue;
         if (!waiting) {
-            am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT, count,
-                                 "the landing zone's released extents", UINT32_MAX, -1, seen);
+            /* A blocking get's room comes back as the replies from the one
+             * node it asks land, and its wait names that node and PE, as a
+             * reply's does (D-6); a nonblocking get's is the PE's, toward no
+             * one node, and its record says how many bytes the zone holds. */
+            if (peer != UINT32_MAX)
+                am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_REPLY,
+                              "the landing zone's released extents", peer, pe, seen);
+            else
+                am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
+                                     zone_bytes_held(), "the landing zone's released extents",
+                                     UINT32_MAX, -1, seen);
             waiting = true;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -1003,7 +1025,7 @@ static uint32_t piece_limit(struct osoe_connection *connection, uint32_t peer)
 }
 
 static void complete_gets(struct osoe_transport_context *c, const char *routine,
-                          const char *what);
+                          const char *what, uint32_t peer, int pe);
 static void issue_get_pieces(struct osoe_transport_context *c, int pe,
                              enum osoe_region region, uint64_t offset, void *dst, size_t len,
                              unsigned flags, const char *routine, bool blocking);
@@ -1020,9 +1042,12 @@ static _Thread_local struct osoe_internode_context own_gets;
  * the thread completes them as that context's quiet would, copying each piece
  * out as it lands. The nonblocking path whole, so that the lead's landing is
  * unchanged and a get waits about one round trip and its bytes' time, not one
- * round trip a piece (the author, 2026-10-10, item 2;
+ * round trip a piece (docs/decisions/2026-10-10-blocking-gets.md;
  * docs/design/blocking-get-proposal.md, (b)). Its pending list lives for the
- * call alone, so that nothing outlives a thread that exits. A thread place
+ * call alone, so that nothing outlives a thread that returns from it: one
+ * cancelled inside the wait, which the library does not support
+ * (base/sweep.h), would leave its pieces to be copied into its buffer by
+ * another thread, and its place's block owing their bytes. A thread place
  * whose block's index a token cannot carry - past OSOE_LANDING_OWNER_MASK, at
  * OSOE_MAX_CONTEXTS near its most - takes the piece-at-a-time path below.
  *
@@ -1046,7 +1071,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
     if (len > limit && own <= OSOE_LANDING_OWNER_MASK) {
         struct osoe_transport_context c = { .block = own, .live = true, .internode = &own_gets };
         issue_get_pieces(&c, pe, region, offset, dst, len, 0, "shmem_get", true);
-        complete_gets(&c, "shmem_get", "the bytes of its get's pieces");
+        complete_gets(&c, "shmem_get", "the bytes of its get's pieces", peer, pe);
         free(own_gets.pending);
         own_gets = (struct osoe_internode_context){ 0 };
         return;
@@ -1056,7 +1081,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
         uint32_t count = extents_for(n);
-        uint32_t extent = make_room(count, "shmem_get");
+        uint32_t extent = make_room(count, "shmem_get", peer, pe);
         uint64_t token = make_token(false, thread, extent);
         arm(slot, token);
         issue_record(extent, token, n);
@@ -1091,18 +1116,21 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
 }
 
 /*
- * Complete every nonblocking get context `c` has in flight: copy out each of
- * its pieces that has landed and that no other thread has claimed first
- * (copy_out), and wait until every byte the context asked for has been copied
- * out, by whichever of the PE's threads (§4.6's counters, in the context's
- * block, bytes_copied against bytes_issued; copy_out_claim_model.py). A wait on
- * the context calls it - a quiet, and all that completes as one. A piece of
- * `pending` another thread copied out has a record that no longer holds its
- * token, or none landed: copy_out's claim fails and the loop moves on, and the
- * count is what says it is done.
+ * Complete every nonblocking get context `c` has in flight - or, on a thread
+ * place's block, the pieces of a blocking get of more than one (remote_get):
+ * copy out each of its pieces that has landed and that no other thread has
+ * claimed first (copy_out), and wait until every byte the context asked for
+ * has been copied out, by whichever of the PE's threads (§4.6's counters, in
+ * the context's block, bytes_copied against bytes_issued;
+ * copy_out_claim_model.py). A wait on the context calls it - a quiet, and all
+ * that completes as one. A piece of `pending` another thread copied out has a
+ * record that no longer holds its token, or none landed: copy_out's claim
+ * fails and the loop moves on, and the count is what says it is done. `peer`
+ * and `pe` are the one node and PE a blocking get's pieces are toward, which
+ * its wait names; UINT32_MAX and -1 for a context's.
  */
 static void complete_gets(struct osoe_transport_context *c, const char *routine,
-                          const char *what)
+                          const char *what, uint32_t peer, int pe)
 {
     if (c->internode->pending_count == 0)
         return;
@@ -1135,11 +1163,16 @@ static void complete_gets(struct osoe_transport_context *c, const char *routine,
         }
         if (!waiting) {
             /* Whatever this PE held back goes out before it waits (transport.h).
-             * The gets may be toward any number of nodes, so the wait names
-             * none: its record says how many bytes are still to come. */
+             * A context's gets may be toward any number of nodes, so its wait
+             * names none, its record saying how many bytes are still to come; a
+             * blocking get's pieces are toward the one node and PE `peer` and
+             * `pe`, which its wait names, as a reply's does (D-6). */
             osoe_progress_host_wake_all();
-            am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
-                                 issued - copied, what, UINT32_MAX, -1, copied);
+            if (peer != UINT32_MAX)
+                am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_REPLY, what, peer, pe, copied);
+            else
+                am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
+                                     issued - copied, what, UINT32_MAX, -1, copied);
             waiting = true;
         }
         slept_on = seen;
@@ -1282,7 +1315,8 @@ static void issue_get_pieces(struct osoe_transport_context *c, int pe,
     unsigned char *at = dst;
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
-        uint32_t extent = make_room(extents_for(n), routine);
+        uint32_t extent = make_room(extents_for(n), routine, blocking ? peer : UINT32_MAX,
+                                    blocking ? pe : -1);
         if (issue_stamp) {
             uint64_t issue = (atomic_fetch_add_explicit(&issue_count, 1, memory_order_seq_cst) +
                               1) & ISSUE_MASK;
@@ -1601,7 +1635,8 @@ static void wait_body(struct osoe_transport_context *context, const int *pes, si
      * wait names: their completion is counted per context, not per target
      * (§4.6). First, so that the stores copying them into place come before
      * quiet's fence and are ordered as every other store before it is. */
-    complete_gets(context, routine, "the bytes its nonblocking gets have landed");
+    complete_gets(context, routine, "the bytes its nonblocking gets have landed", UINT32_MAX,
+                  -1);
     /* On a NOSTORE context too, for fence's reason above. */
     osoe_serializing_fence();
 
@@ -1837,5 +1872,6 @@ void osoe_internode_backend_wait_gets(struct osoe_transport_context *context,
     if (context->concurrent)
         wait_shared(context, NULL, 0, true, routine);
     else
-        complete_gets(context, routine, "the bytes its nonblocking gets have landed");
+        complete_gets(context, routine, "the bytes its nonblocking gets have landed",
+                      UINT32_MAX, -1);
 }

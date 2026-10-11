@@ -1,0 +1,183 @@
+Internal ctest changing into directory: /tmp/v02-blocking-gets-read/build/debug
+Test project /tmp/v02-blocking-gets-read/build/debug
+      Start  19: shmem.static-link
+      Start 199: shmem.internode.0-0-0-0
+      Start 200: shmem.internode.0-1-2
+      Start 201: shmem.internode.zero-copy.0-1-2
+ 1/86 Test #199: shmem.internode.0-0-0-0 ....................   Passed    0.01 sec
+      Start 202: shmem.internode.0-0-1-1-2-2
+ 2/86 Test #201: shmem.internode.zero-copy.0-1-2 ............   Passed    0.09 sec
+      Start 203: shmem.internode.zero-copy.0-0-1-1-2-2
+ 3/86 Test #200: shmem.internode.0-1-2 ......................   Passed    0.11 sec
+      Start 204: shmem.internode.0-0-0-1-2-2
+ 4/86 Test #202: shmem.internode.0-0-1-1-2-2 ................   Passed    0.11 sec
+      Start 205: shmem.internode.zero-copy.0-0-0-1-2-2
+ 5/86 Test #203: shmem.internode.zero-copy.0-0-1-1-2-2 ......   Passed    0.09 sec
+      Start 206: shmem.internode.0-1-2-0-1-0
+ 6/86 Test #204: shmem.internode.0-0-0-1-2-2 ................   Passed    0.08 sec
+      Start 207: shmem.internode.zero-copy.0-1-2-0-1-0
+ 7/86 Test #205: shmem.internode.zero-copy.0-0-0-1-2-2 ......   Passed    0.10 sec
+      Start 208: shmem.internode.zero-copy-refused.0-1-2
+ 8/86 Test #206: shmem.internode.0-1-2-0-1-0 ................   Passed    0.08 sec
+      Start 213: shmem.internode.force-remote.0-1-2
+ 9/86 Test #207: shmem.internode.zero-copy.0-1-2-0-1-0 ......   Passed    0.10 sec
+      Start 214: shmem.internode.force-remote.0-0-1-1-2-2
+10/86 Test #208: shmem.internode.zero-copy-refused.0-1-2 ....   Passed    0.10 sec
+      Start 215: shmem.internode.force-remote.0-0-0-1-2-2
+11/86 Test #213: shmem.internode.force-remote.0-1-2 .........   Passed    0.07 sec
+      Start 216: shmem.internode.force-remote.0-1-2-0-1-0
+12/86 Test #214: shmem.internode.force-remote.0-0-1-1-2-2 ...   Passed    0.08 sec
+      Start 245: shmem.stopped-node.0-0-1
+13/86 Test #215: shmem.internode.force-remote.0-0-0-1-2-2 ...   Passed    0.09 sec
+      Start 246: shmem.stopped-node.no-progress
+14/86 Test #216: shmem.internode.force-remote.0-1-2-0-1-0 ...   Passed    0.08 sec
+      Start 247: shmem.stopped-node.keepalive
+15/86 Test  #19: shmem.static-link ..........................   Passed    3.04 sec
+      Start 248: shmem.stopped-bulk.0-0-1
+16/86 Test #245: shmem.stopped-node.0-0-1 ...................   Passed    3.08 sec
+      Start 249: shmem.get-no-progress.0-1
+17/86 Test #247: shmem.stopped-node.keepalive ...............   Passed    6.08 sec
+      Start 250: shmem.get-no-progress.pieces-3.0-1
+18/86 Test #246: shmem.stopped-node.no-progress .............   Passed    7.29 sec
+      Start 251: shmem.get-no-progress.pieces-20.0-1
+19/86 Test #249: shmem.get-no-progress.0-1 ..................   Passed    7.32 sec
+      Start 308: shmem.rma.L1
+20/86 Test #308: shmem.rma.L1 ...............................   Passed    0.03 sec
+      Start 309: shmem.rma.L2
+21/86 Test #309: shmem.rma.L2 ...............................   Passed    0.03 sec
+      Start 310: shmem.rma.L4
+22/86 Test #310: shmem.rma.L4 ...............................   Passed    0.04 sec
+      Start 326: shmem.landing.L1
+23/86 Test #326: shmem.landing.L1 ...........................   Passed    0.00 sec
+      Start 327: shmem.landing.L2
+24/86 Test #327: shmem.landing.L2 ...........................   Passed    0.00 sec
+      Start 328: shmem.landing.L4
+25/86 Test #328: shmem.landing.L4 ...........................   Passed    0.00 sec
+      Start 350: shmem.get-nbi.L1
+26/86 Test #350: shmem.get-nbi.L1 ...........................   Passed    0.00 sec
+      Start 351: shmem.get-nbi.L2
+27/86 Test #351: shmem.get-nbi.L2 ...........................   Passed    0.00 sec
+      Start 352: shmem.get-nbi.L4
+28/86 Test #352: shmem.get-nbi.L4 ...........................   Passed    0.00 sec
+      Start 390: shmem.statics.L1
+29/86 Test #390: shmem.statics.L1 ...........................   Passed    0.01 sec
+      Start 391: shmem.statics.L2
+30/86 Test #391: shmem.statics.L2 ...........................   Passed    0.01 sec
+      Start 392: shmem.statics.L4
+31/86 Test #392: shmem.statics.L4 ...........................   Passed    0.02 sec
+      Start 393: shmem.statics.0-0-1-1
+32/86 Test #393: shmem.statics.0-0-1-1 ......................   Passed    0.15 sec
+      Start 394: shmem.statics.0-1-2-0-1-0
+33/86 Test #394: shmem.statics.0-1-2-0-1-0 ..................   Passed    0.16 sec
+      Start 395: shmem.statics.pie.L2
+34/86 Test #395: shmem.statics.pie.L2 .......................   Passed    0.02 sec
+      Start 396: shmem.statics.pie.0-0-1-1
+35/86 Test #396: shmem.statics.pie.0-0-1-1 ..................   Passed    0.14 sec
+      Start 397: shmem.statics.misuse
+36/86 Test #397: shmem.statics.misuse .......................   Passed    0.01 sec
+      Start 452: shmem.lanes.threads
+37/86 Test #452: shmem.lanes.threads ........................   Passed    1.20 sec
+      Start 453: shmem.lanes.threads.two-a-node
+38/86 Test #250: shmem.get-no-progress.pieces-3.0-1 .........   Passed    7.34 sec
+      Start 495: shmem.get-nbi.0-0-1-1
+39/86 Test #495: shmem.get-nbi.0-0-1-1 ......................   Passed    0.08 sec
+      Start 496: shmem.get-pieces.0-1
+40/86 Test #496: shmem.get-pieces.0-1 .......................   Passed    0.06 sec
+      Start 497: shmem.get-pieces.fallback.0-1
+41/86 Test #497: shmem.get-pieces.fallback.0-1 ..............   Passed    0.07 sec
+      Start 498: shmem.get-nbi.0-1-2-0-1-0
+42/86 Test #498: shmem.get-nbi.0-1-2-0-1-0 ..................   Passed    0.11 sec
+      Start 499: shmem.multiple.L1
+43/86 Test #499: shmem.multiple.L1 ..........................   Passed    0.01 sec
+      Start 500: shmem.multiple.L2
+44/86 Test #500: shmem.multiple.L2 ..........................   Passed    0.01 sec
+      Start 501: shmem.multiple.L4
+45/86 Test #501: shmem.multiple.L4 ..........................   Passed    0.01 sec
+      Start 502: shmem.multiple.0-1
+46/86 Test #502: shmem.multiple.0-1 .........................   Passed    0.25 sec
+      Start 503: shmem.multiple.checked.0-1
+47/86 Test #453: shmem.lanes.threads.two-a-node .............   Passed    2.07 sec
+      Start 504: shmem.multiple.checked.0-1-2-0-1-0
+48/86 Test #503: shmem.multiple.checked.0-1 .................   Passed    0.34 sec
+      Start 505: shmem.multiple.0-0-1-1
+49/86 Test #505: shmem.multiple.0-0-1-1 .....................   Passed    0.19 sec
+      Start 506: shmem.multiple.0-1-2-0-1-0
+50/86 Test #251: shmem.get-no-progress.pieces-20.0-1 ........   Passed    7.34 sec
+      Start 507: shmem.multiple.exhaust
+51/86 Test #507: shmem.multiple.exhaust .....................   Passed    0.01 sec
+      Start 514: shmem.context-team-destroy.L1
+52/86 Test #514: shmem.context-team-destroy.L1 ..............   Passed    0.00 sec
+      Start 515: shmem.context-team-destroy.L2
+53/86 Test #515: shmem.context-team-destroy.L2 ..............   Passed    0.01 sec
+      Start 516: shmem.context-team-destroy.L4
+54/86 Test #504: shmem.multiple.checked.0-1-2-0-1-0 .........   Passed    0.43 sec
+      Start 522: shmem.multiple.landing-unaligned
+55/86 Test #522: shmem.multiple.landing-unaligned ...........   Passed    0.01 sec
+      Start 523: shmem.thread-places.held
+56/86 Test #516: shmem.context-team-destroy.L4 ..............   Passed    0.04 sec
+      Start 524: shmem.thread-places.freed
+57/86 Test #523: shmem.thread-places.held ...................   Passed    0.01 sec
+      Start 601: shmem.context.L1
+58/86 Test #601: shmem.context.L1 ...........................   Passed    0.01 sec
+      Start 602: shmem.context.L2
+59/86 Test #524: shmem.thread-places.freed ..................   Passed    0.01 sec
+      Start 603: shmem.context.L4
+60/86 Test #602: shmem.context.L2 ...........................   Passed    0.00 sec
+      Start 604: shmem.context.0-0-1-1
+61/86 Test #603: shmem.context.L4 ...........................   Passed    0.01 sec
+      Start 605: shmem.context.0-1-2-0-1-0
+62/86 Test #604: shmem.context.0-0-1-1 ......................   Passed    0.07 sec
+      Start 606: shmem.context.force-remote.0-0-1-1
+63/86 Test #605: shmem.context.0-1-2-0-1-0 ..................   Passed    0.09 sec
+      Start 607: shmem.context.misuse.destroyed
+64/86 Test #607: shmem.context.misuse.destroyed .............   Passed    0.01 sec
+      Start 608: shmem.context.misuse.foreign
+65/86 Test #608: shmem.context.misuse.foreign ...............   Passed    0.01 sec
+      Start 609: shmem.context.misuse.invalid
+66/86 Test #609: shmem.context.misuse.invalid ...............   Passed    0.01 sec
+      Start 610: shmem.context.misuse.outside
+67/86 Test #610: shmem.context.misuse.outside ...............   Passed    0.01 sec
+      Start 611: shmem.context.misuse.default
+68/86 Test #611: shmem.context.misuse.default ...............   Passed    0.01 sec
+      Start 612: shmem.context.misuse.private-team
+69/86 Test #606: shmem.context.force-remote.0-0-1-1 .........   Passed    0.09 sec
+      Start 613: shmem.context.misuse.after-team
+70/86 Test #612: shmem.context.misuse.private-team ..........   Passed    0.01 sec
+      Start 618: shmem.context.pool-1.L2
+71/86 Test #613: shmem.context.misuse.after-team ............   Passed    0.01 sec
+      Start 619: shmem.context.pool-3.L2
+72/86 Test #618: shmem.context.pool-1.L2 ....................   Passed    0.01 sec
+      Start 633: shmem.thread.L1
+73/86 Test #619: shmem.context.pool-3.L2 ....................   Passed    0.01 sec
+      Start 634: shmem.thread.L2
+74/86 Test #506: shmem.multiple.0-1-2-0-1-0 .................   Passed    0.33 sec
+75/86 Test #633: shmem.thread.L1 ............................   Passed    0.00 sec
+      Start 635: shmem.thread.L4
+      Start 639: shmem.stat.L1
+76/86 Test #634: shmem.thread.L2 ............................   Passed    0.01 sec
+      Start 640: shmem.stat.L2
+77/86 Test #635: shmem.thread.L4 ............................   Passed    0.01 sec
+      Start 641: shmem.stat.L4
+78/86 Test #639: shmem.stat.L1 ..............................   Passed    0.01 sec
+      Start 642: shmem.stat.link
+79/86 Test #640: shmem.stat.L2 ..............................   Passed    0.38 sec
+      Start 746: stat.version
+80/86 Test #641: shmem.stat.L4 ..............................   Passed    0.38 sec
+81/86 Test #642: shmem.stat.link ............................   Passed    0.38 sec
+      Start 747: stat.segment
+      Start 748: stat.absent
+82/86 Test #748: stat.absent ................................   Passed    0.00 sec
+      Start 749: stat.help
+83/86 Test #749: stat.help ..................................   Passed    0.00 sec
+84/86 Test #746: stat.version ...............................   Passed    0.02 sec
+85/86 Test #747: stat.segment ...............................   Passed    0.03 sec
+86/86 Test #248: shmem.stopped-bulk.0-0-1 ...................   Passed   15.17 sec
+
+100% tests passed, 0 tests failed out of 86
+
+Label Time Summary:
+internode    =  60.63 sec*proc (37 tests)
+tier1        =   3.09 sec*proc (5 tests)
+tier2        =  62.20 sec*proc (81 tests)
+
+Total Test time (real) =  18.23 sec

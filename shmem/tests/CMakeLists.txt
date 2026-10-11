@@ -1915,6 +1915,28 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
     PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
     FAIL_REGULAR_EXPRESSION "GET RETURNED")
+  # And a get of more than a piece, whose pieces go out together (remote_get):
+  # three pieces of a default chunk's payload, which the landing zone holds, wait
+  # for their bytes; twenty wait for room at the fifth, the zone holding four.
+  # Each wait must name node and PE as a piece's reply does - which both named
+  # neither before the adversarial read of v0.2's blocking gets (finding 2) -
+  # and the expression names the wait, so that each test pins its own.
+  foreach(case IN ITEMS "3;150000;the bytes of its get's pieces"
+                        "20;1300000;the landing zone's released extents")
+    list(GET case 0 pieces)
+    list(GET case 1 bytes)
+    list(GET case 2 watching)
+    add_test(NAME shmem.get-no-progress.pieces-${pieces}.0-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=5 OSOE_TEST_GET_BYTES=${bytes}
+              $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+              $<TARGET_FILE:shmem_test_get-no-progress>)
+    set_tests_properties(shmem.get-no-progress.pieces-${pieces}.0-1 PROPERTIES
+      LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION
+        "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: ${watching} has stayed at"
+      FAIL_REGULAR_EXPRESSION "GET RETURNED")
+    osoe_internode_label(shmem.get-no-progress.pieces-${pieces}.0-1)
+  endforeach()
 endif()
 
 # A loud failure ends the job without joining a collective (§3.15; review round
@@ -3077,14 +3099,28 @@ set(osoe_get_nbi_small OSOE_GET_LANDING_BYTES=4096
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(get-nbi 0,0,1,1 ${osoe_get_nbi_small})
   # A blocking get of more than a piece issues its pieces together, on its
-  # thread's own context, and copies each out as it lands (the author,
-  # 2026-10-10, item 2; test-get-pieces.c): a get of a mebibyte moves
-  # am.gets_completed by a piece at least twice, one of a piece not at all.
+  # thread's own context, and copies each out as it lands
+  # (docs/decisions/2026-10-10-blocking-gets.md; test-get-pieces.c): a get of a
+  # mebibyte moves am.gets_completed by a piece at least twice, one of a piece
+  # not at all, and its pieces fill the zone before any is copied out. The
+  # failure expression, since a pass expression makes CTest ignore the exit
+  # status, and the banner comes before the invariants' check and finalize.
   # A job of two nodes: in the single-node build the test is not registered,
   # and a property on it would refuse that build at configure time.
   if(OSOE_INTERNODE)
     osoe_tier2_map_test(get-pieces 0,1)
-    set_tests_properties(shmem.get-pieces.0-1 PROPERTIES PASS_REGULAR_EXPRESSION "GET PIECES OK")
+    set_tests_properties(shmem.get-pieces.0-1 PROPERTIES PASS_REGULAR_EXPRESSION "GET PIECES OK"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]|invariants:|osoe-launch: (rank|timeout)")
+    # And the fallback: at OSOE_MAX_CONTEXTS 4096 every thread place's block is
+    # past what a token names, so the get goes a piece at a time, as before the
+    # change - the one path no other test takes since.
+    add_test(NAME shmem.get-pieces.fallback.0-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_GET_PIECES=fallback OSOE_MAX_CONTEXTS=4096
+              $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_get-pieces>)
+    set_tests_properties(shmem.get-pieces.fallback.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "GET PIECES FALLBACK OK"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]|invariants:|osoe-launch: (rank|timeout)")
+    osoe_internode_label(shmem.get-pieces.fallback.0-1)
   endif()
   osoe_tier2_map_test(get-nbi 0,1,2,0,1,0 ${osoe_get_nbi_small})
 endif()
@@ -3093,8 +3129,9 @@ endif()
 # test-multiple.c): worker threads of every PE in the library at once, on
 # private contexts and on the default one, waiting several at a time; on one
 # node, and across nodes on a block and an interleaved map, with a landing zone
-# of 8 extents that each thread's 12 pieces in flight overfill; and a full
-# thread table ending the job by name. Under tsan the cross-node case that
+# of 8 extents that each thread's 12 pieces in flight overfill, and that each
+# thread's blocking get of 20 KiB takes in three pieces, copied out by whichever
+# thread finds them landed; and a full thread table ending the job by name. Under tsan the cross-node case that
 # counts is 0,1: one PE a node, so everything that writes a PE's memory - its
 # agent's landings, its threads' copy-outs, its replies - is a thread of the
 # one process tsan instruments, and a race among them is a report, not the

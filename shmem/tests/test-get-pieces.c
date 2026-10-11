@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * A blocking get of more than a piece issues its pieces together (the author,
- * 2026-10-10, item 2; docs/design/blocking-get-proposal.md, (b);
- * transport-internode.c, remote_get).
+ * A blocking get of more than a piece issues its pieces together
+ * (docs/decisions/2026-10-10-blocking-gets.md; docs/design/blocking-get-proposal.md,
+ * (b); transport-internode.c, remote_get).
  *
  * Across nodes a blocking get of more than a chunk's payload goes out as a
  * nonblocking get does - every piece with extents, a record and a token of its
@@ -15,6 +15,18 @@
  * moves it by a piece at least twice - and am.gets_nonblocking not at all,
  * since none of them is a nonblocking get. Every byte is checked where it
  * landed.
+ *
+ * And the pieces overlap: where the get is larger than the landing zone, as at
+ * the default 256 KiB, its first pieces fill the zone before any is copied out,
+ * so an issue finds no room - am.landing_full moves - where a get completing
+ * each piece before it issues the next would never fill it (the adversarial
+ * read of v0.2's blocking gets, note 4).
+ *
+ * OSOE_TEST_GET_PIECES=fallback, with OSOE_MAX_CONTEXTS at its most: every
+ * thread place's block lies past what a token can name, so a get of more than
+ * a piece takes the piece-at-a-time path instead - none of its pieces copied
+ * out as a nonblocking get's, the zone never full - and its bytes are as right
+ * (note 6).
  */
 #include <stdbool.h>
 #include <stddef.h>
@@ -94,6 +106,7 @@ int main(void)
         CHECK(one_piece == 0);
 
         completed = counter("am.gets_completed");
+        uint64_t full = counter("am.landing_full");
         memset(mine, 0, BIG + OFFSET);
         shmem_getmem(mine + OFFSET, source, BIG, 1);
         size_t wrong = first_wrong(mine + OFFSET, BIG);
@@ -105,12 +118,26 @@ int main(void)
             CHECK(mine[i] == 0);
         uint64_t pieces = counter("am.gets_completed") - completed;
         uint64_t counted = counter("am.gets_nonblocking") - nonblocking;
-        printf("a get of %d bytes: %llu pieces copied out, %llu counted nonblocking\n", BIG,
-               (unsigned long long)pieces, (unsigned long long)counted);
-        CHECK(pieces >= 2);
+        uint64_t no_room = counter("am.landing_full") - full;
+        printf("a get of %d bytes: %llu pieces copied out, %llu counted nonblocking, "
+               "%llu issues found no room\n", BIG, (unsigned long long)pieces,
+               (unsigned long long)counted, (unsigned long long)no_room);
         CHECK(counted == 0);
-        if (one_piece == 0 && wrong == BIG && pieces >= 2 && counted == 0)
-            printf("GET PIECES OK\n");
+        const char *mode = getenv("OSOE_TEST_GET_PIECES");
+        if (mode && strcmp(mode, "fallback") == 0) {
+            CHECK(pieces == 0);
+            CHECK(no_room == 0);
+            if (one_piece == 0 && wrong == BIG && pieces == 0 && counted == 0 && no_room == 0)
+                printf("GET PIECES FALLBACK OK\n");
+        } else {
+            const char *zone = getenv("OSOE_GET_LANDING_BYTES");
+            bool overfills = (zone ? strtoull(zone, NULL, 10) : 256 * 1024) < BIG;
+            CHECK(pieces >= 2);
+            CHECK(!overfills || no_room >= 1);
+            if (one_piece == 0 && wrong == BIG && pieces >= 2 && counted == 0 &&
+                (!overfills || no_room >= 1))
+                printf("GET PIECES OK\n");
+        }
         free(mine);
     }
 

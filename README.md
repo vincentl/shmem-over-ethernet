@@ -299,8 +299,8 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 864 tests fail at `shmem_init` or at opening a ring -
-every one but `env.probe` among the 464 labelled `internode`, which need more
+410 of the test suite's 867 tests fail at `shmem_init` or at opening a ring -
+every one but `env.probe` among the 467 labelled `internode`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
@@ -308,7 +308,7 @@ io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 864 tests fail, with io_uring refused as well. Give the container a
+the suite's 867 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -804,7 +804,7 @@ times these:
 |---|---|
 | `OSOE_MAX_TEAMS` | every PE 24.25 KiB of address space at 4 nodes to 27.4 KiB at a thousand - the allgather's and reduce-scatter's words grow with log₂ n - and 12 bytes of the control segment |
 | `OSOE_TEAM_BLOCKS` | the node a kilobyte of `/dev/shm`, written at start; its lead about 760 bytes; every PE about 500 bytes of address space |
-| `OSOE_MAX_THREADS` | every PE a 577 KiB lane of address space and 896 bytes of the control segment, 128 of them the context block its blocking gets of more than one piece go on |
+| `OSOE_MAX_THREADS` | every PE a 577 KiB lane of address space and 896 bytes of the control segment on aarch64, 768 on x86-64, 128 of them the context block its blocking gets of more than one piece go on |
 | `OSOE_MAX_CONTEXTS` | every PE 128 bytes of the control segment and about 180 bytes, and each context in use 21 bytes a peer node |
 | `OSOE_PROGRESS_HELPERS` | each node's lead a thread, an io_uring ring and `OSOE_WIRE_BYTES` × `OSOE_WIRE_BUFFERS` of receive buffers, 1 MiB at the defaults; the control segment 256 bytes |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | a team number eighteen bytes for each byte of the value, on about 9.0 KiB: 11.3 KiB at 128, 27.0 KiB at the default 1 KiB, 297 KiB at 16 KiB, a PE (at 500 nodes) |
@@ -995,13 +995,21 @@ specification or takes a choice the specification leaves open.
 - **A large get from another node is held by its PE's landing zone.** A get's
   pieces of up to 64 KiB - seventeen to a mebibyte - go out together, a
   blocking get's as a nonblocking get's, but no more of them than the landing
-  zone holds: four at the default 256 KiB (`OSOE_GET_LANDING_BYTES`). On the Pi
-  cluster's gigabit a get of 64 KiB or more took 1.00 to 1.06 times a put and
-  quiet of the same size, blocking or not; over the development VM's loopback,
-  where a mebibyte crosses in less than a round trip, about 2.7 times at a
+  zone holds: four at the default 256 KiB (`OSOE_GET_LANDING_BYTES`). The zone
+  is the PE's, shared by its threads and contexts, so while one large get
+  fills it another thread's get of any size waits for a piece to land; and the
+  pieces in flight toward a node are bounded by its connection's reply credits
+  too (`OSOE_AM_CREDITS`, 64, shared by the node's PEs), from sixteen PEs of a
+  node getting at once. On the Pi cluster's gigabit a blocking get of 64 KiB
+  or more took 1.00 to 1.06 times a put and quiet of the same size, and a
+  nonblocking one 0.98 to 1.06; over the development VM's loopback, where a
+  round trip's time carries about the zone's 256 KiB, about 2.7 times at a
   mebibyte and 3.3 at 4 MiB. The zone's size for a fast link waits for one
   (`docs/decisions/2026-10-10-blocking-gets.md`;
-  `docs/design/blocking-get-proposal.md`, (d)).
+  `docs/design/blocking-get-proposal.md`, (d)). A thread whose place's
+  context block lies past block 4,095, the last a get's token can name - as
+  the last places' do from `OSOE_MAX_CONTEXTS` 4,080 at the default
+  `OSOE_MAX_THREADS` - gets a piece at a time, a round trip each.
 - **A nonblocking fetching atomic completes before it returns.**
   `shmem_atomic_fetch_add_nbi` and its kin issue the same round trip as the
   blocking forms and leave the value in place at once - the earliest the
@@ -1329,11 +1337,11 @@ that one could be added without touching the OpenSHMEM layer.
   counting wakes without the flag failed 8 to 9 of 20
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  464 tests labelled `internode` - those of a job of more than one node, of
+  467 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 399 of the full build's 864 tests in
+  development VM with liburing hidden: 399 of the full build's 867 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.

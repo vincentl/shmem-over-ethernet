@@ -781,7 +781,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * Then one for each thread place (layout 37), the block a thread's
      * blocking gets count in, 2.1 KiB a PE at the default 17 places, so that a
      * blocking get's pieces go out together as a nonblocking get's do
-     * (transport-internode.c, remote_get; the author, 2026-10-10, item 2).
+     * (transport-internode.c, remote_get; docs/decisions/2026-10-10-blocking-gets.md).
      */
     uint64_t contexts_offset = align_up(epochs_offset + epochs_bytes);
     uint64_t contexts_bytes = (uint64_t)b->local_count * (b->max_contexts + per_pe) *
@@ -1273,7 +1273,21 @@ again:;
             n->control_bytes ||
         h->dir.owner_bytes != sizeof(struct osoe_am_owner_metrics) ||
         h->dir.owners_bytes < (uint64_t)h->dir.owner_count * h->dir.owner_bytes ||
-        h->dir.owners_offset + h->dir.owners_bytes > n->control_bytes)
+        h->dir.owners_offset + h->dir.owners_bytes > n->control_bytes ||
+        /* The context pool, at its stride since layout 37 - the pool and a
+         * block for each thread place - and the thread records, which every
+         * PE indexes from the directory's counts (the adversarial read of
+         * v0.2's blocking gets, note 9): a mis-sized section is refused here,
+         * not stored past. */
+        h->dir.context_bytes != sizeof(struct osoe_context_block) ||
+        h->dir.contexts_bytes < (uint64_t)h->dir.local_count *
+                                    ((uint64_t)h->dir.contexts_per_pe + h->dir.threads_per_pe) *
+                                    h->dir.context_bytes ||
+        h->dir.contexts_offset + h->dir.contexts_bytes > n->control_bytes ||
+        h->dir.thread_record_bytes != sizeof(struct osoe_thread_record) ||
+        h->dir.threads_bytes < (uint64_t)h->dir.local_count * h->dir.threads_per_pe *
+                                   h->dir.thread_record_bytes ||
+        h->dir.threads_offset + h->dir.threads_bytes > n->control_bytes)
         osoe_fatal("control segment %s is too small for its own directory",
                    n->control_name);
     n->slots = (struct osoe_pe_slot *)((char *)n->hdr + h->dir.slots_offset);

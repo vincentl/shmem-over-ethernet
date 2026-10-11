@@ -103,7 +103,9 @@ struct osoe_segment_directory {
     uint32_t epoch_row_count;
 
     /* Appended at layout 21: each local PE's pool of context blocks (design
-     * §4.11; phase 1 step 8), which no metric scope reads yet. A reader built
+     * §4.11; phase 1 step 8), which no metric scope reads yet - contexts_per_pe
+     * of them, and since layout 37 a block more for each thread place after
+     * them (threads_per_pe), so a PE's stride is their sum. A reader built
      * before them asks and finds them absent. */
     uint64_t contexts_offset;
     uint64_t contexts_bytes;
@@ -367,12 +369,17 @@ void osoe_segment_close(struct osoe_segment *s);
  *       record an owner of the node's wires, the owner scope, appended to
  *       the directory - transport.am.* there, with each owner's tid and
  *       wires - where they were the node record's
+ *   37  each PE's pool of context blocks ends with a block for each thread
+ *       place, contexts_per_pe + threads_per_pe a PE, which its blocking gets
+ *       of more than one piece go on (docs/decisions/2026-10-10-blocking-gets.md)
  *
- * None of 5 to 36 changed the watch word's encoding: 17 gave it a region
- * value it could already carry, and 23 gave each thread a word of its own.
+ * None of 5 to 37 changed the watch word's encoding: 17 gave it a region
+ * value it could already carry, 23 gave each thread a word of its own, and 37
+ * lengthened the context pool, after which the thread records that hold the
+ * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               36
+#define OSOE_SEGMENT_NEWEST_LAYOUT               37
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 

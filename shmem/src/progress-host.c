@@ -143,7 +143,8 @@ static unsigned char *landing_request(void *context, uint32_t pe, uint64_t token
 }
 
 /*
- * A nonblocking get's reply has landed whole (landing_request has checked it).
+ * A nonblocking get's reply has landed whole (landing_request has checked it),
+ * or a piece's of a blocking get of more than one, which is issued as one.
  * Its record goes to LANDED first, with release, so that a second reply naming
  * it is refused and any of the PE's threads may now claim it for copying out
  * (transport-internode.c); then the context block the token names counts its bytes -
@@ -160,7 +161,8 @@ static void landed(void *context, uint32_t pe, uint64_t token, uint32_t bytes)
     uint32_t block = (uint32_t)((token >> OSOE_LANDING_OWNER_SHIFT) & OSOE_LANDING_OWNER_MASK);
     if (local < 0 || block >= osoe.node.contexts_per_pe + osoe.node.threads_per_pe)
         osoe_fatal("a nonblocking get's reply for PE %u names context block %u of %u: its "
-                   "token was accepted, so this node made it, and it made none past its pool",
+                   "token was accepted, so this node made it, and it made none past its pool "
+                   "and its thread places' blocks",
                    pe, block, osoe.node.contexts_per_pe + osoe.node.threads_per_pe);
     struct osoe_landing_record *r =
         &osoe_node_landing_records(&osoe.node, (uint32_t)local)[token & OSOE_LANDING_EXTENT_MASK];

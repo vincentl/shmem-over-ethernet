@@ -32,7 +32,7 @@
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
 /* 37: each PE's pool of context blocks followed by one for each thread place,
- * its blocking gets' own (v0.2, the author's 2026-10-10, item 2). */
+ * its blocking gets' own (v0.2; docs/decisions/2026-10-10-blocking-gets.md). */
 #define OSOE_NODE_LAYOUT 37
 
 enum osoe_phase {
@@ -337,9 +337,12 @@ struct osoe_segment_directory {
 
     /*
      * Appended at layout 21 (§4.6, §4.11; phase 1 step 8): each local PE's
-     * pool of context blocks, contexts_per_pe (OSOE_MAX_CONTEXTS) of them in
-     * local-id order, after every other section so that nothing before them
-     * moved. A PE's block 0 is SHMEM_CTX_DEFAULT's.
+     * pool of context blocks in local-id order, after every other section so
+     * that nothing before them moved - contexts_per_pe (OSOE_MAX_CONTEXTS) of
+     * them, and since layout 37 one more after them for each thread place
+     * (threads_per_pe), which the place's blocking gets of more than one piece
+     * count in, so a PE's stride is the sum (osoe_node_context). A PE's block
+     * 0 is SHMEM_CTX_DEFAULT's.
      */
     uint64_t contexts_offset;
     uint64_t contexts_bytes;
@@ -1023,7 +1026,10 @@ struct osoe_thread_record {
  * osoe_node_context), block 0 being SHMEM_CTX_DEFAULT's, live from init to
  * finalize; shmem_ctx_create claims a free one by a compare-and-swap on its
  * state word and shmem_ctx_destroy releases it, so a destroyed context's
- * block serves a later creation. Fixed-size, one cache line: the pool is O(1)
+ * block serves a later creation. After them, since layout 37, a block for
+ * each thread place, never claimed and never live, which the place's
+ * thread's blocking gets of more than one piece count in
+ * (osoe_node_thread_context). Fixed-size, one cache line: the pool is O(1)
  * per context whatever the job's size, which is the proposal's bound
  * (docs/prompts/done/phase1-step8-slice1-prompt.md, decision 2).
  *
@@ -1043,7 +1049,7 @@ struct osoe_context_block {
      * `bytes_landed` as the whole reply lands, then bumps the wake word and
      * wakes only while the PE waits on it (base/wait-word.h); a wait on the
      * context waits for the two to be equal and then copies its replies out.
-     * The reply's token names the block (OSOE_LANDING_CONTEXT_SHIFT), so the
+     * The reply's token names the block (OSOE_LANDING_OWNER_SHIFT), so the
      * lead credits the right context without the wire changing.
      */
     _Atomic uint64_t bytes_issued[2];
@@ -1081,9 +1087,10 @@ enum { OSOE_CONTEXT_FREE = 0, OSOE_CONTEXT_LIVE = 1 };
  * A get's `dest` may be a stack or malloc buffer that the lead's process cannot
  * see, so a reply cannot be written where the caller asked for it. It lands
  * here, in the node segment, and the *origin* copies it out - the calling
- * thread for a blocking get, and for a nonblocking one whichever of the PE's
- * threads claims it first: its context's quiet, or an issue that found the
- * zone full. It belongs in the control segment rather than the AM connection
+ * thread for a blocking get of one piece, and for a nonblocking get, or a
+ * blocking get of more than one piece, whichever of the PE's threads claims it
+ * first: the wait for its context's gets or for the blocking get's, or an
+ * issue that found the zone full. It belongs in the control segment rather than the AM connection
  * area because every backend needs it: the reason it exists is the address
  * space boundary, not the network.
  *
@@ -1111,9 +1118,10 @@ struct osoe_landing_zone {
  * asked for, and its state - FREE, ISSUED by its PE, LANDED by the lead once
  * the whole reply is in, COPYING by the one thread whose compare-and-swap won
  * it (tools/modelcheck/copy_out_claim_model.py), and back to FREE once its
- * bytes are out and its extents released. A blocking get's record goes to
- * LANDED_BLOCKING instead, which no other thread claims: its own thread copies
- * it. The PE writes `token` and `length`, then `state` with release, before its
+ * bytes are out and its extents released. A blocking get of one piece's
+ * record goes to LANDED_BLOCKING instead, which no other thread claims: its
+ * own thread copies it. A blocking get of more than one piece issues its
+ * pieces as a nonblocking get does, and their records go to LANDED. The PE writes `token` and `length`, then `state` with release, before its
  * request goes out; the lead finds the record by the index in the reply's
  * token and refuses a reply whose token is not the record's, whose record is
  * not ISSUED, or whose bytes would fall outside the piece (§3.4's trust
@@ -1134,9 +1142,10 @@ struct osoe_landing_record {
 };
 
 /*
- * A token (layout 23): the top bit names a nonblocking get; bits 48 to 59
- * the block its completion goes to - a nonblocking get's context block, or a
- * blocking operation's thread record; bit 47, since layout 24, the counter
+ * A token (layout 23): the top bit names a nonblocking get, or a piece of a
+ * blocking get of more than one; bits 48 to 59 the block its completion goes
+ * to - a nonblocking get's context block, such a piece's thread place's block
+ * past them (layout 37), or a blocking operation's thread record; bit 47, since layout 24, the counter
  * pair a shared context's nonblocking get counts in (struct
  * osoe_context_block); bits 16 to 46 a sequence; and the low
  * 16 bits the piece's first extent, or OSOE_LANDING_NO_EXTENT for a fetching

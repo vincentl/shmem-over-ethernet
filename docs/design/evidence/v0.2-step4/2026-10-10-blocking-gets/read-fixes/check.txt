@@ -1,0 +1,41 @@
+== configure and build debug 19:57:57
+== counts
+all 867
+internode 467
+== static 19:58:06
+100% tests passed, 0 tests failed out of 13
+== touched 19:58:32
+100% tests passed, 0 tests failed out of 86
+15/86 Test  #19: shmem.static-link ..........................   Passed    3.04 sec
+19/86 Test #249: shmem.get-no-progress.0-1 ..................   Passed    7.32 sec
+29/86 Test #390: shmem.statics.L1 ...........................   Passed    0.01 sec
+30/86 Test #391: shmem.statics.L2 ...........................   Passed    0.01 sec
+31/86 Test #392: shmem.statics.L4 ...........................   Passed    0.02 sec
+32/86 Test #393: shmem.statics.0-0-1-1 ......................   Passed    0.15 sec
+33/86 Test #394: shmem.statics.0-1-2-0-1-0 ..................   Passed    0.16 sec
+34/86 Test #395: shmem.statics.pie.L2 .......................   Passed    0.02 sec
+35/86 Test #396: shmem.statics.pie.0-0-1-1 ..................   Passed    0.14 sec
+36/86 Test #397: shmem.statics.misuse .......................   Passed    0.01 sec
+38/86 Test #250: shmem.get-no-progress.pieces-3.0-1 .........   Passed    7.34 sec
+40/86 Test #496: shmem.get-pieces.0-1 .......................   Passed    0.06 sec
+41/86 Test #497: shmem.get-pieces.fallback.0-1 ..............   Passed    0.07 sec
+43/86 Test #499: shmem.multiple.L1 ..........................   Passed    0.01 sec
+44/86 Test #500: shmem.multiple.L2 ..........................   Passed    0.01 sec
+45/86 Test #501: shmem.multiple.L4 ..........................   Passed    0.01 sec
+46/86 Test #502: shmem.multiple.0-1 .........................   Passed    0.25 sec
+48/86 Test #503: shmem.multiple.checked.0-1 .................   Passed    0.34 sec
+49/86 Test #505: shmem.multiple.0-0-1-1 .....................   Passed    0.19 sec
+50/86 Test #251: shmem.get-no-progress.pieces-20.0-1 ........   Passed    7.34 sec
+51/86 Test #507: shmem.multiple.exhaust .....................   Passed    0.01 sec
+54/86 Test #504: shmem.multiple.checked.0-1-2-0-1-0 .........   Passed    0.43 sec
+55/86 Test #522: shmem.multiple.landing-unaligned ...........   Passed    0.01 sec
+74/86 Test #506: shmem.multiple.0-1-2-0-1-0 .................   Passed    0.33 sec
+78/86 Test #639: shmem.stat.L1 ..............................   Passed    0.01 sec
+79/86 Test #640: shmem.stat.L2 ..............................   Passed    0.38 sec
+80/86 Test #641: shmem.stat.L4 ..............................   Passed    0.38 sec
+81/86 Test #642: shmem.stat.link ............................   Passed    0.38 sec
+82/86 Test #748: stat.absent ................................   Passed    0.00 sec
+83/86 Test #749: stat.help ..................................   Passed    0.00 sec
+84/86 Test #746: stat.version ...............................   Passed    0.02 sec
+85/86 Test #747: stat.segment ...............................   Passed    0.03 sec
+== done 19:58:50

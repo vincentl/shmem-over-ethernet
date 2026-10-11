@@ -1,0 +1,5 @@
+496: /tmp/v02-blocking-gets-read/shmem/tests/test-get-pieces.c:136: CHECK(!overfills || no_room >= 1) failed
+496: a get of 1000 bytes: 0 pieces copied out
+496: a get of 1048579 bytes: 17 pieces copied out, 0 counted nonblocking, 0 issues found no room
+1/1 Test #496: shmem.get-pieces.0-1 .............***Failed  Error regular expression found in output. Regex=[CHECK[(]|invariants:|osoe-launch: (rank|timeout)]  0.06 sec
+	496 - shmem.get-pieces.0-1 (Failed)                     internode tier2

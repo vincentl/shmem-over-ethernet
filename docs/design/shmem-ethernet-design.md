@@ -4222,8 +4222,9 @@ reused one by one, removes.
   each thread place (node segment layout 37) - and the thread completes it as
   that context's quiet would, so that its pieces are in flight together, as
   far as the zone and the credits allow, rather than one round trip a piece:
-  the nonblocking path whole, the lead's landing unchanged (the author,
-  2026-10-10, item 2; `docs/design/blocking-get-proposal.md`, (b)).
+  the nonblocking path whole, the lead's landing unchanged
+  (`docs/design/blocking-get-proposal.md`, (b), built where the author had
+  accepted (a); `docs/decisions/2026-10-10-blocking-gets.md` says why).
 - **Landing extents** (§10's decision of 2026-09-25): the zone is 1 KiB
   extents, claimed as runs by compare-and-swap over a bitmap; a record goes
   FREE, ISSUED, LANDED, then COPYING by compare-and-swap, so exactly one of the
