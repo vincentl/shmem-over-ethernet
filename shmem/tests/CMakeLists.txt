@@ -4532,3 +4532,19 @@ if(OSOE_INTERNODE)
     osoe_internode_label(tier3.pi.start-up.wrong-address)
   endif()
 endif()
+
+# The jobs of 32 to 70 PEs on one machine run one at a time and alone, each
+# taking every core. Since shmem_init raises the locked-memory limit
+# (docs/decisions/2026-10-11.md) they run whole on a Pi node, where they were
+# refused at start-up in a second, and tier 2 at -j4 started them together and
+# beside the start-up tests, whose processes then waited seconds on NFS for
+# their own scripts under /home - a shell in uninterruptible sleep in an NFSv4
+# open past the launcher's limit - and failed. if(TEST): the single-node build
+# registers none of them.
+foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33
+             shmem.shape.chosen.pi.64 shmem.shape.chosen.loopback.64
+             shmem.reply-pool.overflow)
+  if(TEST ${test})
+    set_tests_properties(${test} PROPERTIES RUN_SERIAL TRUE)
+  endif()
+endforeach()
