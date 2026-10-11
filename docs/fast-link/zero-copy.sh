@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # docs/fast-link.md §7: the zero-copy send. multistream's put stream in 1 MiB
-# and 64 KiB blocks over every node, PES_PER_NODE (4) PEs each, with
+# and 64 KiB blocks over every node, PES_PER_NODE (8) PEs each, with
 # OSOE_WIRE_ZERO_COPY off, and on at a threshold of 16 KiB (the default),
 # 64 KiB and 256 KiB; at each count of HELPERS ("0", and §5's best beside it),
 # ROUNDS (3) times in another order each round, PE 0 printing its node's
@@ -18,7 +18,7 @@ source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 ROUNDS=${ROUNDS:-3}
 HELPERS=${HELPERS:-0}
-PES_PER_NODE=${PES_PER_NODE:-4}
+PES_PER_NODE=${PES_PER_NODE:-8}
 SECONDS_EACH=${STREAM_SECONDS:-10}
 launch "$NODE_COUNT" 1 "$OUT/memlock.txt" -- bash -c 'echo "$(hostname) ulimit -l $(ulimit -l)"'
 CASES="off on-16k on-64k on-256k"

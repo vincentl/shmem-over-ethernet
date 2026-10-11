@@ -13,7 +13,7 @@ export KIT_LAUNCHER=osoe-launch KIT_TIMEOUT=300
 # A tree unpacked without .git cannot say its commit: give it as KIT_COMMIT,
 # which a checkout's own git rev-parse needs no help with (common.sh).
 # A small heap: every logical node's PEs share this machine's /dev/shm, which
-# the default heap's 256 MiB a PE would fill at scale.sh's 16 PEs a node.
+# the default heap's 256 MiB a PE would fill at scale.sh's 32 PEs a node.
 export SHMEM_SYMMETRIC_SIZE=32m
 OUT=$1
 KIT=$(cd "$(dirname "$0")" && pwd)

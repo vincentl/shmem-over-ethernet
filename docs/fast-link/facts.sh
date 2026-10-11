@@ -35,7 +35,8 @@ cat "/sys/class/net/$interface/speed" 2>&1 | say speed
 for option in -i -k -c -l -g; do /usr/sbin/ethtool $option "$interface" 2>&1 | say "ethtool$option"; done
 for key in net.core.netdev_max_backlog net.core.rmem_max net.core.wmem_max net.ipv4.tcp_rmem \
            net.ipv4.tcp_wmem net.ipv4.tcp_congestion_control net.ipv4.tcp_notsent_lowat \
-           net.ipv4.tcp_mtu_probing net.core.default_qdisc kernel.io_uring_disabled; do
+           net.ipv4.tcp_mtu_probing net.ipv4.tcp_slow_start_after_idle net.core.somaxconn \
+           net.core.default_qdisc kernel.io_uring_disabled; do
     echo "$key = $(cat "/proc/sys/${key//.//}" 2>&1)" | say sysctl
 done
 echo "memlock $(ulimit -l), open files $(ulimit -n), stack $(ulimit -s)" | say limits

@@ -55,11 +55,11 @@
  * **The records' bound.** A record is 24 bytes, and each PE has room for
  * RECORDS_A_NODE, 2^20, over the largest node's count of PEs: at most 24 MiB a
  * node, which its first PE copies into its private memory and sorts after the
- * window, and 1.5 MiB a PE at 16 PEs a node. A c2-standard-8's node sends at
- * most its 16 Gbit/s, some 1,910 MiB/s: in 64 KiB blocks 30,500 a second,
- * 305,000 in a 10 s window - three tenths of the room, about 19,100 records a
- * PE at 16 PEs a node against room for 65,536. A PE whose room runs out records
- * no more, and its node's figures stop at its last record: exact still, over a
+ * window, and 768 KiB a PE at 32 PEs a node. A c4-standard-16's node sends at
+ * most its 23 Gbit/s, some 2,740 MiB/s: in 64 KiB blocks 43,900 a second,
+ * 439,000 in a 10 s window - two fifths of the room, about 13,700 records a PE
+ * at 32 PEs a node against room for 32,768. A PE whose room runs out records no
+ * more, and its node's figures stop at its last record: exact still, over a
  * shorter window, which peers_window_s shows. The symmetric heap holds the
  * records beside the block (SHMEM_SYMMETRIC_SIZE): 24 MiB a PE at one PE a
  * node, 3 MiB at eight.
