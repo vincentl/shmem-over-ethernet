@@ -654,7 +654,10 @@ int main(int argc, char **argv)
     int listener = -1;
     pid_t child = -1;
     if (host) {
-        struct addrinfo hints = { .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM }, *found;
+        /* IPv4, as the server listens (below): a name that resolves to IPv6
+         * first - the development VM's own, to a link-local address - was
+         * refused there (round nine's read of the fast-link kit's changes). */
+        struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM }, *found;
         int r = getaddrinfo(host, port, &hints, &found);
         if (r != 0) {
             fprintf(stderr, "echo-uring: %s: %s\n", host, gai_strerror(r));

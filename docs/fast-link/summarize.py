@@ -328,13 +328,14 @@ def summarize(directory):
         print("\nmultistream: the job's MiB/s, a node's (each node's of each round), the"
               "\nprogress threads' CPU seconds a GiB, and the peer nodes a node's PEs were"
               "\ninside a call toward at once, time-averaged over the window every PE of the"
-              "\nnode was in its loop - the figure the model's numbers are set beside - then"
-              "\nthe same with each quiet counted toward the block before it, the share of the"
-              "\nPEs' time in quiets, and the seconds the count was taken over (median, range,"
-              "\ncount)")
+              "\nnode was in its loop - a lower bound of the model's quantity - then the same"
+              "\nwith each quiet counted toward the block before it, which comes nearer it, the"
+              "\nmodel's numbers going beside the pair (fast-link.md, section 5); the share of"
+              "\nthe PEs' time in quiets, and the seconds the count was taken over (median,"
+              "\nrange, count)")
         for key in sorted(multistream, key=lambda k: tuple(-1 if x is None else x for x in k[1:]) + (k[0],)):
             base, pes, h, zone, buffers = key
-            label = f"{base:10s} pes={pes} h={h}" + (f" zone={zone}" if zone else "")
+            label = f"{base:10s} pes={pes} h={'-' if h is None else h}" + (f" zone={zone}" if zone else "")
             v = multistream[key]
             print(f"  {label:36s} job {spread(v['mib_per_s'])}")
             print(f"  {'':36s} node {spread(v['node_mib_per_s'])}")
@@ -358,7 +359,7 @@ def summarize(directory):
               "\n`quick`, of 2,000 without")
         for key in sorted(bench, key=lambda k: tuple(-1 if x is None else x for x in k[1:]) + (k[0],)):
             base, pes, h = key[0], key[1], key[2]
-            print(f"  {base} pes={pes} h={h}")
+            print(f"  {base} pes={pes} h={'-' if h is None else h}")
             for line in sorted(bench[key]):
                 name, unit, size = line[3], line[4], line[1]
                 label = name + (f" {unit}={size}" if unit else "")

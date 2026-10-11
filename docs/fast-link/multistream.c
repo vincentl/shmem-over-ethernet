@@ -29,10 +29,13 @@
  *
  *   peers_in_calls             the time-averaged number of distinct peer nodes
  *                              toward which some PE of the node is inside a
- *                              call - the model's quantity, as near as a
- *                              program sees it (the kit's second adversarial
- *                              read, its Appendix), and the one to set beside
- *                              the model's numbers;
+ *                              call - a lower bound of the model's quantity
+ *                              (the kit's second adversarial read, its
+ *                              Appendix), pulled down by the PEs' time in
+ *                              quiets and by a put's bytes still draining
+ *                              after its call returns; the next comes nearer,
+ *                              and the model's numbers go beside the pair
+ *                              (fast-link.md §5);
  *   quiet_share                the share of the node's PE-time spent in
  *                              quiets, which the model's PEs never wait in -
  *                              in the development VM a put stream's PEs spent

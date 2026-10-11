@@ -148,8 +148,13 @@ and `TaskPlugin=task/none`, so that nothing binds a step's tasks: under
 `task/affinity` a job of one task - as `floor.sh`'s servers, clients and
 `iperf3` each are - is confined to the core Slurm allocated it, whatever
 `--cpu-bind=none` says, and §4's yardstick would measure a core a side rather
-than the link (round nine's review, R1; measured in the development VM's
-Slurm). It also sets, on every node:
+than the link (round nine's review, R1: the confinement measured in the
+development VM's Slurm, what it costs the yardstick not). Every job is then
+unbound, so the fast link's numbers are unbound ones - where the README gives
+the helpers' costs bound and unbound, and where the decisions index's way past
+the Pi's barrier's two modes, Slurm's default binding, is not to be had: read
+the barrier and the 8-byte reduction pooled, or by mode (§5). It also sets, on
+every node:
 
 - `RemoveIPC=no` for systemd-logind: with the default, a user's files in
   `/dev/shm` go ten seconds after the user's last session on a node ends, and a
@@ -170,8 +175,9 @@ build unnoticed, and makes the script's status the failure.
 README asks while a cluster is new, so that a stalled wait ends the job and
 names what it waited for; with `SHMEM_DEBUG=1`, since each job measures the
 link at start-up and sets every data wire's unsent limit from what it measured,
-and its start-up lines - PE 0's link, each node's limit - are the only record
-of either, which `summarize.py` prints beside each case (round nine's review,
+and its start-up lines - PE 0's link, each node's limit - record both for every
+job, where only §7's and §9's `osoe-stat` dumps did before, and `summarize.py`
+prints them beside each case (round nine's review,
 S2); under a timeout of about three times its length, each section's own
 (`KIT_TIMEOUT`), past which it is killed and `osoe-stat --gc` removes what it
 left in `/dev/shm` on every node; and with its input from `/dev/null`. Each job
@@ -272,18 +278,28 @@ connection area and is agreed at start-up), every node at once:
   PE records when each of its calls began and returned, and toward which node,
   and after the window the node's first PE sweeps its node's records for the
   time-averaged count of distinct peer nodes some PE of the node is in a call
-  toward, over the window in which all of them are in their loops. That is the
-  model's quantity (the kit's second adversarial read, its Appendix), and the
-  one figure to set beside the model's numbers - about four of seven at 8 PEs a
-  node, five at 16, six at 32, where the first order of the kit's had two or
-  fewer; four helpers are then about three quarters busy at 8 PEs a node, and
-  nearly all at 32. The model's PEs never wait in a quiet, and the stream's do,
-  their data still going out, so the quiets are printed apart - their share of
-  the PEs' time, and the count again with each quiet counted toward the block
-  before it - and neither is set beside the model's numbers. (The figure the
-  kit printed before, a bit a block in the millisecond its call returned,
-  counted the blocks a node finishes in a millisecond, its rate, and is gone:
-  round nine's review, S1.)
+  toward, over the window in which all of them are in their loops; and the same
+  with each quiet counted toward the block before it,
+  `peers_in_calls_with_quiets`, and the quiets' share of the PEs' time. Neither
+  is the model's quantity exactly (the kit's second adversarial read, its
+  Appendix), which counts every PE on the wire of its current block, with no
+  quiets and no buffers: `peers_in_calls` is a lower bound of it, pulled down by
+  the PEs' time in quiets and by a put's bytes still draining after its call
+  returns, and the count with quiets comes nearer. So the model's numbers go
+  beside the pair - at eight nodes about four of seven at 8 PEs a node, five at
+  16, six at 32; at five, 2.7 to 3.0 of four at 8 PEs a node and 3.6 to 3.9 at
+  32 - where the first order of the kit's had two to three at 8 PEs a node and
+  under two at 16 and 32. In the development VM at eight nodes of 8 PEs they
+  sat near or within the pair at 1 MiB, and near the count with quiets at
+  64 KiB, whose quiets took a quarter to a third of the PEs' time and left
+  `peers_in_calls` at 2.4 to 3.0 (round nine's read of these changes, finding
+  1): a convoy lowers both figures, long quiets only the first. Four helpers
+  are then about three quarters busy at 8 PEs a node, and nearly all at 32.
+  §8's rows of the same figures fall as the zone grows, a get's wait moving
+  from its calls to its quiets, and are not read there. (The figure the kit
+  printed before, a bit a block in the millisecond its call returned, counted
+  the blocks a node finishes in a millisecond, its rate, and is gone: round
+  nine's review, S1.)
 - `multistream put 65536 10`, the same in 64 KiB blocks: more messages a byte;
 - `multistream get 1048576 10`: the same with nonblocking gets, a quiet every
   8 MiB;
@@ -298,7 +314,11 @@ connection area and is agreed at start-up), every node at once:
   bound and 2 to 9% unbound (round eight's review,
   `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4; the README's
   Limits): a sweep of the streams and the mailbox alone would have read them as
-  a gain there (round nine's review, S3).
+  a gain there (round nine's review, S3). The 64 KiB broadcast's tree is
+  chosen from each job's own measured link, which `summarize.py` prints beside
+  the row: compare rows whose links agree, or set the link for the workload
+  (`OSOE_LINK_*`, from §2's facts) where they do not (round nine's read of
+  these changes, note 3).
 
 The order of the helper counts changes each round, so that a drift in the
 machines does not read as a helper count's. Three rounds of 4 helper counts × 3
@@ -392,7 +412,8 @@ speed; the zone's size for a fast link is the proposal's (d). The pieces in
 flight toward a node are bounded by its connection's reply credits too
 (`OSOE_AM_CREDITS`, 64 a connection, shared by the node's PEs), which this
 does not vary: with the stream's blocks spread over the peers, a connection
-carries the pieces of two PEs or so at once at 8 PEs a node, so the credits
+carries about 8/7 of one PE's pieces at once at eight nodes of 8 PEs, so the
+credits
 hold a zone back only from a few MiB. `get-pieces`' one PE, alone on its
 connection, has at most 64 pieces of 64 KiB, 4 MiB, in flight: past a zone of
 4 MiB its line is the credits', not the zone's. 24 jobs: about ten minutes.
