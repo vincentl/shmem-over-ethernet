@@ -16,7 +16,8 @@ process, where the tool cannot see the ordering. Each must:
 
 - be a data race. A report of any other kind fails - a thread leak, a lock
   inversion, a signal handler's unsafe call - and so does every ERROR, the
-  tool's word for a crash it caught;
+  tool's word for a crash it caught, and every FATAL or CHECK failed, its word
+  for its own failures, whatever else the file holds;
 - have its location in a heap object (osoe.<job>.<step>.<node>.<session>.heap.<pe>)
   and every access in the heaps' range, from OSOE_HEAP_BASE, 0x010000000000
   under the tool unless the test sets it;
@@ -112,14 +113,19 @@ def setup(reports, canary):
 
 def test_settings(ctest, build):
     """Each test's heap and collective settings, from ctest's list of the tests:
-    its command - `cmake -E env` and osoe-launch's -e set them there - and its
-    ENVIRONMENT. A setting found with two values is None, which the judging
-    refuses rather than guess."""
+    its command - `cmake -E env` and osoe-launch's -e set them there - its
+    ENVIRONMENT, and the text of any shell script the command runs, which may
+    set them itself (link.sh sets a fan-out of 2: the read of these changes,
+    R9F-3). A setting found with two values is None, which the judging refuses
+    rather than guess."""
     listing = subprocess.run([ctest, '--test-dir', build, '--show-only=json-v1'],
                              capture_output=True, text=True, check=True)
     settings = {}
     for test in json.loads(listing.stdout)['tests']:
         texts = list(test.get('command', []))
+        for word in test.get('command', []):
+            if word.endswith('.sh') and os.path.isfile(word):
+                texts.append(open(word, errors='replace').read())
         for p in test.get('properties', []):
             if p['name'] in ('ENVIRONMENT', 'ENVIRONMENT_MODIFICATION'):
                 texts += p['value'] if isinstance(p['value'], list) else [p['value']]
@@ -226,8 +232,12 @@ def judge(reports, ctest, build, place):
         m = re.match(r'(.+)\.(\d+)$', f)
         test = m.group(1) if m else f
         text = open(os.path.join(reports, f), errors='replace').read()
-        problems = [f'the tool\'s ERROR: {e}' for e in
-                    re.findall(r'ERROR: ThreadSanitizer: ([^\n]*)', text)]
+        # A crash the tool caught (ERROR), and the tool's own failures (FATAL,
+        # CHECK failed), fail the file whatever else it holds (the read of
+        # these changes, R9F-4).
+        problems = [f'the tool says: {m.group(0).strip()}' for m in re.finditer(
+            r'^.*(?:ERROR: ThreadSanitizer|FATAL: ThreadSanitizer|ThreadSanitizer: CHECK failed).*$',
+            text, re.M)]
         starts = list(REPORT_START.finditer(text))
         mine = settings.get(test)
         for i, start in enumerate(starts):

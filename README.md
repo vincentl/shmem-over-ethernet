@@ -203,7 +203,9 @@ only, and needs less. The full build:
   extensions, the symbol attributes and `__typeof__`
 - Python 3, optionally: the model checker and the stress tester's counting
   build use it. Where CMake does not find it, it says so while configuring and
-  leaves those out; nothing else needs it.
+  leaves those out; nothing else needs it but the `tsan` preset, whose verdict
+  a Python script gives, and which needs CMake 3.28 or newer too
+  ([How osoe is tested](#how-osoe-is-tested)).
 
 The single-node build:
 
@@ -252,7 +254,7 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - about 860,
+That builds one file at a time and runs the tests one at a time - about 870,
 checks of the build itself and jobs of a few processes. On four cores of an idle
 virtual machine it took about eleven minutes, one for the build and ten for the
 tests. Both may run four at a time, as this project's own runs do (`cmake
@@ -299,8 +301,8 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 867 tests fail at `shmem_init` or at opening a ring -
-every one but `env.probe` among the 467 labelled `internode`, which need more
+425 of the test suite's 871 tests fail at `shmem_init` or at opening a ring -
+all of them among the 470 labelled `internode` but `env.probe`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
@@ -308,7 +310,7 @@ io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 867 tests fail, with io_uring refused as well. Give the container a
+the suite's 871 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -1048,8 +1050,8 @@ specification or takes a choice the specification leaves open.
   user on the host together, against each one's `ulimit -l`, whose soft limit
   `shmem_init` raises to the hard one too, zero copy or not: a ring the hard
   limit refuses ends the job at start-up, naming it. Only one machine's logical
-  nodes come near it - one node's rings take at most 2.6 MiB at the 4,097-node
-  ceiling - and [`osoe-launch`](#running-a-program-on-one-machine-with-osoe-launch)
+  nodes come near it - one node's rings took at most 2.6 MiB at the 4,097-node
+  ceiling, on a Pi's 16 KiB pages at up to three helpers - and [`osoe-launch`](#running-a-program-on-one-machine-with-osoe-launch)
   gives a Pi's numbers.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
@@ -1332,7 +1334,7 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 860 tests in
+  run before every merge, on the exact tree that merges: about 870 tests in
   release, and the model checker's 40 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
@@ -1353,8 +1355,9 @@ that one could be added without touching the OpenSHMEM layer.
   nodes, each a put or an atomic a helper applies in a PE's heap mapping
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
-  through another process, which the tool cannot see - the reason the
-  multi-node maps are left out of that preset (§8.2) - and with no helpers the
+  through another process, which the tool cannot see - the reason that preset
+  leaves out 251 of the 470 tests labelled `internode`, `shmem.internode`'s
+  maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
   of those: a data race, naming a helper's thread, in a heap mapping; and of
@@ -1370,10 +1373,10 @@ that one could be added without touching the OpenSHMEM layer.
   reduction's grant gave each receiver a field of its own, two helpers could
   also write its head at once, the same bytes from each, and that word was
   about half of the reports: `docs/decisions/2026-10-10-grant-fields.md`.) One
-  test, which reads back 64 MiB a helper landed, takes about two minutes there
+  test, which reads back 64 MiB a helper landed, takes one to two minutes there
   in the tool's handling of eight million such reads, and is given five. The
-  preset runs without `shmem.helper-wake`, which, like every map of more than
-  one node, it leaves out. That test counts each owner's wakes - a helper's, and in a second run at no
+  preset runs without `shmem.helper-wake`, which it leaves out for that reason.
+  That test counts each owner's wakes - a helper's, and in a second run at no
   helpers the lead's agent's - putting to a peer only once the owner of its
   wire has raised the flag it raises before it sleeps, and checks that the put
   claimed that owner's wake itself: a wake sent to another owner or held back
@@ -1385,11 +1388,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  467 tests labelled `internode` - those of a job of more than one node, of
+  470 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 399 of the full build's 867 tests in
+  development VM with liburing hidden: 400 of the full build's 871 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1746,7 +1749,8 @@ other:
   processes on a host, held to each process's own soft limit, and on every
   kernel the zero-copy send (`OSOE_WIRE_ZERO_COPY`) charges the pages it lends
   to the same count. A node's own rings take little - at most 2.6 MiB a lead at
-  the 4,097-node ceiling - but one machine's logical nodes count together: with
+  the 4,097-node ceiling, on a Pi's 16 KiB pages at up to three helpers - but
+  one machine's logical nodes count together: with
   the 8 MiB soft limit a Raspberry Pi's shell passed to its Slurm step, the
   release's tier-2 tests, four at once on one node, failed beside each other,
   and with the soft limit raised in the step, whose hard limit is unlimited,
@@ -1756,6 +1760,10 @@ other:
 
 Neither can make a program that ran before fail: only a descriptor it could
 not have had, or memory it could not have locked, lands above the old limit.
+The locked memory is counted for the user on the host, though, so a job that
+now locks more than its old limit - the zero-copy send's lent pages, under a
+generous hard limit - leaves less of the count to the user's other processes
+there, each held to its own limit.
 Each PE raises its own, and the limits stay raised after `shmem_finalize`; a
 process the program starts inherits them, as it inherits every limit. The hard
 limits are the administrator's: where the hard limit is the soft one - a

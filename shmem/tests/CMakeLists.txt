@@ -1009,8 +1009,13 @@ osoe_refusal_test(shmem.start-up.never-calls-init.non-lead 3 2
 # A lead that ends after it has made the segment, while the node joins: the
 # node's other PEs, which wait on its count and print no notice of their own,
 # end by themselves naming it, where they were silent (the adversarial read of
-# 2026-10-03). See lead-ends.sh.
+# 2026-10-03). See lead-ends.sh. The launcher's limit is 30 s, not the usual 8:
+# a PE that arrives after its lead has died ends at once, naming it, but beside
+# tier 2's largest jobs on a Pi node rank 1 had not yet joined at the lead's
+# second second, and had said nothing when the launcher's eighth came
+# (2026-10-11).
 osoe_refusal_test(shmem.start-up.lead-ends-in-join 3 0
+  SECONDS 30
   LAUNCH -n 3
   PATTERNS "osoe: PE 1: the local lead, rank 0 [(]pid [0-9]+[)], has ended while this PE waited for local PEs to join the node"
   PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends.sh 3 2 $<TARGET_FILE:shmem_test_init>)
@@ -1894,7 +1899,8 @@ if(OSOE_INTERNODE)
   # the old 60 s bound. The limit was 1 s until a Pi took longer than that to
   # connect a second logical node under ctest -j4, and the limit fired at start-up
   # instead (docs/pi-cluster.md, 2026-09-24); then 5 s, until it fired so on a Pi
-  # node beside tier 2's largest jobs (the ninth review's Pi rehearsal).
+  # node beside tier 2's largest jobs (the ninth review's run of P9-1's
+  # refutation).
   osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
   set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
     PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
