@@ -1332,13 +1332,17 @@ that one could be added without touching the OpenSHMEM layer.
   reads back 64 MiB a helper landed, runs past its minute in the tool's
   handling of eight million such reads, and finishes in two given longer. The
   preset gates the suite at no helpers alone, without `shmem.helper-wake`,
-  which sets helpers itself and lands what a local thread reads. That test
-  counts each owner's wakes - a helper's, and in a second run at no helpers
-  the lead's agent's - putting to a peer only once the owner of its wire has
-  raised the flag it raises before it sleeps, so that a put that does not wake
-  that owner is a wake sent to another or an owner that spins, not one slow to
-  sleep: beside four busy loops on four cores it passed 20 runs of 20, where
-  counting wakes without the flag failed 8 to 9 of 20
+  which, like every map of more than one node, the preset leaves out. That
+  test counts each owner's wakes - a helper's, and in a second run at no
+  helpers the lead's agent's - putting to a peer only once the owner of its
+  wire has raised the flag it raises before it sleeps, and checks that the put
+  claimed that owner's wake itself: a wake sent to another owner or held back
+  fails it, and so does an owner that spins after raising its flag for longer
+  than an acknowledgement's round trip, a shorter spin being caught alone but
+  less surely under load. Beside four busy loops on four cores it passed 20
+  runs of 20, at two helpers and at none, in the release build and under
+  AddressSanitizer, where counting wakes without the flag failed 8 of 20 in the
+  release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
   467 tests labelled `internode` - those of a job of more than one node, of

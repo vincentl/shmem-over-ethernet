@@ -1669,20 +1669,22 @@ osoe_tier2_map_test(ack-echo 0,1)
 
 # Progress helpers (v0.2 step 4, Part 3; owner-map.h). A PE's wake reaches the
 # owner of its wire: each put of PE 0's, made once the owner has raised the flag
-# it raises before it sleeps, wakes the helper the map names for its peer, and
-# never the node's other helper (test-helper-wake.c; the wake count is the
-# owner's, layout 36; the flag read where PE 0's process maps the connection
-# area, base/cacheline.h giving the line). The deadlock detector, whose requests
-# nudge every helper, is off. Not under ThreadSanitizer, as the node maps above
-# are not: the helpers land the puts in heaps their PEs' own threads touch,
-# ordered through another process, and the preset runs at no helpers (the
-# second adversarial read of Part 3, S2). Not run alone any more: waiting for
-# the flag, it holds beside four busy loops on four cores, 20 runs of 20, where
-# counting wakes without it failed 8 to 9 of 20 and the suite under
-# AddressSanitizer failed it twice (docs/decisions/2026-10-10-helper-wake.md).
-# The same at no helpers, where the lead's agent is owner 0 and holds every
-# wire: a spin before its idle wait shows as a helper's does (scale S1, the
-# agent's half).
+# it raises before it sleeps, claims that owner's wake and wakes the helper the
+# map names for its peer, and no other owner of the node (test-helper-wake.c;
+# the wake count is the owner's, layout 36; the flag read where PE 0's process
+# maps the connection area, base/cacheline.h giving the line). The deadlock
+# detector, whose requests nudge every helper, is off. Not under
+# ThreadSanitizer, as no map of more than one node is: the helpers land the
+# puts in heaps their PEs' own threads touch, ordered through another process,
+# and the preset runs at no helpers (the second adversarial read of Part 3, S2).
+# Not run alone any more: waiting for the flag, both runs hold beside four busy
+# loops on four cores, 20 runs of 20 in the release build and under
+# AddressSanitizer, where counting wakes without it failed 8 of 20 in the first
+# and 9 of 20 in the second (docs/decisions/2026-10-10-helper-wake.md). The same
+# at no helpers, where the lead's agent is owner 0 and holds every wire: a spin
+# before its idle wait shows as a helper's does (scale S1, the agent's half) -
+# a spin longer than an acknowledgement's round trip surely, a shorter one alone
+# but less surely under load.
 if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(helper-wake 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
   target_include_directories(shmem_test_helper-wake PRIVATE ${PROJECT_SOURCE_DIR})

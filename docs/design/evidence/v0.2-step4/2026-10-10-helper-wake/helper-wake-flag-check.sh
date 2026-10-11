@@ -7,6 +7,10 @@
 # branch, each run five times, every run of which must fail: a helper that
 # spins 200 us after raising its flag (the scale review's mutate.py), the same
 # at 30 us, and a wake sent to the node's other helper.
+# Its summaries parse the lines of the test as it was at 62f060f, "helper H's ...
+# helper O woken"; against the test as committed, "owner H's ... owner O woken",
+# they come out empty while the pass counts still print (the adversarial read of
+# the change, N1). helper-wake-final-check.sh parses the committed lines.
 # usage: helper-wake-flag-check.sh MAIN_TAR BRANCH_TAR OUTDIR. Takes the VM lock.
 exec 9>/tmp/osoe-vm.lock; flock -w 43200 9 || exit 1
 MAIN=$1; BRANCH=$2; D=$3; mkdir -p "$D"; OUT=$D/check.txt; : > "$OUT"

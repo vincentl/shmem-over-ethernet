@@ -1,0 +1,131 @@
+build branch: warnings 0
+build spin200: warnings 0
+build spin30: warnings 0
+build agent200: warnings 0
+build agent30: warnings 0
+build misroute: warnings 0
+build held: warnings 0
+== the branch, alone 20:12:32
+helpers-quiet: 20 of 20 passed
+  lines read: 180
+  the owner woken: 56x100 2x101 1x199 1x200 
+  the other owners woken: 120x0 
+  flags not up: 0
+  PE 0's claims at the puts: 60x100 
+agent-quiet: 20 of 20 passed
+  lines read: 60
+  the owner woken: 60x100 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 60x100 
+== the branch, beside four busy loops 20:12:36
+helpers-loaded: 20 of 20 passed
+  lines read: 180
+  the owner woken: 33x100 1x121 1x122 1x123 1x166 1x168 1x185 1x188 6x198 3x199 11x200 
+  the other owners woken: 120x0 
+  flags not up: 0
+  PE 0's claims at the puts: 60x100 
+agent-loaded: 20 of 20 passed
+  lines read: 60
+  the owner woken: 24x100 1x105 1x116 1x131 1x148 1x170 2x177 1x183 1x192 2x197 4x198 5x199 16x200 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 60x100 
+asan-helpers-loaded: 20 of 20 passed
+  lines read: 180
+  the owner woken: 24x100 6x101 3x102 1x103 1x149 1x150 1x159 1x178 1x185 1x186 1x189 1x193 2x194 2x195 1x196 2x198 4x199 7x200 
+  the other owners woken: 120x0 
+  flags not up: 0
+  PE 0's claims at the puts: 60x100 
+asan-agent-loaded: 20 of 20 passed
+  lines read: 60
+  the owner woken: 36x100 1x101 1x108 1x116 1x162 1x182 1x194 1x196 7x199 10x200 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 60x100 
+== mutants, every run must fail 20:13:00
+mutant-spin200-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 9x1 3x2 1x24 1x46 1x48 
+  the other owners woken: 30x0 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-spin30-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 3x2 5x3 3x4 1x5 2x6 1x100 
+  the other owners woken: 30x0 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-misroute-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 15x0 15x100 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-held-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 30x0 
+  flags not up: 0
+  PE 0's claims at the puts: 15x0 
+mutant-agent200-agent-quiet: 0 of 5 passed
+  lines read: 15
+  the owner woken: 8x0 7x1 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-agent30-agent-quiet: 0 of 5 passed
+  lines read: 15
+  the owner woken: 2x1 1x2 3x3 2x4 3x5 3x6 1x8 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-held-agent-quiet: 0 of 5 passed
+  lines read: 15
+  the owner woken: 15x100 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 15x0 
+mutant-spin200-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 2x1 3x2 1x7 1x37 1x67 1x87 1x98 1x99 1x120 1x166 1x171 1x177 
+  the other owners woken: 30x0 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-spin30-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 2x1 1x2 2x3 1x6 1x8 1x9 1x71 1x79 1x83 1x185 1x193 1x194 1x197 
+  the other owners woken: 30x0 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-misroute-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 14x100 1x101 
+  the other owners woken: 15x0 1x81 2x95 2x96 1x97 9x100 
+  flags not up: 0
+  PE 0's claims at the puts: 1x82 2x95 2x96 1x97 9x100 
+mutant-held-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 30x0 
+  flags not up: 0
+  PE 0's claims at the puts: 15x0 
+mutant-agent200-agent-loaded: 0 of 5 passed
+  lines read: 15
+  the owner woken: 3x0 2x1 1x3 2x4 1x6 1x7 1x34 1x92 1x166 1x177 1x179 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-agent30-agent-loaded: 1 of 5 passed
+  lines read: 15
+  the owner woken: 2x2 1x3 3x4 1x51 1x55 1x57 1x84 1x92 1x97 1x183 1x184 1x192 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 15x100 
+mutant-held-agent-loaded: 0 of 5 passed
+  lines read: 15
+  the owner woken: 15x100 
+  the other owners woken: 
+  flags not up: 0
+  PE 0's claims at the puts: 15x0 
+DONE 20:13:16

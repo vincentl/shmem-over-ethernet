@@ -1,0 +1,111 @@
+build branch: warnings 0
+build spin200: warnings 0
+build spin30: warnings 0
+build agent200: warnings 0
+build agent30: warnings 0
+build misroute: warnings 0
+build held: warnings 0
+== the branch, alone 20:07:15
+helpers-quiet: 20 of 20 passed
+  lines read: 180
+  the owner woken: 4x193 1x194 4x195 4x196 11x197 8x198 8x199 20x200 
+  the other owners woken: 120x0 
+  flags not up: 0
+agent-quiet: 20 of 20 passed
+  lines read: 60
+  the owner woken: 1x187 3x192 1x193 4x194 4x195 4x196 7x197 10x198 15x199 11x200 
+  the other owners woken: 
+  flags not up: 0
+== the branch, beside four busy loops 20:07:19
+helpers-loaded: 15 of 20 passed
+  lines read: 180
+  the owner woken: 1x155 1x161 1x164 1x166 1x168 1x171 1x180 1x184 1x186 3x189 1x190 1x191 1x193 1x194 1x195 3x197 2x198 2x199 36x200 
+  the other owners woken: 120x0 
+  flags not up: 0
+agent-loaded: 19 of 20 passed
+  lines read: 60
+  the owner woken: 1x171 1x191 1x192 1x196 1x198 4x199 51x200 
+  the other owners woken: 
+  flags not up: 0
+asan-helpers-loaded: 19 of 20 passed
+  lines read: 180
+  the owner woken: 1x175 1x191 3x192 1x195 2x196 2x197 3x198 4x199 43x200 
+  the other owners woken: 119x0 1x1 
+  flags not up: 0
+asan-agent-loaded: 19 of 20 passed
+  lines read: 60
+  the owner woken: 1x160 1x187 2x192 1x194 1x196 3x197 2x198 5x199 44x200 
+  the other owners woken: 
+  flags not up: 0
+== mutants, every run must fail 20:08:28
+mutant-spin200-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 9x1 1x2 1x10 2x26 1x55 1x65 
+  the other owners woken: 30x0 
+  flags not up: 0
+mutant-spin30-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 2x1 4x2 3x3 3x4 1x6 2x100 
+  the other owners woken: 30x0 
+  flags not up: 0
+mutant-misroute-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 15x0 15x100 
+  flags not up: 0
+mutant-held-quiet: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 30x0 
+  flags not up: 0
+mutant-agent200-agent-quiet: 0 of 5 passed
+  lines read: 15
+  the owner woken: 8x0 4x1 2x2 1x52 
+  the other owners woken: 
+  flags not up: 0
+mutant-agent30-agent-quiet: 0 of 5 passed
+  lines read: 15
+  the owner woken: 1x1 2x2 1x3 1x4 1x5 3x6 2x10 1x13 1x14 1x25 1x53 
+  the other owners woken: 
+  flags not up: 0
+mutant-held-agent-quiet: 0 of 5 passed
+  lines read: 15
+  the owner woken: 15x100 
+  the other owners woken: 
+  flags not up: 0
+mutant-spin200-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 1x91 1x95 1x97 1x105 1x115 1x124 1x126 1x133 1x159 1x198 5x200 
+  the other owners woken: 30x0 
+  flags not up: 0
+mutant-spin30-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 1x70 1x102 1x113 1x118 1x119 1x121 1x123 2x174 1x180 1x190 4x200 
+  the other owners woken: 30x0 
+  flags not up: 0
+mutant-misroute-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 15x0 1x48 1x66 1x89 2x95 2x98 8x100 
+  flags not up: 0
+mutant-held-loaded: 0 of 5 passed
+  lines read: 45
+  the owner woken: 15x100 
+  the other owners woken: 30x0 
+  flags not up: 0
+mutant-agent200-agent-loaded: 0 of 5 passed
+  lines read: 15
+  the owner woken: 1x57 1x98 2x104 1x106 1x107 1x109 1x112 1x120 1x121 1x155 1x175 1x186 2x200 
+  the other owners woken: 
+  flags not up: 0
+mutant-agent30-agent-loaded: 2 of 5 passed
+  lines read: 15
+  the owner woken: 1x87 3x103 1x112 1x119 2x120 1x123 6x200 
+  the other owners woken: 
+  flags not up: 0
+mutant-held-agent-loaded: 0 of 5 passed
+  lines read: 15
+  the owner woken: 15x100 
+  the other owners woken: 
+  flags not up: 0
+DONE 20:08:58

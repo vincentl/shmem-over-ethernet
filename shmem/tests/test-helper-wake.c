@@ -11,20 +11,34 @@
  * counts each owner's wakes - the futex completions on its ring that saw its
  * wake word move (transport.am.wakes, layout 36) - while PE 0, alone on its
  * node, puts to each peer node in turn with a quiet after each put, and every
- * other PE waits in a barrier. Before each put PE 0 waits for the owner of that
- * peer's wire to raise the flag it raises before it sleeps (connection-area.h's
- * `sleeping`), so every put finds it asleep, or about to be, and must wake it:
- * the owner the map names is woken at nearly every put, and the node's other
- * helper not at all.
+ * other PE waits on a word of its own. Before each put PE 0 waits for the owner
+ * of that peer's wire to raise the flag it raises before it sleeps
+ * (connection-area.h's `sleeping`), so every put finds it asleep, or about to
+ * be, and must wake it: the owner the map names is woken in nearly every round,
+ * and every other owner of the node not at all. And the put's own wake is the
+ * one: PE 0's count of the wakes it claimed (am.wakes_sent) rises across nearly
+ * every put. Each round's quiet wakes the same owner, so the owner's count
+ * alone would pass a put whose wake was lost, or held back for good (the
+ * adversarial read of this test, finding 2).
  *
  * Waiting for the flag is what lets this hold on a loaded machine (the review
  * of v0.2 step 4's merge point, "The verification"): without it, an owner
  * preempted between a round's acknowledgement and its sleep was still awake at
  * the next put, and beside four busy loops on four cores the test failed 9
  * runs of 20, as if the owner spun. A helper that does spin after raising its
- * flag - the "spin a little for latency" change, scale S1's mutants - sees the
- * wake word move during its spin and never sleeps, so its wakes stay near none
- * however long PE 0 waits.
+ * flag - the "spin a little for latency" change, scale S1's mutants - is told
+ * from one that sleeps only as far as the count can tell them apart. The count
+ * is of the futex waits a wake ended, and a ring keeps its wait armed across a
+ * sleep that a socket's completion ended, so a spinner that slept through the
+ * round trip of its last acknowledgement has a wait left armed, which the put's
+ * wake completes and counts, as it would a sleeper's. So this catches a spin
+ * longer than that round trip - a 200 us spin at both helper counts, and at no
+ * helpers a 30 us one - and a shorter one on some wires only (finding 1;
+ * docs/decisions/2026-10-10-helper-wake.md has the counts). Counting the
+ * quiet's wake too, made once the flag rose again after the put, told every
+ * one of them apart on an idle machine, but beside four busy loops a correct
+ * library fell short of its bound in 5 runs of 20, and this runs beside other
+ * tests.
  *
  * Run on four nodes of one PE each, at OSOE_PROGRESS_HELPERS=2: node 0's peers
  * are nodes 1, 2 and 3 in slots 0, 1 and 2, whose wires are helper 1's, helper
@@ -48,12 +62,14 @@
 #include "base/cacheline.h"
 #include "check.h"
 #include "invariants.h"
+#include "launcher.h"
 
 /* A put and a quiet a round, each put once the owner's flag is up. A put can
  * still find the owner awake - its sweep's timeout, a tenth of a second apart,
  * or a pass begun again because a bit was set as it raised its flag - so the
  * bound is nine rounds in ten, not all of them. */
-enum { ROUNDS = 100, WOKEN_AT_LEAST = ROUNDS * 9 / 10, OTHER_AT_MOST = 2 };
+enum { ROUNDS = 100, WOKEN_AT_LEAST = ROUNDS * 9 / 10, OTHER_AT_MOST = 2,
+       CLAIMED_AT_LEAST = ROUNDS * 9 / 10 };
 
 /* How long PE 0 waits for an owner's flag before it counts the owner as one
  * that never sleeps: far past any preemption. */
@@ -117,6 +133,38 @@ static bool wait_for_flag(uint32_t owner)
     return true;
 }
 
+/* PE 0's count of the wakes it claimed (am.wakes_sent, its counter blocks
+ * summed), through one mapping of its node's control segment, read around
+ * each put - before PE 0 waits for the flag, so that the put follows the flag's
+ * rise at once. */
+static struct osoe_segment segment;
+static const struct osoe_metric_descriptor *wakes_sent;
+
+static void open_claims(void)
+{
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(name, sizeof name, 0);
+    if (osoe_segment_open(&segment, name, err, sizeof err) != 0) {
+        fprintf(stderr, "%s\n", err);
+        CHECK_FATAL(false);
+    }
+    wakes_sent = segment.table_usable ? osoe_segment_metric(&segment, "am.wakes_sent") : NULL;
+    CHECK_FATAL(wakes_sent != NULL);
+}
+
+static uint64_t claimed(void)
+{
+    const char *local = osoe_test_launcher("LOCALID");
+    uint32_t local_id = (uint32_t)atoi(local ? local : "0");
+    uint64_t total = 0;
+    for (uint32_t i = 0; i < segment.dir->blocks_per_pe; i++) {
+        uint64_t v;
+        if (osoe_segment_read(&segment, wakes_sent, local_id * segment.dir->blocks_per_pe + i, &v))
+            total += v;
+    }
+    return total;
+}
+
 static uint64_t wakes(uint32_t owner)
 {
     uint64_t value = 0;
@@ -128,45 +176,64 @@ int main(void)
 {
     shmem_init();
     int me = shmem_my_pe(), npes = shmem_n_pes();
-    long *x = shmem_malloc(sizeof *x);
+    long *x = shmem_malloc(sizeof *x), *done = shmem_malloc(sizeof *done);
     *x = 0;
+    *done = 0;
     CHECK_FATAL(npes == 4);
     shmem_barrier_all();
 
     if (me == 0) {
         find_flags();
+        open_claims();
         for (int node = 1; node < npes; node++) {
             uint32_t slot = (uint32_t)node - 1, owner = helpers ? 1 + slot % helpers : 0;
             uint64_t before[HELPERS_MOST + 1], after[HELPERS_MOST + 1];
             for (uint32_t o = 0; o <= helpers; o++)
                 before[o] = wakes(o);
             bool flag_rose = true;
+            uint64_t put_claims = 0;
             for (long round = 1; round <= ROUNDS; round++) {
+                uint64_t claims = claimed();
                 if (flag_rose && !wait_for_flag(owner)) {
                     printf("node %d's wire, owner %u's: its flag not up in %ld s before put "
                            "%ld\n", node, owner, FLAG_WAIT_NS / 1000000000, round);
                     flag_rose = false;
                 }
                 shmem_putmem(x, &round, sizeof round, node);
+                put_claims += claimed() - claims;
                 shmem_quiet();
             }
             for (uint32_t o = 0; o <= helpers; o++)
                 after[o] = wakes(o);
             CHECK(flag_rose);
-            /* With helpers, the agent holds no data wire, and is not judged. */
-            for (uint32_t o = helpers ? 1 : 0; o <= helpers; o++) {
+            printf("node %d's wire, owner %u's: PE 0 claimed a wake at %llu of %d puts\n", node,
+                   owner, (unsigned long long)put_claims, ROUNDS);
+            CHECK(put_claims >= CLAIMED_AT_LEAST);
+            /* Every owner judged: with helpers the agent holds no data wire,
+             * and nothing PE 0 does wakes it. */
+            for (uint32_t o = 0; o <= helpers; o++) {
                 uint64_t woken = after[o] - before[o];
                 printf("node %d's wire, owner %u's: owner %u woken %llu times in %d puts\n",
                        node, owner, o, (unsigned long long)woken, ROUNDS);
                 CHECK(o == owner ? woken >= WOKEN_AT_LEAST : woken <= OTHER_AT_MOST);
             }
         }
+        osoe_segment_close(&segment);
+        long one = 1;
+        for (int node = 1; node < npes; node++)
+            shmem_putmem(done, &one, sizeof one, node);
+        shmem_quiet();
+    } else {
+        /* A wait on this PE's own word, which sends nothing: the barrier's
+         * arrivals would reach node 0 inside the first window. */
+        shmem_long_wait_until(done, SHMEM_CMP_EQ, 1);
     }
 
     shmem_barrier_all();
     if (me != 0)
         CHECK(*x == ROUNDS);
     CHECK_INVARIANTS();
+    shmem_free(done);
     shmem_free(x);
     shmem_finalize();
     return CHECK_DONE();
