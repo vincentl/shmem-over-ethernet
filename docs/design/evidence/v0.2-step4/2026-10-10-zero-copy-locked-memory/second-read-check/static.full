@@ -1,0 +1,36 @@
+Internal ctest changing into directory: /tmp/v02-zero-copy-second-read/build/release
+Test project /tmp/v02-zero-copy-second-read/build/release
+      Start  12: shmem.exports
+      Start  14: shmem.version.library
+      Start  15: shmem.boundary
+      Start  16: shmem.settings-documented
+ 1/13 Test  #14: shmem.version.library ............   Passed    0.01 sec
+      Start  17: shmem.license-lines
+ 2/13 Test  #12: shmem.exports ....................   Passed    0.06 sec
+      Start  18: shmem.memory-orders
+ 3/13 Test  #17: shmem.license-lines ..............   Passed    0.06 sec
+      Start  19: shmem.static-link
+ 4/13 Test  #16: shmem.settings-documented ........   Passed    0.07 sec
+      Start  20: shmem.strict-c11
+ 5/13 Test  #18: shmem.memory-orders ..............   Passed    0.05 sec
+      Start  21: shmem.single-node.configure
+ 6/13 Test  #21: shmem.single-node.configure ......   Passed    0.34 sec
+      Start 706: shmem.version.start-up
+ 7/13 Test #706: shmem.version.start-up ...........   Passed    0.01 sec
+      Start 707: shmem.version.info
+ 8/13 Test #707: shmem.version.info ...............   Passed    0.00 sec
+      Start 708: shmem.version.start-up.sma
+ 9/13 Test #708: shmem.version.start-up.sma .......   Passed    0.00 sec
+      Start 709: shmem.version.info.sma
+10/13 Test #709: shmem.version.info.sma ...........   Passed    0.00 sec
+11/13 Test  #15: shmem.boundary ...................   Passed    0.67 sec
+12/13 Test  #19: shmem.static-link ................   Passed    3.26 sec
+13/13 Test  #20: shmem.strict-c11 .................   Passed   27.00 sec
+
+100% tests passed, 0 tests failed out of 13
+
+Label Time Summary:
+tier1    =  31.52 sec*proc (9 tests)
+tier2    =   0.02 sec*proc (4 tests)
+
+Total Test time (real) =  27.09 sec

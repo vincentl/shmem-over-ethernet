@@ -1,0 +1,101 @@
+Internal ctest changing into directory: /home/pi/osoe/build/zero-copy-src/build/release
+UpdateCTestConfiguration  from :/home/pi/osoe/build/zero-copy-src/build/release/DartConfiguration.tcl
+Parse Config file:/home/pi/osoe/build/zero-copy-src/build/release/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/pi/osoe/build/zero-copy-src/build/release/DartConfiguration.tcl
+Parse Config file:/home/pi/osoe/build/zero-copy-src/build/release/DartConfiguration.tcl
+Test project /home/pi/osoe/build/zero-copy-src/build/release
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 43
+    Start  43: shmem.wire.zero-copy
+
+43: Test command: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_wire "zero-copy"
+43: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+43: Test timeout computed to be: 120
+43: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+43: zero copy: 578 sends by reference, 0 refused, 578 notifications, 578 copied
+1/7 Test  #43: shmem.wire.zero-copy ......................   Passed    0.02 sec
+test 44
+    Start  44: shmem.wire.zero-copy-refused
+
+44: Test command: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_wire "zero-copy-refused"
+44: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+44: Test timeout computed to be: 120
+44: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+44: zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+2/7 Test  #44: shmem.wire.zero-copy-refused ..............   Passed    0.02 sec
+test 201
+    Start 201: shmem.internode.zero-copy.0-1-2
+
+201: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/home/pi/osoe/build/zero-copy-src/build/release/tools/launch/osoe-launch" "-n" "3" "-m" "0,1,2" "-t" "60" "--" "/home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_internode"
+201: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+201: Test timeout computed to be: 90
+201: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+201: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+201: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+3/7 Test #201: shmem.internode.zero-copy.0-1-2 ...........   Passed    0.11 sec
+test 203
+    Start 203: shmem.internode.zero-copy.0-0-1-1-2-2
+
+203: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/home/pi/osoe/build/zero-copy-src/build/release/tools/launch/osoe-launch" "-n" "6" "-m" "0,0,1,1,2,2" "-t" "60" "--" "/home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_internode"
+203: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+203: Test timeout computed to be: 90
+203: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+203: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+203: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+4/7 Test #203: shmem.internode.zero-copy.0-0-1-1-2-2 .....   Passed    0.11 sec
+test 205
+    Start 205: shmem.internode.zero-copy.0-0-0-1-2-2
+
+205: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/home/pi/osoe/build/zero-copy-src/build/release/tools/launch/osoe-launch" "-n" "6" "-m" "0,0,0,1,2,2" "-t" "60" "--" "/home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_internode"
+205: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+205: Test timeout computed to be: 90
+205: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+205: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+205: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+5/7 Test #205: shmem.internode.zero-copy.0-0-0-1-2-2 .....   Passed    0.10 sec
+test 207
+    Start 207: shmem.internode.zero-copy.0-1-2-0-1-0
+
+207: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "/home/pi/osoe/build/zero-copy-src/build/release/tools/launch/osoe-launch" "-n" "6" "-m" "0,1,2,0,1,0" "-t" "60" "--" "/home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_internode"
+207: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+207: Test timeout computed to be: 90
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+6/7 Test #207: shmem.internode.zero-copy.0-1-2-0-1-0 .....   Passed    0.11 sec
+test 208
+    Start 208: shmem.internode.zero-copy-refused.0-1-2
+
+208: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "OSOE_TEST_LOCKED_MEMORY=0" "/home/pi/osoe/build/zero-copy-src/build/release/tools/launch/osoe-launch" "-n" "3" "-m" "0,1,2" "-t" "60" "--" "/home/pi/osoe/build/zero-copy-src/build/release/shmem/tests/shmem_test_internode"
+208: Working Directory: /home/pi/osoe/build/zero-copy-src/build/release/shmem/tests
+208: Test timeout computed to be: 90
+208: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+208: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+208: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+208: osoe: PE 2: node 2: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+208: osoe: PE 1: node 1: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+208: osoe: PE 0: node 0: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, and on Linux 6.14 and later their rings, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+7/7 Test #208: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.10 sec
+
+The following tests passed:
+	shmem.wire.zero-copy
+	shmem.wire.zero-copy-refused
+	shmem.internode.zero-copy.0-1-2
+	shmem.internode.zero-copy.0-0-1-1-2-2
+	shmem.internode.zero-copy.0-0-0-1-2-2
+	shmem.internode.zero-copy.0-1-2-0-1-0
+	shmem.internode.zero-copy-refused.0-1-2
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+internode    =   0.56 sec*proc (7 tests)
+tier1        =   0.04 sec*proc (2 tests)
+tier2        =   0.53 sec*proc (5 tests)
+
+Total Test time (real) =   0.65 sec

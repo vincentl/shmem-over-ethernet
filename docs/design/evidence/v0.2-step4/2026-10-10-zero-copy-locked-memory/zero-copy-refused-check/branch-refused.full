@@ -1,0 +1,47 @@
+Internal ctest changing into directory: /tmp/zero-copy-refused-check/branch/build/release
+UpdateCTestConfiguration  from :/tmp/zero-copy-refused-check/branch/build/release/DartConfiguration.tcl
+Parse Config file:/tmp/zero-copy-refused-check/branch/build/release/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/tmp/zero-copy-refused-check/branch/build/release/DartConfiguration.tcl
+Parse Config file:/tmp/zero-copy-refused-check/branch/build/release/DartConfiguration.tcl
+Test project /tmp/zero-copy-refused-check/branch/build/release
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 43
+    Start  43: shmem.wire.zero-copy-refused
+
+43: Test command: /tmp/zero-copy-refused-check/branch/build/release/shmem/tests/shmem_test_wire "zero-copy-refused"
+43: Working Directory: /tmp/zero-copy-refused-check/branch/build/release/shmem/tests
+43: Test timeout computed to be: 120
+43: osoe: wire split 5000 per myriad, OSOE_WIRE_SEED=20260919
+43: zero copy: 2 sends by reference, 2 refused, 2 notifications, 2 copied
+1/2 Test  #43: shmem.wire.zero-copy-refused ..............   Passed    0.01 sec
+test 207
+    Start 207: shmem.internode.zero-copy-refused.0-1-2
+
+207: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_AM_CREDITS=2" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_WIRE_ZERO_COPY=on" "OSOE_WIRE_ZERO_COPY_BYTES=64" "OSOE_DEADLOCK_SECONDS=0" "OSOE_TEST_LOCKED_MEMORY=0" "/tmp/zero-copy-refused-check/branch/build/release/tools/launch/osoe-launch" "-n" "3" "-m" "0,1,2" "-t" "60" "--" "/tmp/zero-copy-refused-check/branch/build/release/shmem/tests/shmem_test_internode"
+207: Working Directory: /tmp/zero-copy-refused-check/branch/build/release/shmem/tests
+207: Test timeout computed to be: 90
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: wire split 2000 per myriad, OSOE_WIRE_SEED=20260919
+207: osoe: PE 1: node 1: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+207: osoe: PE 2: node 2: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+207: osoe: PE 0: node 0: a zero-copy send was refused for want of locked memory: io_uring counts what every send by reference of this user's processes on this host lends, against each process's own limit (ulimit -l, 0 KiB here) - raise it for the job, or set OSOE_WIRE_ZERO_COPY=off. The connections that met it copy from here on
+2/2 Test #207: shmem.internode.zero-copy-refused.0-1-2 ...   Passed    0.07 sec
+
+The following tests passed:
+	shmem.wire.zero-copy-refused
+	shmem.internode.zero-copy-refused.0-1-2
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+internode    =   0.08 sec*proc (2 tests)
+tier1        =   0.01 sec*proc (1 test)
+tier2        =   0.07 sec*proc (1 test)
+
+Total Test time (real) =   0.11 sec
