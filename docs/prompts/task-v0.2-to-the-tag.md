@@ -98,6 +98,26 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
    and the version (X1, X2), the checklist (X6), the README's sentences the runs
    make old (X4, X5); the author tags.
 
+## Working in small steps: the author's token budget
+
+The author's weekly allowance of tokens is shared by the lead and every agent
+it starts, and round nine's sessions spent most of it: an adversarial read or
+an investigator costs half a million tokens or more. So, as the author asked on
+2026-10-11:
+
+- **One small step a turn**: one item, or one slice's one stage - build, verify,
+  read, merge - then say what it cost and stop for the author's word before the
+  next, where the step was large.
+- **Watch the usage**: where the session has the app's usage tool, read it at
+  each step; tell the author at each tenth of the week's allowance, and stop
+  short of it.
+- **Spend agents where they pay**: Sonnet subagents for mechanical work and
+  searches; a fresh agent's adversarial read once a slice is whole, batching
+  small items into one slice and one read; no agent rereading what the lead
+  already knows - give it the paths and the questions.
+- **Keep the context small**: read the part of a file the step needs, not the
+  whole; run long jobs in the background and read only their summaries.
+
 ## How each piece of work is done
 
 The project's rules, as every session has followed them:
@@ -130,7 +150,14 @@ The project's rules, as every session has followed them:
 
 ## What the author decides first
 
-Each is answered before its items start; the lead's recommendation first.
+**Answered on 2026-10-11** (`docs/decisions/2026-10-11.md`): A7 - RoCE and
+Soft-RoCE stay out, design motivation and no code; A8 - the mesh schedule built
+now; A9 - the session routines no-ops; A10 - `OSOE_AM_HUGEPAGES` retired; A12 -
+cancellation unsupported; A13 - Träff's lower ceiling's tests accepted. **Open:**
+A11, `collect`'s lengths - put to the author with its pros and cons, the lead
+recommending to keep it - and A1's MTU, which the author is checking.
+
+What was put to the author, the lead's recommendation first:
 
 - **A1, the cluster** - answered in part on 2026-10-11 (eight `c2-standard-8`):
   the MTU, the head node, each session's window and the budget remain.
