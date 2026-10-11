@@ -113,14 +113,15 @@ Written 2026-10-10, from the items above that every tag needs, the after-release
 list's one that names "the tag", and the author's answers of the v0.2 arc. Open
 until the tree to be tagged has them; the author tags.
 
-- [ ] **Part 4 on a link above a gigabit, or 0.2 without it** - the author's
-  call: "0.2 may ship without it if the hardware is not there in time"
-  (`docs/decisions/2026-10-09.md` item 3); `docs/fast-link.md` is its runbook.
+- [ ] **Part 4 on a link above a gigabit**: 0.2 waits for the hardware (the
+  author, `docs/decisions/2026-10-10.md` item 3, where `2026-10-09.md` item 3
+  had let it ship without); `docs/fast-link.md` is its runbook.
 - [ ] **The review's findings settled on the candidate.** Round eight, at step
   4's merge point, said *release after named changes*, and they were made
   (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
-  adversarially before it merges. A change that lands between that review and the
-  candidate is weighed for a further full round.
+  adversarially before it merges. A further full round, the ninth, runs before
+  the tag (the author, `docs/decisions/2026-10-10.md` item 5), its findings
+  settled as round eight's were.
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at no helpers and at two and three where the merge point ran
   them; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
@@ -149,10 +150,11 @@ until the tree to be tagged has them; the author tags.
   names, with the README's places that give the current version - its Status,
   the version strings and the library's file name, the repository table's row,
   `SHMEM_VERSION`'s row - and the README's Status linking the new note.
-- [ ] **The soname** - the author's call: `libosoe.so.0`, as 0.1.0's - the
-  installed headers and the exported names are 0.1.0's, so a program built
-  against 0.1.0 should link and run against 0.2, which no one has tried - or a
-  new one. The library's file is `libosoe.so.0.2.0` either way.
+- [x] **The soname**: `libosoe.so.0`, as 0.1.0's (the author,
+  `docs/decisions/2026-10-10.md` item 4) - the installed headers and the
+  exported names are 0.1.0's, so a program built against 0.1.0 should link and
+  run against 0.2, which no one has tried. The library's file is
+  `libosoe.so.0.2.0`.
 
 ## After the release
 
