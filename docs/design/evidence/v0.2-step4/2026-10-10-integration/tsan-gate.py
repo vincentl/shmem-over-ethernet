@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
 """v0.2 step 4 part 3: the gate on ThreadSanitizer's reports at a helper count,
 test by test (the second adversarial read of Part 3, S2: the first gate read
 the reports alone, and passed a run in which a test had failed by a timeout).
