@@ -19,11 +19,14 @@ SSH="ssh -o StrictHostKeyChecking=accept-new"
 everywhere() { for n in $(grep . "$NODES_FILE"); do $SSH "$n" "$@"; done; }
 
 # munge: the first node's key, on every node, by its standard input rather
-# than its command line, where ps would show it.
+# than its command line, where ps would show it; read once, before the loop,
+# since the first node's own copy is rewritten in it.
 sudo test -s /etc/munge/munge.key || sudo mungekey --create
+KEY=$(sudo base64 -w0 /etc/munge/munge.key)
 for n in $(grep . "$NODES_FILE"); do
-    sudo cat /etc/munge/munge.key |
-        $SSH "$n" "sudo tee /etc/munge/munge.key > /dev/null &&
+    echo "$KEY" |
+        $SSH "$n" "base64 -d | sudo tee /etc/munge/munge.key.new > /dev/null &&
+                   sudo mv /etc/munge/munge.key.new /etc/munge/munge.key &&
                    sudo chown munge:munge /etc/munge/munge.key && sudo chmod 400 /etc/munge/munge.key &&
                    sudo systemctl enable munge && sudo systemctl restart munge"
 done
@@ -51,6 +54,7 @@ SelectType=select/cons_tres
 SelectTypeParameters=CR_Core
 SchedulerType=sched/backfill
 PropagateResourceLimitsExcept=MEMLOCK
+InactiveLimit=120
 ReturnToService=2
 SlurmUser=slurm
 SlurmctldPidFile=/run/slurmctld/slurmctld.pid

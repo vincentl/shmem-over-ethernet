@@ -13,14 +13,20 @@
  * node had the same list, starting on the same peer, and under the block
  * layout a node's PEs moved together as a convoy, one peer node at a time: in a
  * model, 2 to 2.8 peers of 7 busy at once at 8 PEs a node, and 1.5 at 32 (the
- * adversarial read of the kit, finding 1). Each node's bytes to each peer node
- * are printed, so that the spread is in the output rather than assumed.
+ * adversarial read of the kit, finding 1). So the spread is measured, not
+ * assumed: each node's bytes to each peer node over the window, which come out
+ * even whatever the order, and how many peer nodes its PEs start blocks toward
+ * at once - each PE ORs a bit for the block's peer node into its node's word
+ * for the millisecond the block starts in, a word a millisecond on the node's
+ * first PE, and that PE averages the bits set over the milliseconds with any
+ * (the second adversarial read of the kit, finding 7). For jobs of at most 64
+ * nodes and windows of at most 16 s, longer windows taking longer slices.
  *
  * PE 0 prints a line for each node, one for each node's peers, and one for the
  * job:
  *
  *   multistream node=N pes=P mib_per_s=R progress_cpu_s=C program_cpu_s=Q
- *               progress_cpu_s_per_gib=G
+ *               progress_cpu_s_per_gib=G peers_at_once=A
  *   multistream node=N peer_mib=M1,M2,... (to nodes in order, itself skipped)
  *   multistream job mode=put bytes=B seconds=S nodes=N pes=P helpers=H
  *               mib_per_s=R progress_cpu_s_per_gib=G
@@ -137,9 +143,13 @@ static void dump(const char *which)
 /* Per node, at PE 0, indexed by the node's first PE: bytes moved, nanoseconds
  * of progress and of program CPU, and its PEs; and, for jobs of at most
  * PEER_NODES nodes, each node's bytes to each peer node, by node index. */
-enum { PEER_NODES = 64 };
+enum { PEER_NODES = 64, SLICES = 16384 };
 static uint64_t node_bytes[4096], node_progress[4096], node_program[4096], node_pes[4096];
 static uint64_t peer_bytes[PEER_NODES][PEER_NODES];
+/* On each node's first PE: a bit for each peer node its PEs started a block
+ * toward in each slice of the window; and at PE 0, each node's mean of them, in
+ * thousandths. */
+static uint64_t slice_peers[SLICES], node_at_once[4096];
 /* Every PE's node, as its first PE, and its local rank there (fcollect). */
 static int my_first, my_rank, firsts[4096], ranks[4096];
 
@@ -230,6 +240,7 @@ int main(int argc, char **argv)
 
     uint64_t progress0, program0;
     thread_cpu(&progress0, &program0);
+    double slice = seconds / SLICES > 1e-3 ? seconds / SLICES : 1e-3;
     double start = now(), stop = start + seconds;
     uint64_t moved = 0;
     if (count > 0) {
@@ -241,6 +252,12 @@ int main(int argc, char **argv)
                 shmem_putmem(window, local, bytes, targets[t]);
             moved += bytes;
             to_node[node_of[targets[t]]] += bytes;
+            if (nodes_count <= PEER_NODES) {
+                size_t s = (size_t)((now() - start) / slice);
+                if (s < SLICES)
+                    shmem_uint64_atomic_or(&slice_peers[s], UINT64_C(1) << node_of[targets[t]],
+                                           first);
+            }
             if (++since_quiet == per_quiet) {
                 shmem_quiet();
                 since_quiet = 0;
@@ -263,6 +280,18 @@ int main(int argc, char **argv)
         for (int n = 0; n < nodes_count; n++)
             if (to_node[n])
                 shmem_uint64_atomic_add(&peer_bytes[mine][n], to_node[n], 0);
+    /* Every OR is done, at every node's first PE, before it counts them. */
+    shmem_barrier_all();
+    if (me == first && nodes_count <= PEER_NODES) {
+        uint64_t bits = 0, busy = 0;
+        for (size_t s = 0; s < SLICES; s++)
+            if (slice_peers[s]) {
+                bits += (uint64_t)__builtin_popcountll(slice_peers[s]);
+                busy++;
+            }
+        if (busy)
+            shmem_uint64_atomic_add(&node_at_once[first], bits * 1000 / busy, 0);
+    }
     /* A reduction's source and destination are symmetric. */
     static double this_elapsed, slowest;
     this_elapsed = elapsed;
@@ -281,11 +310,13 @@ int main(int argc, char **argv)
             uint64_t b = shmem_uint64_atomic_fetch(&node_bytes[n], 0);
             uint64_t c = shmem_uint64_atomic_fetch(&node_progress[n], 0);
             uint64_t q = shmem_uint64_atomic_fetch(&node_program[n], 0);
+            uint64_t a = shmem_uint64_atomic_fetch(&node_at_once[n], 0);
             double gib = (double)b / (double)(1u << 30);
             printf("multistream node=%d pes=%llu mib_per_s=%.1f progress_cpu_s=%.3f "
-                   "program_cpu_s=%.3f progress_cpu_s_per_gib=%.4f\n", nodes - 1,
-                   (unsigned long long)pes, (double)b / (1 << 20) / slowest, (double)c * 1e-9,
-                   (double)q * 1e-9, gib > 0 ? (double)c * 1e-9 / gib : 0.0);
+                   "program_cpu_s=%.3f progress_cpu_s_per_gib=%.4f peers_at_once=%.2f\n",
+                   nodes - 1, (unsigned long long)pes, (double)b / (1 << 20) / slowest,
+                   (double)c * 1e-9, (double)q * 1e-9, gib > 0 ? (double)c * 1e-9 / gib : 0.0,
+                   (double)a / 1000);
             total += b;
             progress += c;
             if (nodes_count <= PEER_NODES && nodes_count > 1) {

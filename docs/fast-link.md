@@ -154,8 +154,13 @@ each section's own (`KIT_TIMEOUT`), past which it is killed and `osoe-stat --gc`
 removes what it left in `/dev/shm` on every node; on whole nodes, unbound,
 with more PEs than CPUs allowed (`--exclusive --cpu-bind=none --overcommit`),
 since 32 PEs a node are more tasks than a `c4-standard-16` has CPUs; and with
-its input from `/dev/null`. Each section's output directory should be new: a
-second run into one overwrites its rounds by name.
+its input from `/dev/null`. Every job is named `osoe-kit`, so that one the
+timeout ended, whose killed `srun` may leave its allocation behind, is
+cancelled by name - and `slurm-setup.sh` sets `InactiveLimit=120` besides. Run
+the kit from the first node's shell, not inside an allocation (`salloc`), where
+the steps `floor.sh` runs at once would wait on each other. Each section's
+output directory should be new: a second run into one overwrites its rounds by
+name.
 
 ## 2. The facts
 
@@ -228,7 +233,11 @@ connection area and is agreed at start-up), every node at once:
   node's progress threads - its PEs' agents, by the name `osoe-agent`, the
   lead's doing the work and the others waking ten times a second, and its
   helpers, `osoe-helper-N` - and its PEs' own threads spent, a GiB moved. The
-  kernel's receive work in softirq context is in neither;
+  kernel's receive work in softirq context is in neither. And how many peer
+  nodes a node's PEs start blocks toward at once - in a model, about four of
+  seven at 8 PEs a node, five at 16, six at 32, where the first order of the
+  kit's had two or fewer; four helpers are then about three quarters busy at 8
+  PEs a node, and nearly all at 32;
 - `multistream put 65536 10`, the same in 64 KiB blocks: more messages a byte;
 - `multistream get 1048576 10`: the same with nonblocking gets, a quiet every
   8 MiB;
@@ -242,13 +251,14 @@ about an hour at eight nodes. `ROUNDS`, `HELPERS`, `PES_PER_NODE` and
 `WORKLOADS` in the environment shorten it.
 
 `summarize.py` prints, for each workload, PE count and helper count, the median
-and range of the rounds' rates and of the progress threads' CPU a GiB, to three
-significant figures, with the count of rounds - a case with fewer lost one -
-and the least share any node's least-used peer had of its most-used; and,
-given §4's directory too, the bare aggregate, to be read at as many streams
-each way as a node has peers. What decides the question (§8 item 3) is whether
-a helper count raises the rate a node reaches toward its bare aggregate, at
-what CPU, and whether that holds at every PE count - a rule the author may then give, for example a count that follows
+and range of the rounds' rates - the job's, and a node's, which is what the
+node sent to all its peers, one way - of the progress threads' CPU a GiB, and
+of the peers a node fed at once, to three significant figures, with the count
+of rounds - a case with fewer lost one; and §4's bare aggregate, between two
+nodes both ways, with a node's share each way, which is what a node's rate is
+set beside, at as many streams as a node has peers. What decides the question
+(§8 item 3) is whether a helper count raises the rate a node reaches toward
+that share, at what CPU, and whether that holds at every PE count - a rule the author may then give, for example a count that follows
 the link's measured bandwidth and the node's peers, or the setting alone as
 today.
 
@@ -314,9 +324,10 @@ together only as far as the zone holds them - four pieces at the default - so
 where a round trip's time carries more than the zone, the zone sets a get's
 speed; the zone's size for a fast link is the proposal's (d). The pieces in
 flight toward a node are bounded by its connection's reply credits too
-(`OSOE_AM_CREDITS`, 64, shared by the node's PEs), which this does not vary: at
-8 PEs a node a zone above about 512 KiB may be held by them. 24 jobs: about ten
-minutes.
+(`OSOE_AM_CREDITS`, 64 a connection, shared by the node's PEs), which this
+does not vary: with the stream's blocks spread over the peers, a connection
+carries the pieces of two PEs or so at once at 8 PEs a node, so the credits
+hold a zone back only from a few MiB. 24 jobs: about ten minutes.
 
 ## 9. Fan-in
 
@@ -344,8 +355,10 @@ docs/fast-link/scale.sh NODES out/scale
 slowest PE's, which is the launcher's spread and init, and the fastest's,
 nearer init's own; and the SOS test suite at two PEs a node if `SOS_BUILD`
 names the directory of its programs, built as `docs/pi-cluster.md` §8 builds
-them, at the same path on every node: inside the tree but not under `build/`,
-so that `build.sh` copies it. The first runs of osoe on x86-64 hardware and on
+them - the suite fetched into the reading corpus first, which the repository
+does not hold - at the same path on every node: inside the tree but not under
+`build/`, and built before `build.sh` runs, or with `build.sh` run again after
+it, so that `build.sh` copies it. The first runs of osoe on x86-64 hardware and on
 more than four nodes: a failure here is the first finding to bring back. About
 an hour.
 

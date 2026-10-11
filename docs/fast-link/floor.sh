@@ -41,18 +41,20 @@ end_after() {   # PID SECONDS: wait for PID, ending it after SECONDS
 for k in $CONNECTIONS; do
     f=$OUT/echo-$k.txt
     echo "# $(date -u +%H:%M:%S) $k connections each way between $CLIENT and $SERVER" > "$f"
-    on "$SERVER" bash "$KIT/echo-servers.sh" "$ECHO" "$k" > "$OUT/echo-$k-servers-1.txt" 2>&1 &
+    spawn "$SERVER" "$OUT/echo-$k-servers-1.txt" bash "$KIT/echo-servers.sh" "$ECHO" "$k"
     servers1=$!
     if [ "$KIT_LAUNCHER" != osoe-launch ]; then
-        on "$CLIENT" bash "$KIT/echo-servers.sh" "$ECHO" "$k" > "$OUT/echo-$k-servers-2.txt" 2>&1 &
+        spawn "$CLIENT" "$OUT/echo-$k-servers-2.txt" bash "$KIT/echo-servers.sh" "$ECHO" "$k"
         servers2=$!
     fi
-    on "$CLIENT" bash "$KIT/echo-clients.sh" "$ECHO" "$k" "$SERVER_ADDRESS" "$ECHO_MEBIBYTES" \
-        > "$f.to-first" 2>&1 &
+    # The second direction's connections numbered from k, so that summarize.py
+    # sums all 2k of them.
+    spawn "$CLIENT" "$f.to-first" bash "$KIT/echo-clients.sh" "$ECHO" "$k" "$SERVER_ADDRESS" \
+        "$ECHO_MEBIBYTES" 0
     clients1=$!
     if [ "$KIT_LAUNCHER" != osoe-launch ]; then
-        on "$SERVER" bash "$KIT/echo-clients.sh" "$ECHO" "$k" "$CLIENT_ADDRESS" "$ECHO_MEBIBYTES" \
-            > "$f.to-second" 2>&1 &
+        spawn "$SERVER" "$f.to-second" bash "$KIT/echo-clients.sh" "$ECHO" "$k" \
+            "$CLIENT_ADDRESS" "$ECHO_MEBIBYTES" "$k"
         clients2=$!
     fi
     wait "$clients1"; echo "# exit toward the first node $?" >> "$f"
@@ -67,12 +69,16 @@ done
 
 if command -v iperf3 > /dev/null; then
     for k in $CONNECTIONS; do
-        on "$SERVER" iperf3 -s -1 -p 5201 > "$OUT/iperf3-$k-server.txt" 2>&1 &
+        spawn "$SERVER" "$OUT/iperf3-$k-server.txt" iperf3 -s -1 -p 5201
         server=$!
-        sleep 2
-        # The JSON alone in its file: srun's own messages would spoil it.
-        on "$CLIENT" iperf3 -c "$SERVER_ADDRESS" -p 5201 -P "$k" -t 10 --bidir -J \
-            > "$OUT/iperf3-$k.json" 2> "$OUT/iperf3-$k-client.txt"
+        # The JSON alone in its file: srun's own messages would spoil it. A
+        # client the server was not yet listening for tries again.
+        for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 1
+            on "$CLIENT" iperf3 -c "$SERVER_ADDRESS" -p 5201 -P "$k" -t 10 --bidir -J \
+                > "$OUT/iperf3-$k.json" 2> "$OUT/iperf3-$k-client.txt" && break
+            grep -q 'unable to connect' "$OUT/iperf3-$k.json" "$OUT/iperf3-$k-client.txt" || break
+        done
         end_after "$server" 30
         echo "$(date -u +%H:%M:%S) iperf3 $k streams each way done" >> "$LOG"
     done

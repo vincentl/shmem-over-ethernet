@@ -12,8 +12,8 @@
 #                  no binding, and more PEs than CPUs - 32 PEs a node of 16 -
 #                  which srun refuses without --overcommit)
 #   KIT_TIMEOUT    seconds a job may take before it is ended, SIGKILL 30 s
-#                  after SIGTERM; each section sets its own, about three times
-#                  its jobs' length (default 900)
+#                  after SIGTERM; each section sets its own, a few times its
+#                  longest job's length (default 900)
 #   KIT_COMMIT     the commit the cluster built, where the tree has no .git
 #                  (default: git rev-parse HEAD)
 #
@@ -66,9 +66,12 @@ block_map() {
 # launch NODES PES OUTFILE [NAME=VALUE...] -- PROGRAM [ARGUMENTS...]: one job,
 # its output to OUTFILE after a header of what ran; its status returned, and
 # logged. Its input is /dev/null: srun forwards a terminal to the tasks, and
-# under timeout's process group a read would stop it. A job ended by the
-# timeout may leave named heaps in /dev/shm, which osoe-stat --gc then removes
-# on every node.
+# under timeout's process group a read would stop it. Every job is named
+# osoe-kit, so that one ended by the timeout - whose killed srun may leave its
+# allocation behind - is cancelled by name; then osoe-stat --gc removes what it
+# left in /dev/shm on every node, itself under a timeout, since a node that is
+# down would hold it for ever. The kit is run outside an allocation (not under
+# salloc), where the steps it runs at once would wait on each other.
 launch() {
     local nodes=$1 pes=$2 file=$3 settings=()
     shift 3
@@ -85,12 +88,13 @@ launch() {
         status=$?
     else
         # shellcheck disable=SC2086
-        env "${settings[@]}" timeout -k 30 "$KIT_TIMEOUT" srun $KIT_SRUN -N"$nodes" \
-            --ntasks-per-node="$pes" "$@" >> "$file" 2>&1 < /dev/null
+        env "${settings[@]}" timeout -k 30 "$KIT_TIMEOUT" srun -J osoe-kit $KIT_SRUN \
+            -N"$nodes" --ntasks-per-node="$pes" "$@" >> "$file" 2>&1 < /dev/null
         status=$?
         if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
-            srun -N"$NODE_COUNT" --ntasks-per-node=1 "$KIT_BUILD/tools/stat/osoe-stat" --gc \
-                >> "$file" 2>&1 < /dev/null
+            scancel -u "$(id -un)" -n osoe-kit >> "$file" 2>&1
+            timeout -k 10 120 srun -J osoe-kit-gc -N"$NODE_COUNT" --ntasks-per-node=1 \
+                "$KIT_BUILD/tools/stat/osoe-stat" --gc >> "$file" 2>&1 < /dev/null
         fi
     fi
     echo "# exit $status" >> "$file"
@@ -107,7 +111,23 @@ on() {
     if [ "$KIT_LAUNCHER" = osoe-launch ]; then
         timeout -k 30 "$KIT_TIMEOUT" "$@"
     else
-        timeout -k 30 "$KIT_TIMEOUT" srun -N1 -n1 --cpu-bind=none -w "$name" "$@" < /dev/null
+        timeout -k 30 "$KIT_TIMEOUT" srun -J osoe-kit -N1 -n1 --cpu-bind=none -w "$name" "$@" \
+            < /dev/null
+    fi
+}
+
+# spawn NODE OUTFILE COMMAND...: as on, but in the background, its output to
+# OUTFILE, and $! the timeout around it rather than a subshell, so that ending
+# $! ends the command on its node: timeout passes the signal to srun, which
+# passes it to the task.
+spawn() {
+    local name=$1 file=$2
+    shift 2
+    if [ "$KIT_LAUNCHER" = osoe-launch ]; then
+        timeout -k 30 "$KIT_TIMEOUT" "$@" > "$file" 2>&1 < /dev/null &
+    else
+        timeout -k 30 "$KIT_TIMEOUT" srun -J osoe-kit -N1 -n1 --cpu-bind=none -w "$name" "$@" \
+            > "$file" 2>&1 < /dev/null &
     fi
 }
 

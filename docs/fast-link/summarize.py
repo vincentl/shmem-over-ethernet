@@ -153,6 +153,11 @@ def summarize(directory):
                 fields = number_fields(line)
                 for k in ("mib_per_s", "progress_cpu_s_per_gib"):
                     multistream[key][k].append(fields[k])
+            elif line.startswith("multistream node=") and "mib_per_s=" in line:
+                fields = number_fields(line)
+                multistream[key]["node_mib_per_s"].append(fields["mib_per_s"])
+                if "peers_at_once" in fields:
+                    multistream[key]["peers_at_once"].append(fields["peers_at_once"])
             elif line.startswith("multistream node=") and "peer_mib=" in line:
                 node = int(re.search(r"node=(\d+)", line).group(1))
                 to = [float(x) for x in re.search(r"peer_mib=([0-9.,]+)", line).group(1).split(",")]
@@ -211,12 +216,15 @@ def summarize(directory):
         for line in floor_ratios:
             print(f"  {line}")
     if echo or iperf:
-        print("\nthe bare aggregate, MiB/s, both ways at once: iperf3's sum over its ten seconds,"
-              "\nand echo-uring's per-connection medians summed - an upper bound, since nothing"
-              "\nchecks that its streams ran at once; set beside the helpers' table at as many"
-              "\nconnections as a node has peers")
+        print("\nthe bare aggregate, MiB/s, between two nodes both ways at once: iperf3's sum"
+              "\nover its ten seconds, a node's share each way half of it, and echo-uring's"
+              "\nper-connection medians summed over both ways - an upper bound, since nothing"
+              "\nchecks that its streams ran at once. A node's rate in the helpers' table is"
+              "\nwhat it sent, one way, to all its peers: set it beside a node's share each"
+              "\nway at as many streams as a node has peers")
         for k in sorted(set(echo) | set(iperf)):
-            i = f"{figures(iperf[k]):>9}" if k in iperf else f"{'-':>9}"
+            i = (f"{figures(iperf[k]):>9}, a node's each way {figures(iperf[k] / 2):>9}"
+                 if k in iperf else f"{'-':>9}")
             if k in echo:
                 total, count, failures = echo[k]
                 e = (f"{figures(total):>9} ({count} connection{'s' if count != 1 else ''}"
@@ -225,12 +233,18 @@ def summarize(directory):
                 e = f"{'-':>9}"
             print(f"  {k:3d} each way  iperf3 {i}   echo-uring {e}")
     if multistream:
-        print("\nmultistream: MiB/s, and the progress threads' CPU seconds a GiB (median, range)")
+        print("\nmultistream: the job's MiB/s, a node's (each node's of each round), the"
+              "\nprogress threads' CPU seconds a GiB, and the peer nodes a node fed at once"
+              "\n(median, range, count)")
         for key in sorted(multistream, key=lambda k: tuple(-1 if x is None else x for x in k[1:]) + (k[0],)):
             base, pes, h, zone, buffers = key
             label = f"{base:10s} pes={pes} h={h}" + (f" zone={zone}" if zone else "")
             v = multistream[key]
-            print(f"  {label:36s} {spread(v['mib_per_s']):30s} cpu/GiB {spread(v['progress_cpu_s_per_gib'])}")
+            print(f"  {label:36s} job {spread(v['mib_per_s'])}")
+            print(f"  {'':36s} node {spread(v['node_mib_per_s'])}")
+            print(f"  {'':36s} cpu/GiB {spread(v['progress_cpu_s_per_gib'])}")
+            if v["peers_at_once"]:
+                print(f"  {'':36s} peers at once {spread(v['peers_at_once'])}")
             if peers.get(key):
                 least = min(min(r) for r in peers[key].values())
                 print(f"  {'':36s} each node's least peer over its most, the least of all: {figures(least)}")
