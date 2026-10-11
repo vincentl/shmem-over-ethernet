@@ -57,7 +57,8 @@ author's.
   sweep's 32 PEs a node would be four a vCPU, and its timings and costs another
   machine's. Its first slice (branch `kit-c2-standard-8`) set the PE counts to
   4, 8 and 16 - one PE a core, one a vCPU and two a vCPU, as 8, 16 and 32 were
-  there - and the sessions' times and §0's costing to `c2-standard-8`'s.
+  there - and §0's costing to `c2-standard-8`'s; the sessions' times, checked,
+  stand.
 
 **The Pi cluster** for its items (P4, H21, H22, T6, T9 to T12): only `~/osoe`;
 `ssh` through the Mac; never to the compute nodes; one session held open while

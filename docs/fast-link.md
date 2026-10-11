@@ -9,8 +9,9 @@ section's script has run end to end on the development VM's logical nodes
 (`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`, at every helper count
 the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
 `2026-10-10-fast-link-dry-run/` for the kit as its two reads left it and
-`2026-10-11-fast-link-kit-fixes/` for the kit as it is), and none yet on a
-cluster. In the development VM's Slurm, one node of four CPUs, the kit's
+`2026-10-11-fast-link-kit-fixes/` for the kit as round nine left it, and
+`2026-10-11-kit-c2-standard-8/` for the kit as it is, set for `c2-standard-8`),
+and none yet on a cluster. In the development VM's Slurm, one node of four CPUs, the kit's
 `launch`, `on` and `spawn` have run, with `facts.sh`'s `scontrol` and `sinfo`,
 `helpers.sh`'s jobs and `slurm-setup.sh`'s reading of `slurmd -C`. Never run at
 all: the rest of `slurm-setup.sh`, `build.sh`'s copying to other nodes, a job
@@ -19,7 +20,10 @@ cannot run. The kit was read adversarially twice before any node was rented
 (`docs/reviews/archive/v0.2-fast-link-kit-adversarial-read.md` and
 `v0.2-fast-link-kit-second-adversarial-read.md`) and again in round nine's
 review (`v0.2-before-part4-review.md`, its third change), and their findings
-are in what follows.
+are in what follows. Its change for `c2-standard-8` - the PE counts, the
+machine, the MTU - was checked against the brief by a Sonnet agent in place of
+a fourth read, the author's choice of 2026-10-11
+(`v0.2-fast-link-kit-c2-standard-8-check.md`).
 
 **Build the commit the run records.** Every section's `run.txt` names the
 commit (`git rev-parse HEAD` on the first node, or `KIT_COMMIT` where the tree
@@ -297,13 +301,13 @@ connection area and is agreed at start-up), every node at once:
   in `docs/design/evidence/v0.2-step4/2026-10-11-kit-c2-standard-8/`), go beside
   the pair - at eight nodes about three of seven at 4 PEs a node, four at 8 and
   five at 16; at five, 2.3 to 2.5 of four at 4 PEs a node, 2.7 to 3.0 at 8 and
-  3.4 to 3.7 at 16 - where the first order of the kit's had two to three at 4
-  and 8 PEs a node and under two at 16. In the development VM at eight nodes of
+  3.4 to 3.7 at 16 - where the first order of the kit's had, at eight nodes,
+  two to three at 4 and 8 PEs a node and under two at 16. In the development VM at eight nodes of
   8 PEs they sat near or within the pair at 1 MiB, and near the count with
   quiets at 64 KiB, whose quiets took a quarter to a third of the PEs' time and
   left `peers_in_calls` at 2.4 to 3.0 (round nine's read of these changes,
-  finding 1): a convoy lowers both figures, long quiets only the first. Four
-  helpers are then about three fifths busy at 4 PEs a node, four fifths at 8 and
+  finding 1): a convoy lowers both figures, long quiets only the first. At
+  eight nodes four helpers are then about three fifths busy at 4 PEs a node, four fifths at 8 and
   nine tenths at 16. §8's rows of the same figures fall as the zone grows, a
   get's wait moving from its calls to its quiets, and are not read there. (The
   figure the kit printed before, a bit a block in the millisecond its call

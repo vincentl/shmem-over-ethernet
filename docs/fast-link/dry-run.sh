@@ -1,8 +1,9 @@
 #!/bin/bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # The kit end to end on one machine (docs/fast-link.md): every section's script
-# under osoe-launch's logical nodes, at sizes that finish in about half an hour
-# on four cores, then summarize.py over each section's output. It shows the
+# under osoe-launch's logical nodes, at sizes that finish in a few minutes on
+# four cores (three in the VM on 2026-10-11, as in round nine's), then
+# summarize.py over each section's output. It shows the
 # scripts and probes run and their outputs parse - not any number a cluster
 # would give. Run from the tree, after `docs/fast-link/build.sh` with
 # KIT_LAUNCHER=osoe-launch has built it here.

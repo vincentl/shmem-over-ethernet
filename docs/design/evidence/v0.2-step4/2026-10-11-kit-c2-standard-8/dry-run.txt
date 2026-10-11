@@ -1,0 +1,26 @@
+# 2026-10-11T22:32:29Z tree 34a4251
+# lock taken 2026-10-11T22:32:29Z; 0.03 0.05 0.01
+build.sh: 0
+warnings in the release build: 0
+the scripts parse
+# done 2026-10-11T22:32:53Z
+# lock taken 2026-10-11T22:32:53Z; 1.45 0.39 0.12
+== facts 22:32:53
+exit 0, jobs that failed: 0
+== floor 22:33:17
+exit 0, jobs that failed: 0
+== helpers 22:33:24
+exit 0, jobs that failed: 0
+== ladder 22:34:09
+exit 0, jobs that failed: 0
+== zero-copy 22:34:53
+exit 0, jobs that failed: 0
+== gets 22:35:10
+exit 0, jobs that failed: 0
+== fan-in 22:35:14
+exit 0, jobs that failed: 0
+== scale 22:35:16
+exit 0, jobs that failed: 0
+DONE 22:35:46
+dry-run.sh: 0
+# finished 2026-10-11T22:35:46Z, status 0
