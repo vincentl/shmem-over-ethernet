@@ -25,10 +25,10 @@ decide first.
 
 ## The machines
 
-**Google Cloud, eight `c2-standard-8`** (the author, 2026-10-11): 8 vCPUs - four
-cores - 32 GB, Cascade Lake, about 16 Gbit/s of egress by Google's per-vCPU rule
-(measure it: §2's facts). The account, every launch and every deletion are the
-author's.
+**Google Cloud, eight `c4-standard-16`** (the author, 2026-10-11, after weighing
+`c2-standard-8`'s price): 16 vCPUs - eight cores - 60 GB, up to 23 Gbit/s of
+egress (measure it: §2's facts and §4's bare stream). The account, every launch
+and every deletion are the author's.
 
 - **OS: Debian 13** (Google's `debian-13` image) on every node: the development
   VM's, with liburing 2.9, CMake 3.31 (the ThreadSanitizer preset needs 3.28),
@@ -53,12 +53,11 @@ author's.
   each session's window.
 - **A custom image** after the first setup - the packages, Slurm's daemons
   stopped, `RemoveIPC=no`, the limits - saves each later session its half hour.
-- **The kit was written for `c4-standard-16`** (eight cores): on four cores its
-  sweep's 32 PEs a node would be four a vCPU, and its timings and costs another
-  machine's. Its first slice (branch `kit-c2-standard-8`) set the PE counts to
-  4, 8 and 16 - one PE a core, one a vCPU and two a vCPU, as 8, 16 and 32 were
-  there - and §0's costing to `c2-standard-8`'s; the sessions' times, checked,
-  stand.
+- **The kit is written for `c4-standard-16`**, its 8, 16 and 32 PEs a node one
+  PE a core, one a vCPU and two a vCPU. It was set for `c2-standard-8` on
+  2026-10-11 (branch `kit-c2-standard-8`) and set back the same day when the
+  author chose the eight cores (branch `kit-c4-standard-16`), keeping that
+  change's fixes.
 
 **The Pi cluster** for its items (P4, H21, H22, T6, T9 to T12): only `~/osoe`;
 `ssh` through the Mac; never to the compute nodes; one session held open while
@@ -69,8 +68,8 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
 
 1. **Now, in the VMs, while the cluster is made** - the 125 items that need no
    cluster, in slices of related items, each slice a branch:
-   - **the kit for `c2-standard-8`**, first, so that it is read before the
-     first session;
+   - **the kit for the cluster's machine** - done on 2026-10-11, set for
+     `c2-standard-8` and back to `c4-standard-16` - before the first session;
    - **the protocols' large items, models first**: the global exit's single
      carrier (P1), the hand-on wake (P2), Träff's rows apart from the ceiling
      (P3), the local release's hold (T16); and the models under the checker's
@@ -85,13 +84,13 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
    - **diagnostics** (D1 to D30), batched by file - `osoe-stat`, `fatal.c` and
      `abort.c`, start-up's messages, settings;
    - **tests** (T14 to T44 but those that need GC);
-   - **build and tools** (B1 to B7, B10) and **documentation** (X7 to X15);
+   - **build and tools** (B1 to B7, B10, B11) and **documentation** (X7 to X15);
    - the author's answers below decide A7 to A14's items.
 2. **The cluster's first session**: the kit's shake-down (H1 to H3), then the
    first native x86-64 runs - the presets at 0, 2 and 3 helpers, tier 3, the
    models, SOS, the pacer, the litmus and the lost-wake test (B8, B9, T7, T35,
    T36, T45) - since those find defects that would spoil Part 4's numbers.
-3. **Part 4's sessions** (H4 to H19), as the runbook orders them; each session's
+3. **Part 4's sessions** (H4 to H19, with H25 and H26), as the runbook orders them; each session's
    results brought back (X3) the same day; then the author's decisions A2 to A6,
    and their slices (H20, and whatever they change), and the runs that check
    them.
@@ -165,11 +164,11 @@ a scan, each modelled and tested, and the crossover among the three measured
 
 What was put to the author, the lead's recommendation first:
 
-- **A1, the cluster** - answered in part on 2026-10-11 (eight `c2-standard-8`,
+- **A1, the cluster** - answered in part on 2026-10-11 (eight `c4-standard-16`,
   an MTU of 8896): the head node, each session's window and the budget remain.
 - **A7, the scope.** `task-v0.2.md` put out of v0.2 RoCE and Soft-RoCE, the mesh
   schedule and `process_vm_readv` for statics. *Recommended:* RoCE and Soft-RoCE
-  stay out - a backend is new work, not an open item, and `c2-standard-8` has no
+  stay out - a backend is new work, not an open item, and `c4-standard-16` has no
   RDMA; `process_vm_readv` stays out as the README says why; the mesh schedule
   is A8.
 - **A8, the mesh's start-up schedule** (`docs/design/mesh-schedule-proposal.md`).
@@ -201,9 +200,9 @@ verification - about three hours of a VM - and read. With subagents for the
 mechanical slices, the work in the VMs is some eight to twelve working sessions;
 Part 4 is four cluster sessions of four hours and their analysis; the Pi's items
 a day; round ten and its fixes two days; the tag's checks a day or two. The
-cluster's cost is the author's to set: at about $0.42 a node-hour on demand
-(`c2-standard-8`'s list price in `us-central1` as the lead recalled it - check
-it), eight nodes for sixteen hours is about $54.
+cluster's cost is the author's to set: at about $0.79 a node-hour on demand
+(`c4-standard-16`'s list price in `us-central1` as the lead recalled it - check
+it), eight nodes for sixteen hours is about $100.
 
 ## Done means
 

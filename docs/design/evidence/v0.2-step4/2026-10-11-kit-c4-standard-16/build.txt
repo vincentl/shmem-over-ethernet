@@ -1,0 +1,2 @@
+lima-osoe: built, 0 warnings
+build.sh: 0
