@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 166 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 171 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
@@ -34,9 +34,8 @@ author's.
   VM's, with liburing 2.9, CMake 3.31 (the ThreadSanitizer preset needs 3.28),
   Slurm 24.11, GCC 14, Linux 6.12 - which does not charge io_uring's rings to the
   locked-memory limit; the Pi's 6.18 covers that. gVNIC, a compact placement
-  policy, and one VPC whose MTU is chosen once and recorded (8896 for the
-  sessions, unless the author prefers the default 1460: a change between
-  sessions makes their numbers incomparable).
+  policy, and one VPC whose MTU is 8896 (the author, 2026-10-11) in every
+  session: a change between sessions makes their numbers incomparable.
 - **No separate head node.** The kit runs Slurm's controller on the first node
   and copies the build to every node with `rsync` (`build.sh`), with no shared
   file system - which on the Pi stalled tests in NFSv4 opens under load
@@ -67,7 +66,7 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
 
 ## The order of the work
 
-1. **Now, in the VMs, while the cluster is made** - the 121 items that need no
+1. **Now, in the VMs, while the cluster is made** - the 125 items that need no
    cluster, in slices of related items, each slice a branch:
    - **the kit for `c2-standard-8`**, first, so that it is read before the
      first session;
@@ -75,6 +74,11 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
      carrier (P1), the hand-on wake (P2), Träff's rows apart from the ceiling
      (P3), the local release's hold (T16); and the models under the checker's
      weaker orders (T29) and of `active-set.c` (T28);
+   - **`collect`'s places three ways** (A11): each node's total (P29), batched
+     with `collectives.c`'s other items (P23, P24); then the scan, modelled
+     first, and the crossover (P30, P31), a slice of their own since the
+     allgather's steps change; their measurement in the VM (H24) once both
+     are in, and on the cluster (H25) in a Part 4 session;
    - **the protocols' smaller items** (P5 to P28), a slice each where a layout
      or the wire changes (P14, P15, D26), batched otherwise;
    - **diagnostics** (D1 to D30), batched by file - `osoe-stat`, `fatal.c` and
@@ -153,14 +157,15 @@ The project's rules, as every session has followed them:
 **Answered on 2026-10-11** (`docs/decisions/2026-10-11.md`): A7 - RoCE and
 Soft-RoCE stay out, design motivation and no code; A8 - the mesh schedule built
 now; A9 - the session routines no-ops; A10 - `OSOE_AM_HUGEPAGES` retired; A12 -
-cancellation unsupported; A13 - Träff's lower ceiling's tests accepted. **Open:**
-A11, `collect`'s lengths - put to the author with its pros and cons, the lead
-recommending to keep it - and A1's MTU, which the author is checking.
+cancellation unsupported; A13 - Träff's lower ceiling's tests accepted. That
+evening: A11 - `collect`'s places built both other ways, each node's total and
+a scan, each modelled and tested, and the crossover among the three measured
+(P29 to P31, H24, H25); and A1's MTU, 8896.
 
 What was put to the author, the lead's recommendation first:
 
-- **A1, the cluster** - answered in part on 2026-10-11 (eight `c2-standard-8`):
-  the MTU, the head node, each session's window and the budget remain.
+- **A1, the cluster** - answered in part on 2026-10-11 (eight `c2-standard-8`,
+  an MTU of 8896): the head node, each session's window and the budget remain.
 - **A7, the scope.** `task-v0.2.md` put out of v0.2 RoCE and Soft-RoCE, the mesh
   schedule and `process_vm_readv` for statics. *Recommended:* RoCE and Soft-RoCE
   stay out - a backend is new work, not an open item, and `c2-standard-8` has no
@@ -175,7 +180,10 @@ What was put to the author, the lead's recommendation first:
 - **A10, hugetlbfs.** *Recommended:* retire `OSOE_AM_HUGEPAGES`, which has no
   effect, unless Part 4 shows the receive path paying for small pages.
 - **A11, `collect`'s O(P) length reduction.** *Recommended:* keep it, the author's
-  choice of 2026-09-26, its cost in the README.
+  choice of 2026-09-26, its cost in the README. *Answered:* both alternatives
+  built beside it - each node's total, eight bytes a node, and a scan, O(log P)
+  - modelled and tested, the default among the three from measurement, since
+  shmem libraries switch algorithms at crossover points (the author).
 - **A12, a thread cancelled in a large blocking get.** *Recommended:* unsupported,
   as the README says since 2026-10-11: OpenSHMEM defines no cancellation.
 - **A13, Träff's at 257 to 512 nodes**, which 254 logical nodes cannot reach.
@@ -187,7 +195,7 @@ What was put to the author, the lead's recommendation first:
 
 ## What it costs
 
-The inventory's sizes are 97 small, 62 medium and 7 large, before each slice's
+The inventory's sizes are 98 small, 65 medium and 8 large, before each slice's
 verification - about three hours of a VM - and read. With subagents for the
 mechanical slices, the work in the VMs is some eight to twelve working sessions;
 Part 4 is four cluster sessions of four hours and their analysis; the Pi's items
