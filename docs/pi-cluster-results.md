@@ -1000,3 +1000,29 @@ what.
   refusal once - one 6.18 gives at submission - and a job of two logical nodes
   under `ulimit -l 0` was refused at start-up, naming the limit. The first
   build's run had failed one of the seven, by the test's own defect.
+
+## Round nine and its changes (2026-10-10, night, to 2026-10-11)
+
+- **The tag's Pi checks rehearsed on `main` at `3b45472`** (round nine's lead,
+  overnight; `docs/reviews/archive/v0.2-before-part4-review.md`, "The Pi
+  rehearsal"): 0.1.0's release-point runbook in its four parts. The build without
+  a warning, the probe, tier 1 101 of 101, the smoke on block and cyclic maps,
+  the floor, the benchmark, the endings, the corpus as at 0.1.0, every pacer run
+  `failures=0`, an hour of `mix` `failures=0` in 3,603 s and an hour of
+  `threads` under the debug checks `failures=0` - and tier 2 on one node, as
+  the runbook runs it (`srun -N1 -n1 -c4`, `ctest -j4`), failing four runs of
+  four, 758 or 759 of 760: from Linux 6.14 io_uring charges every ring to one
+  count of locked memory for the user on the host, and the step's soft limit
+  was the shell's 8 MiB, its hard limit unlimited (portability P9-1).
+- **Tier 2 on one node with `shmem_init` raising the soft limit to the hard
+  one** (`docs/decisions/2026-10-11.md`), the step's limits as before (soft
+  8 MiB, hard unlimited): no ring refused in twelve runs. Two start-up tests
+  failed in six of the first nine - `shmem.leftovers.restart.other-size` and
+  `shmem.start-up.lead-ends-in-join` - none of them the library's: the second's
+  job ran forty times of forty outside `ctest`, twenty on `main` and twenty on
+  the change, and a sampler caught a rank's shell in uninterruptible sleep in
+  an NFSv4 open of its script under `/home` past the launcher's limit, while
+  the 64- and 70-PE jobs, whole now where they were refused in a second,
+  started beside it. With those jobs run alone (`RUN_SERIAL`) and the
+  lead-ends test's limit at 30 s, three runs of three passed, 764 of 764, in
+  246 to 298 s.
