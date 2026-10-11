@@ -101,7 +101,7 @@ build/release/tools/launch/osoe-launch -n 4 -m 0,0,1,1 -- ./ring
 ```
 
 The build does not run the tests; from a clean tree it took 29 seconds on four
-cores of the development virtual machine. Each run prints these four lines,
+cores of a development virtual machine. Each run prints these four lines,
 in any order - each PE's box holds the number of the PE before it - and exits
 with status 0:
 
@@ -613,7 +613,7 @@ where to find what among the documents.
 | `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
-| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds and of two reads of v0.2 step 4's first part (`evidence/`) |
+| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds, of two reads of v0.2 step 4's first part and of round eight's scale S4 on the Pi (`evidence/`) |
 | `docs/reference/` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
 
 `tools/` has a directory for each program, or group of tests, it builds. Of the
@@ -967,8 +967,11 @@ specification or takes a choice the specification leaves open.
 - **A thread must not be cancelled inside a call, nor leave one by
   `longjmp`.** The specification defines neither. A thread cancelled in a large
   blocking get leaves its pieces in flight, and they land after it is gone -
-  into its buffer, freed or an unwound stack, or held in the zone for the next
-  thread in its place (the ninth review's C9-3).
+  into its buffer, freed or an unwound stack - or stay in the zone, where the
+  next thread in its place can wait for bytes no one copies (the ninth review's
+  C9-3); and the deadlock detector counts the thread as waiting for ever, so a
+  program that does either must turn it off, `OSOE_DEADLOCK_SECONDS=0`
+  (`base/sweep.h`).
 
 **Memory**
 
@@ -1188,11 +1191,12 @@ specification or takes a choice the specification leaves open.
   (`OSOE_COLLECTIVE_SHAPE`): two runs whose links measure either side of a
   crossover may differ in the last bits, and more where a sum overflows on the
   way, a NaN is among the inputs or zeros of both signs meet. Over 4,096 doubles
-  on five nodes, a sum that overflows on the way was infinite in 2,458 elements
-  at 0.1.0's shape, 1,639 under the link's tree and 819 under Träff's, and a
-  maximum with a NaN among its inputs fell below the largest number in 819
-  under the tree - since a maximum is `x > y ? x : y`, a NaN's place in the
-  order decides (the ninth review's conformance C1). The specification allows
+  on five nodes, each shape forced by a link set by hand, a sum that overflows
+  on the way was infinite in 2,458 elements at 0.1.0's shape, 1,639 under a
+  tree the chooser takes and 819 under Träff's, and a maximum with a NaN among
+  its inputs fell below the largest number in 819 under that tree, 656 under
+  Träff's and none at 0.1.0's shape - since a maximum is `x > y ? x : y`, a
+  NaN's place in the order decides (the ninth review's conformance C1). The specification allows
   it. `OSOE_COLLECTIVE_SHAPE=fixed`, or the link's three numbers set
   (`OSOE_LINK_*`), makes a run repeat its results; `fixed` with
   `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2` is 0.1.0's shape.
@@ -1533,7 +1537,7 @@ both are set the `SHMEM_` one controls.
 | `OSOE_COLLECTIVE_FANOUT` | `8` | The ceiling of the tree the node leads meet in: `2` to `32`. A barrier's tree and the small class's take it whole, and a scan's under `fixed`; under `link` and `tree` a scan's tree keeps 0.1.0's fan-out of 4, or the ceiling where that is less, since a scan cannot change its tree from call to call; a large reduction's or broadcast's takes the fan-out up to it that the link makes cheapest for its size (`OSOE_COLLECTIVE_SHAPE`), since over Ethernet the fan-out is a bandwidth choice at large sizes, a node sending a copy to each of its children over its one link, and a latency choice at small ones. The layout of every team number and lane is sized for it; Träff's reduction takes a lane's rows, at least one a round of a half, so it runs only where ⌈log₂ n⌉ is at most the ceiling + 1 - on up to 512 nodes at the default. *Checked*. |
 | `OSOE_COLLECTIVE_PIPELINE` | `4` | The capacity: the most pieces of a large reduction, broadcast or scan each node or member keeps in flight up and down its tree, `1` to `8`, and what every lane's slots are sized for - each round of Träff's reduction keeping that many again for each of a lane's rows its rounds leave it, 16 pieces on three or four nodes and the capacity from 17. A large reduction or broadcast keeps the capacity in flight under `link` as under `fixed`; a scan keeps it under `fixed`, and under `link` and `tree` 0.1.0's two, or the capacity where that is less: on the Pi cluster four in flight made a scan over 16 PEs on four nodes 1.30 times faster at 1 MiB but 6.6% slower at 64 KiB. A reduction's or a broadcast's piece carries 16 KiB, its header in the lane's slot beside it; a scan's is sized to it, at most 16 KiB. *Checked*. |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | `1024` | The largest reduction, broadcast or scan that moves in one piece through slots its team keeps: `128` to `16384`. A larger one goes in pieces through lanes the threads that lead it lend it - every member's thread, for a scan - and a reduction's or scan's child may wait for its parent's, once - up to a hop, or a round trip when the parent enters after it. Each team number keeps the slots - one for each child position of the tree and one for the release, for its reductions and broadcasts and again for its scans - so each byte of the value costs every PE eighteen bytes a number at the default fan-out of 8: lower it for memory, raise it to keep a few kilobytes' reduction or scan in one hop. *Checked*. |
-| `OSOE_COLLECTIVE_SHAPE` | `link` | `link`, `tree` or `fixed`: whether a large reduction's or broadcast's shape is to be the one its size makes cheapest on the link - a tree's fan-out and window, or for a reduction Träff's reduce-scatter and allgather - chosen alike on every node from the link's three numbers; the same among the trees alone, Träff's turned off by name; or `OSOE_COLLECTIVE_FANOUT` and `OSOE_COLLECTIVE_PIPELINE` for every call, as osoe 0.1.0 did, which measures nothing - the setting that makes a run repeat its results, as the link's three numbers set (`OSOE_LINK_*`) also do under `link` and `tree`, or 0.1.0's shape at its defaults with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`; with no link known, it also leaves each data wire's unsent limit at its 16 KiB floor unless `OSOE_LINK_*` are set (`OSOE_WIRE_UNSENT_BYTES`). A barrier and the small class keep the ceiling's tree under each, and a scan 0.1.0's shape under `link` and `tree` (`OSOE_COLLECTIVE_FANOUT`). *Checked*. |
+| `OSOE_COLLECTIVE_SHAPE` | `link` | `link`, `tree` or `fixed`: whether a large reduction's or broadcast's shape is to be the one its size makes cheapest on the link - a tree's fan-out and window, or for a reduction Träff's reduce-scatter and allgather - chosen alike on every node from the link's three numbers; the same among the trees alone, Träff's turned off by name; or `OSOE_COLLECTIVE_FANOUT` and `OSOE_COLLECTIVE_PIPELINE` for every call, as osoe 0.1.0 did, which measures nothing - the setting that makes a run repeat its results (as the link's three numbers set, `OSOE_LINK_*`, also do under `link` and `tree`), or 0.1.0's shape at its defaults with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`; with no link known, it also leaves each data wire's unsent limit at its 16 KiB floor unless `OSOE_LINK_*` are set (`OSOE_WIRE_UNSENT_BYTES`). A barrier and the small class keep the ceiling's tree under each, and a scan 0.1.0's shape under `link` and `tree` (`OSOE_COLLECTIVE_FANOUT`). *Checked*. |
 | `OSOE_LINK_HOP_NS`, `OSOE_LINK_MESSAGE_NS`, `OSOE_LINK_BYTES_PER_SECOND` | not set | The link the shape is chosen from, set by hand in place of its measurement - for tests, and for a fabric known in advance: the one-way time of a small message between two nodes' leads, through both progress threads (`1` to `10000000000` nanoseconds); what a lead's loop spends on each message it sends (`0` to `1000000000` nanoseconds); and the bytes a second a node's link carries each way (`1` to `10000000000000`). All three or none: one alone is refused by name. Not set, a job of more than one node with the shape `link` or `tree` measures the link at the end of `shmem_init` - the root's lead, through the data path with every progress thread running, against its first children's: the hop from round trips, the bandwidth from streams, the message cost from one message to each child against one alone - and every PE takes the root's numbers before `shmem_init` returns. On the Pi cluster that costs a start 27 ms, the hop and the bandwidth agreeing within 8% start to start; the message cost there varies from 0 to 21 µs between starts, which moves no choice its four nodes have. Its streams carry 1.9 MiB, so a slower link pays more - about 170 ms at 100 Mbit/s - and set numbers or the shape `fixed` skip it. Its puts - 136 on two nodes, 198 on four, 278 from nine at the default ceiling - count in the transport counters of the root's lead as a program's would. `osoe-stat` shows the link, measured or set, and so does `SHMEM_DEBUG`'s start-up line. *Checked*. |
 
 **Start-up, failures and inspection**
@@ -1578,7 +1582,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_FORCE_REMOTE` | `1`: `shmem_ptr` and `shmem_team_ptr` answer NULL for node-mates, and `SHMEM_TEAM_SHARED` shrinks to the calling PE alone; the traffic to node-mates still goes through shared memory. Needs two logical nodes or more. |
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
-| `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. A testing hook, and the one setting that does not refuse a bad value by name: one outside the range, or not a number, leaves the notice at 30 s. |
+| `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. A testing hook, which does not refuse a bad value by name as the settings above do: one outside the range, or not a number, leaves the notice at 30 s. |
 | `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection's data wire, which its puts and gets go by (a control wire keeps the system's own): `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set at the end of `shmem_init` from the link, measured or set. `OSOE_COLLECTIVE_SHAPE=fixed` measures none, so there it is 16 KiB on any link unless the three `OSOE_LINK_*` give the bandwidth - less than the rule gives a link faster than a gigabit. Uncapped, as at v0.2 step 3, a fetch-add behind a put stream on the Pi cluster waited 17 to 20 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |

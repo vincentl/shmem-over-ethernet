@@ -1,7 +1,7 @@
 # 2026-10-02 on: the release fixes
 
-The fixes the round-three review named, built on `docs/prompts/task-release-fixes.md`
-(the brief), which carries the plan `docs/prompts/phase1-release-fixes-plan.md` (the
+The fixes the round-three review named, built on `docs/prompts/done/task-release-fixes.md`
+(the brief), which carries the plan `docs/prompts/done/phase1-release-fixes-plan.md` (the
 plan) and the author's decisions of 2026-10-02 (`2026-10-02.md`). This record grows a
 section a part as each merges; the team redesign has records of its own.
 

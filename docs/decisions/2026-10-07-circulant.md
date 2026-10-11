@@ -1,6 +1,6 @@
 # 2026-10-07: Träff's circulant reduce-scatter (v0.2 step 3)
 
-The third step of v0.2 (`docs/prompts/v0.2-step3-rabenseifner-prompt.md`, the
+The third step of v0.2 (`docs/prompts/done/v0.2-step3-rabenseifner-prompt.md`, the
 brief), on the author's answers of 2026-10-06 (`2026-10-06.md`): item 6, "model
 Träff's and then implement if happy with model", for node counts that are not
 powers of two; item 7, flow within a step as recommended, "and credits

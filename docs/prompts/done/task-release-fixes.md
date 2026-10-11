@@ -49,7 +49,7 @@ three and one for this work in particular:
 
 1. `CLAUDE.md`: how work is delegated, how names are spelled, how a rename is
    audited. The last of these governs Part 5.
-2. The plan, `docs/prompts/phase1-release-fixes-plan.md`, whole. Each finding
+2. The plan, `docs/prompts/done/phase1-release-fixes-plan.md`, whole. Each finding
    is described there with what happens, how it was checked, the options and
    the recommendation; §1 lists what the validation corrected; §2 the
    decisions above.
@@ -157,12 +157,12 @@ three and one for this work in particular:
 ## Part 0: the record goes in first
 
 Commit, to `main`, as they are: the six review files, the review lead's brief
-(`docs/prompts/phase1-release-fixes-prompt.md`), the plan, the team proposal
+(`docs/prompts/done/phase1-release-fixes-prompt.md`), the plan, the team proposal
 (`docs/design/team-resources-proposal.md`), the day's record
 (`docs/decisions/2026-10-02.md`) with the decisions index's lines for it
 (already edited in the working tree), the first team brief
-(`docs/prompts/phase1-step7-slice3-prompt.md`), the session's opening prompt
-(`docs/prompts/task-first-release.md`), and this brief. One edit before the
+(`docs/prompts/done/phase1-step7-slice3-prompt.md`), the session's opening prompt
+(`docs/prompts/done/task-first-release.md`), and this brief. One edit before the
 commit, D9's: `phase1-release-readiness.md` quotes the author's home path
 three times, and would be the 62nd tracked file carrying it; write it
 `/Users/<author>` there. Prove the audit before trusting it: the grep that

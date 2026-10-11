@@ -2,7 +2,7 @@
 /*
  * atomics - every atomic memory operation of Tables 6 to 8, on every type, on
  * three contexts, checked by oracles that do not depend on the order in which
- * the operations landed (proposal §4.5; docs/prompts/task-stress-phase3.md).
+ * the operations landed (proposal §4.5; docs/prompts/done/task-stress-phase3.md).
  *
  * **A round is a case.** Six families of operation, each over its table's
  * types - 71 cases - and a round runs one of them on every PE at once:

@@ -1,7 +1,7 @@
 # v0.2 step 4's evidence
 
 Raw outputs of v0.2's fourth step, the progress helpers
-(`docs/prompts/v0.2-step4-progress-helpers-prompt.md`; the design is
+(`docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`; the design is
 `docs/design/progress-helpers-proposal.md`), one directory per session. The
 directories hold Parts 0 to 3 of it: Part 0, the profile of the one thread and
 the ladder that followed from it - a put fills the room an open buffer has, the

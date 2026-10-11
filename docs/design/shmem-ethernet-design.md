@@ -424,8 +424,8 @@ while the default buffer was 128 KiB; `docs/decisions/2026-10-07.md` item 12).
 That was the arithmetic of both buffers lent at once, which the build below
 does not do: only one buffer of a connection is lent at a time, so a peer's
 stream sends at most one buffer by reference a round trip, the other turning
-over by copy meanwhile - no figure bounds it, and nothing has timed it on a
-fast link (the ninth review's S6).*
+over by copy meanwhile - no measured figure bounds its rate, and nothing has
+timed it on a fast link (the ninth review's S6).*
 *As built (v0.2 step 4):* `OSOE_WIRE_ZERO_COPY=on` sends a connection buffer
 by reference wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`
 (16 KiB by default), with `IORING_SEND_ZC_REPORT_USAGE`; the completion frees the
@@ -1507,10 +1507,12 @@ a value written into the calling thread's reply slot, and takes no extent of the
 zone: `transport-am.c`, `OSOE_LANDING_NO_EXTENT`)*:
 
 - blocking get or fetching AMO: the calling thread, already waiting in the
-  library *(as built since 2026-10-10, a blocking get of one piece only: one of
-  more goes out as a nonblocking get's pieces on its thread's own context, and
-  whichever thread of the PE claims a landed piece copies it - another thread's
-  wait, or an issue that finds the zone full - as for a nonblocking get, below;
+  library *(as built since 2026-10-10, a blocking get of one piece, or of any
+  size from a thread place past the 4,096th context block, a piece at a time:
+  one of more goes out as a nonblocking get's pieces on its thread's own
+  context, each landed piece copied by whichever of the PE's threads claims it
+  first - the caller's wait for its pieces, or any thread's issue that finds
+  the zone full; `node.h`, the landing zone;
   `docs/decisions/2026-10-10-blocking-gets.md`)*;
 - nonblocking get: that PE's agent, or the application thread at `quiet`,
   whichever comes first *(as built, the thread at its next wait, or at an issue
@@ -3139,8 +3141,8 @@ slice 3).*
 require no symmetric memory. A context is a sequence-number space. Confirm this
 stays true as contexts are fleshed out; a context needing symmetric scratch
 would be genuinely difficult. *It stayed true* (phase 1 step 8 slice 1): a
-context is process memory and one cache line of the node segment, nothing
-symmetric.
+context is process memory and 128 bytes of the node segment - a cache line on
+aarch64, two on x86-64 - nothing symmetric.
 
 ### 4.6 Ordering and completion
 
@@ -3983,7 +3985,7 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
-| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get of one piece: its reply lands in the landing slot and the calling thread copies it out (§3.12); of more, and a nonblocking get: its pieces land in the landing arena, each copied out by whichever thread of the PE claims it - the wait, or another (§4.6, §4.11 item 3, as built) |
+| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get of one piece, or of each piece in turn past the 4,096th context block: its reply lands in the landing slot and the calling thread copies it out (§3.12); of more, and a nonblocking get: its pieces land in the landing arena, each copied out by whichever of the PE's threads claims it first - the wait for that context's gets, or any thread's issue that finds the zone full (§4.6, §4.11's *As built, slice 2*) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
 | fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
 | wait | Every write on the context — to listed PEs, or to all — and every nonblocking get the PE has issued is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes, after the nonblocking gets |
@@ -4188,8 +4190,9 @@ Operations branch once on the mode. Programs that never request `MULTIPLE` run o
 serial mode, so phase-1 costs do not move.
 
 *As built, serial mode* (phase 1 step 8 slice 1; `context.c`,
-`transport-am.c`, `node.h`). A context is two parts. In the node segment, a
-cache line from its PE's pool of `OSOE_MAX_CONTEXTS` (default 64, 1 to 4,096,
+`transport-am.c`, `node.h`). A context is two parts. In the node segment, 128
+bytes - a cache line on aarch64, two on x86-64 - from its PE's pool of
+`OSOE_MAX_CONTEXTS` (default 64, 1 to 4,096,
 agreed between a node's PEs, layout 21): a state word claimed by
 compare-and-swap at creation and released at destroy, and the context's
 `bytes_issued`, `bytes_landed` and their wake word, which until then were one

@@ -12,7 +12,8 @@
 # close (a million states with the trapped-state check), abort (its largest
 # case, goodbye [2:3], 11.8 million states, where a fatal's of 5.7 million and
 # 18 minutes was the largest when this was first written), abort_exit (a case
-# of ten million; 17) and, since v0.2 step 4's zero-copy send, reservation (21
+# of ten million; 17), deadlock_owners (16 minutes in the ninth review's run)
+# and, since v0.2 step 4's zero-copy send, reservation (21
 # minutes in the development VM beside another model in the ninth review's run,
 # its largest case of 23 million states under x86-TSO about 13 of them, against
 # the 40 its timeout gives) - made the 24 models 55 minutes of the 61 the release workflow took (the

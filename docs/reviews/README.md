@@ -32,9 +32,10 @@ read), and of the changes after step 4's merge point, each named for its change
 `v0.2-helper-wake-adversarial-read.md`, and the fast-link kit's two,
 `v0.2-fast-link-kit-adversarial-read.md` and
 `v0.2-fast-link-kit-second-adversarial-read.md`, and the read of round
-nine's changes, `v0.2-round-nine-fixes-adversarial-read.md`); and a fresh
-agent's fact-check of the 0.2 release note's draft, line by line against its
-sources (`v0.2-release-notes-fact-check.md`). Start with a round's synthesis,
+nine's changes, `v0.2-round-nine-fixes-adversarial-read.md`); and fresh
+agents' fact-checks, line by line against their sources, of the 0.2 release
+note's draft (`v0.2-release-notes-fact-check.md`) and of round nine's minor
+changes (`v0.2-round-nine-minor-fixes-fact-check.md`). Start with a round's synthesis,
 whose first section is its verdict: `archive/v0.2-before-part4-review.md` is
 round nine's, `archive/v0.2-step4-review.md` round eight's, and
 `archive/phase1-step7-slice4-review.md` round six's, on the first release's

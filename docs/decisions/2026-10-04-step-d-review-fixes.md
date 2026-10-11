@@ -1,7 +1,7 @@
 # 2026-10-04: the fixes of the round-five review (step D's merge point)
 
 The round-five review ran on `main` at `d8a651d`, the tree step D left, as the
-second of the three merge points of `docs/prompts/task-first-release.md`: five
+second of the three merge points of `docs/prompts/done/task-first-release.md`: five
 investigators, a refutation pass and a synthesis,
 `docs/reviews/archive/phase1-step7-slice3-review.md`, whose verdict is *release
 once step E is built, after the named changes*. This record is those changes,

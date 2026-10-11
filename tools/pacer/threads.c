@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * threads - SHMEM_THREAD_MULTIPLE (proposal §4.7;
- * docs/prompts/task-stress-phase2.md): T worker threads a PE, each working on
+ * docs/prompts/done/task-stress-phase2.md): T worker threads a PE, each working on
  * four contexts in turn and checking every result it can see:
  *
  *   private     its own shmem_ctx_create(SHMEM_CTX_PRIVATE), each slice inside

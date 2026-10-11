@@ -9,6 +9,7 @@ helpers and at two (`OSOE_PROGRESS_HELPERS`), one file a run
 (`coll-BINDING-hHELPERS-ROUND.txt`) and the run's order and exit statuses
 (`run.txt`). The README's "6 to 35% slower" (Limits, transport and API) and
 `docs/pi-cluster-results.md`'s "Helpers on the Pi" read these with Part 3's
-run and the merge point's (`docs/design/evidence/v0.2-step4/2026-10-08-helpers/`).
+run (`docs/design/evidence/v0.2-step4/2026-10-08-helpers/pi-7903b15/`) and the
+merge point's (`docs/design/evidence/v0.2-step4/2026-10-10-merge-point/pi-vs-step3/`).
 Copied here on 2026-10-11 from the review's scratch directory, where the ninth
 review found them out of the tree (scale S10).

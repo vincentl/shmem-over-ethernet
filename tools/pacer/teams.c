@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * teams - teams of every shape, their queries, and collectives on many teams
- * at once (proposal §4.3; docs/prompts/task-stress-phase2.md).
+ * at once (proposal §4.3; docs/prompts/done/task-stress-phase2.md).
  *
  * **Made at setup, and renewed as it runs.** A team's number is each PE's own,
  * and a destroyed team gives it back (design §5.7), so what the exercise costs

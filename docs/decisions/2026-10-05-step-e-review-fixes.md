@@ -1,7 +1,7 @@
 # 2026-10-05: the fixes of the round-six review (step E's merge point)
 
 The round-six review ran on `main` at `375973a`, the tree step E left, as the
-last of the three merge points of `docs/prompts/task-first-release.md`: five
+last of the three merge points of `docs/prompts/done/task-first-release.md`: five
 investigators, the refutation of the one finding rated *fix before release*,
 and a synthesis, `docs/reviews/archive/phase1-step7-slice4-review.md`, whose
 verdict is *release, after the named changes*. This record is those changes,

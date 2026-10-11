@@ -1,6 +1,6 @@
 # 2026-10-07: the one thread, profiled (v0.2 step 4, Part 0)
 
-The first item of v0.2's fourth step, on `docs/prompts/v0.2-step4-progress-helpers-prompt.md`
+The first item of v0.2's fourth step, on `docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`
 (the brief) as amended on 2026-10-07: the profile of the lead's agent that every
 later claim of the step refers to, and the first measurements of the ladder.
 

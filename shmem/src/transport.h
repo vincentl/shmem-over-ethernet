@@ -409,11 +409,13 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
  * (§4.6 deferred sampling). Gets are never fenced (spec §9.12.1).
  *
  * Intranode: memcpy out of the target's heap mapping, nonblocking or not.
- * AM: a blocking get of one piece: its reply lands in this PE's landing slot and
- * the calling thread copies it out (§3.12). Of more, and a nonblocking get: its
- * pieces land in the PE's landing arena, and whichever thread of the PE claims a
- * landed piece copies it out - the wait that completes it, or another thread's
- * wait, or an issue that finds the zone full (§4.6, §4.11 item 3, as built).
+ * AM: a blocking get of one piece - or of each piece in turn, from a thread
+ * place past the 4,096th context block - lands in this PE's landing slot and the
+ * calling thread copies it out (§3.12). Of more, and a nonblocking get: its
+ * pieces land in the PE's landing arena, and whichever of the PE's threads
+ * claims a landed piece first copies it out - the wait for that context's gets,
+ * or any thread's issue that finds the zone full (§4.6; node.h, the landing
+ * zone).
  *
  * `flags`: OSOE_TRANSPORT_NONBLOCKING, and OSOE_TRANSPORT_MORE, which a gather
  * loop or a strided get sets on every nonblocking get but its last, so that a

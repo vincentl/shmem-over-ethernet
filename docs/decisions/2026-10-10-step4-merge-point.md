@@ -1,7 +1,7 @@
 # 2026-10-10: v0.2 step 4's merge point
 
 The merge point of v0.2's fourth step
-(`docs/prompts/v0.2-step4-progress-helpers-prompt.md`, "The merge point"),
+(`docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`, "The merge point"),
 with Parts 0 to 3 on `main` at `c897948`. It covers four things:
 
 - **The brief's runs.**

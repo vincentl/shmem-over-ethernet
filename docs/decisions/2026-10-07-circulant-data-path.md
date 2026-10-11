@@ -1,6 +1,6 @@
 # 2026-10-07: Träff's on the data path (v0.2 step 3, Part 2)
 
-The second part of v0.2's third step, on `docs/prompts/v0.2-step3-rabenseifner-prompt.md`
+The second part of v0.2's third step, on `docs/prompts/done/v0.2-step3-rabenseifner-prompt.md`
 (the brief) and its section "Amended on 2026-10-07", which wins over the rest:
 Träff's circulant reduce-scatter and allgather as the record of Part 1 designs
 it (`2026-10-07-circulant.md`) and the author accepted it on 2026-10-07

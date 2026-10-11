@@ -2,7 +2,7 @@
 
 The round-four review ran on `main` at `08b3da0`, the tree the release fixes
 left (`2026-10-02-release-fixes.md`), as the first of the three merge points of
-`docs/prompts/task-first-release.md`: five investigators, a refutation pass and
+`docs/prompts/done/task-first-release.md`: five investigators, a refutation pass and
 a synthesis, `docs/reviews/archive/phase1-release-fixes-review.md`, whose verdict
 is *release after named changes*. This record is those changes, made on the
 branch `review-fixes` from `08b3da0`, by Claude under the task's mandate:

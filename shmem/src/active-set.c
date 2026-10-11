@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * The deprecated collectives on an active set that is not the whole job
- * (Annex F; phase 1 step 5 slice 7, docs/prompts/phase1-step5-slice7-prompt.md).
+ * (Annex F; phase 1 step 5 slice 7, docs/prompts/done/phase1-step5-slice7-prompt.md).
  *
  * The whole job keeps the world team's collectives (collectives.c). Any other
  * set cannot use a team - creating one needs every PE of its parent, and only

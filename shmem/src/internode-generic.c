@@ -2312,7 +2312,7 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
  * **A small scan is one piece and a large one goes in pieces, D of them in
  * flight** (the author's decision of 2026-09-27; D is the scan's window,
  * scan_window below: OSOE_COLLECTIVE_PIPELINE under OSOE_COLLECTIVE_SHAPE=fixed,
- * 0.1.0's two under link; the team redesign's step E, E6): a small scan - its
+ * 0.1.0's two under link and tree; the team redesign's step E, E6): a small scan - its
  * bytes at most OSOE_SMALL_COLLECTIVE_BYTES - goes through the team number's
  * own small slots, one per child position and one for the down; a large one
  * through the members' lanes, as a large reduction does, in pieces sized to
@@ -2428,8 +2428,9 @@ static uint64_t scan_grant_words(uint32_t number)
  * nodes, and its rows share one base - the pieces the team's scans have moved -
  * so it cannot take a shape per call as the reductions and broadcasts do: a row
  * one call left unused would fall behind the base, and the next call to use it
- * would wait forever. Under `link` it keeps 0.1.0's shape, a fan-out of 4 and
- * two pieces in flight, or the ceiling and the capacity where those are less;
+ * would wait forever. Under `link` and `tree` it keeps 0.1.0's shape, a fan-out
+ * of 4 and two pieces in flight, or the ceiling and the capacity where those are
+ * less;
  * under `fixed` the ceiling and the capacity, as every tree. On the Pi (v0.2
  * step 2, Part 2's record), a scan over 16 PEs on four nodes at the defaults'
  * fan-out of 8 took 1.5 to 2.0 times as long from 8 KiB up - its root's node

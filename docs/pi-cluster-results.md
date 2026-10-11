@@ -960,7 +960,8 @@ what.
   and every remote line of `osoe-bench` within 0.7%, its small latencies about a
   microsecond longer.
 - **Helpers on the Pi** (the merge point's review of scale and performance,
-  `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4):
+  `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4; its own runs
+  in `docs/reviews/evidence/v0.2-step4-scale-s4-pi/`):
   `OSOE_PROGRESS_HELPERS=2` against none, the collective lines of `osoe-bench`
   at 4 × 4 and 4 × 1 in Part 3's run (`2026-10-08-helpers/pi-7903b15/`) and the
   merge point's, which agree to within 3%, and a short run of the review's own

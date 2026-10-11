@@ -1,6 +1,6 @@
 # 2026-10-04: step E's merge point
 
-The merge point of `docs/prompts/phase1-step7-slice4-prompt.md`, the team
+The merge point of `docs/prompts/done/phase1-step7-slice4-prompt.md`, the team
 redesign's step E: with both parts on `main` - the first,
 `2026-10-04-team-lanes.md`, and the second, `2026-10-04-team-scans.md` - the
 brief asks for the four presets, `tier3` and `models` on `main` whole; the SOS

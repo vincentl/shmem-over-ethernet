@@ -37,7 +37,7 @@ was directed, written and reviewed; this part is where each level of it is kept.
 | `docs/decisions/<date>*.md` | the dated records: what was decided on a day or in a piece of work, by whom, why, and how to undo it, with what was built and found |
 | `docs/prompts/` | the brief each working session was given: its goal, what to read first, what to build, how to verify it, and the questions to stop and put to the author. The open briefs are in the directory, the finished ones in `done/`; the table in its `README.md` gives each, in the order the work was done, with its outcome and merge commit |
 | `CLAUDE.md` | the working agreements a session works under: when to delegate to subagents, how names are spelled, how a rename is audited, how review files are named |
-| `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds and of two reads of v0.2 step 4's first part; its `README.md` is the guide |
+| `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds, of two reads of v0.2 step 4's first part and of round eight's scale S4 on the Pi; its `README.md` is the guide |
 
 **The evidence.** About 2,400 files sit under `docs/design/evidence/` and
 `docs/reviews/evidence/` - `git ls-files | grep -c '/evidence/'` counts them:

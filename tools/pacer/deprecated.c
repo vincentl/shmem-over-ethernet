@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * deprecated - Annex F's routines, for coverage (proposal §4.10;
- * docs/prompts/task-stress-phase4.md item 5). Not run unless named, and on
+ * docs/prompts/done/task-stress-phase4.md item 5). Not run unless named, and on
  * the world alone. A round is one case:
  *
  *   to_all        a reduction of Table 11 - every operator on the four signed

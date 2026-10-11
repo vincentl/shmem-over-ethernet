@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * collectives - every collective, every type, at every size (proposal §4.8;
- * docs/prompts/task-stress-phase3.md). Each round, on every PE at once:
+ * docs/prompts/done/task-stress-phase3.md). Each round, on every PE at once:
  *
  *   three typed cases   every typed routine of the team-based collectives in
  *                       turn - the reductions of Table 10 by operator and

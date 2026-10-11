@@ -1,7 +1,7 @@
 # 2026-10-06: the single-node build (v0.2 step 1, parts 2 and 3)
 
 The second and third parts of v0.2's first step, built on
-`docs/prompts/v0.2-step1-single-node-prompt.md` (the brief), Parts 2 and 3, on
+`docs/prompts/done/v0.2-step1-single-node-prompt.md` (the brief), Parts 2 and 3, on
 the first part's seam (`docs/decisions/2026-10-06-single-node-seam.md`), from
 the author's decisions for v0.2 (`docs/decisions/2026-10-05-v0.2.md`, items 2
 to 5). A builder who configures with `-DOSOE_SINGLE_NODE=ON` gets a library and

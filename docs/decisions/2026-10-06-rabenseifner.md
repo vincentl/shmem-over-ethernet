@@ -1,6 +1,6 @@
 # 2026-10-06: Rabenseifner's reduction, Part 1 (v0.2 step 3)
 
-The first part of v0.2's third step, on `docs/prompts/v0.2-step3-rabenseifner-prompt.md`
+The first part of v0.2's third step, on `docs/prompts/done/v0.2-step3-rabenseifner-prompt.md`
 (the brief): the model and the arithmetic. Its third item - the chooser's new
 shape - waits on step 2's chooser; the author's prompt for the night said that
 Part 1 depends on nothing in step 2, and items 1 and 2 do not.

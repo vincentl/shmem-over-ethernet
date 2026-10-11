@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """Rabenseifner's reduction over a team's node leads (v0.2 step 3,
-docs/prompts/v0.2-step3-rabenseifner-prompt.md; the record
+docs/prompts/done/v0.2-step3-rabenseifner-prompt.md; the record
 docs/decisions/2026-10-06-rabenseifner.md): a reduce-scatter by recursive
 halving and an allgather by recursive doubling, with a fold for a node count
 that is not a power of two.

@@ -360,8 +360,9 @@ rated them (round six's readiness Q5-5).
     and "this PE was not waiting in the library" said of a PE in
     `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are) -
     and a non-lead at no helpers wrote "the job is aborting on behalf of PE 0"
-    twice once in about 25 failing runs, since `fatal.c` has no guard of once a
-    process (the ninth review's readiness Q5-4);
+    twice once in about 25 failing runs, the line having two writers, `abort.c`
+    and `fatal.c`, and no guard of once a process (the ninth review's readiness
+    Q5-4);
   - Träff's on teams that are not the world, typed reductions in place at its
     sizes, the whole-job `_to_all` at them, members' bits after a rounding sum,
     nodes at different helper counts, and SOS at three helpers, each right by
