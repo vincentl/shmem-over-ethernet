@@ -1,0 +1,9 @@
+alone 1: 50% tests passed, 1 tests failed out of 2
+alone 2: 100% tests passed, 0 tests failed out of 2
+alone 3: 100% tests passed, 0 tests failed out of 2
+alone 4: 100% tests passed, 0 tests failed out of 2
+alone 5: 100% tests passed, 0 tests failed out of 2
+loaded 1: 100% tests passed, 0 tests failed out of 6
+loaded 2: 100% tests passed, 0 tests failed out of 6
+loaded 3: 100% tests passed, 0 tests failed out of 6
+DONE 12:47:21

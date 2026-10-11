@@ -1115,8 +1115,9 @@ static void abort_wires(struct osoe_progress_owner *o, const struct osoe_deadlin
 
 /* A helper that has seen the node's abort, at a turn or at a sweep of its
  * close: its own wires' goodbyes within its grace, then done, and its thread
- * returns; the process ends by the agent's hand (abort.c), which waits for it
- * within the same grace (osoe_progress_host_abort). */
+ * returns once the agent releases it (wait_released); the process ends by the
+ * agent's hand (abort.c), which waits for it within the same grace
+ * (osoe_progress_host_abort). */
 static void helper_abort(uint32_t helper)
 {
     struct osoe_deadline grace = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_GRACE_SECONDS);
@@ -1136,6 +1137,28 @@ static void helper_stop(uint32_t helper)
         say_stop(&osoe_am.owner[helper], HELPER_DONE);
     else
         helper_abort(helper);
+}
+
+/*
+ * A done helper's last wait: its thread returns only into the agent's join,
+ * which releases it first (release_helper). Before, a helper that had stopped,
+ * or seen the node's abort, returned at once, and where the process then ended
+ * on a death path the agent was not leading - a fatal's _exit, on whichever
+ * thread met it - the helper was a finished thread never joined, which
+ * ThreadSanitizer reports as a leak (the ninth review, C9-1: four of the
+ * suite's tests that end a lead). Such a process now finds its helpers waiting
+ * here, running. In an ending the agent leads it releases them at once, and in
+ * one it does not, the process ends around them. The wait sleeps as every wait
+ * does, sweeping, on a word only the agent writes.
+ */
+static void *wait_released(uint32_t helper)
+{
+    _Atomic uint32_t *word = &osoe_am.owner[helper].released;
+    while (atomic_load_explicit(word, memory_order_acquire) == 0) {
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_futex_wait(word, 0, &sweep, OSOE_FUTEX_PRIVATE);
+    }
+    return NULL;
 }
 
 /*
@@ -1176,7 +1199,7 @@ static void *helper_main(void *arg)
                 abort_seen_ns = now;
             if (now - abort_seen_ns >= abort_delay_ns) {
                 helper_abort(helper);
-                return NULL;
+                return wait_released(helper);
             }
         }
         lower_flag(helper);
@@ -1187,7 +1210,7 @@ static void *helper_main(void *arg)
                 due = request;
             else if (helper != deaf_helper) {
                 helper_stop(helper);
-                return NULL;
+                return wait_released(helper);
             }
         }
         bool moved = osoe_progress_poll(o);
@@ -1217,6 +1240,7 @@ static void start_helpers(void)
         struct osoe_am_owner *h = &osoe_am.owner[helper];
         if (h->started)
             continue;
+        atomic_store_explicit(&h->released, 0, memory_order_release);
         int r = pthread_create(&h->thread, NULL, helper_main, (void *)(uintptr_t)helper);
         if (r != 0)
             osoe_fatal("cannot start progress helper %u of %u: %s", helper,
@@ -1304,12 +1328,22 @@ static void wait_helpers(const struct osoe_deadline *grace)
     }
 }
 
+/* Let a done helper's thread return (wait_released), the agent about to join
+ * it: the word stored, then the helper woken from its sleep on it. */
+static void release_helper(uint32_t helper)
+{
+    struct osoe_am_owner *h = &osoe_am.owner[helper];
+    atomic_store_explicit(&h->released, 1, memory_order_release);
+    osoe_futex_wake(&h->released, 1, OSOE_FUTEX_PRIVATE);
+}
+
 static void join_helpers(void)
 {
     for (uint32_t helper = 1; helper <= osoe_am.area.helpers; helper++) {
         struct osoe_am_owner *h = &osoe_am.owner[helper];
         if (!h->started)
             continue;
+        release_helper(helper);
         int r = pthread_join(h->thread, NULL);
         if (r != 0)
             osoe_fatal("cannot join progress helper %u: %s", helper, strerror(r));
@@ -1318,19 +1352,22 @@ static void join_helpers(void)
 }
 
 /* On an abort, once the helpers have had their grace: each that is done is
- * returning, and is joined, so that it is no finished thread the process's end
+ * released and joined, so that it is no finished thread the process's end
  * leaves unjoined - ThreadSanitizer reports one; each that is not is left to
- * the process's end, detached, since joining it could wait for ever. */
+ * the process's end, detached, since joining it could wait for ever - and if it
+ * is done later, it waits unreleased until then (wait_released). */
 static void leave_helpers(void)
 {
     for (uint32_t helper = 1; helper <= osoe_am.area.helpers; helper++) {
         struct osoe_am_owner *h = &osoe_am.owner[helper];
         if (!h->started)
             continue;
-        if (atomic_load_explicit(&h->stop, memory_order_acquire) >= HELPER_DONE)
+        if (atomic_load_explicit(&h->stop, memory_order_acquire) >= HELPER_DONE) {
+            release_helper(helper);
             (void)pthread_join(h->thread, NULL);
-        else
+        } else {
             (void)pthread_detach(h->thread);
+        }
         h->started = false;
     }
 }

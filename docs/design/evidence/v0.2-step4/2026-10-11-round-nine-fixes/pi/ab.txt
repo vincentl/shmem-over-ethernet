@@ -1,0 +1,43 @@
+build: 0
+main-tree run 1: status 4, 3031 ms, pattern 1, timeout lines 0
+main-tree run 2: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 3: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 4: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 5: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 6: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 7: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 8: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 9: status 4, 3113 ms, pattern 1, timeout lines 0
+main-tree run 10: status 4, 3113 ms, pattern 1, timeout lines 0
+main-tree run 11: status 4, 3116 ms, pattern 1, timeout lines 0
+main-tree run 12: status 4, 3113 ms, pattern 1, timeout lines 0
+main-tree run 13: status 4, 3113 ms, pattern 1, timeout lines 0
+main-tree run 14: status 4, 3113 ms, pattern 1, timeout lines 0
+main-tree run 15: status 4, 3113 ms, pattern 1, timeout lines 0
+main-tree run 16: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 17: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 18: status 4, 3114 ms, pattern 1, timeout lines 0
+main-tree run 19: status 4, 3115 ms, pattern 1, timeout lines 0
+main-tree run 20: status 4, 3116 ms, pattern 1, timeout lines 0
+build: 0
+tree run 1: status 4, 3032 ms, pattern 1, timeout lines 0
+tree run 2: status 4, 3115 ms, pattern 1, timeout lines 0
+tree run 3: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 4: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 5: status 4, 3113 ms, pattern 1, timeout lines 0
+tree run 6: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 7: status 4, 3113 ms, pattern 1, timeout lines 0
+tree run 8: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 9: status 4, 3115 ms, pattern 1, timeout lines 0
+tree run 10: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 11: status 4, 3116 ms, pattern 1, timeout lines 0
+tree run 12: status 4, 3113 ms, pattern 1, timeout lines 0
+tree run 13: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 14: status 4, 3113 ms, pattern 1, timeout lines 0
+tree run 15: status 4, 3113 ms, pattern 1, timeout lines 0
+tree run 16: status 4, 3115 ms, pattern 1, timeout lines 0
+tree run 17: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 18: status 4, 3114 ms, pattern 1, timeout lines 0
+tree run 19: status 4, 3115 ms, pattern 1, timeout lines 0
+tree run 20: status 4, 3115 ms, pattern 1, timeout lines 0
+DONE 12:53:50

@@ -1,0 +1,33 @@
+90 report files, 104 reports, 104 passed in 26 tests
+  passed 24: in a program's heap
+  passed 8: in the internal region, at its grant-words: osoe_am_parse against osoe_am_parse
+  passed 4: in the internal region, at its grant-words: osoe_am_parse against osoe_internode_generic_number_taken
+  passed 1: in the internal region, at its lane-word: osoe_am_parse against osoe_am_parse
+  passed 67: in the internal region, at its past-the-team-words: osoe_am_parse against osoe_internode_generic_number_taken
+  passed: shmem.ack-echo.0-1: 1
+  passed: shmem.circulant.3: 1
+  passed: shmem.circulant.3.window-128: 2
+  passed: shmem.circulant.4: 4
+  passed: shmem.circulant.4.max-teams-4: 4
+  passed: shmem.circulant.5: 5
+  passed: shmem.circulant.5.capacity-1: 4
+  passed: shmem.circulant.5.ceiling-2: 5
+  passed: shmem.circulant.5.lanes: 5
+  passed: shmem.circulant.5.perturb: 5
+  passed: shmem.circulant.5.stress: 5
+  passed: shmem.circulant.6: 9
+  passed: shmem.circulant.7: 7
+  passed: shmem.circulant.7.lanes: 10
+  passed: shmem.circulant.8: 8
+  passed: shmem.circulant.9: 13
+  passed: shmem.lanes.reuse: 1
+  passed: shmem.lanes.rotation: 1
+  passed: shmem.lanes.scan-reuse: 1
+  passed: shmem.lanes.threads: 5
+  passed: shmem.multiple.0-1: 1
+  passed: shmem.multiple.checked.0-1: 1
+  passed: shmem.stopped-bulk.0-0-1: 2
+  passed: shmem.stopped-node.0-0-1: 1
+  passed: shmem.stopped-node.keepalive: 1
+  passed: tools.pacer.threads.0-1: 2
+THREAD SANITIZER GATE PASSED

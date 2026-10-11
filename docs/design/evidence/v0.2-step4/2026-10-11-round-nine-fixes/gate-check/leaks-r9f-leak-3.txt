@@ -1,0 +1,31 @@
+Internal ctest changing into directory: /tmp/r9f-leak/src/build/tsan
+Test project /tmp/r9f-leak/src/build/tsan
+    Start   1: tsan.reports.setup
+1/6 Test   #1: tsan.reports.setup ...............   Passed    0.03 sec
+    Start 217: shmem.helpers.deaf.0-1
+    Start 542: shmem.dead-pe.lead.0-0-1-1
+    Start 222: shmem.reply-pool.overflow
+    Start 242: shmem.kill-after-init.TERM
+2/6 Test #242: shmem.kill-after-init.TERM .......   Passed    0.15 sec
+3/6 Test #222: shmem.reply-pool.overflow ........   Passed    1.25 sec
+4/6 Test #542: shmem.dead-pe.lead.0-0-1-1 .......   Passed    1.42 sec
+5/6 Test #217: shmem.helpers.deaf.0-1 ...........   Passed    1.56 sec
+    Start   2: tsan.reports
+6/6 Test   #2: tsan.reports .....................***Failed    0.05 sec
+shmem.dead-pe.lead.0-0-1-1 (shmem.dead-pe.lead.0-0-1-1.1211493): a report of another kind: thread leak
+shmem.helpers.deaf.0-1 (shmem.helpers.deaf.0-1.1211504): a report of another kind: thread leak
+2 report files, 2 reports, 0 passed in 0 tests
+THREAD SANITIZER GATE FAILED: 2 report files
+
+
+83% tests passed, 1 tests failed out of 6
+
+Label Time Summary:
+internode    =   4.38 sec*proc (4 tests)
+tier2        =   4.38 sec*proc (4 tests)
+
+Total Test time (real) =   1.66 sec
+
+The following tests FAILED:
+	  2 - tsan.reports (Failed)
+Errors while running CTest

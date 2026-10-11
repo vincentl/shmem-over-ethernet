@@ -38,7 +38,7 @@ settings() {
 for ((round = 1; round <= ROUNDS; round++)); do
     for c in $(rotate "$(echo $CASES)" "$round"); do
         # shellcheck disable=SC2046
-        KIT_SRUN="$KIT_SRUN $(pair)" launch 2 2 "$OUT/hol-$c-r$round.txt" SHMEM_DEBUG=1 \
+        KIT_SALLOC="$KIT_SALLOC $(pair)" launch 2 2 "$OUT/hol-$c-r$round.txt" SHMEM_DEBUG=1 \
             $(settings "$c") -- "$KIT_BIN/hol" "$HOL_SECONDS"
     done
 done

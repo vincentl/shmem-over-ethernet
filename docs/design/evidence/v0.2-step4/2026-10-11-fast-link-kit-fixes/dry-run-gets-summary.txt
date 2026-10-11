@@ -1,0 +1,43 @@
+== <repo>/build/scratch/review-nine-fixes/kit/final/dry-run/gets
+jobs: 4, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - the figure the model's numbers are set beside - then
+the same with each quiet counted toward the block before it, the share of the
+PEs' time in quiets, and the seconds the count was taken over (median, range,
+count)
+  get-1m     pes=2 h=None zone=262144  job 6025 (n=1)
+                                       node 1206 (1148-1267, n=5)
+                                       cpu/GiB 0.434 (n=1)
+                                       peers in calls 1.59 (1.56-1.65, n=5)
+                                       with quiets 1.62 (1.59-1.68, n=5), in quiets 0.0240 (0.0230-0.0250, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.997
+                                       link 4617 MiB/s, hop 19.3 us, message 4.52 us; unsent limit 619626 B
+  get-1m     pes=2 h=None zone=1048576 job 6103 (n=1)
+                                       node 1240 (1176-1250, n=5)
+                                       cpu/GiB 0.473 (n=1)
+                                       peers in calls 1.64 (1.63-1.66, n=5)
+                                       with quiets 1.80 (1.79-1.81, n=5), in quiets 0.106 (0.0970-0.111, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 2775 MiB/s, hop 15.8 us, message 2.91 us; unsent limit 372475 B
+
+get-pieces: medians of the rounds' medians, microseconds; a get's and a nonblocking get's time over a put's
+  zone 262144
+    link 12799 MiB/s, hop 15.8 us, message 0 us; unsent limit 1717862 B
+         16384 B  put     34.0  get     36.1 (1.06x)  nbi     36.4 (1.07x)  n=1
+         65536 B  put     47.4  get     51.3 (1.08x)  nbi     46.3 (0.98x)  n=1
+        262144 B  put     68.4  get      150 (2.20x)  nbi      153 (2.24x)  n=1
+       1048576 B  put      157  get      423 (2.69x)  nbi      439 (2.79x)  n=1
+       4194304 B  put      461  get     1537 (3.34x)  nbi     1549 (3.36x)  n=1
+  zone 1048576
+    link 4049 MiB/s, hop 15.8 us, message 0 us; unsent limit 543440 B
+         16384 B  put     35.0  get     36.2 (1.03x)  nbi     35.0 (1.00x)  n=1
+         65536 B  put     40.9  get     46.6 (1.14x)  nbi     42.1 (1.03x)  n=1
+        262144 B  put     95.5  get     93.6 (0.98x)  nbi     98.2 (1.03x)  n=1
+       1048576 B  put      160  get      204 (1.28x)  nbi      207 (1.30x)  n=1
+       4194304 B  put      435  get      650 (1.50x)  nbi      644 (1.48x)  n=1

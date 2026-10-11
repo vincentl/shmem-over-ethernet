@@ -1,6 +1,6 @@
 # 2026-09-27, afternoon: the stress tester's third phase
 
-The session worked `docs/prompts/task-stress-phase3.md` on the branch
+The session worked `docs/prompts/done/task-stress-phase3.md` on the branch
 `task-stress-phase3`, begun from phase 2's tip while phase 2's last
 measurements ran, in the brief's order: `atomics`, `rma`, `locks` and
 `memory`, `collectives`, the shim, then the tests, the runbook, the
@@ -320,4 +320,4 @@ matters. At 8 bytes every family costs 130 to 530 µs, a team sync 170.
 
 ## Next
 
-Phase 4, `docs/prompts/task-stress-phase4.md`.
+Phase 4, `docs/prompts/done/task-stress-phase4.md`.

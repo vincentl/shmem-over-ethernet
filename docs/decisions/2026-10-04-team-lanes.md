@@ -1,7 +1,7 @@
 # 2026-10-04: counters per team, lanes per thread (step E, part 1)
 
 The first part of the team redesign's step E, built on
-`docs/prompts/phase1-step7-slice4-prompt.md` (the brief), Part 1, from
+`docs/prompts/done/phase1-step7-slice4-prompt.md` (the brief), Part 1, from
 `docs/design/team-resources-proposal.md` (the proposal) §4, E1 to E5, E8 and E9,
 with the author's answers to its §8 (`docs/decisions/2026-10-02.md`, item 8).
 A team number stops owning 160 KiB of slots for reductions and broadcasts on

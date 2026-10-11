@@ -13,7 +13,7 @@ precede the first tag, and D is a verified checkpoint before E begins
 (2026-10-02, items 2 and 4). It is the proposal's build plan, not a new design:
 build from it without waiting, and put any point where the build must depart
 from the proposal to the author before building that point
-(`docs/prompts/task-first-release.md`).
+(`docs/prompts/done/task-first-release.md`).
 
 What E changes, in one sentence: a team number stops owning 200 KiB of slots
 on every PE and owns counters and one small slot a position instead, while the

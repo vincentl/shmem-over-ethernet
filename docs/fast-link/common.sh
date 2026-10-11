@@ -7,10 +7,14 @@
 #                  logical nodes: the dry run on the development VM)
 #   KIT_BUILD      the release build, at the same path on every node
 #                  (default: build/release under the repository)
-#   KIT_SRUN       srun's options beside -N and --ntasks-per-node (default:
-#                  -K1 --cpu-bind=none --overcommit --exclusive: whole nodes,
-#                  no binding, and more PEs than CPUs - 32 PEs a node of 16 -
-#                  which srun refuses without --overcommit)
+#   KIT_SALLOC     salloc's options beside -J and -N, for each job's allocation
+#                  (default: --exclusive, whole nodes); a two-node section adds
+#                  the pair's names here (pair, below), since salloc chooses
+#                  the nodes
+#   KIT_SRUN       srun's options beside -N and --ntasks-per-node, for the
+#                  allocation's one step (default: -K1 --cpu-bind=none
+#                  --overcommit: no binding, and more PEs than CPUs - 32 PEs a
+#                  node of 16 - which a step may have only with --overcommit)
 #   KIT_TIMEOUT    seconds a job may take before it is ended, SIGKILL 30 s
 #                  after SIGTERM; each section sets its own, a few times its
 #                  longest job's length (default 900)
@@ -19,7 +23,11 @@
 #
 # Every job runs with OSOE_NO_PROGRESS_TIMEOUT=60 unless it is set, as the
 # README asks while a cluster is new: a stalled wait ends the job and names
-# what it waited for, rather than holding every node until KIT_TIMEOUT.
+# what it waited for, rather than holding every node until KIT_TIMEOUT. And
+# with SHMEM_DEBUG=1 unless it is set: each job measures the link at start-up
+# and sets every data wire's unsent limit from what it measured, and its
+# start-up lines - PE 0's link, each node's limit - are the only record of
+# either (round nine's review, S2), which summarize.py prints beside each case.
 #
 # Every job's command line, environment and exit status go to the section's
 # run.txt beside its output, and each output file starts with them.
@@ -28,10 +36,12 @@ KIT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPOSITORY=$(cd "$KIT/../.." && pwd)
 KIT_LAUNCHER=${KIT_LAUNCHER:-srun}
 KIT_BUILD=${KIT_BUILD:-$REPOSITORY/build/release}
-KIT_SRUN=${KIT_SRUN:--K1 --cpu-bind=none --overcommit --exclusive}
+KIT_SALLOC=${KIT_SALLOC:---exclusive}
+KIT_SRUN=${KIT_SRUN:--K1 --cpu-bind=none --overcommit}
 KIT_TIMEOUT=${KIT_TIMEOUT:-900}
 KIT_BIN=$KIT_BUILD/kit
 export OSOE_NO_PROGRESS_TIMEOUT=${OSOE_NO_PROGRESS_TIMEOUT:-60}
+export SHMEM_DEBUG=${SHMEM_DEBUG:-1}
 
 # kit_start NODES_FILE OUTDIR: the node list, its count, and the section's log.
 kit_start() {
@@ -45,7 +55,8 @@ kit_start() {
         echo "# $(date -u +%Y-%m-%dT%H:%M:%SZ) $(basename "$0") on $(hostname)"
         echo "# kit ${KIT_COMMIT:-$(git -C "$REPOSITORY" rev-parse HEAD 2>/dev/null || echo unknown)}"
         echo "# launcher $KIT_LAUNCHER, build $KIT_BUILD, nodes $NODE_COUNT," \
-             "OSOE_NO_PROGRESS_TIMEOUT=$OSOE_NO_PROGRESS_TIMEOUT, timeout $KIT_TIMEOUT s"
+             "OSOE_NO_PROGRESS_TIMEOUT=$OSOE_NO_PROGRESS_TIMEOUT, SHMEM_DEBUG=$SHMEM_DEBUG," \
+             "timeout $KIT_TIMEOUT s"
     } >> "$LOG"
 }
 
@@ -65,13 +76,21 @@ block_map() {
 
 # launch NODES PES OUTFILE [NAME=VALUE...] -- PROGRAM [ARGUMENTS...]: one job,
 # its output to OUTFILE after a header of what ran; its status returned, and
-# logged. Its input is /dev/null: srun forwards a terminal to the tasks, and
-# under timeout's process group a read would stop it. Every job is named
-# osoe-kit, so that one ended by the timeout - whose killed srun may leave its
+# logged. On a cluster each job is an allocation of its own, whole nodes
+# (salloc --exclusive), whose one step is the kit's srun: Slurm refuses a job
+# more tasks a node than the node has CPUs, whatever --overcommit says -
+# select/cons_tres tests a node's tasks before it looks at the overcommit -
+# where a step of an allocation may have them (round nine's review, P9-2). So
+# KIT_SRUN goes to the step alone - salloc's -K is --kill-command, not srun's
+# --kill-on-bad-exit - and the nodes a section names to salloc (KIT_SALLOC).
+# Its input is /dev/null: srun forwards a terminal to the tasks, and under
+# timeout's process group a read would stop it. Every job is named osoe-kit,
+# so that one ended by the timeout - whose killed salloc may leave its
 # allocation behind - is cancelled by name; then osoe-stat --gc removes what it
 # left in /dev/shm on every node, itself under a timeout, since a node that is
 # down would hold it for ever. The kit is run outside an allocation (not under
-# salloc), where the steps it runs at once would wait on each other.
+# salloc): each job asks for whole nodes of its own, which an allocation around
+# the kit would hold.
 launch() {
     local nodes=$1 pes=$2 file=$3 settings=()
     shift 3
@@ -88,8 +107,8 @@ launch() {
         status=$?
     else
         # shellcheck disable=SC2086
-        env "${settings[@]}" timeout -k 30 "$KIT_TIMEOUT" srun -J osoe-kit $KIT_SRUN \
-            -N"$nodes" --ntasks-per-node="$pes" "$@" >> "$file" 2>&1 < /dev/null
+        env "${settings[@]}" timeout -k 30 "$KIT_TIMEOUT" salloc -J osoe-kit -N"$nodes" $KIT_SALLOC \
+            srun $KIT_SRUN -N"$nodes" --ntasks-per-node="$pes" "$@" >> "$file" 2>&1 < /dev/null
         status=$?
         if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
             scancel -u "$(id -un)" -n osoe-kit >> "$file" 2>&1
@@ -103,8 +122,12 @@ launch() {
 }
 
 # on NODE COMMAND...: a command on one node of the list (by name), through Slurm
-# on a cluster, or here on the one machine; unbound, so that its processes may
-# use every core of the node, as a job's do; ended after KIT_TIMEOUT.
+# on a cluster - a job of one task, beside the others on the node, not of whole
+# nodes - or here on the one machine; ended after KIT_TIMEOUT. Its processes may
+# use every core of the node, as a job's do, because slurm-setup.sh's
+# TaskPlugin is task/none: under task/affinity, a task of a job given less than
+# whole nodes is confined to the CPUs Slurm allocated it - a core, under
+# CR_Core - whatever --cpu-bind=none says (round nine's review, R1).
 on() {
     local name=$1
     shift
@@ -131,8 +154,9 @@ spawn() {
     fi
 }
 
-# pair: srun's option that pins a two-node section to the list's first two
-# nodes, as the bare stream between them is; nothing on one machine.
+# pair: salloc's option that pins a two-node section's allocation to the
+# list's first two nodes, as the bare stream between them is, for KIT_SALLOC;
+# nothing on one machine.
 pair() {
     [ "$KIT_LAUNCHER" = osoe-launch ] || echo "-w $(node 1),$(node 2)"
 }

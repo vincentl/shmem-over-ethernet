@@ -9,13 +9,18 @@ that failed (run.txt). A case with fewer rounds than the others lost one.
     summarize.py OUTDIR [OUTDIR...]
 
 A section is known by its files: multistream's (its job line, and each node's
-rate and bytes to each peer), the mailbox's, hol's, get-pieces', fan-in's,
-echo-uring's and iperf3's, the floor test's ratios, osoe-bench's, the start-up
-probe's, and the pacer's and the SOS programs' outcomes. Counters PE 0 printed
-between "counters start begin" and "counters end end" (osoe-stat -d -j) are
-compared field by field, and the fields whose names say sends, zero_copy,
-enobufs or rearm are shown where they moved. A file that should parse and does
-not is named.
+rate, its peers in calls and bytes to each peer), the mailbox's, osoe-bench's
+barrier and collective lines, hol's, get-pieces', fan-in's, echo-uring's and
+iperf3's, the floor test's ratios, the start-up probe's, and the pacer's and
+the SOS programs' outcomes; osoe-bench's other lines are printed as they are.
+Every job runs under SHMEM_DEBUG (common.sh), and beside each case it prints
+what its jobs' start-up lines said: the link each measured - PE 0's line - and
+the unsent limit node 0 set from it, which differ from job to job (round nine's
+review, S2); where a job has no such line, the link its counters' dump
+recorded. Counters PE 0 printed between "counters start begin" and "counters
+end end" (osoe-stat -d -j) are compared field by field, and the fields whose
+names say sends, zero_copy, enobufs or rearm are shown where they moved. A file
+that should parse and does not is named.
 """
 import json
 import math
@@ -24,6 +29,23 @@ import re
 import statistics
 import sys
 from collections import defaultdict
+
+# SHMEM_DEBUG's start-up lines (shmem/src/init.c, progress-host.c's
+# say_unsent): PE 0's link, as every PE took it, and node 0's unsent limit - or
+# none, the system's, where OSOE_WIRE_UNSENT_BYTES=0.
+LINK = re.compile(r"^osoe: PE 0 of \d+ \(local .*; link (?:measured|set): a hop of (\d+) ns, "
+                  r"a message cost of (\d+) ns, (\d+) bytes a second", re.M)
+LIMIT = re.compile(r"^osoe: node 0 (?:limits the unsent bytes of each of its \d+ connections "
+                   r"to (\d+)|leaves the unsent bytes of its \d+ connections to the system)", re.M)
+DEBUG_LINE = re.compile(r"^osoe: (?:PE \d+ of \d+ \(local |node \d+(?: limits the unsent| leaves "
+                        r"the unsent| probes its connections| sets no TCP keepalive|: \S+ resolves))")
+# osoe-bench's barrier and collective lines (tools/bench/osoe-bench.c), in its
+# own order.
+BENCH = re.compile(r"(barrier|reduce|broadcast|fcollect|alltoall) pes=\d+ "
+                   r"(?:(bytes|block)=(\d+) )?median_us=([0-9.]+) fastest_us=([0-9.]+)$")
+BENCH_ORDER = {"barrier": (0, 0), "reduce": (1, 0), "broadcast": (1, 1), "fcollect": (2, 0),
+               "alltoall": (2, 1)}
+MULTISTREAM_PEERS = ("peers_in_calls", "peers_in_calls_with_quiets", "quiet_share", "peers_window_s")
 
 
 def figures(x, n=3):
@@ -46,6 +68,15 @@ def spread(values):
     if len(values) == 1:
         return f"{figures(m)} (n=1)"
     return f"{figures(m)} ({figures(min(values))}-{figures(max(values))}, n={len(values)})"
+
+
+def short(values):
+    """The median and the range, without the count, for the start-up lines that
+    sit beside a case whose count is given."""
+    m = statistics.median(values)
+    if min(values) == max(values):
+        return figures(m)
+    return f"{figures(m)} ({figures(min(values))}-{figures(max(values))})"
 
 
 def name_parts(name):
@@ -107,14 +138,53 @@ def moved_counters(text):
     return {k: v for k, v in totals.items() if v}
 
 
+def start_up(text):
+    """A job's link and node 0's unsent limit, from its SHMEM_DEBUG lines: the
+    bandwidth in MiB/s, the hop and the message cost in microseconds, the limit
+    in bytes (0, the system's); or, with no such line, the link its counters'
+    dump recorded, node 0's measurement (node.link.measured_*)."""
+    found = {}
+    m = LINK.search(text)
+    if m:
+        found["hop_us"] = int(m.group(1)) / 1e3
+        found["message_us"] = int(m.group(2)) / 1e3
+        found["link_mib_per_s"] = int(m.group(3)) / (1 << 20)
+    else:
+        node = (counters(text, "start") or {}).get("node", {})
+        if node.get("node.link.measured_bytes_per_second"):
+            found["hop_us"] = node.get("node.link.measured_hop_ns", 0) / 1e3
+            found["message_us"] = node.get("node.link.measured_message_ns", 0) / 1e3
+            found["link_mib_per_s"] = node["node.link.measured_bytes_per_second"] / (1 << 20)
+    m = LIMIT.search(text)
+    if m:
+        found["unsent_limit"] = int(m.group(1)) if m.group(1) else 0
+    return found
+
+
+def link_and_limit(values):
+    """A case's link and limit over its rounds, as one line, or None."""
+    if not values:
+        return None
+    parts = []
+    if values.get("link_mib_per_s"):
+        parts.append(f"link {short(values['link_mib_per_s'])} MiB/s, hop {short(values['hop_us'])} us,"
+                     f" message {short(values['message_us'])} us")
+    if values.get("unsent_limit"):
+        limits = values["unsent_limit"]
+        parts.append(f"unsent limit {short(limits)} B" + (" (0: the system's)" if 0 in limits else ""))
+    return "; ".join(parts) if parts else None
+
+
 def summarize(directory):
     files = sorted(f for f in os.listdir(directory) if f.endswith((".txt", ".json")))
     multistream = defaultdict(lambda: defaultdict(list))   # (base, pes, h, zone) -> field -> values
     mailbox = defaultdict(list)
+    bench = defaultdict(lambda: defaultdict(list))         # key -> (group, size, order, name, unit) -> medians
     hol = defaultdict(lambda: defaultdict(list))
     pieces = defaultdict(lambda: defaultdict(list))         # zone -> bytes -> [(put, get, nbi)]
     fan_in = defaultdict(lambda: defaultdict(list))
     moved = defaultdict(lambda: defaultdict(list))
+    links = defaultdict(lambda: defaultdict(list))         # key -> link field -> values
     echo = {}
     iperf = {}
     startup = defaultdict(lambda: defaultdict(list))
@@ -148,6 +218,8 @@ def summarize(directory):
             except (ValueError, KeyError, AttributeError):
                 unparsed.append(f)
             continue
+        for name, value in start_up(text).items():
+            links[key][name].append(value)
         for line in text.splitlines():
             if line.startswith("multistream job "):
                 fields = number_fields(line)
@@ -156,8 +228,9 @@ def summarize(directory):
             elif line.startswith("multistream node=") and "mib_per_s=" in line:
                 fields = number_fields(line)
                 multistream[key]["node_mib_per_s"].append(fields["mib_per_s"])
-                if "peers_at_once" in fields:
-                    multistream[key]["peers_at_once"].append(fields["peers_at_once"])
+                for k in MULTISTREAM_PEERS:
+                    if k in fields:
+                        multistream[key][k].append(fields[k])
             elif line.startswith("multistream node=") and "peer_mib=" in line:
                 node = int(re.search(r"node=(\d+)", line).group(1))
                 to = [float(x) for x in re.search(r"peer_mib=([0-9.,]+)", line).group(1).split(",")]
@@ -170,6 +243,11 @@ def summarize(directory):
                 outcomes.append(f"{f}: {line.strip()}")
             elif line.startswith("summary mailbox "):
                 mailbox[key].append(number_fields(line)["messages_per_s"])
+            elif BENCH.match(line):
+                m = BENCH.match(line)
+                name, unit, size = m.group(1), m.group(2) or "", int(m.group(3) or 0)
+                group, order = BENCH_ORDER[name]
+                bench[key][(group, size, order, name, unit)].append(float(m.group(4)))
             elif line.startswith("hol phase="):
                 fields = number_fields(line)
                 phase = re.search(r"phase=(\w+)", line).group(1)
@@ -204,17 +282,31 @@ def summarize(directory):
         if f.startswith("sos-") and re.search(r"^# exit [1-9]", text, re.M):
             outcomes.append(f"{f}: failed")
         if f.startswith("bench-"):
-            other.append((f, [l for l in text.splitlines() if l and not l.startswith("#")][:60]))
+            other.append((f, [l for l in text.splitlines()
+                              if l and not l.startswith("#") and not BENCH.match(l)
+                              and not DEBUG_LINE.match(l)][:60]))
+
+    def beside(key, indent):
+        line = link_and_limit(links.get(key))
+        if line:
+            print(f"{'':{indent}s}{line}")
 
     print(f"== {directory}")
     if jobs:
         print(f"jobs: {jobs}, of which {failed} failed (run.txt)")
     for f in unparsed:
         print(f"did not parse: {f}")
+    shown = (set(multistream) | set(mailbox) | set(bench) | set(fan_in)
+             | {(b, None, None, None, None) for b, phase in hol} | {("floor", None, None, None, None)}
+             | {("get-pieces", None, None, z, None) for z in pieces})
+    if shown & set(links):
+        print("\nbeside each case: the link its jobs measured at start-up, as PE 0 took it, and the"
+              "\nunsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds")
     if floor_ratios:
         print("\nthe floor test's ratios, the median of its pairs (range)")
         for line in floor_ratios:
             print(f"  {line}")
+        beside(("floor", None, None, None, None), 4)
     if echo or iperf:
         print("\nthe bare aggregate, MiB/s, between two nodes both ways at once: iperf3's sum"
               "\nover its ten seconds, a node's share each way half of it, and echo-uring's"
@@ -234,36 +326,60 @@ def summarize(directory):
             print(f"  {k:3d} each way  iperf3 {i}   echo-uring {e}")
     if multistream:
         print("\nmultistream: the job's MiB/s, a node's (each node's of each round), the"
-              "\nprogress threads' CPU seconds a GiB, and the peer nodes a node fed at once"
-              "\n(median, range, count)")
+              "\nprogress threads' CPU seconds a GiB, and the peer nodes a node's PEs were"
+              "\ninside a call toward at once, time-averaged over the window every PE of the"
+              "\nnode was in its loop - a lower bound of the model's quantity - then the same"
+              "\nwith each quiet counted toward the block before it, which comes nearer it, the"
+              "\nmodel's numbers going beside the pair (fast-link.md, section 5); the share of"
+              "\nthe PEs' time in quiets, and the seconds the count was taken over (median,"
+              "\nrange, count)")
         for key in sorted(multistream, key=lambda k: tuple(-1 if x is None else x for x in k[1:]) + (k[0],)):
             base, pes, h, zone, buffers = key
-            label = f"{base:10s} pes={pes} h={h}" + (f" zone={zone}" if zone else "")
+            label = f"{base:10s} pes={pes} h={'-' if h is None else h}" + (f" zone={zone}" if zone else "")
             v = multistream[key]
             print(f"  {label:36s} job {spread(v['mib_per_s'])}")
             print(f"  {'':36s} node {spread(v['node_mib_per_s'])}")
             print(f"  {'':36s} cpu/GiB {spread(v['progress_cpu_s_per_gib'])}")
-            if v["peers_at_once"]:
-                print(f"  {'':36s} peers at once {spread(v['peers_at_once'])}")
+            if v["peers_in_calls"]:
+                print(f"  {'':36s} peers in calls {spread(v['peers_in_calls'])}")
+                print(f"  {'':36s} with quiets {spread(v['peers_in_calls_with_quiets'])},"
+                      f" in quiets {spread(v['quiet_share'])}, over {spread(v['peers_window_s'])} s")
             if peers.get(key):
                 least = min(min(r) for r in peers[key].values())
                 print(f"  {'':36s} each node's least peer over its most, the least of all: {figures(least)}")
+            beside(key, 39)
     if mailbox:
         print("\nmailbox: messages a second (median, range)")
         for key in sorted(mailbox, key=lambda k: (k[1] or 0, k[2] or 0)):
             print(f"  pes={key[1]} h={key[2]}  {spread(mailbox[key])}")
+            beside(key, 4)
+    if bench:
+        print("\nosoe-bench: each line's median microseconds over its trips, the median of the"
+              "\nrounds' (range, count); a job's own lines are its median of 200 trips under"
+              "\n`quick`, of 2,000 without")
+        for key in sorted(bench, key=lambda k: tuple(-1 if x is None else x for x in k[1:]) + (k[0],)):
+            base, pes, h = key[0], key[1], key[2]
+            print(f"  {base} pes={pes} h={'-' if h is None else h}")
+            for line in sorted(bench[key]):
+                name, unit, size = line[3], line[4], line[1]
+                label = name + (f" {unit}={size}" if unit else "")
+                print(f"    {label:24s} {spread(bench[key][line])}")
+            beside(key, 4)
     if hol:
         print("\nhol: a fetch-add's round trip, microseconds, alone and behind the stream; the stream's MiB/s")
         for key in sorted(hol):
             v = hol[key]
-            line = f"  {key[0]:18s} {key[1]:6s} median {spread(v['median_us']):22s} p99 {spread(v['p99_us']):22s}"
+            line = f"  {key[0]:19s} {key[1]:6s} median {spread(v['median_us']):22s} p99 {spread(v['p99_us']):22s}"
             if v["stream_mib_per_s"]:
                 line += f" stream {spread(v['stream_mib_per_s'])}"
             print(line)
+            if key[1] == "stream":
+                beside((key[0], None, None, None, None), 22)
     if pieces:
         print("\nget-pieces: medians of the rounds' medians, microseconds; a get's and a nonblocking get's time over a put's")
         for zone in sorted(pieces, key=lambda z: z or 0):
             print(f"  zone {zone}")
+            beside(("get-pieces", None, None, zone, None), 4)
             for size in sorted(pieces[zone]):
                 rows = pieces[zone][size]
                 put = statistics.median(r[0] for r in rows)
@@ -275,6 +391,7 @@ def summarize(directory):
         print("\nfan-in: MiB/s into PE 0")
         for key in sorted(fan_in, key=lambda k: tuple(-1 if x is None else x for x in k[1:])):
             print(f"  pes={key[1]} h={key[2]} buffers={key[4]}  {spread(fan_in[key]['mib_per_s'])}")
+            beside(key, 4)
     if moved:
         print("\ncounters that moved over the window (PE 0's node; median, range)")
         for key in sorted(moved, key=lambda k: tuple(-1 if x is None else x for x in k[1:]) + (k[0],)):

@@ -152,7 +152,7 @@ OSOE_BUILD_NOTE
 "                           the capacity: the most pieces of a large data\n"
 "                           collective each node keeps in flight up and down\n"
 "                           its tree, 1 to 8, the same on every node, default\n"
-"                           4; a scan keeps 2 under link (§5.8)\n"
+"                           4; a scan keeps 2 under link and tree (§5.8)\n"
 "    OSOE_SMALL_COLLECTIVE_BYTES\n"
 "                           the largest reduction, broadcast or scan that\n"
 "                           moves through a team's own slots in one piece, 128\n"
@@ -165,9 +165,9 @@ OSOE_BUILD_NOTE
 "                           broadcast's fan-out and window from the link,\n"
 "                           measured at start or set below, or for a\n"
 "                           reduction Träff's reduce-scatter and allgather\n"
-"                           where it costs less, and a scan keeps 0.1.0's 4\n"
-"                           and 2; tree chooses among the trees alone; fixed\n"
-"                           keeps the two above for every call\n"
+"                           where it costs less; tree chooses among the\n"
+"                           trees alone; under both a scan keeps 0.1.0's 4\n"
+"                           and 2; fixed keeps the two above for every call\n"
 "    OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND\n"
 "                           the link's hop and message cost in nanoseconds\n"
 "                           and its bandwidth, all three or none, the same on\n"
@@ -302,6 +302,23 @@ static void session_start(void)
     if (getrlimit(RLIMIT_NOFILE, &files) == 0 && files.rlim_cur < files.rlim_max) {
         files.rlim_cur = files.rlim_max;
         (void)setrlimit(RLIMIT_NOFILE, &files);
+    }
+    /*
+     * And the soft RLIMIT_MEMLOCK, before any ring is made, by the author's
+     * decision (docs/decisions/2026-10-11.md): from Linux 6.14 io_uring charges
+     * every ring to one count of locked memory for all the user's processes on
+     * the host, held to each process's own soft limit, and so do the zero-copy
+     * send's lent pages (ring.c). One machine's logical nodes count together:
+     * at the 8 MiB a Pi's shell has, 113 logical nodes with no helpers were
+     * refused, and the tag's tier 2 failed beside its larger jobs, while a
+     * Slurm step's hard limit there is unlimited (the ninth review, P9-1). A
+     * program that ran before cannot fail for it: only memory it could not
+     * have locked is locked above the old limit.
+     */
+    struct rlimit locked;
+    if (getrlimit(RLIMIT_MEMLOCK, &locked) == 0 && locked.rlim_cur < locked.rlim_max) {
+        locked.rlim_cur = locked.rlim_max;
+        (void)setrlimit(RLIMIT_MEMLOCK, &locked);
     }
     /*
      * §1's start-up check of the running kernel, before anything is created:

@@ -9,7 +9,7 @@ on the Pi at 4 × 4 the runbook's barrier and 8-byte collective lines against
 the records, where D, changing no data path, may move nothing beyond noise and
 a difference is a stop-and-ask. `main` is then the checkpoint step E starts
 from, and E's brief, written from D's record, is
-`docs/prompts/phase1-step7-slice4-prompt.md`.
+`docs/prompts/done/phase1-step7-slice4-prompt.md`.
 
 ## The merge
 

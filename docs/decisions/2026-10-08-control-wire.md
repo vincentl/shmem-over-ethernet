@@ -1,6 +1,6 @@
 # 2026-10-08: the control wire (v0.2 step 4, Part 2)
 
-The third part of v0.2's fourth step, on `docs/prompts/v0.2-step4-progress-helpers-prompt.md`
+The third part of v0.2's fourth step, on `docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`
 (the brief), its "Part 2": a node pair is joined by two connections, a control
 wire and a data wire, at every helper count - no helper thread exists yet. The
 author's answer to the proposal's §8 (`docs/decisions/2026-10-07.md` items 4

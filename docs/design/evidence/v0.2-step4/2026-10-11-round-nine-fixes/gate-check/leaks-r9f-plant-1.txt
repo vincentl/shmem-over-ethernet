@@ -1,0 +1,22 @@
+Internal ctest changing into directory: /tmp/r9f-plant/src/build/tsan
+Test project /tmp/r9f-plant/src/build/tsan
+    Start   1: tsan.reports.setup
+1/6 Test   #1: tsan.reports.setup ...............   Passed    0.03 sec
+    Start 217: shmem.helpers.deaf.0-1
+    Start 222: shmem.reply-pool.overflow
+    Start 242: shmem.kill-after-init.TERM
+    Start 542: shmem.dead-pe.lead.0-0-1-1
+2/6 Test #242: shmem.kill-after-init.TERM .......   Passed    1.20 sec
+3/6 Test #222: shmem.reply-pool.overflow ........   Passed    1.24 sec
+4/6 Test #542: shmem.dead-pe.lead.0-0-1-1 .......   Passed    1.43 sec
+5/6 Test #217: shmem.helpers.deaf.0-1 ...........   Passed    1.59 sec
+    Start   2: tsan.reports
+6/6 Test   #2: tsan.reports .....................   Passed    0.07 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Label Time Summary:
+internode    =   5.45 sec*proc (4 tests)
+tier2        =   5.45 sec*proc (4 tests)
+
+Total Test time (real) =   1.70 sec

@@ -100,8 +100,8 @@ build/release/tools/launch/osoe-launch -n 4 -- ./ring
 build/release/tools/launch/osoe-launch -n 4 -m 0,0,1,1 -- ./ring
 ```
 
-The build does not run the tests; from a clean tree it took 20 to 21 seconds on
-four cores of the development virtual machine. Each run prints these four lines,
+The build does not run the tests; from a clean tree it took 29 seconds on four
+cores of a development virtual machine. Each run prints these four lines,
 in any order - each PE's box holds the number of the PE before it - and exits
 with status 0:
 
@@ -203,7 +203,9 @@ only, and needs less. The full build:
   extensions, the symbol attributes and `__typeof__`
 - Python 3, optionally: the model checker and the stress tester's counting
   build use it. Where CMake does not find it, it says so while configuring and
-  leaves those out; nothing else needs it.
+  leaves those out; nothing else needs it but the `tsan` preset, whose verdict
+  a Python script gives, and which needs CMake 3.28 or newer too
+  ([How osoe is tested](#how-osoe-is-tested)).
 
 The single-node build:
 
@@ -252,14 +254,14 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - about 860,
+That builds one file at a time and runs the tests one at a time - about 870,
 checks of the build itself and jobs of a few processes. On four cores of an idle
 virtual machine it took about eleven minutes, one for the build and ten for the
 tests. Both may run four at a time, as this project's own runs do (`cmake
 --build --preset release -j4`, `ctest --preset release -j4`). The 40 tests of
-the model checker (`tools/modelcheck`, which needs Python 3) took 52 minutes in
-the development VM one at a time, the longest of them, `model.deadlock_owners`,
-11 of those, and check the design, which does not vary with the machine. They
+the model checker (`tools/modelcheck`, which needs Python 3) took 62 minutes in
+a development VM one at a time on 2026-10-11, the longest of them,
+`model.reservation`, 14 of those, and check the design, which does not vary with the machine. They
 want memory more than cores: the largest, `model.abort`, holds 3 GiB at its
 peak, the next 2.5 GiB and the one after 1.7 GiB, so run them two at a time on a
 machine of 8 GiB and one at a time on 4 GiB - four at once ran the development
@@ -299,8 +301,8 @@ io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, for which the message names the sysctl even though it reads 0 inside
 the container, and Podman with `ENOSYS`. There jobs on one node run, but about
-410 of the test suite's 867 tests fail at `shmem_init` or at opening a ring -
-every one but `env.probe` among the 467 labelled `internode`, which need more
+425 of the test suite's 871 tests fail at `shmem_init` or at opening a ring -
+all of them among the 470 labelled `internode` but `env.probe`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
@@ -308,7 +310,7 @@ io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 867 tests fail, with io_uring refused as well. Give the container a
+the suite's 871 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -485,7 +487,14 @@ build/release/tools/launch/osoe-launch -n 6 -m 0,0,1,1,2,2 -- ./my_program
 lead listening on its own loopback address, so one machine runs a job of
 several nodes, over TCP between them as a cluster would - up to 1,024
 processes on 254 logical nodes; the single-node build refuses such a job by
-name, since it has no TCP. `-s` names the variables as `srun` does, so
+name, since it has no TCP. On Linux 6.14 and later its logical nodes also
+share one count of locked memory, which io_uring charges every node's rings to
+against each process's limit - raised by `shmem_init` to the hard one
+([What `shmem_init` changes in the process](#what-shmem_init-changes-in-the-process)),
+so the hard limit is what counts: at the 8 MiB most distributions give a login
+shell, a Raspberry Pi 5 started 112 logical nodes with no helpers, 56 with two
+and 42 with three, and refused one more at start-up, naming the limit; an
+administrator raises the hard limit for more. `-s` names the variables as `srun` does, so
 the job takes the bootstrap's Slurm path. Its logical nodes run without TCP
 keepalive unless `OSOE_KEEPALIVE` is set. Their loopback addresses put them in
 one network namespace, with no link between them to cut, and the kernel closes
@@ -604,7 +613,7 @@ where to find what among the documents.
 | `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
-| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds and of two reads of v0.2 step 4's first part (`evidence/`) |
+| `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds, of two reads of v0.2 step 4's first part and of round eight's scale S4 on the Pi (`evidence/`) |
 | `docs/reference/` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
 
 `tools/` has a directory for each program, or group of tests, it builds. Of the
@@ -955,6 +964,14 @@ specification or takes a choice the specification leaves open.
   that follows the specification can see it.
 - **Communication sessions are accepted and do nothing** - conforming: they
   may not change what a program computes.
+- **A thread must not be cancelled inside a call, nor leave one by
+  `longjmp`.** The specification defines neither. A thread cancelled in a large
+  blocking get leaves its pieces in flight, and they land after it is gone -
+  into its buffer, freed or an unwound stack - or stay in the zone, where the
+  next thread in its place can wait for bytes no one copies (the ninth review's
+  C9-3); and the deadlock detector counts the thread as waiting for ever, so a
+  program that does either must turn it off, `OSOE_DEADLOCK_SECONDS=0`
+  (`base/sweep.h`).
 
 **Memory**
 
@@ -1033,9 +1050,12 @@ specification or takes a choice the specification leaves open.
   the hard limit on open files (`ulimit -Hn`) must leave room for them;
   `shmem_init` raises the soft limit to it. On Linux 6.14 and later io_uring
   also charges a node's rings to its user's locked memory, every process of the
-  user on the host together, against each one's `ulimit -l` (8 MiB by
-  default), zero copy or not: a ring the limit refuses ends the job at
-  start-up, naming it.
+  user on the host together, against each one's `ulimit -l`, whose soft limit
+  `shmem_init` raises to the hard one too, zero copy or not: a ring the hard
+  limit refuses ends the job at start-up, naming it. Only one machine's logical
+  nodes come near it - one node's rings took at most 2.6 MiB at the 4,097-node
+  ceiling, on a Pi's 16 KiB pages at up to three helpers - and [`osoe-launch`](#running-a-program-on-one-machine-with-osoe-launch)
+  gives a Pi's numbers.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
   statics.
@@ -1166,6 +1186,20 @@ specification or takes a choice the specification leaves open.
 **Transport and API**
 
 - **TCP only**; no RDMA backend exists (below).
+- **A floating-point reduction's result depends on the collectives' shape**,
+  which at the default the link measured at start-up chooses for each size
+  (`OSOE_COLLECTIVE_SHAPE`): two runs whose links measure either side of a
+  crossover may differ in the last bits, and more where a sum overflows on the
+  way, a NaN is among the inputs or zeros of both signs meet. Over 4,096 doubles
+  on five nodes, each shape forced by a link set by hand, a sum that overflows
+  on the way was infinite in 2,458 elements at 0.1.0's shape, 1,639 under a
+  tree the chooser takes and 819 under Träff's, and a maximum with a NaN among
+  its inputs fell below the largest number in 819 under that tree, 656 under
+  Träff's and none at 0.1.0's shape - since a maximum is `x > y ? x : y`, a
+  NaN's place in the order decides (the ninth review's conformance C1). The specification allows
+  it. `OSOE_COLLECTIVE_SHAPE=fixed`, or the link's three numbers set
+  (`OSOE_LINK_*`), makes a run repeat its results; `fixed` with
+  `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2` is 0.1.0's shape.
 - **By default one thread a node moves every message between nodes.** The
   progress thread of a node's first PE seals, sends, receives and applies the
   traffic of all the node's PEs, so a node's message rate and its bandwidth to
@@ -1304,37 +1338,49 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 860 tests in
+  run before every merge, on the exact tree that merges: about 870 tests in
   release, and the model checker's 40 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
-  well as at none, by the environment `ctest` passes on to every test - in the
-  debug, release and AddressSanitizer presets, and under ThreadSanitizer as
-  below. There about a dozen tests across nodes - a different few at each
-  count - report a put or an atomic a helper applies in a PE's heap mapping,
-  against a local thread's access to the same place or another helper's put
-  there in an earlier collective. From under half to three quarters of the
-  reports, run by run, are in the words the library keeps for its collectives
-  at the end of that mapping, the rest in a program's heap. The ordering that
-  makes them safe runs through another process, which the tool cannot see -
-  the reason the multi-node maps are left out of that preset (§8.2) - and with
-  no helpers the one agent applies every peer's puts and has met the local
-  thread through the barrier's handoff, which the tool does see. (Until a
-  Träff's reduction's grant gave each receiver a field of its own, two helpers
-  could also write its head at once, the same bytes from each, and that word
-  was about half of the reports: `docs/decisions/2026-10-10-grant-fields.md`.)
-  Every failure of those runs is
-  checked to be the tool's reports alone, each in a heap mapping and none in
-  the helpers' own words - a check that cannot tell a real race in the
-  collectives' words from these, which the models hold instead
-  (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-2). One test, which
-  reads back 64 MiB a helper landed, runs past its minute in the tool's
-  handling of eight million such reads, and finishes in two given longer. The
-  preset gates the suite at no helpers alone, without `shmem.helper-wake`,
-  which, like every map of more than one node, the preset leaves out. That
-  test counts each owner's wakes - a helper's, and in a second run at no
+  well as at none, by the environment `ctest` passes on to every test, in every
+  preset.
+- **ThreadSanitizer's verdict.** Under it every test runs with the tool's
+  `exitcode=0`, `abort_on_error=1` and a `log_path` of its own
+  (`cmake/OsoeThreadSanitizer.cmake`): the tool leaves each process its own
+  exit status and turns a crash it catches into an abort, so that `ctest`
+  judges every test there as it does in the other presets, and it writes its
+  reports to files named for the test, which a last test, `tsan.reports`,
+  judges at every helper count, none included - its failure the run's, and a
+  canary's race, which it must find first, showing that the files are written
+  (`cmake/thread-sanitizer-gate.py`). With no helpers there is no report at
+  all. With two or three, about a hundred, in about 27 of the tests across
+  nodes, each a put or an atomic a helper applies in a PE's heap mapping
+  against a local thread's access to the same place, or another helper's put
+  there in an earlier collective. The ordering that makes them safe runs
+  through another process, which the tool cannot see - the reason that preset
+  leaves out 251 of the 470 tests labelled `internode`, `shmem.internode`'s
+  maps among them (§8.2) - and with no helpers the
+  one agent applies every peer's puts and has met the local thread through the
+  barrier's handoff, which the tool does see. So a report passes only as one
+  of those: a data race, naming a helper's thread, in a heap mapping; and of
+  the three quarters in the words the library keeps for its collectives at the
+  end of that mapping, only at the places, and against the accesses, the gate
+  names with the reason each is ordered - a team number's words against their
+  zeroing when a split took the number, and a parent's grant words or a
+  child's lane word against the collective before's. A crash, a thread leak,
+  a report of any other kind, and a race no helper made fail it, wherever they
+  are: each was planted and failed, and with the gate before 2026-10-11, which
+  read `ctest`'s log, a failed check or a crash beside a race passed
+  (`docs/reviews/archive/v0.2-before-part4-review.md`, C9-1). (Until a Träff's
+  reduction's grant gave each receiver a field of its own, two helpers could
+  also write its head at once, the same bytes from each, and that word was
+  about half of the reports: `docs/decisions/2026-10-10-grant-fields.md`.) One
+  test, which reads back 64 MiB a helper landed, takes one to two minutes there
+  in the tool's handling of eight million such reads, and is given five. The
+  preset runs without `shmem.helper-wake`, which it leaves out for that reason.
+  That test counts each owner's wakes - a helper's, and in a second run at no
   helpers the lead's agent's - putting to a peer only once the owner of its
   wire has raised the flag it raises before it sleeps, and checks that the put
   claimed that owner's wake itself: a wake sent to another owner or held back
@@ -1346,11 +1392,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  467 tests labelled `internode` - those of a job of more than one node, of
+  470 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 399 of the full build's 867 tests in
+  development VM with liburing hidden: 400 of the full build's 871 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1488,10 +1534,10 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_COLLECTIVE_FANOUT` | `8` | The ceiling of the tree the node leads meet in: `2` to `32`. A barrier's tree and the small class's take it whole, and a scan's under `fixed`; under `link` a scan's tree keeps 0.1.0's fan-out of 4, or the ceiling where that is less, since a scan cannot change its tree from call to call; a large reduction's or broadcast's takes the fan-out up to it that the link makes cheapest for its size (`OSOE_COLLECTIVE_SHAPE`), since over Ethernet the fan-out is a bandwidth choice at large sizes, a node sending a copy to each of its children over its one link, and a latency choice at small ones. The layout of every team number and lane is sized for it; Träff's reduction takes a lane's rows, at least one a round of a half, so it runs only where ⌈log₂ n⌉ is at most the ceiling + 1 - on up to 512 nodes at the default. *Checked*. |
-| `OSOE_COLLECTIVE_PIPELINE` | `4` | The capacity: the most pieces of a large reduction, broadcast or scan each node or member keeps in flight up and down its tree, `1` to `8`, and what every lane's slots are sized for - each round of Träff's reduction keeping that many again for each of a lane's rows its rounds leave it, 16 pieces on three or four nodes and the capacity from 17. A large reduction or broadcast keeps the capacity in flight under `link` as under `fixed`; a scan keeps it under `fixed`, and under `link` 0.1.0's two, or the capacity where that is less: on the Pi cluster four in flight made a scan over 16 PEs on four nodes 1.30 times faster at 1 MiB but 6.6% slower at 64 KiB. A reduction's or a broadcast's piece carries 16 KiB, its header in the lane's slot beside it; a scan's is sized to it, at most 16 KiB. *Checked*. |
+| `OSOE_COLLECTIVE_FANOUT` | `8` | The ceiling of the tree the node leads meet in: `2` to `32`. A barrier's tree and the small class's take it whole, and a scan's under `fixed`; under `link` and `tree` a scan's tree keeps 0.1.0's fan-out of 4, or the ceiling where that is less, since a scan cannot change its tree from call to call; a large reduction's or broadcast's takes the fan-out up to it that the link makes cheapest for its size (`OSOE_COLLECTIVE_SHAPE`), since over Ethernet the fan-out is a bandwidth choice at large sizes, a node sending a copy to each of its children over its one link, and a latency choice at small ones. The layout of every team number and lane is sized for it; Träff's reduction takes a lane's rows, at least one a round of a half, so it runs only where ⌈log₂ n⌉ is at most the ceiling + 1 - on up to 512 nodes at the default. *Checked*. |
+| `OSOE_COLLECTIVE_PIPELINE` | `4` | The capacity: the most pieces of a large reduction, broadcast or scan each node or member keeps in flight up and down its tree, `1` to `8`, and what every lane's slots are sized for - each round of Träff's reduction keeping that many again for each of a lane's rows its rounds leave it, 16 pieces on three or four nodes and the capacity from 17. A large reduction or broadcast keeps the capacity in flight under `link` as under `fixed`; a scan keeps it under `fixed`, and under `link` and `tree` 0.1.0's two, or the capacity where that is less: on the Pi cluster four in flight made a scan over 16 PEs on four nodes 1.30 times faster at 1 MiB but 6.6% slower at 64 KiB. A reduction's or a broadcast's piece carries 16 KiB, its header in the lane's slot beside it; a scan's is sized to it, at most 16 KiB. *Checked*. |
 | `OSOE_SMALL_COLLECTIVE_BYTES` | `1024` | The largest reduction, broadcast or scan that moves in one piece through slots its team keeps: `128` to `16384`. A larger one goes in pieces through lanes the threads that lead it lend it - every member's thread, for a scan - and a reduction's or scan's child may wait for its parent's, once - up to a hop, or a round trip when the parent enters after it. Each team number keeps the slots - one for each child position of the tree and one for the release, for its reductions and broadcasts and again for its scans - so each byte of the value costs every PE eighteen bytes a number at the default fan-out of 8: lower it for memory, raise it to keep a few kilobytes' reduction or scan in one hop. *Checked*. |
-| `OSOE_COLLECTIVE_SHAPE` | `link` | `link`, `tree` or `fixed`: whether a large reduction's or broadcast's shape is to be the one its size makes cheapest on the link - a tree's fan-out and window, or for a reduction Träff's reduce-scatter and allgather - chosen alike on every node from the link's three numbers; the same among the trees alone, Träff's turned off by name; or `OSOE_COLLECTIVE_FANOUT` and `OSOE_COLLECTIVE_PIPELINE` for every call, as osoe 0.1.0 did, which measures nothing - the setting that makes a run reproducible, or 0.1.0's shape at its defaults with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`; with no link known, it also leaves each data wire's unsent limit at its 16 KiB floor unless `OSOE_LINK_*` are set (`OSOE_WIRE_UNSENT_BYTES`). A barrier and the small class keep the ceiling's tree under each, and a scan 0.1.0's shape under `link` and `tree` (`OSOE_COLLECTIVE_FANOUT`). *Checked*. |
+| `OSOE_COLLECTIVE_SHAPE` | `link` | `link`, `tree` or `fixed`: whether a large reduction's or broadcast's shape is to be the one its size makes cheapest on the link - a tree's fan-out and window, or for a reduction Träff's reduce-scatter and allgather - chosen alike on every node from the link's three numbers; the same among the trees alone, Träff's turned off by name; or `OSOE_COLLECTIVE_FANOUT` and `OSOE_COLLECTIVE_PIPELINE` for every call, as osoe 0.1.0 did, which measures nothing - the setting that makes a run repeat its results (as the link's three numbers set, `OSOE_LINK_*`, also do under `link` and `tree`), or 0.1.0's shape at its defaults with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2`; with no link known, it also leaves each data wire's unsent limit at its 16 KiB floor unless `OSOE_LINK_*` are set (`OSOE_WIRE_UNSENT_BYTES`). A barrier and the small class keep the ceiling's tree under each, and a scan 0.1.0's shape under `link` and `tree` (`OSOE_COLLECTIVE_FANOUT`). *Checked*. |
 | `OSOE_LINK_HOP_NS`, `OSOE_LINK_MESSAGE_NS`, `OSOE_LINK_BYTES_PER_SECOND` | not set | The link the shape is chosen from, set by hand in place of its measurement - for tests, and for a fabric known in advance: the one-way time of a small message between two nodes' leads, through both progress threads (`1` to `10000000000` nanoseconds); what a lead's loop spends on each message it sends (`0` to `1000000000` nanoseconds); and the bytes a second a node's link carries each way (`1` to `10000000000000`). All three or none: one alone is refused by name. Not set, a job of more than one node with the shape `link` or `tree` measures the link at the end of `shmem_init` - the root's lead, through the data path with every progress thread running, against its first children's: the hop from round trips, the bandwidth from streams, the message cost from one message to each child against one alone - and every PE takes the root's numbers before `shmem_init` returns. On the Pi cluster that costs a start 27 ms, the hop and the bandwidth agreeing within 8% start to start; the message cost there varies from 0 to 21 µs between starts, which moves no choice its four nodes have. Its streams carry 1.9 MiB, so a slower link pays more - about 170 ms at 100 Mbit/s - and set numbers or the shape `fixed` skip it. Its puts - 136 on two nodes, 198 on four, 278 from nine at the default ceiling - count in the transport counters of the root's lead as a program's would. `osoe-stat` shows the link, measured or set, and so does `SHMEM_DEBUG`'s start-up line. *Checked*. |
 
 **Start-up, failures and inspection**
@@ -1526,17 +1572,17 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
-| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". To keep sending by reference, raise it for the job - `ulimit -l` in its batch script, as far as the hard limit allows. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
+| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". `shmem_init` raises the soft limit to the hard one ([What `shmem_init` changes in the process](#what-shmem_init-changes-in-the-process)), so to keep sending by reference past that, the hard limit must be raised - an administrator's change, or Slurm's, whose steps on the Pi cluster have no hard limit. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
 
 **For testing**
 
 | Variable | What it does |
 |---|---|
-| `OSOE_HEAP_SHIFT` | A size: each PE maps its heap that far times its rank past the base, so no two PEs share a symmetric address - how a program is checked for assuming they do. |
+| `OSOE_HEAP_SHIFT` | A size, a whole number of pages - `4k` is refused on a Raspberry Pi 5's 16 KiB pages: each PE maps its heap that far times its rank past the base, so no two PEs share a symmetric address - how a program is checked for assuming they do. |
 | `OSOE_FORCE_REMOTE` | `1`: `shmem_ptr` and `shmem_team_ptr` answer NULL for node-mates, and `SHMEM_TEAM_SHARED` shrinks to the calling PE alone; the traffic to node-mates still goes through shared memory. Needs two logical nodes or more. |
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
-| `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. |
+| `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. A testing hook, which does not refuse a bad value by name as the settings above do: one outside the range, or not a number, leaves the notice at 30 s. |
 | `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection's data wire, which its puts and gets go by (a control wire keeps the system's own): `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set at the end of `shmem_init` from the link, measured or set. `OSOE_COLLECTIVE_SHAPE=fixed` measures none, so there it is 16 KiB on any link unless the three `OSOE_LINK_*` give the bandwidth - less than the rule gives a link faster than a gigabit. Uncapped, as at v0.2 step 3, a fetch-add behind a put stream on the Pi cluster waited 17 to 20 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
@@ -1687,7 +1733,48 @@ at once, and a full set leaves the rest waiting - nor from a process on a lead's
 host that holds a port the lead would answer on and answers first, which a
 caller takes for a job launched with another secret and ends; nor the traffic
 after the handshake, which is not encrypted or authenticated. Without the
-secret, any host that can reach the ports can join.
+secret, any host that can reach the ports can join - and a host that joins is a
+node: it can read and write every PE's symmetric memory, the program's global
+and static variables among them.
+
+### What `shmem_init` changes in the process
+
+`shmem_init` raises two of the process's resource limits, each from its soft
+limit to its hard one, before it opens anything either counts, and changes no
+other:
+
+- **Open files** (`RLIMIT_NOFILE`, `ulimit -n`). A node's lead holds two
+  sockets for every other node - its control wire and its data wire - and a
+  descriptor for every other PE of its node, beside the program's own. Slurm
+  passes on the submitting shell's limits, often a soft 1,024, which at 256 PEs
+  a node runs out at about 385 nodes.
+- **Locked memory** (`RLIMIT_MEMLOCK`, `ulimit -l`). On Linux 6.14 and later
+  io_uring charges every ring to one count of locked memory for all the user's
+  processes on a host, held to each process's own soft limit, and on every
+  kernel the zero-copy send (`OSOE_WIRE_ZERO_COPY`) charges the pages it lends
+  to the same count. A node's own rings take little - at most 2.6 MiB a lead at
+  the 4,097-node ceiling, on a Pi's 16 KiB pages at up to three helpers - but
+  one machine's logical nodes count together: with
+  the 8 MiB soft limit a Raspberry Pi's shell passed to its Slurm step, the
+  release's tier-2 tests, four at once on one node, failed beside each other,
+  and with the soft limit raised in the step, whose hard limit is unlimited,
+  they passed (`docs/reviews/archive/v0.2-before-part4-review.md`, P9-1).
+  Raised since 2026-10-11, by the author's decision
+  (`docs/decisions/2026-10-11.md`).
+
+Neither can make a program that ran before fail: only a descriptor it could
+not have had, or memory it could not have locked, lands above the old limit.
+The locked memory is counted for the user on the host, though, so a job that
+now locks more than its old limit - the zero-copy send's lent pages, under a
+generous hard limit - leaves less of the count to the user's other processes
+there, each held to its own limit.
+Each PE raises its own, and the limits stay raised after `shmem_finalize`; a
+process the program starts inherits them, as it inherits every limit. The hard
+limits are the administrator's: where the hard limit is the soft one - a
+desktop's 8 MiB of locked memory, often - nothing is raised, and a ring the
+limit refuses ends the job at start-up, naming the limit. Under Slurm a step's
+hard limits are `slurmd`'s, unlimited on the Pi cluster, where the soft ones
+come from the submitting shell.
 
 ### How a job ends
 

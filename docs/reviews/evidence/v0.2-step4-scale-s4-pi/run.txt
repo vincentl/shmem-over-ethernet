@@ -1,0 +1,10 @@
+start 23:38:46
+round=1 bind=default helpers=0 exit=0 23:39:11
+round=1 bind=default helpers=2 exit=0 23:39:31
+round=1 bind=none helpers=0 exit=0 23:39:48
+round=1 bind=none helpers=2 exit=0 23:40:06
+round=2 bind=default helpers=0 exit=0 23:40:24
+round=2 bind=default helpers=2 exit=0 23:40:43
+round=2 bind=none helpers=0 exit=0 23:41:00
+round=2 bind=none helpers=2 exit=0 23:41:17
+end 23:41:17

@@ -5,8 +5,13 @@
 # (build/scratch/step3/slurm/install-slurm.sh, 2026-09-23) - untested across
 # machines until a cluster runs it. Run on the first node, as a user with sudo
 # on every node and ssh from this node to each; slurm-wlm and munge already
-# installed (§1). On every node it also sets logind's RemoveIPC=no and the
-# user's locked-memory limit unlimited, for slurmd's steps too (§1 says why).
+# installed, without their recommended packages (§1). TaskPlugin=task/none, so
+# that nothing binds a step's tasks: under task/affinity a job of one task is
+# confined to the core Slurm allocated it, whatever --cpu-bind=none says, and
+# floor.sh's servers and clients, each such a job, would share one core a node
+# (round nine's review, R1). On every node it also sets logind's RemoveIPC=no
+# and the user's locked-memory limit unlimited, for slurmd's steps too (§1 says
+# why).
 # NODES holds Slurm's names for the nodes - the short host names slurmd -C
 # reports - not addresses. Every node's host key is taken on first contact.
 # usage: slurm-setup.sh NODES
@@ -33,14 +38,36 @@ done
 
 # Each node as slurmd -C sees it, less 512 MiB of memory for the system; by its
 # path, since Debian 13 keeps /usr/sbin off a user's PATH, and the setup stops
-# unless every node gave its line.
-NODE_LINES=$(for n in $(grep . "$NODES_FILE"); do
-    $SSH "$n" /usr/sbin/slurmd -C | sed -n 's/^\(NodeName=[^ ]*.*\) RealMemory=\([0-9]*\).*/\1 RealMemory=\2/p' |
-        awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^RealMemory=/) { split($i, m, "="); $i = "RealMemory=" (m[2] - 512) } print }'
-done)
-if [ "$(printf '%s\n' "$NODE_LINES" | grep -c '^NodeName=')" -ne "$COUNT" ]; then
-    echo "slurmd -C gave $(printf '%s\n' "$NODE_LINES" | grep -c '^NodeName=') node lines for $COUNT nodes:" >&2
-    printf '%s\n' "$NODE_LINES" >&2
+# unless every node gave its line, showing what each that did not printed and
+# what to do. slurm-wlm's recommended packages bring the ROCm GPU plugin and
+# its library, librocm-smi64; with the library installed, slurmd -C crashed in
+# the development VM, a machine without a GPU, with nothing on its output -
+# the plugin removed alone, it still did (round nine's review, R2).
+NODE_LINES=
+MISSING=0
+for n in $(grep . "$NODES_FILE"); do
+    REPORT=$($SSH "$n" /usr/sbin/slurmd -C 2>&1) && STATUS=0 || STATUS=$?
+    LINE=$(printf '%s\n' "$REPORT" | sed -n 's/^\(NodeName=[^ ]*.*\) RealMemory=\([0-9]*\).*/\1 RealMemory=\2/p' |
+        awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^RealMemory=/) { split($i, m, "="); $i = "RealMemory=" (m[2] - 512) } print }')
+    if [ -z "$LINE" ]; then
+        MISSING=$((MISSING + 1))
+        echo "slurmd -C on $n gave no node line (status $STATUS); it printed:" >&2
+        printf '%s\n' "$REPORT" | sed 's/^/    /' >&2
+    fi
+    NODE_LINES=$NODE_LINES${NODE_LINES:+$'\n'}$LINE
+done
+if [ "$MISSING" -gt 0 ]; then
+    cat >&2 <<HELP
+$MISSING of $COUNT nodes gave no node line, and nothing but munge's key has been
+changed. A crash after "Failed to open drm root directory" or "rsmi_init" is
+the ROCm SMI library's, on a node without a GPU: on each such node remove it -
+sudo apt-get remove -y librocm-smi64-1, which takes the ROCm GPU plugin and
+the slurm-wlm-plugins metapackage with it and leaves slurmd; the plugin
+removed alone leaves the library, and the crash - or install Slurm as
+docs/fast-link.md §1 does, with --no-install-recommends; then run this again.
+Otherwise check that /usr/sbin/slurmd is there on that node and that ssh from
+here reaches it.
+HELP
     exit 1
 fi
 CONF=$(cat <<CONF
@@ -49,7 +76,9 @@ ClusterName=fastlink
 SlurmctldHost=${FIRST%%.*}
 MpiDefault=none
 ProctrackType=proctrack/linuxproc
-TaskPlugin=task/affinity
+# Nothing binds a step's tasks, so that a job of one task may use every core of
+# its node (docs/fast-link.md, §1).
+TaskPlugin=task/none
 SelectType=select/cons_tres
 SelectTypeParameters=CR_Core
 SchedulerType=sched/backfill

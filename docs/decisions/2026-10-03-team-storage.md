@@ -1,7 +1,7 @@
 # 2026-10-03: team blocks become a pool found by name (step D, part 1)
 
 The first part of the team redesign's step D, built on
-`docs/prompts/phase1-step7-slice3-prompt.md` (the brief), Part 1, from
+`docs/prompts/done/phase1-step7-slice3-prompt.md` (the brief), Part 1, from
 `docs/design/team-resources-proposal.md` (the proposal) §3, D3 and D5. Nothing
 about numbering changes: a team's number still comes from world PE 0's counter
 and is never given back. What changes is where a node keeps a team and how it

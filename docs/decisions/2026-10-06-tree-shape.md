@@ -1,6 +1,6 @@
 # 2026-10-06: the tree's shape from the link, Part 1 (v0.2 step 2)
 
-The first part of v0.2's second step, on `docs/prompts/v0.2-step2-tree-shape-prompt.md`
+The first part of v0.2's second step, on `docs/prompts/done/v0.2-step2-tree-shape-prompt.md`
 (the brief), from the author's decisions for v0.2 (`docs/decisions/2026-10-05-v0.2.md`,
 items 1 and 7): the cost model fitted to the Pi's table, the chooser, the link
 and its settings. Part 1 chooses nothing on the data path: every collective

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * locks - the distributed locks (proposal §4.8; docs/prompts/task-stress-phase3.md).
+ * locks - the distributed locks (proposal §4.8; docs/prompts/done/task-stress-phase3.md).
  *
  * LOCKS locks, and for each a count at its home PE, lock mod N. Every PE, a
  * round at a time, takes random locks - by shmem_set_lock, or by spinning on

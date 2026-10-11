@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * memory - the symmetric heap's routines (proposal §4.8;
- * docs/prompts/task-stress-phase3.md).
+ * docs/prompts/done/task-stress-phase3.md).
  *
  * A seeded sequence of shmem_malloc, shmem_calloc, shmem_align,
  * shmem_malloc_with_hints (both hints), shmem_realloc and shmem_free, the same

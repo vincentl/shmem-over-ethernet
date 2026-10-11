@@ -1029,8 +1029,9 @@ struct osoe_thread_record {
  * block serves a later creation. After them, since layout 37, a block for
  * each thread place, never claimed and never live, which the place's
  * thread's blocking gets of more than one piece count in
- * (osoe_node_thread_context). Fixed-size, one cache line: the pool is O(1)
- * per context whatever the job's size, which is the proposal's bound
+ * (osoe_node_thread_context). Fixed-size, 128 bytes - one cache line on
+ * aarch64, two on x86-64 (base/cacheline.h): the pool is O(1) per context
+ * whatever the job's size, which is the proposal's bound
  * (docs/prompts/done/phase1-step8-slice1-prompt.md, decision 2).
  *
  * The rest of a context - its dirty set, O(nodes) virtual - is process

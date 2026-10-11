@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * rma - ordering, strides, and many in flight (proposal §4.6;
- * docs/prompts/task-stress-phase3.md). Every round, on every PE at once:
+ * docs/prompts/done/task-stress-phase3.md). Every round, on every PE at once:
  *
  *   the halo      a bulk put of the round's pattern to the next PE, a fence,
  *                 then an update of that PE's flag - an atomic add, a

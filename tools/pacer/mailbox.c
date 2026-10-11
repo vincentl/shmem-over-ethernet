@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * mailbox - point-to-point synchronization, the U4 idiom (proposal §4.4;
- * docs/prompts/task-stress-phase2.md): every PE has a slot for every sender, a
+ * docs/prompts/done/task-stress-phase2.md): every PE has a slot for every sender, a
  * payload area and two signal words; every round each PE sends K messages and
  * receives K, waiting for them with one of the spec's waiting and testing
  * forms - another every round, so that twenty rounds run every form.

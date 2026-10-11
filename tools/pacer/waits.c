@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * waits - every point-to-point synchronization routine on every type it takes
- * (docs/prompts/task-stress-phase4.md item 5). mailbox waits with every form
+ * (docs/prompts/done/task-stress-phase4.md item 5). mailbox waits with every form
  * on uint64_t words; this takes every form - wait_until, its _all, _any and
  * _some, their _vector forms, and the six tests - over every standard AMO
  * type of Table 6, which since 1.5 are the types a wait takes (§9.11), by the

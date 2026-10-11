@@ -1,6 +1,6 @@
 # 2026-10-07: the shape on the data path (v0.2 step 2, Part 2)
 
-The second part of v0.2's second step, on `docs/prompts/v0.2-step2-tree-shape-prompt.md`
+The second part of v0.2's second step, on `docs/prompts/done/v0.2-step2-tree-shape-prompt.md`
 (the brief), "Part 2: the shape on the data path", and the step's merge point;
 Part 1's record is `2026-10-06-tree-shape.md`. Built overnight from 2026-10-06
 to 07 on the author's answers of 2026-10-06 (`2026-10-06.md`, items 3 to 5):

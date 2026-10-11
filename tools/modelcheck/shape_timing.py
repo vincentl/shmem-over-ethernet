@@ -3,7 +3,7 @@
 """The cost of a collective's shape on a link (v0.2 step 2): which fan-out k and
 window W a large reduction or broadcast should run its internode tree with, from
 three numbers measured at start-up - the hop h, the message cost o and the
-bandwidth B (docs/prompts/v0.2-step2-tree-shape-prompt.md, Part 1; the record
+bandwidth B (docs/prompts/done/v0.2-step2-tree-shape-prompt.md, Part 1; the record
 docs/decisions/2026-10-06-tree-shape.md).
 
 One rule, in three forms, in the form of grant_timing.py:

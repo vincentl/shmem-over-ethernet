@@ -1,7 +1,7 @@
 # 2026-10-03: a team number is each member PE's, and is given back (step D, part 2)
 
 The second part of the team redesign's step D, built on
-`docs/prompts/phase1-step7-slice3-prompt.md` (the brief), Part 2, from
+`docs/prompts/done/phase1-step7-slice3-prompt.md` (the brief), Part 2, from
 `docs/design/team-resources-proposal.md` (the proposal) §3, D1, D2 and D4 to D8.
 The first part (`2026-10-03-team-storage.md`) moved a node's team blocks into a
 pool found by name and kept numbering as it was; this part changes numbering. A

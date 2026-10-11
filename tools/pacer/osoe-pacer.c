@@ -3,7 +3,7 @@
  * osoe-pacer - puts the library through its paces: whole-job patterns from
  * real OpenSHMEM codes, every result checked against an oracle, reported as
  * it goes (docs/design/osoe-pacer-proposal.md; phase 1's brief is
- * docs/prompts/task-stress-phase1.md).
+ * docs/prompts/done/task-stress-phase1.md).
  *
  *   srun -N4 --ntasks-per-node=4 osoe-pacer [OPTION]... [EXERCISE]...
  *   osoe-launch -n 4 -m 0,0,1,1 -- osoe-pacer --quick

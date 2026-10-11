@@ -1,7 +1,7 @@
 # 2026-10-04: the scans through the lanes, and 256 numbers (step E, part 2)
 
 The second part of the team redesign's step E, built on
-`docs/prompts/phase1-step7-slice4-prompt.md` (the brief), Part 2, from
+`docs/prompts/done/phase1-step7-slice4-prompt.md` (the brief), Part 2, from
 `docs/design/team-resources-proposal.md` (the proposal) §4, E6 and E10, on the
 first part (`2026-10-04-team-lanes.md`). The scans move as the reductions moved:
 a small scan through its team number's own small rows, a large one through the

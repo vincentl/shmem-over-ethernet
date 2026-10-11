@@ -1,0 +1,25 @@
+Internal ctest changing into directory: /tmp/r9f-plant/src/build/tsan
+Test project /tmp/r9f-plant/src/build/tsan
+    Start   1: tsan.reports.setup
+1/3 Test   #1: tsan.reports.setup ...............   Passed    0.03 sec
+    Start 442: shmem.circulant.4
+2/3 Test #442: shmem.circulant.4 ................   Passed    1.41 sec
+    Start   2: tsan.reports
+3/3 Test   #2: tsan.reports .....................***Failed    0.07 sec
+shmem.circulant.4 (shmem.circulant.4.1205632): a race outside the heaps: global 'planted_global' of size 8 at 0xaaaadb3b0798 (shmem_test_circulant-reduce+0x50798)
+shmem.circulant.4 (shmem.circulant.4.1205632): a race no progress helper made, between T2 and main thread
+1 report files, 1 reports, 0 passed in 0 tests
+THREAD SANITIZER GATE FAILED: 1 report files
+
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+internode    =   1.41 sec*proc (1 test)
+tier2        =   1.41 sec*proc (1 test)
+
+Total Test time (real) =   1.52 sec
+
+The following tests FAILED:
+	  2 - tsan.reports (Failed)
+Errors while running CTest

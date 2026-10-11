@@ -1,0 +1,91 @@
+shmem.circulant.3 (shmem.circulant.3.1189851): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.3.window-128 (shmem.circulant.3.window-128.1189202): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.3.window-128 (shmem.circulant.3.window-128.1189203): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4 (shmem.circulant.4.1189077): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4 (shmem.circulant.4.1189078): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4 (shmem.circulant.4.1189081): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4 (shmem.circulant.4.1189083): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4.max-teams-4 (shmem.circulant.4.max-teams-4.1188232): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4.max-teams-4 (shmem.circulant.4.max-teams-4.1188234): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4.max-teams-4 (shmem.circulant.4.max-teams-4.1188235): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.4.max-teams-4 (shmem.circulant.4.max-teams-4.1188236): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5 (shmem.circulant.5.1187874): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5 (shmem.circulant.5.1187875): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5 (shmem.circulant.5.1187876): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5 (shmem.circulant.5.1187877): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5 (shmem.circulant.5.1187878): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.capacity-1 (shmem.circulant.5.capacity-1.1188098): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.capacity-1 (shmem.circulant.5.capacity-1.1188100): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.capacity-1 (shmem.circulant.5.capacity-1.1188102): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.capacity-1 (shmem.circulant.5.capacity-1.1188103): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.ceiling-2 (shmem.circulant.5.ceiling-2.1188179): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.ceiling-2 (shmem.circulant.5.ceiling-2.1188181): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.ceiling-2 (shmem.circulant.5.ceiling-2.1188183): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.ceiling-2 (shmem.circulant.5.ceiling-2.1188185): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.ceiling-2 (shmem.circulant.5.ceiling-2.1188186): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.perturb (shmem.circulant.5.perturb.1185826): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.perturb (shmem.circulant.5.perturb.1185828): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.perturb (shmem.circulant.5.perturb.1185830): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.perturb (shmem.circulant.5.perturb.1185832): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.perturb (shmem.circulant.5.perturb.1185834): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.stress (shmem.circulant.5.stress.1186607): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.stress (shmem.circulant.5.stress.1186609): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.stress (shmem.circulant.5.stress.1186610): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.stress (shmem.circulant.5.stress.1186613): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.5.stress (shmem.circulant.5.stress.1186614): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.6 (shmem.circulant.6.1186133): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.6 (shmem.circulant.6.1186135): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.6 (shmem.circulant.6.1186136): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.6 (shmem.circulant.6.1186139): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.6 (shmem.circulant.6.1186139): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.6 (shmem.circulant.6.1186140): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.6 (shmem.circulant.6.1186140): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.6 (shmem.circulant.6.1186143): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.6 (shmem.circulant.6.1186143): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186147): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186158): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186160): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186161): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186163): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186164): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.7 (shmem.circulant.7.1186165): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186944): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186946): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186947): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186949): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186950): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186951): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186952): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.8 (shmem.circulant.8.1186953): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185969): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185971): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185973): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185975): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.9 (shmem.circulant.9.1185975): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185976): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.9 (shmem.circulant.9.1185976): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185977): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.9 (shmem.circulant.9.1185977): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185978): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.9 (shmem.circulant.9.1185978): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.circulant.9 (shmem.circulant.9.1185979): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.circulant.9 (shmem.circulant.9.1185979): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.reuse (shmem.lanes.reuse.1193902): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.rotation (shmem.lanes.rotation.1192796): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/memcpy/osoe_am_parse
+shmem.lanes.scan-reuse (shmem.lanes.scan-reuse.1193792): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.threads (shmem.lanes.threads.1183393): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.threads (shmem.lanes.threads.1183393): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.threads (shmem.lanes.threads.1183395): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.threads (shmem.lanes.threads.1183395): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+shmem.lanes.threads (shmem.lanes.threads.1183397): a race in the library's internal region not among those explained: memcpy/memcpy/osoe_am_parse against memset/memset/osoe_internode_generic_number_taken
+90 report files, 104 reports, 24 passed in 9 tests
+  passed: shmem.ack-echo.0-1: 1
+  passed: shmem.circulant.5.lanes: 5
+  passed: shmem.circulant.7.lanes: 10
+  passed: shmem.multiple.0-1: 1
+  passed: shmem.multiple.checked.0-1: 1
+  passed: shmem.stopped-bulk.0-0-1: 2
+  passed: shmem.stopped-node.0-0-1: 1
+  passed: shmem.stopped-node.keepalive: 1
+  passed: tools.pacer.threads.0-1: 2
+THREAD SANITIZER GATE FAILED: 70 report files

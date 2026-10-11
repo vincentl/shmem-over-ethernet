@@ -960,7 +960,8 @@ what.
   and every remote line of `osoe-bench` within 0.7%, its small latencies about a
   microsecond longer.
 - **Helpers on the Pi** (the merge point's review of scale and performance,
-  `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4):
+  `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4; its own runs
+  in `docs/reviews/evidence/v0.2-step4-scale-s4-pi/`):
   `OSOE_PROGRESS_HELPERS=2` against none, the collective lines of `osoe-bench`
   at 4 × 4 and 4 × 1 in Part 3's run (`2026-10-08-helpers/pi-7903b15/`) and the
   merge point's, which agree to within 3%, and a short run of the review's own
@@ -977,3 +978,51 @@ what.
   one at two, give the 8-byte reduction about 5% faster at 4 × 4 under the
   binding and nothing at 4 × 1 (the merge point's adversarial read of its fixes,
   finding 6). Four nodes only.
+
+## v0.2 after step 4's merge point (2026-10-10)
+
+- **A blocking get's pieces together** (`docs/decisions/2026-10-10-blocking-gets.md`,
+  "The measurements"; `docs/design/evidence/v0.2-step4/2026-10-10-blocking-gets/pi-blocking-gets/`):
+  question 4's probe, `get-pieces.c`, on two nodes of one PE, 21 repetitions a
+  size, the medians, `main` at `7a42c92` against the branch alternating three
+  times. A blocking get of a mebibyte took 11,550 to 11,559 µs on `main` and
+  9,148 to 9,154 on the branch - a fifth less, the nonblocking get's time - and
+  from 64 KiB up 1.00 to 1.06 times a put and quiet where `main`'s took 1.22 to
+  1.28; a get of one piece, 16 KiB, was as it was. The branch's tests of gets
+  on one Pi node's logical nodes passed 57 of 57 once the internode test's count
+  was corrected, 48 of 57 before.
+- **The zero-copy send refused for want of locked memory**
+  (`docs/decisions/2026-10-10-zero-copy-locked-memory.md`, "The verification";
+  `docs/design/evidence/v0.2-step4/2026-10-10-zero-copy-locked-memory/`,
+  `pi-zero-copy-refused/` and `pi-zero-copy-refused-e53c9e2/`): on the Pi's
+  Linux 6.18, which charges rings to the limit too, the seven zero-copy tests
+  passed at `e53c9e2`, after the change's second read, each node saying its
+  refusal once - one 6.18 gives at submission - and a job of two logical nodes
+  under `ulimit -l 0` was refused at start-up, naming the limit. The first
+  build's run had failed one of the seven, by the test's own defect.
+
+## Round nine and its changes (2026-10-10, night, to 2026-10-11)
+
+- **The tag's Pi checks rehearsed on `main` at `3b45472`** (round nine's lead,
+  overnight; `docs/reviews/archive/v0.2-before-part4-review.md`, "The Pi
+  rehearsal"): 0.1.0's release-point runbook in its four parts. The build without
+  a warning, the probe, tier 1 101 of 101, the smoke on block and cyclic maps,
+  the floor, the benchmark, the endings, the corpus as at 0.1.0, every pacer run
+  `failures=0`, an hour of `mix` `failures=0` in 3,603 s and an hour of
+  `threads` under the debug checks `failures=0` - and tier 2 on one node, as
+  the runbook runs it (`srun -N1 -n1 -c4`, `ctest -j4`), failing four runs of
+  four, 758 or 759 of 760: from Linux 6.14 io_uring charges every ring to one
+  count of locked memory for the user on the host, and the step's soft limit
+  was the shell's 8 MiB, its hard limit unlimited (portability P9-1).
+- **Tier 2 on one node with `shmem_init` raising the soft limit to the hard
+  one** (`docs/decisions/2026-10-11.md`), the step's limits as before (soft
+  8 MiB, hard unlimited): no ring refused in twelve runs. Two start-up tests
+  failed in six of the first nine - `shmem.leftovers.restart.other-size` and
+  `shmem.start-up.lead-ends-in-join` - none of them the library's: the second's
+  job ran forty times of forty outside `ctest`, twenty on `main` and twenty on
+  the change, and a sampler caught a rank's shell in uninterruptible sleep in
+  an NFSv4 open of its script under `/home` past the launcher's limit, while
+  the 64- and 70-PE jobs, whole now where they were refused in a second,
+  started beside it. With those jobs run alone (`RUN_SERIAL`) and the
+  lead-ends test's limit at 30 s, three runs of three passed, 764 of 764, in
+  246 to 298 s.

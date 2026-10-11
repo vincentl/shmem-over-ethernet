@@ -1,6 +1,6 @@
 # 2026-10-05: the release point
 
-The last stretch of `docs/prompts/task-first-release.md`: the release point's
+The last stretch of `docs/prompts/done/task-first-release.md`: the release point's
 conditions (design §1) and everything on `docs/release-checklist.md`, checked
 on the tree to be tagged - `main` at `beae139`, round six's review and its
 fixes on step E's merge point - by Claude, through the night of 2026-10-04 to

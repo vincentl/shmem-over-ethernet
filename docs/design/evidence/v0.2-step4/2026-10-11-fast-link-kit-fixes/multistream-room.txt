@@ -1,0 +1,7 @@
+node pes  blocks  in_calls    exact     diff  w_quiets  exact_q     diff  q_share offline   window offline  old_kit
+   0   2    4096     0.933   0.9326  +0.0004     1.664   1.6642  -0.0002    0.409  0.4090    0.098  0.0984     3.88  ROOM FULL
+   1   2    4096     0.925   0.9245  +0.0005     1.613   1.6133  -0.0003    0.387  0.3867    0.125  0.1254     3.91  ROOM FULL
+   2   2    4096     0.924   0.9244  -0.0004     1.712   1.7118  +0.0002    0.430  0.4296    0.093  0.0934     3.97  ROOM FULL
+   3   2    4096     1.080   1.0800  +0.0000     1.599   1.5988  +0.0002    0.316  0.3155    0.122  0.1225     3.82  ROOM FULL
+   4   2    4096     1.015   1.0150  +0.0000     1.631   1.6307  +0.0003    0.368  0.3677    0.111  0.1109     3.95  ROOM FULL
+largest difference, probe against offline: 0.0005 (the probe prints three decimals)

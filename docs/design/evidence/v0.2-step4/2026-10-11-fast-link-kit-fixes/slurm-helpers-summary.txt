@@ -1,0 +1,48 @@
+== <repo>/build/scratch/review-nine-fixes/kit/final/slurm/a-helpers
+jobs: 6, of which 0 failed (run.txt)
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - the figure the model's numbers are set beside - then
+the same with each quiet counted toward the block before it, the share of the
+PEs' time in quiets, and the seconds the count was taken over (median, range,
+count)
+  put-1m     pes=8 h=0                 job 0 (n=1)
+                                       node 0 (n=1)
+                                       cpu/GiB 0 (n=1)
+  put-1m     pes=8 h=2                 job 0 (n=1)
+                                       node 0 (n=1)
+                                       cpu/GiB 0 (n=1)
+
+mailbox: messages a second (median, range)
+  pes=8 h=0  19363 (n=1)
+  pes=8 h=2  19772 (n=1)
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  collectives pes=8 h=0
+    barrier                  13.2 (n=1)
+    reduce bytes=8           21.4 (n=1)
+    broadcast bytes=8        20.8 (n=1)
+    reduce bytes=65536       46.3 (n=1)
+    broadcast bytes=65536    23.5 (n=1)
+    fcollect block=8         43.1 (n=1)
+    alltoall block=8         25.3 (n=1)
+    fcollect block=4096      51.4 (n=1)
+    alltoall block=4096      31.9 (n=1)
+  collectives pes=8 h=2
+    barrier                  14.0 (n=1)
+    reduce bytes=8           19.8 (n=1)
+    broadcast bytes=8        19.4 (n=1)
+    reduce bytes=65536       42.0 (n=1)
+    broadcast bytes=65536    26.7 (n=1)
+    fcollect block=8         45.9 (n=1)
+    alltoall block=8         24.7 (n=1)
+    fcollect block=4096      48.5 (n=1)
+    alltoall block=4096      29.3 (n=1)
+
+outcomes
+  mailbox-pes8-h0-r1.txt: osoe-pacer failures=0 seconds=3.9
+  mailbox-pes8-h2-r1.txt: osoe-pacer failures=0 seconds=4.0

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * osoe-pacer-start-pes - Annex F's routines without a prefix, in a program of
- * their own (docs/prompts/task-stress-phase4.md item 5): start_pes starts the
+ * their own (docs/prompts/done/task-stress-phase4.md item 5): start_pes starts the
  * library in place of shmem_init, and finalizes it at exit, so it cannot share
  * osoe-pacer's process.
  *

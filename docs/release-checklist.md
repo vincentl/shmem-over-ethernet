@@ -119,23 +119,29 @@ until the tree to be tagged has them; the author tags.
 - [ ] **The review's findings settled on the candidate.** Round eight, at step
   4's merge point, said *release after named changes*, and they were made
   (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
-  adversarially before it merges. A further full round, the ninth, runs before
-  the tag (the author, `docs/decisions/2026-10-10.md` item 5), its findings
-  settled as round eight's were.
+  adversarially before it merges. The ninth, before Part 4, said the same,
+  and its changes were made and read (`docs/decisions/2026-10-11.md`); a tenth
+  runs before the tag, once every open item is cleared
+  (`docs/prompts/task-v0.2-to-the-tag.md`).
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at no helpers and at two and three where the merge point ran
-  them; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
+  them - ThreadSanitizer's as `ctest` judges every test there since the ninth
+  review's C9-1, its reports judged by `tsan.reports` at each count, none
+  included, and no gate run apart; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
   last run at 0.1.0's tag; the single-node build in its presets and on Rocky
   Linux 9.
 - [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
   two PEs at no helpers and at two, and its team programs at 70 PEs, as at step
   4's merge point (`docs/decisions/2026-10-10-step4-merge-point.md`), which ran
-  them before its review's fixes and every change since.
+  them before its review's fixes and every change since; and the README's
+  sentence on Sandia OpenSHMEM's suite "on the tree tagged 0.1.0" made the
+  tree tagged 0.2's (the ninth review's readiness Q5-4).
 - [ ] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
   for 0.1.0 (above): the sixteen cases in the development VM's Slurm, and
   `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on.
 - [ ] **The x86-64 item at two and three helpers too** (portability P3, under
-  "After the release").
+  "After the release"), and the README's sentence on what "the tagged tree"
+  did on x86-64 made 0.2's (readiness Q5-4).
 - [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
 - [ ] **The README's commands on the Pi cluster, and its quick start on Raspberry
@@ -152,9 +158,18 @@ until the tree to be tagged has them; the author tags.
   `SHMEM_VERSION`'s row - and the README's Status linking the new note.
 - [x] **The soname**: `libosoe.so.0`, as 0.1.0's (the author,
   `docs/decisions/2026-10-10.md` item 4) - the installed headers and the
-  exported names are 0.1.0's, so a program built against 0.1.0 should link and
-  run against 0.2, which no one has tried. The library's file is
-  `libosoe.so.0.2.0`.
+  exported names are 0.1.0's, so a program built against 0.1.0 links and runs
+  against 0.2: the ninth review's investigators built the README's ring against
+  a 0.1.0 install and ran it once 0.2 was installed over it, on one node and
+  two, with the right lines. The library's file is `libosoe.so.0.2.0`.
+- [ ] **The upgrade run again on the tree tagged**: a program built against the
+  0.1.0 install, run against the tagged library installed over it (readiness
+  Q5-3, Q5-4).
+- [ ] **If Part 4 turns the zero-copy send on by default**, its locked-memory
+  questions are the tag's, since every user with a low `ulimit -l` then meets
+  them: whether a connection that met the limit lends again after a while,
+  where today it copies for the rest of the job (readiness Q5-4; `shmem_init`
+  raises the soft limit to the hard one since 2026-10-11).
 
 ## After the release
 
@@ -310,8 +325,9 @@ rated them (round six's readiness Q5-5).
   - the ThreadSanitizer gate at a helper count tells the library's own
     collective words in the heap mapping from a program's heap, passes a
     report there only against a short list with a reason each, and requires a
-    helper's frame in every report it passes (correctness Q2-2): today it would
-    pass a real race in a Träff's row;
+    helper's frame in every report it passes (correctness Q2-2). *Done
+    2026-10-11*, with the ninth review's C9-1 (`cmake/thread-sanitizer-gate.py`,
+    `docs/decisions/2026-10-11.md`);
   - a white-box test of the deadlock detector's helper half - an answer naming
     the request posted last, the helpers' applied counts in the activity, the
     pass after the request - each removal failing it (correctness Q2-3):
@@ -334,15 +350,20 @@ rated them (round six's readiness Q5-5).
     want of locked memory keeps (portability P1, built 2026-10-10:
     `docs/decisions/2026-10-10-zero-copy-locked-memory.md`): whether a
     connection that met the limit lends again after a while, where now it
-    copies for the rest of the job; and whether `shmem_init` raises the soft
-    locked-memory limit to the hard one with zero copy on, as it does for open
-    files;
+    copies for the rest of the job (whether `shmem_init` raises the soft
+    locked-memory limit to the hard one, as it does for open files, the author
+    decided on 2026-10-11, for the rings on Linux 6.14 and later: it does,
+    zero copy on or off);
   - the backend's own threads named to the deadlock detector through
     `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
     owner's last pass shown with its age in `osoe-stat` (Q5-9);
   - a lead with helpers writing a death twice, its agent's line and a helper's,
     and "this PE was not waiting in the library" said of a PE in
-    `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are);
+    `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are) -
+    and a non-lead at no helpers wrote "the job is aborting on behalf of PE 0"
+    twice once in about 25 failing runs, the line having two writers, `abort.c`
+    and `fatal.c`, and no guard of once a process (the ninth review's readiness
+    Q5-4);
   - Träff's on teams that are not the world, typed reductions in place at its
     sizes, the whole-job `_to_all` at them, members' bits after a rounding sum,
     nodes at different helper counts, and SOS at three helpers, each right by

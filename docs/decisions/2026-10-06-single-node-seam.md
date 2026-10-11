@@ -1,7 +1,7 @@
 # 2026-10-06: the internode backend behind one file boundary (v0.2 step 1, part 1)
 
 The first part of v0.2's first step, built on
-`docs/prompts/v0.2-step1-single-node-prompt.md` (the brief), Part 1, from the
+`docs/prompts/done/v0.2-step1-single-node-prompt.md` (the brief), Part 1, from the
 author's decisions for v0.2 (`docs/decisions/2026-10-05-v0.2.md`, items 2 to
 5). A refactor of the full build, so that the second part can replace
 everything a job of more than one node needs with a backend that refuses such

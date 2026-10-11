@@ -16,6 +16,15 @@
  * the pieces the landing zone holds, for room - two waits other than a piece's
  * reply, each of which must name the node and the PE too (the adversarial read
  * of v0.2's blocking gets, finding 2).
+ *
+ * With three PEs, one a node, the room is another node's: PE 2 stops, PE 0's
+ * nonblocking get from it fills PE 0's landing zone, and PE 0's blocking get
+ * from PE 1 - live, its node answering while its own thread sleeps outside the
+ * library - waits for room its own pieces do not hold. That wait must name no
+ * node: it named node 1, which owed it nothing (the ninth review, Q5-2). The
+ * zone is set to 64 KiB (OSOE_GET_LANDING_BYTES), which the nonblocking get's
+ * one piece of 63 KiB and a byte fills to its last extent; were it two pieces,
+ * the nonblocking get would wait itself, under its own routine's name.
  */
 #define _GNU_SOURCE
 #include <signal.h>
@@ -39,18 +48,28 @@ int main(void)
     long *out = malloc(bytes);
     CHECK_FATAL(v && out);
     *v = 99;
+    int stopped = shmem_n_pes() == 3 ? 2 : 1;
+    size_t filling = 63 * 1024 + 1;
+    char *held = stopped == 2 ? shmem_calloc(1, filling) : NULL;
+    char *into = stopped == 2 ? malloc(filling) : NULL;
+    CHECK_FATAL(stopped == 1 || (held && into));
     shmem_barrier_all();
 
-    if (me == 1) {
+    if (me == stopped) {
         raise(SIGSTOP);                 /* never continued: the launcher kills it (-k) */
         for (;;)
             pause();
     }
+    if (me != 0)                        /* PE 1 of three: its node answers PE 0 */
+        for (;;)
+            pause();
 
     struct timespec settle = { 0, 200 * 1000000L };
     nanosleep(&settle, NULL);
+    if (stopped == 2)                       /* never lands: node 2 is stopped */
+        shmem_getmem_nbi(into, held, filling, 2);
     *out = 0;
-    shmem_getmem(out, v, bytes, 1);         /* node 1 is stopped: never returns */
+    shmem_getmem(out, v, bytes, 1);         /* node 1 stopped, or PE 0's zone held: never returns */
     printf("GET RETURNED %ld toward a stopped node\n", *out);
     fflush(stdout);
     free(out);

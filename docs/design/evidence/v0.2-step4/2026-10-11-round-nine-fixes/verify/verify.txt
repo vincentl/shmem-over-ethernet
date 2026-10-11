@@ -1,0 +1,70 @@
+== static checks 13:41:10
+100% tests passed, 0 tests failed out of 13
+== build debug 13:41:57
+== debug OSOE_PROGRESS_HELPERS=0 13:42:06
+100% tests passed, 0 tests failed out of 871
+== debug OSOE_PROGRESS_HELPERS=2 13:46:29
+100% tests passed, 0 tests failed out of 871
+== debug OSOE_PROGRESS_HELPERS=3 13:50:46
+100% tests passed, 0 tests failed out of 871
+== build release 13:55:10
+== release OSOE_PROGRESS_HELPERS=0 13:55:11
+100% tests passed, 0 tests failed out of 871
+== release OSOE_PROGRESS_HELPERS=2 13:58:30
+100% tests passed, 0 tests failed out of 871
+== release OSOE_PROGRESS_HELPERS=3 14:01:45
+100% tests passed, 0 tests failed out of 871
+== build asan 14:04:56
+== asan OSOE_PROGRESS_HELPERS=0 14:05:15
+100% tests passed, 0 tests failed out of 856
+== asan OSOE_PROGRESS_HELPERS=2 14:09:25
+100% tests passed, 0 tests failed out of 856
+== asan OSOE_PROGRESS_HELPERS=3 14:13:01
+100% tests passed, 0 tests failed out of 856
+== build tsan 14:16:24
+== tsan OSOE_PROGRESS_HELPERS=0 14:16:34
+100% tests passed, 0 tests failed out of 612
+0 report files, 0 reports, 0 passed in 0 tests
+THREAD SANITIZER GATE PASSED
+== tsan OSOE_PROGRESS_HELPERS=2 14:19:43
+100% tests passed, 0 tests failed out of 612
+83 report files, 95 reports, 95 passed in 25 tests
+  passed 22: in a program's heap
+  passed 5: in the internal region, at its grant-words: osoe_am_parse against osoe_am_parse
+  passed 4: in the internal region, at its grant-words: osoe_am_parse against osoe_internode_generic_number_taken
+  passed 1: in the internal region, at its lane-word: osoe_am_parse against osoe_am_parse
+  passed 63: in the internal region, at its past-the-team-words: osoe_am_parse against osoe_internode_generic_number_taken
+THREAD SANITIZER GATE PASSED
+== tsan OSOE_PROGRESS_HELPERS=3 14:22:54
+100% tests passed, 0 tests failed out of 612
+90 report files, 105 reports, 105 passed in 25 tests
+  passed 23: in a program's heap
+  passed 8: in the internal region, at its grant-words: osoe_am_parse against osoe_am_parse
+  passed 4: in the internal region, at its grant-words: osoe_am_parse against osoe_internode_generic_number_taken
+  passed 1: in the internal region, at its lane-word: osoe_am_parse against osoe_am_parse
+  passed 69: in the internal region, at its past-the-team-words: osoe_am_parse against osoe_internode_generic_number_taken
+THREAD SANITIZER GATE PASSED
+== tier3 14:26:07
+100% tests passed, 0 tests failed out of 114
+== models 14:30:25
+100% tests passed, 0 tests failed out of 40
+== pacer mix at 0 helpers 15:32:38
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mailbox at 0 helpers 15:33:39
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer collectives at 0 helpers 15:34:39
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix-ten-minutes at 0 helpers 15:35:39
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix at 2 helpers 15:45:43
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mailbox at 2 helpers 15:46:43
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer collectives at 2 helpers 15:47:43
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix-ten-minutes at 2 helpers 15:48:44
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== the single-node build 15:58:51
+warnings: 0
+100% tests passed, 0 tests failed out of 405
+DONE 15:59:40
