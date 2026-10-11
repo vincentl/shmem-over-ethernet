@@ -1,0 +1,79 @@
+== <repo>/build/scratch/review-nine-fixes/kit/final/dry-run/zero-copy
+jobs: 9, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - the figure the model's numbers are set beside - then
+the same with each quiet counted toward the block before it, the share of the
+PEs' time in quiets, and the seconds the count was taken over (median, range,
+count)
+  put-1048576-off pes=2 h=0            job 9265 (n=1)
+                                       node 1849 (1768-1927, n=5)
+                                       cpu/GiB 0.341 (n=1)
+                                       peers in calls 1.25 (1.22-1.27, n=5)
+                                       with quiets 1.81 (1.79-1.82, n=5), in quiets 0.309 (0.292-0.326, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 9034 MiB/s, hop 18.5 us, message 1.69 us; unsent limit 1212518 B
+  put-1048576-on-16k pes=2 h=0         job 7974 (n=1)
+                                       node 1611 (1408-1751, n=5)
+                                       cpu/GiB 0.399 (n=1)
+                                       peers in calls 1.38 (1.34-1.43, n=5)
+                                       with quiets 1.78 (1.77-1.80, n=5), in quiets 0.227 (0.206-0.242, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 8278 MiB/s, hop 16.0 us, message 1.77 us; unsent limit 1111024 B
+  put-1048576-on-256k pes=2 h=0        job 7549 (n=1)
+                                       node 1544 (1356-1587, n=5)
+                                       cpu/GiB 0.421 (n=1)
+                                       peers in calls 1.40 (1.37-1.44, n=5)
+                                       with quiets 1.79 (1.78-1.82, n=5), in quiets 0.225 (0.204-0.237, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.997
+                                       link 3318 MiB/s, hop 19.9 us, message 1.89 us; unsent limit 445308 B
+  put-1048576-on-64k pes=2 h=0         job 7832 (n=1)
+                                       node 1566 (1477-1720, n=5)
+                                       cpu/GiB 0.406 (n=1)
+                                       peers in calls 1.37 (1.36-1.39, n=5)
+                                       with quiets 1.77 (1.76-1.79, n=5), in quiets 0.228 (0.217-0.241, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 7498 MiB/s, hop 17.1 us, message 2.26 us; unsent limit 1006371 B
+  put-65536-off pes=2 h=0              job 11949 (n=1)
+                                       node 2405 (2222-2486, n=5)
+                                       cpu/GiB 0.263 (n=1)
+                                       peers in calls 0.945 (0.916-0.958, n=5)
+                                       with quiets 1.68 (1.66-1.72, n=5), in quiets 0.408 (0.390-0.424, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 14037 MiB/s, hop 16.7 us, message 3.90 us; unsent limit 1884022 B
+  put-65536-on-16k pes=2 h=0           job 9719 (n=1)
+                                       node 1878 (1865-2099, n=5)
+                                       cpu/GiB 0.334 (n=1)
+                                       peers in calls 1.07 (1.06-1.09, n=5)
+                                       with quiets 1.56 (1.53-1.56, n=5), in quiets 0.272 (0.264-0.282, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 4186 MiB/s, hop 16.2 us, message 1.86 us; unsent limit 561843 B
+  put-65536-on-256k pes=2 h=0          job 10202 (n=1)
+                                       node 2060 (1928-2162, n=5)
+                                       cpu/GiB 0.310 (n=1)
+                                       peers in calls 0.990 (0.976-1.02, n=5)
+                                       with quiets 1.58 (1.57-1.61, n=5), in quiets 0.335 (0.322-0.346, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 3401 MiB/s, hop 19.8 us, message 4.36 us; unsent limit 456414 B
+  put-65536-on-64k pes=2 h=0           job 9518 (n=1)
+                                       node 1893 (1824-1989, n=5)
+                                       cpu/GiB 0.335 (n=1)
+                                       peers in calls 1.07 (1.05-1.09, n=5)
+                                       with quiets 1.55 (1.54-1.58, n=5), in quiets 0.279 (0.263-0.303, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 5731 MiB/s, hop 18.8 us, message 2.43 us; unsent limit 769197 B
+
+counters that moved over the window (PE 0's node; median, range)
+  put-1048576-off pes=2 h=0 buffers=None: receive_enobufs 6298 (n=1), receive_rearms 6298 (n=1), sends 19448 (n=1)
+  put-1048576-on-16k pes=2 h=0 buffers=None: receive_enobufs 5088 (n=1), receive_rearms 5088 (n=1), sends 16262 (n=1), zero_copy_copied 6849 (n=1), zero_copy_notifications 6849 (n=1), zero_copy_sends 6849 (n=1)
+  put-1048576-on-256k pes=2 h=0 buffers=None: receive_enobufs 4313 (n=1), receive_rearms 4313 (n=1), sends 16362 (n=1), zero_copy_copied 6277 (n=1), zero_copy_notifications 6277 (n=1), zero_copy_sends 6277 (n=1)
+  put-1048576-on-64k pes=2 h=0 buffers=None: receive_enobufs 4166 (n=1), receive_rearms 4166 (n=1), sends 18214 (n=1), zero_copy_copied 7397 (n=1), zero_copy_notifications 7397 (n=1), zero_copy_sends 7397 (n=1)
+  put-65536-off pes=2 h=0 buffers=None: receive_enobufs 7203 (n=1), receive_rearms 7203 (n=1), sends 36051 (n=1)
+  put-65536-on-16k pes=2 h=0 buffers=None: receive_enobufs 4073 (n=1), receive_rearms 4073 (n=1), sends 35063 (n=1), zero_copy_copied 19603 (n=1), zero_copy_notifications 19603 (n=1), zero_copy_sends 19603 (n=1)
+  put-65536-on-256k pes=2 h=0 buffers=None: receive_enobufs 5320 (n=1), receive_rearms 5320 (n=1), sends 33428 (n=1), zero_copy_copied 3753 (n=1), zero_copy_notifications 3753 (n=1), zero_copy_sends 3753 (n=1)
+  put-65536-on-64k pes=2 h=0 buffers=None: receive_enobufs 4475 (n=1), receive_rearms 4475 (n=1), sends 34448 (n=1), zero_copy_copied 19290 (n=1), zero_copy_notifications 19290 (n=1), zero_copy_sends 19290 (n=1)

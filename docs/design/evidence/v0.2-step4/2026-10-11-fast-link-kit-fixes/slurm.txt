@@ -1,0 +1,235 @@
+# lock taken 2026-10-11T17:32:45Z on lima-osoe, slurm-wlm 24.11.5; load 6.91 4.15 2.69
+
+######## A. the VM's own slurm.conf: TaskPlugin=task/affinity SelectTypeParameters=CR_Core NodeName=lima-osoe CPUs=4 RealMemory=7427 State=UNKNOWN 
+== P9-2: the kit's old form, a job of 8 tasks on 4 CPUs
+srun: error: Unable to allocate resources: Requested node configuration is not available
+  status 1
+== launch: 8 tasks on 4 CPUs
+  status 0 in 219 ms
+  | # 17:32:45 nodes=1 pes_per_node=8 
+  | # bash -c echo "task ${SLURM_PROCID:-?} of ${SLURM_NTASKS:-?} on $(hostname -s): allowed $(grep Cpus_allowed_list /proc/self/status | cut -f2), nproc $(nproc)"
+  | salloc: Granted job allocation 490
+  | salloc: Nodes lima-osoe are ready for job
+  | task 0 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 4 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 1 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 2 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 3 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 7 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 5 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 6 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | salloc: Relinquishing job allocation 490
+  | # exit 0
+== launch: osoe-bench quick barrier collectives at 8 PEs on 4 CPUs
+  status 0
+  | osoe: PE 0 of 8 (local 0 of 8): segment /dev/shm/osoe.491.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 1
+  | osoe-bench pes=8 remote_target=-1 local_target=1
+  | barrier pes=8 median_us=12.4 fastest_us=9.3
+  | alltoall pes=8 block=8 median_us=28.5 fastest_us=1.4
+  | alltoall pes=8 block=4096 median_us=33.2 fastest_us=4.9
+== launch's timeout: KIT_TIMEOUT=5, 8 tasks that would take 60 s
+  status 124 in 5264 ms
+  | # 17:32:46 nodes=1 pes_per_node=8 
+  | # sleep 60
+  | salloc: Granted job allocation 492
+  | salloc: Nodes lima-osoe are ready for job
+  | salloc: Job allocation 492 has been revoked.
+  | srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+  | slurmstepd-lima-osoe: error: *** STEP 492.0 ON lima-osoe FAILED (non-zero exit code or other failure mode) ***
+  | slurmstepd-lima-osoe: error: *** REASON: RaisedSignal:15(Terminated) ***
+  | srun: error: lima-osoe: tasks 0-7: Terminated
+  | srun: Terminating StepId=492.0
+  | srun: job 493 queued and waiting for resources
+  | srun: job 493 has been allocated resources
+  | no named osoe segments, job tables or connection areas in /dev/shm
+  | # exit 124
+  queue: [] steps: [] processes matching 'sleep 60': 0
+  node idle
+== launch's timeout: KIT_TIMEOUT=5, 8 tasks that ignore SIGTERM and would take 120 s
+  status 124 in 35083 ms
+  | # 17:32:51 nodes=1 pes_per_node=8 
+  | # bash -c trap "" TERM; sleep 120
+  | salloc: Granted job allocation 494
+  | salloc: Nodes lima-osoe are ready for job
+  | salloc: Job allocation 494 has been revoked.
+  | slurmstepd-lima-osoe: error: *** STEP 494.0 ON lima-osoe FAILED (non-zero exit code or other failure mode) ***
+  | slurmstepd-lima-osoe: error: *** REASON: RaisedSignal:15(Terminated) ***
+  | srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+  | srun: error: lima-osoe: tasks 0-7: Killed
+  | srun: Terminating StepId=494.0
+  | srun: job 495 queued and waiting for resources
+  | srun: job 495 has been allocated resources
+  | no named osoe segments, job tables or connection areas in /dev/shm
+  | # exit 124
+  queue: [] steps: [] processes matching 'sleep 120': 0
+  node idle
+== the floor's pinned form: KIT_SALLOC with -w, KIT_SRUN with --cpus-per-task=4
+  status 0
+  | # 17:33:26 nodes=1 pes_per_node=1 
+  | # bash -c echo "task ${SLURM_PROCID:-?} of ${SLURM_NTASKS:-?} on $(hostname -s): allowed $(grep Cpus_allowed_list /proc/self/status | cut -f2), nproc $(nproc)"
+  | salloc: Granted job allocation 496
+  | salloc: Nodes lima-osoe are ready for job
+  | task 0 of 1 on lima-osoe: allowed 0-3, nproc 4
+  | salloc: Relinquishing job allocation 496
+  | # exit 0
+== R1 as it was: on and spawn, jobs of one task, with --cpu-bind=none
+  on | task 0 of 1 on lima-osoe: allowed 0, nproc 1
+  spawn's status 0
+  | task 0 of 1 on lima-osoe: allowed 0, nproc 1
+== R1 as it was: floor.sh's echo part through spawn, toward 192.168.5.15
+  clients' status 0
+  seen:      24 --client allowed 1
+  seen:      24 --server allowed 0
+  a-echo: the per-connection medians summed 19253 MiB/s over 4 connections
+  queue: [] steps: [] processes matching 'echo-uring': 0
+== helpers.sh under srun: one round, 0 and 2 helpers, 8 PEs a node on 4 CPUs
+  status 0
+  | # 2026-10-11T17:33:32Z helpers.sh on lima-osoe
+  | # kit 7316f22
+  | # launcher srun, build /tmp/kit-fixes/src/build/release, nodes 1, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 120 s
+  | note: 1 nodes; four helpers need four peers, five nodes
+  | 17:33:33 exit 0 put-1m-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 /tmp/kit-fixes/src/build/release/kit/multistream put 1048576 2
+  | 17:33:37 exit 0 mailbox-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 /tmp/kit-fixes/src/build/release/tools/pacer/osoe-pacer --seconds 4 mailbox
+  | 17:33:37 exit 0 collectives-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 /tmp/kit-fixes/src/build/release/tools/bench/osoe-bench quick barrier collectives
+  | 17:33:37 exit 0 put-1m-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 /tmp/kit-fixes/src/build/release/kit/multistream put 1048576 2
+  | 17:33:41 exit 0 mailbox-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 /tmp/kit-fixes/src/build/release/tools/pacer/osoe-pacer --seconds 4 mailbox
+  | 17:33:42 exit 0 collectives-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 /tmp/kit-fixes/src/build/release/tools/bench/osoe-bench quick barrier collectives
+  | # done 17:33:42
+  summarize.py: 0
+== facts.sh under srun
+  status 0, 233 lines of facts, scontrol's 220 lines
+  | # 2026-10-11T17:33:42Z facts.sh on lima-osoe
+  | # kit 7316f22
+  | # launcher srun, build /tmp/kit-fixes/src/build/release, nodes 1, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 120 s
+  | 17:33:42 exit 0 facts.txt:  bash -c first=lima-osoe
+  | nodes="lima-osoe "
+  | say() { sed "s/^/$(hostname) $1: /"; }
+  | uname -a | say kernel
+  | lscpu | say cpu
+  | free -b | say memory
+  | df -B1 /dev/shm | say dev-shm
+  | getconf PAGESIZE | say page-size
+  | cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>&1 | say governor
+  | numactl --hardware 2>&1 | say numa
+  | address=$(getent ahostsv4 "$first" | awk 'NR == 1 { print $1 }')
+  | interface=$(ip route get "$address" 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }' | head -1)
+  | if [ -z "$interface" ] || [ "$interface" = lo ]; then
+  |     interface=$(ip -o -4 route show default | awk '{ print $5 }' | head -1)
+  | fi
+  | echo "$interface" | say interface
+  | ip -d link show "$interface" | say link
+  | cat "/sys/class/net/$interface/speed" 2>&1 | say speed
+  | for option in -i -k -c -l -g; do /usr/sbin/ethtool $option "$interface" 2>&1 | say "ethtool$option"; done
+  | for key in net.core.netdev_max_backlog net.core.rmem_max net.core.wmem_max net.ipv4.tcp_rmem \
+  |            net.ipv4.tcp_wmem net.ipv4.tcp_congestion_control net.ipv4.tcp_notsent_lowat \
+  |            net.ipv4.tcp_mtu_probing net.core.default_qdisc kernel.io_uring_disabled; do
+  |     echo "$key = $(cat "/proc/sys/${key//.//}" 2>&1)" | say sysctl
+  | done
+  | echo "memlock $(ulimit -l), open files $(ulimit -n), stack $(ulimit -s)" | say limits
+  | loginctl show-user "$(id -un)" -p Linger 2>&1 | say linger
+  | grep -h '^ *RemoveIPC' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>&1 | say logind
+  | dpkg-query -W liburing2 liburing-dev 2>&1 | say packages
+  | for n in $nodes; do echo "$n $(getent ahostsv4 "$n" | awk 'NR == 1 { print $1 }')"; done | say resolves
+  | # done 17:33:42
+
+######## B. TaskPlugin=task/none, as slurm-setup.sh now sets it
+# original slurm.conf: md5 75d4d2986179de12638b64f73e27b0c5  -, root:root 644 669 bytes 2026-09-23 23:11:02.359443479 -0400
+  TaskPlugin              = (null)
+== R1 fixed: on and spawn, jobs of one task
+  on | task 0 of 1 on lima-osoe: allowed 0-3, nproc 4
+  spawn's status 0
+  | task 0 of 1 on lima-osoe: allowed 0-3, nproc 4
+== R1 fixed: floor.sh's echo part through spawn, toward 192.168.5.15
+<repo>/build/scratch/review-nine-fixes/kit/vm-slurm-final.sh: line 83: /proc/1286202/cmdline: No such file or directory
+  clients' status 0
+  seen:       1  allowed 
+  seen:      14 --client allowed 0-3
+  seen:      13 --server allowed 0-3
+<repo>/build/scratch/review-nine-fixes/kit/vm-slurm-final.sh: line 162: wait_for: No record of process 1286457
+  b-echo: the per-connection medians summed 26634 MiB/s over 4 connections
+  queue: [] steps: [] processes matching 'echo-uring': 0
+== launch under task/none: 8 tasks on 4 CPUs
+  status 0
+  | # 17:33:50 nodes=1 pes_per_node=8 
+  | # bash -c echo "task ${SLURM_PROCID:-?} of ${SLURM_NTASKS:-?} on $(hostname -s): allowed $(grep Cpus_allowed_list /proc/self/status | cut -f2), nproc $(nproc)"
+  | salloc: Granted job allocation 512
+  | salloc: Nodes lima-osoe are ready for job
+  | task 6 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 3 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 2 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 1 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 7 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 4 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 0 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | task 5 of 8 on lima-osoe: allowed 0-3, nproc 4
+  | salloc: Relinquishing job allocation 512
+  | # exit 0
+== launch under task/none: osoe-bench quick barrier collectives at 8 PEs
+  status 0
+  | osoe-bench pes=8 remote_target=-1 local_target=1
+  | barrier pes=8 median_us=14.0 fastest_us=9.2
+  | alltoall pes=8 block=8 median_us=25.5 fastest_us=1.6
+  | alltoall pes=8 block=4096 median_us=30.6 fastest_us=2.4
+== P9-2 under task/none: the old form still refused
+srun: error: Unable to allocate resources: Requested node configuration is not available
+  status 1
+
+######## restore: the original slurm.conf, both daemons restarted
+NODELIST STATE CPUS S:C:T REASON
+lima-osoe idle 4 4:1:1 none
+md5 now 75d4d2986179de12638b64f73e27b0c5  - (original 75d4d2986179de12638b64f73e27b0c5  -); root:root 644 669 bytes 2026-09-23 23:11:02.359443479 -0400
+DebugFlags              = (null)
+InactiveLimit           = 0 sec
+SelectTypeParameters    = CR_CORE
+SlurmctldDebug          = info
+SlurmdParameters        = (null)
+TaskPlugin              = task/affinity
+active
+active
+lima-osoe
+lima-osoe
+restored 2026-10-11T17:33:54Z
+
+######## C. R2: slurm-setup.sh's loop over the nodes' slurmd -C lines
+== as installed, with slurm-wlm's recommended packages
+  | slurmd -C on lima-osoe gave no node line (status 139); it printed:
+  |     Failed to open drm root directory /sys/class/drm.: No such file or directory
+  |     Exception caught: rsmi_init.
+  | 1 of 1 nodes gave no node line, and nothing but munge's key has been
+  | changed. A crash after "Failed to open drm root directory" or "rsmi_init" is
+  | the ROCm SMI library's, on a node without a GPU: on each such node remove it -
+  | sudo apt-get remove -y librocm-smi64-1, which takes the ROCm GPU plugin and
+  | the slurm-wlm-plugins metapackage with it and leaves slurmd; the plugin
+  | removed alone leaves the library, and the crash - or install Slurm as
+  | docs/fast-link.md §1 does, with --no-install-recommends; then run this again.
+  | Otherwise check that /usr/sbin/slurmd is there on that node and that ssh from
+  | here reaches it.
+  status 1
+== apt's simulation of §1's install from nothing: 169 packages with the recommended ones, 90 without
+  Slurm's recommended chain: freeipmi-common libaec0 libfreeipmi17 libhdf5-310 libhdf5-hl-310 libipmimonitoring6 libmariadb3 liboam-dev liboam1 librocm-smi-dev librocm-smi64-1 libsz2 mariadb-common mysql-common slurm-wlm-elasticsearch-plugin slurm-wlm-hdf5-plugin slurm-wlm-influxdb-plugin slurm-wlm-ipmi-plugins slurm-wlm-jwt-plugin slurm-wlm-mysql-plugin slurm-wlm-plugins slurm-wlm-rsmi-plugin 
+== without Slurm's recommended chain, as --no-install-recommends installs it: 88 of 97 plugins, 19 library files hidden
+  | the node lines:
+  | NodeName=lima-osoe CPUs=4 Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1 RealMemory=7427
+  |   status 0
+== without the ROCm GPU plugin alone (slurm-wlm-rsmi-plugin): 96 of 97 plugins, 0 library files hidden
+  | slurmd -C on lima-osoe gave no node line (status 139); it printed:
+  |     
+  | 1 of 1 nodes gave no node line, and nothing but munge's key has been
+  | changed. A crash after "Failed to open drm root directory" or "rsmi_init" is
+  | the ROCm SMI library's, on a node without a GPU: on each such node remove it -
+  | sudo apt-get remove -y librocm-smi64-1, which takes the ROCm GPU plugin and
+  | the slurm-wlm-plugins metapackage with it and leaves slurmd; the plugin
+  | removed alone leaves the library, and the crash - or install Slurm as
+  | docs/fast-link.md §1 does, with --no-install-recommends; then run this again.
+  | Otherwise check that /usr/sbin/slurmd is there on that node and that ssh from
+  | here reaches it.
+  |   status 1
+== without the ROCm SMI library alone (librocm-smi64-1): 97 of 97 plugins, 1 library files hidden
+  | the node lines:
+  | NodeName=lima-osoe CPUs=4 Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1 RealMemory=7427
+  |   status 0
+== apt's simulations of the remedies
+  apt-get remove librocm-smi64-1: slurm-wlm-plugins slurm-wlm-rsmi-plugin librocm-smi-dev librocm-smi64-1 
+  apt-get remove slurm-wlm-rsmi-plugin: slurm-wlm-plugins slurm-wlm-rsmi-plugin 
+  outside the namespaces afterwards: 97 plugin files; /usr/lib/aarch64-linux-gnu/librocm_smi64.so.1.0
+# done 2026-10-11T17:33:56Z

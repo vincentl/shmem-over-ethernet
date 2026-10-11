@@ -1,0 +1,33 @@
+== <repo>/build/scratch/review-nine-fixes/kit/final/dry-run/fan-in
+jobs: 8, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+fan-in: MiB/s into PE 0
+  pes=1 h=0 buffers=64  8090 (n=1)
+    link 4555 MiB/s, hop 16.1 us, message 1.83 us; unsent limit 611319 B
+  pes=1 h=0 buffers=256  7179 (n=1)
+    link 4415 MiB/s, hop 15.9 us, message 5.03 us; unsent limit 592562 B
+  pes=1 h=2 buffers=64  9841 (n=1)
+    link 16449 MiB/s, hop 17.4 us, message 2.27 us; unsent limit 2207722 B
+  pes=1 h=2 buffers=256  7519 (n=1)
+    link 4127 MiB/s, hop 15.7 us, message 2.18 us; unsent limit 553971 B
+  pes=2 h=0 buffers=64  9531 (n=1)
+    link 5790 MiB/s, hop 15.9 us, message 4.66 us; unsent limit 777118 B
+  pes=2 h=0 buffers=256  8978 (n=1)
+    link 8998 MiB/s, hop 17.0 us, message 2.94 us; unsent limit 1207631 B
+  pes=2 h=2 buffers=64  11009 (n=1)
+    link 4070 MiB/s, hop 16.6 us, message 2.12 us; unsent limit 546204 B
+  pes=2 h=2 buffers=256  6972 (n=1)
+    link 6125 MiB/s, hop 16.5 us, message 3.04 us; unsent limit 822090 B
+
+counters that moved over the window (PE 0's node; median, range)
+  fan-in pes=1 h=0 buffers=64: receive_enobufs 2234 (n=1), receive_rearms 2234 (n=1), sends 2567 (n=1)
+  fan-in pes=1 h=0 buffers=256: receive_enobufs 56.0 (n=1), receive_rearms 56.0 (n=1), sends 2564 (n=1)
+  fan-in pes=1 h=2 buffers=64: receive_enobufs 777 (n=1), receive_rearms 777 (n=1), sends 2564 (n=1)
+  fan-in pes=1 h=2 buffers=256: sends 2564 (n=1)
+  fan-in pes=2 h=0 buffers=64: receive_enobufs 3042 (n=1), receive_rearms 3042 (n=1), sends 1551 (n=1)
+  fan-in pes=2 h=0 buffers=256: receive_enobufs 499 (n=1), receive_rearms 499 (n=1), sends 1405 (n=1)
+  fan-in pes=2 h=2 buffers=64: receive_enobufs 1224 (n=1), receive_rearms 1224 (n=1), sends 1572 (n=1)
+  fan-in pes=2 h=2 buffers=256: receive_enobufs 47.0 (n=1), receive_rearms 47.0 (n=1), sends 1450 (n=1)

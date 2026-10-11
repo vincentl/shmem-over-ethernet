@@ -1,0 +1,19 @@
+# lock taken 2026-10-11T17:28:46Z; 1.29 1.84 1.77
+== facts 17:28:46
+exit 0, jobs that failed: 0
+== floor 17:29:10
+exit 0, jobs that failed: 0
+== helpers 17:29:16
+exit 0, jobs that failed: 0
+== ladder 17:30:01
+exit 0, jobs that failed: 0
+== zero-copy 17:30:45
+exit 0, jobs that failed: 0
+== gets 17:31:02
+exit 0, jobs that failed: 0
+== fan-in 17:31:07
+exit 0, jobs that failed: 0
+== scale 17:31:09
+exit 0, jobs that failed: 0
+DONE 17:31:39
+dry-run.sh: 0

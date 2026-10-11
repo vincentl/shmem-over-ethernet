@@ -1,0 +1,9 @@
+# lock taken 2026-10-11T17:28:24Z; 0.10 1.67 1.71
+build.sh: 0
+warnings in the release build: 0
+the kit's probes compile with -Wall -Wextra -Werror, -Wformat-truncation apart
+warnings in multistream.c, -Wall -Wextra: 3
+warnings in main's multistream.c (7d1d868), -Wall -Wextra: 3
+the check probe built
+the scripts parse
+# done 2026-10-11T17:28:46Z

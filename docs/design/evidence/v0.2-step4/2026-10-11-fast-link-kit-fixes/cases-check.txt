@@ -1,0 +1,12 @@
+# name probe nodes pes mode bytes [settings]
+r1-put1m-8x8-h0 multistream-check 8 8 put 1048576
+r1-get1m-8x8-h0 multistream-check 8 8 get 1048576
+r1-put64k-8x8-h0 multistream-check 8 8 put 65536
+r1-put1m-5x8-h0 multistream-check 5 8 put 1048576
+r1-put1m-5x8-h2 multistream-check 5 8 put 1048576 OSOE_PROGRESS_HELPERS=2
+r1-put64k-5x2-h0 multistream-check 5 2 put 65536
+r1-put1m-5x2-h4 multistream-check 5 2 put 1048576 OSOE_PROGRESS_HELPERS=4
+r1-put1m-2x1-h0 multistream-check 2 1 put 1048576
+r1-kit-put1m-8x8-h0 multistream 8 8 put 1048576
+r2-put1m-8x8-h0 multistream-check 8 8 put 1048576
+r2-get1m-8x8-h1 multistream-check 8 8 get 1048576 OSOE_PROGRESS_HELPERS=1

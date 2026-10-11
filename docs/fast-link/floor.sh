@@ -3,12 +3,14 @@
 # docs/fast-link.md §4: the floor and the bare stream, between the list's first
 # two nodes. shmem_test_floor, one PE a node (design §8.4); then CONNECTIONS
 # ("1 2 4 8 16") echo-uring streams at once each way - servers on both nodes,
-# each node's clients toward the other's, unbound, so that the node's every core
-# may serve them - each stream ECHO_MEBIBYTES (1024) a trial; and iperf3 with as
-# many streams each way at once (--bidir), whose sum over its ten seconds is
-# the bare aggregate the helpers' table is set against (§5). echo-uring's
-# per-connection medians, summed, are an upper bound beside it: nothing checks
-# that its streams ran at once.
+# each node's clients toward the other's - each stream ECHO_MEBIBYTES (1024) a
+# trial; and iperf3 with as many streams each way at once (--bidir), whose sum
+# over its ten seconds is the bare aggregate the helpers' table is set against
+# (§5). echo-uring's per-connection medians, summed, are an upper bound beside
+# it: nothing checks that its streams ran at once. The servers, the clients and
+# iperf3 are each a job of one task (on and spawn, common.sh), unbound: the
+# node's every core may serve them, since slurm-setup.sh's TaskPlugin is
+# task/none.
 # usage: floor.sh NODES OUTDIR
 : "${KIT_TIMEOUT:=300}"
 source "$(dirname "$0")/common.sh"
@@ -24,7 +26,7 @@ ECHO=$KIT_BUILD/tools/echo-uring/echo-uring
 
 # The one task a node every core of it, as docs/pi-cluster.md §5 gives the Pi's:
 # its main thread, its agent and the floor's echo would otherwise share one.
-KIT_SRUN="$KIT_SRUN $(pair) --cpus-per-task=${FLOOR_CPUS:-4}" \
+KIT_SALLOC="$KIT_SALLOC $(pair)" KIT_SRUN="$KIT_SRUN --cpus-per-task=${FLOOR_CPUS:-4}" \
     launch 2 1 "$OUT/floor.txt" -- "$KIT_BUILD/shmem/tests/shmem_test_floor"
 
 # echo-uring's servers on both nodes, one a port; each node's clients toward the

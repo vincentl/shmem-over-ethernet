@@ -1,0 +1,54 @@
+# lock taken 2026-10-11T17:15:07Z; load 0.33 0.56 1.12
+# original slurm.conf: md5 75d4d2986179de12638b64f73e27b0c5  -, root:root 644 669 bytes 2026-09-23 23:11:02.359443479 -0400
+== round 1, TaskPlugin = task/affinity, toward 192.168.5.15
+  clients' status 0
+  seen:      24 --client
+  seen:      24 --mebibytes 1
+  seen:      24 --rounds
+  seen:      24 --server 0
+  r1-affinity: the per-connection medians summed 18743 MiB/s over 4 connections
+  left: 0 jobs, 0 echo-uring processes
+== round 1, TaskPlugin = (null), toward 192.168.5.15
+<repo>/build/scratch/review-nine-fixes/kit/vm-r1-echo.sh: line 68: /proc/1258995/cmdline: No such file or directory
+  clients' status 0
+  seen:       1  
+  seen:      14 --client
+  seen:      14 --mebibytes 0-3
+  seen:      14 --rounds
+  seen:      14 --server 0-3
+<repo>/build/scratch/review-nine-fixes/kit/vm-r1-echo.sh: line 93: wait_for: No record of process 1259216
+  r1-none: the per-connection medians summed 26327 MiB/s over 4 connections
+  left: 0 jobs, 0 echo-uring processes
+== round 2, TaskPlugin = task/affinity, toward 192.168.5.15
+  clients' status 0
+  seen:      24 --client
+  seen:      24 --mebibytes 1
+  seen:      24 --rounds
+  seen:      24 --server 0
+<repo>/build/scratch/review-nine-fixes/kit/vm-r1-echo.sh: line 93: wait_for: No record of process 1259755
+  r2-affinity: the per-connection medians summed 19358 MiB/s over 4 connections
+  left: 0 jobs, 0 echo-uring processes
+== round 2, TaskPlugin = (null), toward 192.168.5.15
+  clients' status 0
+  seen:      14 --client
+  seen:      14 --mebibytes 0-3
+  seen:      14 --rounds
+  seen:      13 --server 0-3
+<repo>/build/scratch/review-nine-fixes/kit/vm-r1-echo.sh: line 93: wait_for: No record of process 1260175
+  r2-none: the per-connection medians summed 26665 MiB/s over 4 connections
+  left: 0 jobs, 0 echo-uring processes
+######## restore: the original slurm.conf, both daemons restarted
+NODELIST STATE CPUS S:C:T REASON
+lima-osoe idle 4 4:1:1 none
+md5 now 75d4d2986179de12638b64f73e27b0c5  - (original 75d4d2986179de12638b64f73e27b0c5  -); root:root 644 669 bytes 2026-09-23 23:11:02.359443479 -0400
+DebugFlags              = (null)
+InactiveLimit           = 0 sec
+SelectTypeParameters    = CR_CORE
+SlurmctldDebug          = info
+SlurmdParameters        = (null)
+TaskPlugin              = task/affinity
+active
+active
+lima-osoe
+lima-osoe
+restored 2026-10-11T17:15:45Z

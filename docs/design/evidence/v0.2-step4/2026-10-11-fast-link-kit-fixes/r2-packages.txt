@@ -1,0 +1,18 @@
+== without librocm-smi64-1: 97 plugins, 1 library files covered
+  status 0; stdout: NodeName=lima-osoe CPUs=4 Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1 RealMemory=79
+== without librocm-smi64-1 librocm-smi-dev: 97 plugins, 5 library files covered
+  status 0; stdout: NodeName=lima-osoe CPUs=4 Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1 RealMemory=79
+== without slurm-wlm-rsmi-plugin: 96 plugins, 0 library files covered
+  status 139; stdout: 
+== without slurm-wlm-rsmi-plugin slurm-wlm-plugins librocm-smi64-1 librocm-smi-dev liboam1 liboam-dev: 96 plugins, 6 library files covered
+  status 0; stdout: NodeName=lima-osoe CPUs=4 Boards=1 SocketsPerBoard=1 CoresPerSocket=4 ThreadsPerCore=1 RealMemory=79
+== apt's simulations
+  apt-get remove slurm-wlm-rsmi-plugin: slurm-wlm-plugins slurm-wlm-rsmi-plugin 
+  apt-get remove --autoremove slurm-wlm-rsmi-plugin: slurm-wlm-plugins slurm-wlm-ipmi-plugins libipmimonitoring6 libfreeipmi17 freeipmi-common slurm-wlm-hdf5-plugin libhdf5-hl-310 libhdf5-310 libsz2 libaec0 slurm-wlm-mysql-plugin libmariadb3 liboam-dev liboam1 slurm-wlm-rsmi-plugin librocm-smi-dev librocm-smi64-1 mariadb-common mysql-common slurm-wlm-elasticsearch-plugin slurm-wlm-influxdb-plugin slurm-wlm-jwt-plugin 
+  outside afterwards: 97 plugin files, /usr/lib/aarch64-linux-gnu/librocm_smi64.so.1.0
+apt-get -s remove librocm-smi64-1: slurm-wlm-plugins slurm-wlm-rsmi-plugin librocm-smi-dev librocm-smi64-1 
+librocm-smi64-1
+Reverse Depends:
+  librocm-smi-dev
+/usr/lib/aarch64-linux-gnu/librocm_smi64.so.1.0
+/usr/lib/aarch64-linux-gnu/librocm_smi64.so.1

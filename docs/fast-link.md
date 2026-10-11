@@ -6,15 +6,20 @@ cluster's gigabit: v0.2 step 4's Part 4
 fast link"), and the questions earlier parts left to it. Written before any such
 machine exists, so that one is not paid for while scripts are written: every
 section's script has run end to end on the development VM's logical nodes
-(`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`; its runs are in
-`docs/design/evidence/v0.2-step4/2026-10-10-fast-link-dry-run/`, the kit as it is
-in `after-reads/`, at every helper count the sweep runs), and none yet on a
-cluster. Never run at all: `slurm-setup.sh`, `build.sh`'s copying to other
-nodes, every `srun` the kit makes - `launch`'s, `on`'s and `facts.sh`'s
-`scontrol` and `sinfo` - and `floor.sh`'s second direction, which one machine
-cannot run. The kit was read adversarially before any node was rented
-(`docs/reviews/archive/v0.2-fast-link-kit-adversarial-read.md`), and its
-findings are in what follows.
+(`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`, at every helper count
+the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
+`2026-10-10-fast-link-dry-run/` for the kit as its two reads left it and
+`2026-10-11-fast-link-kit-fixes/` for the kit as it is), and none yet on a
+cluster. In the development VM's Slurm, one node of four CPUs, the kit's
+`launch`, `on` and `spawn` have run, with `facts.sh`'s `scontrol` and `sinfo`,
+`helpers.sh`'s jobs and `slurm-setup.sh`'s reading of `slurmd -C`. Never run at
+all: the rest of `slurm-setup.sh`, `build.sh`'s copying to other nodes, a job
+across nodes under Slurm, and `floor.sh`'s second direction, which one machine
+cannot run. The kit was read adversarially twice before any node was rented
+(`docs/reviews/archive/v0.2-fast-link-kit-adversarial-read.md` and
+`v0.2-fast-link-kit-second-adversarial-read.md`) and again in round nine's
+review (`v0.2-before-part4-review.md`, its third change), and their findings
+are in what follows.
 
 **Build the commit the run records.** Every section's `run.txt` names the
 commit (`git rev-parse HEAD` on the first node, or `KIT_COMMIT` where the tree
@@ -87,8 +92,8 @@ numbers incomparable.
 **Sessions.** Each section says how long it takes; in four-hour sessions:
 
 1. Setup, facts, the suite on a node, the floor and the bare stream (§1 to §4).
-2. The helper sweep (§5), about an hour at eight nodes, with time to repeat
-   what it shows.
+2. The helper sweep (§5), about an hour and a quarter at eight nodes, with
+   time to repeat what it shows.
 3. The ladder, the zero-copy send, the landing zone, the fan-in (§6 to §9).
 4. The cluster at size (§10), and whatever the first three left to repeat.
 
@@ -105,18 +110,25 @@ also runs Slurm's controller, as a user with `sudo`:
 ```sh
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential cmake pkg-config \
-    liburing-dev git rsync slurm-wlm munge ethtool iperf3
+    liburing-dev git rsync ethtool iperf3
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends slurm-wlm munge
 ```
 
 and the same on every other node (the list `NODES`, one name a line, every
-node's name as the others resolve it, the first node first);
+node's name as the others resolve it, the first node first).
 `DEBIAN_FRONTEND=noninteractive` answers `iperf3`'s question about a daemon of
-its own with no:
+its own with no, and Slurm goes without its recommended packages: they bring
+the ROCm GPU plugin and its library, `librocm-smi64`, and with the library
+installed `slurmd -C` - from which `slurm-setup.sh` writes each node's line -
+crashed in the development VM, a machine without a GPU, printing no node line;
+with the plugin removed alone it still did (round nine's review, R2):
 
 ```sh
 for n in $(tail -n +2 NODES); do ssh -o StrictHostKeyChecking=accept-new $n \
     "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-     build-essential cmake pkg-config liburing-dev rsync slurm-wlm munge ethtool iperf3"; done
+     build-essential cmake pkg-config liburing-dev rsync ethtool iperf3 &&
+     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+     slurm-wlm munge"; done
 ```
 
 Then, on the first node:
@@ -128,10 +140,16 @@ docs/fast-link/build.sh NODES             # the tree to every node at the same p
 
 `slurm-setup.sh` writes one partition of every node with its cores and memory
 as `slurmd -C` reports them - by its path, `/usr/sbin/slurmd`, which Debian 13
-keeps off a user's `PATH`, and it stops unless every node gave its line -
-`TaskPlugin=task/affinity`, and `PropagateResourceLimitsExcept=MEMLOCK`, so
-that a step takes the login session's limits but the locked-memory one, which
-`slurmd` gives it unlimited. It also sets, on every node:
+keeps off a user's `PATH`, and it stops unless every node gave its line, saying
+what a node that gave none printed and what to do -
+`PropagateResourceLimitsExcept=MEMLOCK`, so that a step takes the login
+session's limits but the locked-memory one, which `slurmd` gives it unlimited,
+and `TaskPlugin=task/none`, so that nothing binds a step's tasks: under
+`task/affinity` a job of one task - as `floor.sh`'s servers, clients and
+`iperf3` each are - is confined to the core Slurm allocated it, whatever
+`--cpu-bind=none` says, and §4's yardstick would measure a core a side rather
+than the link (round nine's review, R1; measured in the development VM's
+Slurm). It also sets, on every node:
 
 - `RemoveIPC=no` for systemd-logind: with the default, a user's files in
   `/dev/shm` go ten seconds after the user's last session on a node ends, and a
@@ -150,18 +168,32 @@ build unnoticed, and makes the script's status the failure.
 
 **Every job** the kit starts runs with `OSOE_NO_PROGRESS_TIMEOUT=60`, as the
 README asks while a cluster is new, so that a stalled wait ends the job and
-names what it waited for; under a timeout of about three times its length,
-each section's own (`KIT_TIMEOUT`), past which it is killed and `osoe-stat --gc`
-removes what it left in `/dev/shm` on every node; on whole nodes, unbound,
-with more PEs than CPUs allowed (`--exclusive --cpu-bind=none --overcommit`),
-since 32 PEs a node are more tasks than a `c4-standard-16` has CPUs; and with
-its input from `/dev/null`. Every job is named `osoe-kit`, so that one the
-timeout ended, whose killed `srun` may leave its allocation behind, is
-cancelled by name - and `slurm-setup.sh` sets `InactiveLimit=120` besides. Run
-the kit from the first node's shell, not inside an allocation (`salloc`), where
-the steps `floor.sh` runs at once would wait on each other. Each section's
-output directory should be new: a second run into one overwrites its rounds by
-name.
+names what it waited for; with `SHMEM_DEBUG=1`, since each job measures the
+link at start-up and sets every data wire's unsent limit from what it measured,
+and its start-up lines - PE 0's link, each node's limit - are the only record
+of either, which `summarize.py` prints beside each case (round nine's review,
+S2); under a timeout of about three times its length, each section's own
+(`KIT_TIMEOUT`), past which it is killed and `osoe-stat --gc` removes what it
+left in `/dev/shm` on every node; and with its input from `/dev/null`. Each job
+is an allocation of its own, of whole nodes, whose one step starts the PEs
+unbound and with more PEs than CPUs allowed (`common.sh`'s `launch`):
+
+```sh
+salloc -J osoe-kit -N<nodes> --exclusive \
+    srun -K1 --cpu-bind=none --overcommit -N<nodes> --ntasks-per-node=<PEs> PROGRAM
+```
+
+32 PEs a node are more tasks than a `c4-standard-16` has CPUs, and Slurm
+refuses a job that many, whatever `--overcommit` says - `select/cons_tres`
+tests a node's tasks against its CPUs before it looks at the overcommit - where
+a step of an allocation may have them (round nine's review, P9-2; measured in
+the development VM's Slurm 24.11.5, eight tasks on four CPUs). Every job is
+named `osoe-kit`, so that one the timeout ended, whose killed `salloc` may
+leave its allocation behind, is cancelled by name - and `slurm-setup.sh` sets
+`InactiveLimit=120` besides. Run the kit from the first node's shell, not
+inside an allocation: each job asks for whole nodes of its own, which an
+allocation around the kit would hold. Each section's output directory should
+be new: a second run into one overwrites its rounds by name.
 
 ## 2. The facts
 
@@ -184,14 +216,14 @@ with another.
 
 ```sh
 srun -N$(wc -l < NODES) --ntasks-per-node=1 build/release/tools/probe/probe
-srun -N$(wc -l < NODES) --ntasks-per-node=32 --overcommit --exclusive --cpu-bind=none \
-    build/release/kit/startup
+salloc -N$(wc -l < NODES) --exclusive srun --cpu-bind=none --overcommit -N$(wc -l < NODES) \
+    --ntasks-per-node=32 build/release/kit/startup
 srun -N1 -n1 -c16 ctest --test-dir build/release -L tier2 -E '^model\.' -j8 --timeout 300 > out/suite.txt
 ```
 
 The probe must say `ok` for every facility on every node, and the second line
-must start a job of 32 PEs a node, the sweep's largest, before the sweep is
-started. The suite is the
+must start a job of 32 PEs a node, the sweep's largest, as the kit starts every
+job (§1), before the sweep is started. The suite is the
 release build's tier 2 on one node's logical nodes; tier 1 compiles, and runs on
 the node that built it (`ctest -L tier1`). The floor pins (`shmem.floor`,
 `echo-uring`'s) were set on the VM and may fail here: a finding to keep, not a
@@ -212,15 +244,16 @@ node with several connections can reach, which one connection's rate may not
 show where a provider limits each flow - and `echo-uring`, a pair of processes
 a connection, whose per-connection medians, summed, are an upper bound beside
 it, since nothing checks that its streams ran at once. Every process is
-unbound, free to use every core of its node; a client whose server is not yet
-listening tries again, and servers whose client never came are ended. About
-fifteen minutes.
+unbound, free to use every core of its node - each a job of one task, which
+`slurm-setup.sh`'s `TaskPlugin=task/none` leaves unbound (§1); a client whose
+server is not yet listening tries again, and servers whose client never came
+are ended. About fifteen minutes.
 
 ## 5. The progress helpers
 
 ```sh
 docs/fast-link/helpers.sh NODES out/helpers          # three rounds, 0 1 2 4 helpers, 8 16 32 PEs a node
-docs/fast-link/summarize.py out/helpers
+docs/fast-link/summarize.py out/floor out/helpers
 ```
 
 Each case is a fresh job at one helper count (the count shapes the node's
@@ -235,33 +268,65 @@ connection area and is agreed at start-up), every node at once:
   lead's doing the work and the others waking ten times a second, and its
   helpers, `osoe-helper-N` - and its PEs' own threads spent, a GiB moved. The
   kernel's receive work in softirq context is in neither. And how many peer
-  nodes a node's PEs start blocks toward at once - in a model, about four of
-  seven at 8 PEs a node, five at 16, six at 32, where the first order of the
-  kit's had two or fewer; four helpers are then about three quarters busy at 8
-  PEs a node, and nearly all at 32;
+  nodes a node's PEs are inside a call toward at once, `peers_in_calls`: each
+  PE records when each of its calls began and returned, and toward which node,
+  and after the window the node's first PE sweeps its node's records for the
+  time-averaged count of distinct peer nodes some PE of the node is in a call
+  toward, over the window in which all of them are in their loops. That is the
+  model's quantity (the kit's second adversarial read, its Appendix), and the
+  one figure to set beside the model's numbers - about four of seven at 8 PEs a
+  node, five at 16, six at 32, where the first order of the kit's had two or
+  fewer; four helpers are then about three quarters busy at 8 PEs a node, and
+  nearly all at 32. The model's PEs never wait in a quiet, and the stream's do,
+  their data still going out, so the quiets are printed apart - their share of
+  the PEs' time, and the count again with each quiet counted toward the block
+  before it - and neither is set beside the model's numbers. (The figure the
+  kit printed before, a bit a block in the millisecond its call returned,
+  counted the blocks a node finishes in a millisecond, its rate, and is gone:
+  round nine's review, S1.)
 - `multistream put 65536 10`, the same in 64 KiB blocks: more messages a byte;
 - `multistream get 1048576 10`: the same with nonblocking gets, a quiet every
   8 MiB;
 - `osoe-pacer --seconds 20 mailbox`: small messages with signals to PEs on every
-  node, messages a second.
+  node, messages a second;
+- `osoe-bench quick barrier collectives`: the barrier, a sum reduction and a
+  broadcast of 8 bytes and of 64 KiB, and an fcollect and an alltoall of 8-byte
+  and of 4 KiB blocks, over every PE, each line the median of 200 calls after
+  200 of warm-up. A collective's payloads go on the data wires, which the
+  helpers hold, and on the Pi cluster two helpers made the mailbox about a fifth
+  faster while a 64 KiB broadcast and a 4 KiB alltoall ran 6 to 35% slower
+  bound and 2 to 9% unbound (round eight's review,
+  `docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4; the README's
+  Limits): a sweep of the streams and the mailbox alone would have read them as
+  a gain there (round nine's review, S3).
 
 The order of the helper counts changes each round, so that a drift in the
 machines does not read as a helper count's. Three rounds of 4 helper counts × 3
-PE counts × 4 workloads are 144 jobs of 10 to 20 seconds and their start-ups:
-about an hour at eight nodes. `ROUNDS`, `HELPERS`, `PES_PER_NODE` and
-`WORKLOADS` in the environment shorten it.
+PE counts × 5 workloads are 180 jobs and their start-ups: 144 of 10 to 20
+seconds, and 36 of the collectives, which take seconds - their longest line, the
+4 KiB alltoall at 32 PEs a node, sends 28 MiB from each node a call, some 10 ms
+at 23 Gbit/s, 4 s over its 400 calls. About an hour and a quarter at eight
+nodes. `ROUNDS`, `HELPERS`, `PES_PER_NODE` and `WORKLOADS` in the environment
+shorten it.
 
 `summarize.py` prints, for each workload, PE count and helper count, the median
-and range of the rounds' rates - the job's, and a node's, which is what the
-node sent to all its peers, one way - of the progress threads' CPU a GiB, and
-of the peers a node fed at once, to three significant figures, with the count
-of rounds - a case with fewer lost one; and §4's bare aggregate, between two
-nodes both ways, with a node's share each way, which is what a node's rate is
-set beside, at as many streams as a node has peers. What decides the question
-(§8 item 3) is whether a helper count raises the rate a node reaches toward
-that share, at what CPU, and whether that holds at every PE count - a rule the author may then give, for example a count that follows
-the link's measured bandwidth and the node's peers, or the setting alone as
-today.
+and range of the rounds' figures, to three significant figures, with the count
+of rounds - a case with fewer lost one: the rates - the job's, and a node's,
+which is what the node sent to all its peers, one way - the progress threads'
+CPU a GiB, the peers in calls and the quiets, the mailbox's messages a second
+and each collective line's time; beside each case, the link its jobs measured
+at start-up and the unsent limit they set from it (§1); and, from `out/floor`,
+§4's bare aggregate between two nodes both ways, with a node's share each way,
+which is what a node's rate is set beside, at as many streams as a node has
+peers. What decides the question (§8 item 3) is whether a helper count raises
+the rate a node reaches toward that share, at what CPU, and whether that holds
+at every PE count - weighed against what it costs the collectives: the 64 KiB
+broadcast's and the 4 KiB alltoall's lines, where the Pi's helpers cost, beside
+the streams; the barrier's and the 8-byte reduce's read pooled or by mode,
+since unbound they land in one of two modes a job on the Pi, about 25 µs apart,
+which three rounds can draw unevenly (`docs/decisions/README.md`). A rule the
+author may then give: for example a count that follows the link's measured
+bandwidth and the node's peers, or the setting alone as today.
 
 ## 6. The ladder
 
@@ -328,7 +393,9 @@ flight toward a node are bounded by its connection's reply credits too
 (`OSOE_AM_CREDITS`, 64 a connection, shared by the node's PEs), which this
 does not vary: with the stream's blocks spread over the peers, a connection
 carries the pieces of two PEs or so at once at 8 PEs a node, so the credits
-hold a zone back only from a few MiB. 24 jobs: about ten minutes.
+hold a zone back only from a few MiB. `get-pieces`' one PE, alone on its
+connection, has at most 64 pieces of 64 KiB, 4 MiB, in flight: past a zone of
+4 MiB its line is the credits', not the zone's. 24 jobs: about ten minutes.
 
 ## 9. Fan-in
 
@@ -386,9 +453,14 @@ The README's sentences the numbers replace or confirm:
 - **The platforms:** "aarch64 only" where it says so of measured hardware, and
   the Pi cluster as the only real cluster (§3, §10).
 
-Not measured by the kit, and left open: a barrier or a fetch-add behind the
-stream at each helper count - the control wires stay on the agent - TCP's
-retransmissions around a stream (`nstat`), which would explain a cloud link's
-rate, and a profile of the progress threads on x86-64.
+Not measured by the kit, and left open: a barrier behind the stream at each
+helper count - its messages go on the control wires, which the lead's agent
+keeps at every count, so that a helper count reaches it only through the CPU
+the helpers take, and §5 times the barrier alone; a fetch-add behind the stream
+at each count, which goes on the stream's own data wire whichever thread holds
+it - the head of line §6 measures at no helpers; the collectives behind a
+stream, which §5 times alone at each count, their payloads on the data wires
+the helpers hold; TCP's retransmissions around a stream (`nstat`), which would
+explain a cloud link's rate; and a profile of the progress threads on x86-64.
 
 The decisions are the author's, each in a dated record beside the results.

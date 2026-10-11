@@ -1,0 +1,161 @@
+== <repo>/build/scratch/review-nine-fixes/kit/final/dry-run/helpers
+jobs: 20, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - the figure the model's numbers are set beside - then
+the same with each quiet counted toward the block before it, the share of the
+PEs' time in quiets, and the seconds the count was taken over (median, range,
+count)
+  get-1m     pes=2 h=0                 job 6248 (n=1)
+                                       node 1234 (1227-1283, n=5)
+                                       cpu/GiB 0.426 (n=1)
+                                       peers in calls 1.62 (1.60-1.62, n=5)
+                                       with quiets 1.65 (1.64-1.66, n=5), in quiets 0.0240 (0.0230-0.0260, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.997
+                                       link 3966 MiB/s, hop 27.8 us, message 2.60 us; unsent limit 532300 B
+  put-1m     pes=2 h=0                 job 9207 (n=1)
+                                       node 1826 (1750-1933, n=5)
+                                       cpu/GiB 0.333 (n=1)
+                                       peers in calls 1.25 (1.24-1.26, n=5)
+                                       with quiets 1.82 (1.77-1.83, n=5), in quiets 0.306 (0.287-0.317, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 7560 MiB/s, hop 17.7 us, message 2.42 us; unsent limit 1014730 B
+  put-64k    pes=2 h=0                 job 11808 (n=1)
+                                       node 2385 (2261-2421, n=5)
+                                       cpu/GiB 0.258 (n=1)
+                                       peers in calls 0.926 (0.917-0.956, n=5)
+                                       with quiets 1.69 (1.65-1.70, n=5), in quiets 0.413 (0.392-0.426, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 4059 MiB/s, hop 20.5 us, message 2.66 us; unsent limit 544803 B
+  get-1m     pes=2 h=1                 job 5888 (n=1)
+                                       node 1169 (1142-1251, n=5)
+                                       cpu/GiB 0.446 (n=1)
+                                       peers in calls 1.64 (1.55-1.68, n=5)
+                                       with quiets 1.67 (1.58-1.71, n=5), in quiets 0.0240 (0.0220-0.0250, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.997
+                                       link 8577 MiB/s, hop 27.3 us, message 1.85 us; unsent limit 1151174 B
+  put-1m     pes=2 h=1                 job 9214 (n=1)
+                                       node 1844 (1737-1924, n=5)
+                                       cpu/GiB 0.337 (n=1)
+                                       peers in calls 1.26 (1.22-1.29, n=5)
+                                       with quiets 1.80 (1.78-1.82, n=5), in quiets 0.289 (0.287-0.325, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 2540 MiB/s, hop 13.1 us, message 4.65 us; unsent limit 340977 B
+  put-64k    pes=2 h=1                 job 11639 (n=1)
+                                       node 2310 (2271-2392, n=5)
+                                       cpu/GiB 0.268 (n=1)
+                                       peers in calls 0.952 (0.941-0.973, n=5)
+                                       with quiets 1.68 (1.66-1.68, n=5), in quiets 0.397 (0.387-0.404, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 5010 MiB/s, hop 18.5 us, message 4.96 us; unsent limit 672370 B
+  get-1m     pes=2 h=2                 job 5572 (n=1)
+                                       node 1118 (1090-1140, n=5)
+                                       cpu/GiB 0.531 (n=1)
+                                       peers in calls 1.63 (1.59-1.66, n=5)
+                                       with quiets 1.66 (1.61-1.69, n=5), in quiets 0.0210 (0.0210-0.0220, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 4367 MiB/s, hop 15.7 us, message 1.79 us; unsent limit 586118 B
+  put-1m     pes=2 h=2                 job 7348 (n=1)
+                                       node 1457 (1405-1551, n=5)
+                                       cpu/GiB 0.434 (n=1)
+                                       peers in calls 1.39 (1.38-1.41, n=5)
+                                       with quiets 1.67 (1.64-1.68, n=5), in quiets 0.164 (0.149-0.170, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 5646 MiB/s, hop 10.6 us, message 3.54 us; unsent limit 757858 B
+  put-64k    pes=2 h=2                 job 8618 (n=1)
+                                       node 1704 (1618-1874, n=5)
+                                       cpu/GiB 0.397 (n=1)
+                                       peers in calls 1.21 (1.20-1.24, n=5)
+                                       with quiets 1.54 (1.53-1.55, n=5), in quiets 0.197 (0.185-0.205, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 7972 MiB/s, hop 17.4 us, message 2.77 us; unsent limit 1069975 B
+  get-1m     pes=2 h=4                 job 5471 (n=1)
+                                       node 1095 (1063-1121, n=5)
+                                       cpu/GiB 0.581 (n=1)
+                                       peers in calls 1.76 (1.73-1.80, n=5)
+                                       with quiets 1.78 (1.76-1.84, n=5), in quiets 0.0210 (0.0210-0.0220, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 4052 MiB/s, hop 15.9 us, message 8.01 us; unsent limit 543836 B
+  put-1m     pes=2 h=4                 job 7045 (n=1)
+                                       node 1413 (1375-1438, n=5)
+                                       cpu/GiB 0.479 (n=1)
+                                       peers in calls 1.22 (1.22-1.24, n=5)
+                                       with quiets 1.54 (1.51-1.54, n=5), in quiets 0.170 (0.168-0.184, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 11767 MiB/s, hop 15.5 us, message 4.43 us; unsent limit 1579378 B
+  put-64k    pes=2 h=4                 job 7571 (n=1)
+                                       node 1535 (1469-1550, n=5)
+                                       cpu/GiB 0.472 (n=1)
+                                       peers in calls 1.16 (1.16-1.17, n=5)
+                                       with quiets 1.46 (1.44-1.48, n=5), in quiets 0.177 (0.174-0.183, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 4356 MiB/s, hop 16.3 us, message 5.28 us; unsent limit 584714 B
+
+mailbox: messages a second (median, range)
+  pes=2 h=0  31233 (n=1)
+    link 5001 MiB/s, hop 15.8 us, message 3.39 us; unsent limit 671267 B
+  pes=2 h=1  28232 (n=1)
+    link 14920 MiB/s, hop 19.3 us, message 3.77 us; unsent limit 2002532 B
+  pes=2 h=2  21807 (n=1)
+    link 7752 MiB/s, hop 24.1 us, message 10.4 us; unsent limit 1040447 B
+  pes=2 h=4  20021 (n=1)
+    link 4144 MiB/s, hop 16.2 us, message 5.42 us; unsent limit 556213 B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  collectives pes=2 h=0
+    barrier                  77.3 (n=1)
+    reduce bytes=8           129 (n=1)
+    broadcast bytes=8        129 (n=1)
+    reduce bytes=65536       208 (n=1)
+    broadcast bytes=65536    152 (n=1)
+    fcollect block=8         197 (n=1)
+    alltoall block=8         188 (n=1)
+    fcollect block=4096      211 (n=1)
+    alltoall block=4096      219 (n=1)
+    link 14661 MiB/s, hop 15.9 us, message 3.19 us; unsent limit 1967771 B
+  collectives pes=2 h=1
+    barrier                  70.9 (n=1)
+    reduce bytes=8           127 (n=1)
+    broadcast bytes=8        123 (n=1)
+    reduce bytes=65536       196 (n=1)
+    broadcast bytes=65536    151 (n=1)
+    fcollect block=8         195 (n=1)
+    alltoall block=8         200 (n=1)
+    fcollect block=4096      199 (n=1)
+    alltoall block=4096      224 (n=1)
+    link 14213 MiB/s, hop 17.5 us, message 4.19 us; unsent limit 1907657 B
+  collectives pes=2 h=2
+    barrier                  70.4 (n=1)
+    reduce bytes=8           121 (n=1)
+    broadcast bytes=8        122 (n=1)
+    reduce bytes=65536       196 (n=1)
+    broadcast bytes=65536    143 (n=1)
+    fcollect block=8         196 (n=1)
+    alltoall block=8         181 (n=1)
+    fcollect block=4096      148 (n=1)
+    alltoall block=4096      201 (n=1)
+    link 2998 MiB/s, hop 16.0 us, message 5.27 us; unsent limit 402333 B
+  collectives pes=2 h=4
+    barrier                  68.3 (n=1)
+    reduce bytes=8           124 (n=1)
+    broadcast bytes=8        125 (n=1)
+    reduce bytes=65536       197 (n=1)
+    broadcast bytes=65536    152 (n=1)
+    fcollect block=8         201 (n=1)
+    alltoall block=8         196 (n=1)
+    fcollect block=4096      211 (n=1)
+    alltoall block=4096      218 (n=1)
+    link 4410 MiB/s, hop 15.8 us, message 7.17 us; unsent limit 591955 B
+
+outcomes
+  mailbox-pes2-h0-r1.txt: osoe-pacer failures=0 seconds=3.8
+  mailbox-pes2-h1-r1.txt: osoe-pacer failures=0 seconds=4.2
+  mailbox-pes2-h2-r1.txt: osoe-pacer failures=0 seconds=4.4
+  mailbox-pes2-h4-r1.txt: osoe-pacer failures=0 seconds=4.0

@@ -1,0 +1,19 @@
+records-off: lines changed 1
+records 5x2 65536 r1 exit 0 mib_per_s=14984.9 load 2.99
+records-off 5x2 65536 r1 exit 0 mib_per_s=14966.5 load 3.39
+main 5x2 65536 r1 exit 0 mib_per_s=14758.7 load 3.52
+records 8x8 1048576 r1 exit 0 mib_per_s=6463.6 load 4.20
+records-off 8x8 1048576 r1 exit 0 mib_per_s=4983.3 load 4.67
+main 8x8 1048576 r1 exit 0 mib_per_s=7040.4 load 5.09
+records-off 5x2 65536 r2 exit 0 mib_per_s=12644.3 load 5.09
+main 5x2 65536 r2 exit 0 mib_per_s=12621.2 load 4.85
+records 5x2 65536 r2 exit 0 mib_per_s=12775.1 load 4.86
+records-off 8x8 1048576 r2 exit 0 mib_per_s=7155.9 load 5.59
+main 8x8 1048576 r2 exit 0 mib_per_s=7345.2 load 5.94
+records 8x8 1048576 r2 exit 0 mib_per_s=7221.4 load 5.94
+main 5x2 65536 r3 exit 0 mib_per_s=12435.5 load 5.87
+records 5x2 65536 r3 exit 0 mib_per_s=12593.2 load 5.96
+records-off 5x2 65536 r3 exit 0 mib_per_s=12723.3 load 5.96
+main 8x8 1048576 r3 exit 0 mib_per_s=7286.2 load 6.37
+records 8x8 1048576 r3 exit 0 mib_per_s=7148.0 load 6.98
+records-off 8x8 1048576 r3 exit 0 mib_per_s=7330.5 load 6.98
