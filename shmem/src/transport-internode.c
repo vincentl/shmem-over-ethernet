@@ -827,6 +827,17 @@ static uint64_t zone_bytes_held(void)
     return held * OSOE_LANDING_EXTENT_BYTES;
 }
 
+/* The bytes of a context's gets issued and not yet copied out: its pieces that
+ * hold part of the zone, landed or not (complete_gets). */
+static uint64_t bytes_in_flight(struct osoe_context_block *block)
+{
+    uint64_t issued = atomic_load_explicit(&block->bytes_issued[0], memory_order_acquire) +
+                      atomic_load_explicit(&block->bytes_issued[1], memory_order_acquire);
+    uint64_t copied = atomic_load_explicit(&block->bytes_copied[0], memory_order_acquire) +
+                      atomic_load_explicit(&block->bytes_copied[1], memory_order_acquire);
+    return issued > copied ? issued - copied : 0;
+}
+
 /*
  * A run of `count` extents for a piece, waiting if the zone has none: an
  * issue that finds no room first copies out every landed piece it can claim,
@@ -834,9 +845,12 @@ static uint64_t zone_bytes_held(void)
  * which the boundary allows (transport.h) - and then sleeps on the zone's
  * `freed` word, which every release and every landing bumps, with the value
  * it read before it looked (landing_extent_model.py). A get whose pieces are
- * this PE's own, none landed yet, wakes when the first lands.
+ * this PE's own, none landed yet, wakes when the first lands. `own` is the
+ * context of a blocking get's pieces, whose target is node `peer` and PE `pe`,
+ * and NULL for any other piece.
  */
-static uint32_t make_room(uint32_t count, const char *routine, uint32_t peer, int pe)
+static uint32_t make_room(uint32_t count, const char *routine,
+                          struct osoe_context_block *own, uint32_t peer, int pe)
 {
     uint32_t first = claim_run(count);
     if (first != UINT32_MAX)
@@ -846,7 +860,7 @@ static uint32_t make_room(uint32_t count, const char *routine, uint32_t peer, in
     osoe_wait_word_enter(freed);
     osoe_progress_host_wake_all();          /* what this PE held back may be what lands */
     struct am_wait w;
-    bool waiting = false;
+    bool waiting = false, named = false;
     for (;;) {
         uint32_t seen = osoe_wait_word_load(freed);
         first = claim_run(count);
@@ -854,12 +868,25 @@ static uint32_t make_room(uint32_t count, const char *routine, uint32_t peer, in
             break;
         if (copy_out_any())
             continue;
+        /*
+         * A blocking get's room comes back as its own pieces land, from the
+         * one node it asks, while any of them holds part of the zone: its wait
+         * names that node and PE then, as a reply's does (D-6). Otherwise - a
+         * nonblocking get, a get of one piece at a time, or a blocking get
+         * whose pieces are all out of the zone while other gets hold it - the
+         * room is the PE's, toward no one node, and the record says how many
+         * bytes the zone holds: naming the get's own target there blamed a node
+         * that owed it nothing (the ninth review, Q5-2). A wait begun naming
+         * the target is begun again naming none once its pieces are out, which
+         * happens at most once: none of its pieces is issued while it waits.
+         */
+        bool held = own && bytes_in_flight(own) > 0;
+        if (waiting && named && !held) {
+            am_wait_end();
+            waiting = false;
+        }
         if (!waiting) {
-            /* A blocking get's room comes back as the replies from the one
-             * node it asks land, and its wait names that node and PE, as a
-             * reply's does (D-6); a nonblocking get's is the PE's, toward no
-             * one node, and its record says how many bytes the zone holds. */
-            if (peer != UINT32_MAX)
+            if (held)
                 am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_REPLY,
                               "the landing zone's released extents", peer, pe, seen);
             else
@@ -867,6 +894,7 @@ static uint32_t make_room(uint32_t count, const char *routine, uint32_t peer, in
                                      zone_bytes_held(), "the landing zone's released extents",
                                      UINT32_MAX, -1, seen);
             waiting = true;
+            named = held;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_wait_sleeps();
@@ -1081,7 +1109,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
         uint32_t count = extents_for(n);
-        uint32_t extent = make_room(count, "shmem_get", peer, pe);
+        uint32_t extent = make_room(count, "shmem_get", NULL, UINT32_MAX, -1);
         uint64_t token = make_token(false, thread, extent);
         arm(slot, token);
         issue_record(extent, token, n);
@@ -1315,8 +1343,7 @@ static void issue_get_pieces(struct osoe_transport_context *c, int pe,
     unsigned char *at = dst;
     while (len > 0) {
         uint32_t n = len > limit ? limit : (uint32_t)len;
-        uint32_t extent = make_room(extents_for(n), routine, blocking ? peer : UINT32_MAX,
-                                    blocking ? pe : -1);
+        uint32_t extent = make_room(extents_for(n), routine, blocking ? block : NULL, peer, pe);
         if (issue_stamp) {
             uint64_t issue = (atomic_fetch_add_explicit(&issue_count, 1, memory_order_seq_cst) +
                               1) & ISSUE_MASK;

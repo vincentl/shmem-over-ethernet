@@ -92,3 +92,11 @@ endif()
 add_subdirectory(base)
 add_subdirectory(shmem)
 add_subdirectory(tools)
+
+# In a ThreadSanitizer build every test writes the tool's reports to files, and
+# a test after them all judges the files (cmake/OsoeThreadSanitizer.cmake; the
+# ninth review's C9-1).
+if(BUILD_TESTING AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  include(OsoeThreadSanitizer)
+  osoe_thread_sanitizer_gate()
+endif()

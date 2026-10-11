@@ -304,6 +304,23 @@ static void session_start(void)
         (void)setrlimit(RLIMIT_NOFILE, &files);
     }
     /*
+     * And the soft RLIMIT_MEMLOCK, before any ring is made, by the author's
+     * decision (docs/decisions/2026-10-11.md): from Linux 6.14 io_uring charges
+     * every ring to one count of locked memory for all the user's processes on
+     * the host, held to each process's own soft limit, and so do the zero-copy
+     * send's lent pages (ring.c). One machine's logical nodes count together:
+     * at the 8 MiB a Pi's shell has, 113 logical nodes with no helpers were
+     * refused, and the tag's tier 2 failed beside its larger jobs, while a
+     * Slurm step's hard limit there is unlimited (the ninth review, P9-1). A
+     * program that ran before cannot fail for it: only memory it could not
+     * have locked is locked above the old limit.
+     */
+    struct rlimit locked;
+    if (getrlimit(RLIMIT_MEMLOCK, &locked) == 0 && locked.rlim_cur < locked.rlim_max) {
+        locked.rlim_cur = locked.rlim_max;
+        (void)setrlimit(RLIMIT_MEMLOCK, &locked);
+    }
+    /*
      * §1's start-up check of the running kernel, before anything is created:
      * an old kernel is refused by name, rather than aborting mid-rendezvous
      * with the control segment and heaps already in /dev/shm (review round two,

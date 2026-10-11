@@ -60,6 +60,7 @@ struct osoe_am_owner {
     _Atomic uint32_t request;
     _Atomic uint32_t answer;
     _Atomic uint32_t stop;          /* 0, then acknowledged, then done (progress-host.c) */
+    _Atomic uint32_t released;      /* the agent's: a done helper's thread may return */
     _Atomic uint64_t turns;
     uint64_t unsent_taken;
     _Atomic uint64_t unsent_applied;

@@ -312,7 +312,15 @@ Part 3's verification with the release preset added at two and three helpers.
   It is the load S1 saw (below).
 - **ThreadSanitizer:** 600 of 600 at no helpers. At two helpers 12 tests
   failed, at three 19, every one the tool's reports alone in a heap mapping, as
-  the gate (`tsan-gate.py`, Part 3's) judged them.
+  the gate (`tsan-gate.py`, Part 3's) judged them. *Corrected 2026-10-11:* the
+  gate could not show that. The tool ends a process that has reported anything
+  with its own status, 66, and the gate read any 66 as the reports alone, so a
+  failed check or a crash beside a race passed it, and a race in a test that
+  passed was never read (the ninth review's C9-1). Under the gate that replaced
+  it (`cmake/OsoeThreadSanitizer.cmake`) the suite on `main` at `3b45472` passed
+  its own checks at every count, but for one test's timeout in the tool's slow
+  path, and every report was a race in a heap mapping naming a helper's thread
+  (`docs/reviews/archive/v0.2-before-part4-refutations.md`).
   - Of the reports, 22 of 42 at two helpers and 49 of 87 at three were two
     helpers' landings of one word, every one in a Träff's reduction's grant:
     correctness Q2-4's word, which the next change removes

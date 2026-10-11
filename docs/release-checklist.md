@@ -124,7 +124,9 @@ until the tree to be tagged has them; the author tags.
   settled as round eight's were.
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at no helpers and at two and three where the merge point ran
-  them; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
+  them - ThreadSanitizer's as `ctest` judges every test there since the ninth
+  review's C9-1, its reports judged by `tsan.reports` at each count, none
+  included, and no gate run apart; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
   last run at 0.1.0's tag; the single-node build in its presets and on Rocky
   Linux 9.
 - [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
@@ -310,8 +312,9 @@ rated them (round six's readiness Q5-5).
   - the ThreadSanitizer gate at a helper count tells the library's own
     collective words in the heap mapping from a program's heap, passes a
     report there only against a short list with a reason each, and requires a
-    helper's frame in every report it passes (correctness Q2-2): today it would
-    pass a real race in a Träff's row;
+    helper's frame in every report it passes (correctness Q2-2). *Done
+    2026-10-11*, with the ninth review's C9-1 (`cmake/thread-sanitizer-gate.py`,
+    `docs/decisions/2026-10-11.md`);
   - a white-box test of the deadlock detector's helper half - an answer naming
     the request posted last, the helpers' applied counts in the activity, the
     pass after the request - each removal failing it (correctness Q2-3):
@@ -334,9 +337,10 @@ rated them (round six's readiness Q5-5).
     want of locked memory keeps (portability P1, built 2026-10-10:
     `docs/decisions/2026-10-10-zero-copy-locked-memory.md`): whether a
     connection that met the limit lends again after a while, where now it
-    copies for the rest of the job; and whether `shmem_init` raises the soft
-    locked-memory limit to the hard one with zero copy on, as it does for open
-    files;
+    copies for the rest of the job (whether `shmem_init` raises the soft
+    locked-memory limit to the hard one, as it does for open files, the author
+    decided on 2026-10-11, for the rings on Linux 6.14 and later: it does,
+    zero copy on or off);
   - the backend's own threads named to the deadlock detector through
     `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
     owner's last pass shown with its age in `osoe-stat` (Q5-9);

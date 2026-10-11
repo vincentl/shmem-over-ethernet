@@ -6798,7 +6798,13 @@ must is an RDMA one.
 - `shmem_init` raises the soft `RLIMIT_NOFILE` to the hard limit. Slurm propagates
   the submitting shell's limits, commonly a soft limit of 1,024, and a lead on a
   500-node job holds two sockets per peer node, its control wire and its data
-  wire (§3.1; one until v0.2 step 4).
+  wire (§3.1; one until v0.2 step 4). *Since 2026-10-11* it raises the soft
+  `RLIMIT_MEMLOCK` to the hard limit too, by the author's decision
+  (`docs/decisions/2026-10-11.md`): from Linux 6.14 io_uring charges every ring
+  to one count of locked memory for all the user's processes on the host, held
+  to each process's own soft limit, and a Slurm step on the Pi cluster, whose
+  hard limit is unlimited, failed its tier-2 tests at the shell's 8 MiB (the
+  ninth review's P9-1). No other limit is changed.
 - **Bare `sbatch` launch.** If `SLURM_JOB_ID` is set but `SLURM_STEP_ID` is not,
   the program was started directly by a batch script rather than by `srun`.
   Fail at once with that message rather than waiting for peers that will never

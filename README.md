@@ -485,7 +485,14 @@ build/release/tools/launch/osoe-launch -n 6 -m 0,0,1,1,2,2 -- ./my_program
 lead listening on its own loopback address, so one machine runs a job of
 several nodes, over TCP between them as a cluster would - up to 1,024
 processes on 254 logical nodes; the single-node build refuses such a job by
-name, since it has no TCP. `-s` names the variables as `srun` does, so
+name, since it has no TCP. On Linux 6.14 and later its logical nodes also
+share one count of locked memory, which io_uring charges every node's rings to
+against each process's limit - raised by `shmem_init` to the hard one
+([What `shmem_init` changes in the process](#what-shmem_init-changes-in-the-process)),
+so the hard limit is what counts: at the 8 MiB most distributions give a login
+shell, a Raspberry Pi 5 started 112 logical nodes with no helpers, 56 with two
+and 42 with three, and refused one more at start-up, naming the limit; an
+administrator raises the hard limit for more. `-s` names the variables as `srun` does, so
 the job takes the bootstrap's Slurm path. Its logical nodes run without TCP
 keepalive unless `OSOE_KEEPALIVE` is set. Their loopback addresses put them in
 one network namespace, with no link between them to cut, and the kernel closes
@@ -1033,9 +1040,12 @@ specification or takes a choice the specification leaves open.
   the hard limit on open files (`ulimit -Hn`) must leave room for them;
   `shmem_init` raises the soft limit to it. On Linux 6.14 and later io_uring
   also charges a node's rings to its user's locked memory, every process of the
-  user on the host together, against each one's `ulimit -l` (8 MiB by
-  default), zero copy or not: a ring the limit refuses ends the job at
-  start-up, naming it.
+  user on the host together, against each one's `ulimit -l`, whose soft limit
+  `shmem_init` raises to the hard one too, zero copy or not: a ring the hard
+  limit refuses ends the job at start-up, naming it. Only one machine's logical
+  nodes come near it - one node's rings take at most 2.6 MiB at the 4,097-node
+  ceiling - and [`osoe-launch`](#running-a-program-on-one-machine-with-osoe-launch)
+  gives a Pi's numbers.
 - **A program linked statically is refused**: `oshcc -static` says so, since the
   C library's own state would then be gathered with the program's symmetric
   statics.
@@ -1310,31 +1320,42 @@ that one could be added without touching the OpenSHMEM layer.
   through another process, and so leaves most tests across nodes to the other
   three.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
-  well as at none, by the environment `ctest` passes on to every test - in the
-  debug, release and AddressSanitizer presets, and under ThreadSanitizer as
-  below. There about a dozen tests across nodes - a different few at each
-  count - report a put or an atomic a helper applies in a PE's heap mapping,
-  against a local thread's access to the same place or another helper's put
-  there in an earlier collective. From under half to three quarters of the
-  reports, run by run, are in the words the library keeps for its collectives
-  at the end of that mapping, the rest in a program's heap. The ordering that
-  makes them safe runs through another process, which the tool cannot see -
-  the reason the multi-node maps are left out of that preset (§8.2) - and with
-  no helpers the one agent applies every peer's puts and has met the local
-  thread through the barrier's handoff, which the tool does see. (Until a
-  Träff's reduction's grant gave each receiver a field of its own, two helpers
-  could also write its head at once, the same bytes from each, and that word
-  was about half of the reports: `docs/decisions/2026-10-10-grant-fields.md`.)
-  Every failure of those runs is
-  checked to be the tool's reports alone, each in a heap mapping and none in
-  the helpers' own words - a check that cannot tell a real race in the
-  collectives' words from these, which the models hold instead
-  (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-2). One test, which
-  reads back 64 MiB a helper landed, runs past its minute in the tool's
-  handling of eight million such reads, and finishes in two given longer. The
-  preset gates the suite at no helpers alone, without `shmem.helper-wake`,
-  which, like every map of more than one node, the preset leaves out. That
-  test counts each owner's wakes - a helper's, and in a second run at no
+  well as at none, by the environment `ctest` passes on to every test, in every
+  preset.
+- **ThreadSanitizer's verdict.** Under it every test runs with the tool's
+  `exitcode=0`, `abort_on_error=1` and a `log_path` of its own
+  (`cmake/OsoeThreadSanitizer.cmake`): the tool leaves each process its own
+  exit status and turns a crash it catches into an abort, so that `ctest`
+  judges every test there as it does in the other presets, and it writes its
+  reports to files named for the test, which a last test, `tsan.reports`,
+  judges at every helper count, none included - its failure the run's, and a
+  canary's race, which it must find first, showing that the files are written
+  (`cmake/thread-sanitizer-gate.py`). With no helpers there is no report at
+  all. With two or three, about a hundred, in about 27 of the tests across
+  nodes, each a put or an atomic a helper applies in a PE's heap mapping
+  against a local thread's access to the same place, or another helper's put
+  there in an earlier collective. The ordering that makes them safe runs
+  through another process, which the tool cannot see - the reason the
+  multi-node maps are left out of that preset (§8.2) - and with no helpers the
+  one agent applies every peer's puts and has met the local thread through the
+  barrier's handoff, which the tool does see. So a report passes only as one
+  of those: a data race, naming a helper's thread, in a heap mapping; and of
+  the three quarters in the words the library keeps for its collectives at the
+  end of that mapping, only at the places, and against the accesses, the gate
+  names with the reason each is ordered - a team number's words against their
+  zeroing when a split took the number, and a parent's grant words or a
+  child's lane word against the collective before's. A crash, a thread leak,
+  a report of any other kind, and a race no helper made fail it, wherever they
+  are: each was planted and failed, and with the gate before 2026-10-11, which
+  read `ctest`'s log, a failed check or a crash beside a race passed
+  (`docs/reviews/archive/v0.2-before-part4-review.md`, C9-1). (Until a Träff's
+  reduction's grant gave each receiver a field of its own, two helpers could
+  also write its head at once, the same bytes from each, and that word was
+  about half of the reports: `docs/decisions/2026-10-10-grant-fields.md`.) One
+  test, which reads back 64 MiB a helper landed, takes about two minutes there
+  in the tool's handling of eight million such reads, and is given five. The
+  preset runs without `shmem.helper-wake`, which, like every map of more than
+  one node, it leaves out. That test counts each owner's wakes - a helper's, and in a second run at no
   helpers the lead's agent's - putting to a peer only once the owner of its
   wire has raised the flag it raises before it sleeps, and checks that the put
   claimed that owner's wake itself: a wake sent to another owner or held back
@@ -1526,7 +1547,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
-| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". To keep sending by reference, raise it for the job - `ulimit -l` in its batch script, as far as the hard limit allows. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
+| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. Not timed on a fast link: v0.2 step 4's last part, on one, decides its default and whether a connection needs more than two buffers. Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". `shmem_init` raises the soft limit to the hard one ([What `shmem_init` changes in the process](#what-shmem_init-changes-in-the-process)), so to keep sending by reference past that, the hard limit must be raised - an administrator's change, or Slurm's, whose steps on the Pi cluster have no hard limit. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
 
 **For testing**
 
@@ -1688,6 +1709,40 @@ host that holds a port the lead would answer on and answers first, which a
 caller takes for a job launched with another secret and ends; nor the traffic
 after the handshake, which is not encrypted or authenticated. Without the
 secret, any host that can reach the ports can join.
+
+### What `shmem_init` changes in the process
+
+`shmem_init` raises two of the process's resource limits, each from its soft
+limit to its hard one, before it opens anything either counts, and changes no
+other:
+
+- **Open files** (`RLIMIT_NOFILE`, `ulimit -n`). A node's lead holds two
+  sockets for every other node - its control wire and its data wire - and a
+  descriptor for every other PE of its node, beside the program's own. Slurm
+  passes on the submitting shell's limits, often a soft 1,024, which at 256 PEs
+  a node runs out at about 385 nodes.
+- **Locked memory** (`RLIMIT_MEMLOCK`, `ulimit -l`). On Linux 6.14 and later
+  io_uring charges every ring to one count of locked memory for all the user's
+  processes on a host, held to each process's own soft limit, and on every
+  kernel the zero-copy send (`OSOE_WIRE_ZERO_COPY`) charges the pages it lends
+  to the same count. A node's own rings take little - at most 2.6 MiB a lead at
+  the 4,097-node ceiling - but one machine's logical nodes count together: with
+  the 8 MiB soft limit a Raspberry Pi's shell passed to its Slurm step, the
+  release's tier-2 tests, four at once on one node, failed beside each other,
+  and with the soft limit raised in the step, whose hard limit is unlimited,
+  they passed (`docs/reviews/archive/v0.2-before-part4-review.md`, P9-1).
+  Raised since 2026-10-11, by the author's decision
+  (`docs/decisions/2026-10-11.md`).
+
+Neither can make a program that ran before fail: only a descriptor it could
+not have had, or memory it could not have locked, lands above the old limit.
+Each PE raises its own, and the limits stay raised after `shmem_finalize`; a
+process the program starts inherits them, as it inherits every limit. The hard
+limits are the administrator's: where the hard limit is the soft one - a
+desktop's 8 MiB of locked memory, often - nothing is raised, and a ring the
+limit refuses ends the job at start-up, naming the limit. Under Slurm a step's
+hard limits are `slurmd`'s, unlimited on the Pi cluster, where the soft ones
+come from the submitting shell.
 
 ### How a job ends
 

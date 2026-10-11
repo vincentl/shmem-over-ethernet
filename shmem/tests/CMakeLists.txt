@@ -1626,8 +1626,15 @@ endfunction()
 # what only exists between nodes. Built like osoe_tier2_test, with the segment
 # reader, so it can read the control segment's metrics by name. A map of more
 # than one node is the internode label's, and the single-node build registers
-# none (cmake/OsoeInternode.cmake); a map of one node runs in both builds.
+# none (cmake/OsoeInternode.cmake); a map of one node runs in both builds. The
+# rest of the arguments are the job's environment, but SECONDS n, the
+# launcher's limit, 60 unless given, and ctest's 30 more.
 function(osoe_tier2_map_test name map)
+  cmake_parse_arguments(PARSE_ARGV 2 test "" "SECONDS" "")
+  if(NOT test_SECONDS)
+    set(test_SECONDS 60)
+  endif()
+  math(EXPR timeout "${test_SECONDS} + 30")
   osoe_map_nodes("${map}" nodes)
   if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
     return()
@@ -1644,10 +1651,10 @@ function(osoe_tier2_map_test name map)
   list(LENGTH ranks count)
   string(REPLACE "," "-" label "${map}")
   add_test(NAME shmem.${name}.${label}
-    COMMAND ${CMAKE_COMMAND} -E env ${ARGN}
-            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
+    COMMAND ${CMAKE_COMMAND} -E env ${test_UNPARSED_ARGUMENTS}
+            $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t ${test_SECONDS} --
             $<TARGET_FILE:shmem_test_${name}>)
-  set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90)
+  set_tests_properties(shmem.${name}.${label} PROPERTIES LABELS "tier2" TIMEOUT ${timeout})
   if(nodes GREATER 1)
     osoe_internode_label(shmem.${name}.${label})
   endif()
@@ -1666,6 +1673,21 @@ endfunction()
 # acknowledgement protocol: 1,320 header-only segments per node in the idle
 # half second.
 osoe_tier2_map_test(ack-echo 0,1)
+
+# shmem_init raises the soft limits on open files and on locked memory to the
+# hard ones (init.c; the author's decision of 2026-10-11, after the ninth
+# review's P9-1), each lowered by the program before its init: on one node, in
+# both builds, and across two, whose rings a kernel from 6.14 on would refuse at
+# the locked-memory limit the program lowered to nothing.
+osoe_tier2_map_test(limits 0,0)
+osoe_tier2_map_test(limits 0,1)
+foreach(map IN ITEMS 0-0 0-1)
+  if(TEST shmem.limits.${map})
+    set_tests_properties(shmem.limits.${map} PROPERTIES
+      PASS_REGULAR_EXPRESSION "LIMITS RAISED OK"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]|after shmem_init")
+  endif()
+endforeach()
 
 # Progress helpers (v0.2 step 4, Part 3; owner-map.h). A PE's wake reaches the
 # owner of its wire: each put of PE 0's, made once the owner has raised the flag
@@ -1867,16 +1889,17 @@ if(OSOE_INTERNODE)
 
   # A quiet waits as long as its peer does (§3.15; review round two, D3): node 1
   # stopped for 3 s, then continued, and the quiet completes with the no-progress
-  # limit unset; with it at 5 s and node 1 stopped for 9, the quiet ends the job
+  # limit unset; with it at 10 s and node 1 stopped for 18, the quiet ends the job
   # naming the connection. The slice-2 commit records a run stopped for 65 s, past
   # the old 60 s bound. The limit was 1 s until a Pi took longer than that to
   # connect a second logical node under ctest -j4, and the limit fired at start-up
-  # instead (docs/pi-cluster.md, 2026-09-24).
+  # instead (docs/pi-cluster.md, 2026-09-24); then 5 s, until it fired so on a Pi
+  # node beside tier 2's largest jobs (the ninth review's Pi rehearsal).
   osoe_tier2_map_test(stopped-node 0,0,1 OSOE_TEST_STOP_MS=3000)
   set_tests_properties(shmem.stopped-node.0-0-1 PROPERTIES
     PASS_REGULAR_EXPRESSION "quiet completed after node 1 was stopped")
   add_test(NAME shmem.stopped-node.no-progress
-    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=9000 OSOE_NO_PROGRESS_TIMEOUT=5
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STOP_MS=18000 OSOE_NO_PROGRESS_TIMEOUT=10
             $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 30 --
             $<TARGET_FILE:shmem_test_stopped-node>)
   set_tests_properties(shmem.stopped-node.no-progress PROPERTIES LABELS "tier2" TIMEOUT 60
@@ -1902,18 +1925,26 @@ if(OSOE_INTERNODE)
   # node that was never gone, and every other stopped-node test still passes. The
   # stop is 15 s: 12 s let the removal through and 13 s did not, so that leaves
   # 2.8 s over the time the removal takes (the test's header has the arithmetic).
-  # In every preset, as the stopped-node tests are.
-  osoe_tier2_map_test(stopped-bulk 0,0,1 OSOE_TEST_STOP_MS=15000 OSOE_KEEPALIVE=1,1,3
-    SHMEM_SYMMETRIC_SIZE=128m)
+  # In every preset, as the stopped-node tests are. Under ThreadSanitizer with
+  # helpers its check of the 64 MiB a helper landed is eight million racy reads
+  # in the tool's slow path, 117 s at two helpers (docs/decisions/2026-10-08-helpers.md),
+  # past the launcher's minute: given five, as ctest must judge every test there
+  # (the ninth review, C9-1).
+  set(stopped_bulk_seconds 60)
+  if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    set(stopped_bulk_seconds 300)
+  endif()
+  osoe_tier2_map_test(stopped-bulk 0,0,1 SECONDS ${stopped_bulk_seconds} OSOE_TEST_STOP_MS=15000
+    OSOE_KEEPALIVE=1,1,3 SHMEM_SYMMETRIC_SIZE=128m)
   set_tests_properties(shmem.stopped-bulk.0-0-1 PROPERTIES
     PASS_REGULAR_EXPRESSION "STOPPED BULK OK"
     FAIL_REGULAR_EXPRESSION "stopped answering|CHECK[(]|osoe-launch: (rank|timeout)")
 
   # The other half of D-6 (diagnosability review): a blocking get waits for one
   # PE's reply, not a whole node's queue, so its no-progress fatal must name that
-  # PE and not only the node. Before this fix it named neither. Five seconds, like
+  # PE and not only the node. Before this fix it named neither. Ten seconds, like
   # shmem.stopped-node.no-progress's, because the limit covers start-up too.
-  osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=5)
+  osoe_tier2_map_test(get-no-progress 0,1 OSOE_NO_PROGRESS_TIMEOUT=10)
   set_tests_properties(shmem.get-no-progress.0-1 PROPERTIES
     PASS_REGULAR_EXPRESSION "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s"
     FAIL_REGULAR_EXPRESSION "GET RETURNED")
@@ -1929,7 +1960,7 @@ if(OSOE_INTERNODE)
     list(GET case 1 bytes)
     list(GET case 2 watching)
     add_test(NAME shmem.get-no-progress.pieces-${pieces}.0-1
-      COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=5 OSOE_TEST_GET_BYTES=${bytes}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=10 OSOE_TEST_GET_BYTES=${bytes}
               $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
               $<TARGET_FILE:shmem_test_get-no-progress>)
     set_tests_properties(shmem.get-no-progress.pieces-${pieces}.0-1 PROPERTIES
@@ -1938,6 +1969,25 @@ if(OSOE_INTERNODE)
         "shmem_get: no progress toward node 1 [(]PE 1[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: ${watching} has stayed at"
       FAIL_REGULAR_EXPRESSION "GET RETURNED")
     osoe_internode_label(shmem.get-no-progress.pieces-${pieces}.0-1)
+  endforeach()
+  # And a get whose room another node holds (the ninth review, Q5-2): PE 0's
+  # zone, set to 64 KiB, filled by a nonblocking get from PE 2, which stops, and
+  # PE 0's blocking get from PE 1, live, waiting for room. Its wait names no
+  # node, whether its pieces go one at a time (8 bytes) or together (three
+  # pieces), where both named node 1 before. The routine must be the blocking
+  # get's: had the nonblocking get waited itself, it would say its own.
+  foreach(bytes IN ITEMS 8 150000)
+    add_test(NAME shmem.get-no-progress.zone-held.${bytes}.0-1-2
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=10 OSOE_TEST_GET_BYTES=${bytes}
+              OSOE_GET_LANDING_BYTES=65536
+              $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 60 --
+              $<TARGET_FILE:shmem_test_get-no-progress>)
+    set_tests_properties(shmem.get-no-progress.zone-held.${bytes}.0-1-2 PROPERTIES
+      LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION
+        "shmem_get: no progress for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
+      FAIL_REGULAR_EXPRESSION "GET RETURNED|toward node")
+    osoe_internode_label(shmem.get-no-progress.zone-held.${bytes}.0-1-2)
   endforeach()
 endif()
 
