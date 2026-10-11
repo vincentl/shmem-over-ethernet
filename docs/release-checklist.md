@@ -119,9 +119,10 @@ until the tree to be tagged has them; the author tags.
 - [ ] **The review's findings settled on the candidate.** Round eight, at step
   4's merge point, said *release after named changes*, and they were made
   (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
-  adversarially before it merges. A further full round, the ninth, runs before
-  the tag (the author, `docs/decisions/2026-10-10.md` item 5), its findings
-  settled as round eight's were.
+  adversarially before it merges. The ninth, before Part 4, said the same,
+  and its changes were made and read (`docs/decisions/2026-10-11.md`); a tenth
+  runs before the tag, once every open item is cleared
+  (`docs/prompts/task-v0.2-to-the-tag.md`).
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at no helpers and at two and three where the merge point ran
   them - ThreadSanitizer's as `ctest` judges every test there since the ninth

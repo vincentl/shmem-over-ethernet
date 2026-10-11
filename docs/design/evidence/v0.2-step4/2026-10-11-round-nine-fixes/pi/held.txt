@@ -1,0 +1,7 @@
+held tier2 run 1: 8 99% tests passed, 1 tests failed out of 764
+ 92/764 Test #151: shmem.start-up.lead-ends-in-join .................................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+held tier2 run 2: 0 100% tests passed, 0 tests failed out of 764
+held tier2 run 3: 8 99% tests passed, 1 tests failed out of 764
+119/764 Test #151: shmem.start-up.lead-ends-in-join .................................***Timeout  38.02 sec
+	151 - shmem.start-up.lead-ends-in-join (Timeout)        tier2
+DONE 13:07:59

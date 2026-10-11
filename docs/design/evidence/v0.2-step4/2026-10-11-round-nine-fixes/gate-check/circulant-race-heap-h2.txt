@@ -1,0 +1,25 @@
+Internal ctest changing into directory: /tmp/r9f-plant/src/build/tsan
+Test project /tmp/r9f-plant/src/build/tsan
+    Start   1: tsan.reports.setup
+1/3 Test   #1: tsan.reports.setup ...............   Passed    0.04 sec
+    Start 442: shmem.circulant.4
+2/3 Test #442: shmem.circulant.4 ................   Passed    1.35 sec
+    Start   2: tsan.reports
+3/3 Test   #2: tsan.reports .....................***Failed    0.07 sec
+shmem.circulant.4 (shmem.circulant.4.1205700): a race no progress helper made, between T4 and main thread
+3 report files, 3 reports, 2 passed in 1 tests
+  passed: shmem.circulant.4: 2
+THREAD SANITIZER GATE FAILED: 1 report files
+
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+internode    =   1.35 sec*proc (1 test)
+tier2        =   1.35 sec*proc (1 test)
+
+Total Test time (real) =   1.47 sec
+
+The following tests FAILED:
+	  2 - tsan.reports (Failed)
+Errors while running CTest

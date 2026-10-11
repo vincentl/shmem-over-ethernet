@@ -1,0 +1,12 @@
+start 12:27:53
+build: 0
+warnings: 0
+step limits: soft 8192 hard unlimited
+6.18.50+rpt-rpi-2712
+tier2 run 1: 0 100% tests passed, 0 tests failed out of 764
+tier2 run 2: 8 99% tests passed, 1 tests failed out of 764
+ 23/764 Test #273: shmem.leftovers.restart.other-size ...............................***Failed  Required regular expression not found. Regex=[RESTART LEFTOVERS OK
+tier2 run 3: 8 99% tests passed, 2 tests failed out of 764
+  3/764 Test #273: shmem.leftovers.restart.other-size ...............................***Failed  Required regular expression not found. Regex=[RESTART LEFTOVERS OK
+ 89/764 Test #151: shmem.start-up.lead-ends-in-join .................................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+DONE 12:43:26

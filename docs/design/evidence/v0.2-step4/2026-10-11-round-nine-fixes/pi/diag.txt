@@ -1,0 +1,7 @@
+diag tier2 run 1: 8 99% tests passed, 1 tests failed out of 764
+ 18/764 Test #273: shmem.leftovers.restart.other-size ...............................***Failed  Required regular expression not found. Regex=[RESTART LEFTOVERS OK
+diag tier2 run 2: 8 99% tests passed, 2 tests failed out of 764
+  3/764 Test #273: shmem.leftovers.restart.other-size ...............................***Failed  Required regular expression not found. Regex=[RESTART LEFTOVERS OK
+ 88/764 Test #151: shmem.start-up.lead-ends-in-join .................................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+diag tier2 run 3: 0 100% tests passed, 0 tests failed out of 764
+DONE 13:24:28

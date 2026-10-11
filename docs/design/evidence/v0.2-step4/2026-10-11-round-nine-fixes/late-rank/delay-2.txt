@@ -1,0 +1,10 @@
+osoe-launch: rank 2 exited with status 3
+osoe: PE 0: shmem_init on node 0 has waited 2 s for local PEs to join the node (call shmem_init): 2 of 3 have; still waiting for local id 2 (rank 2)
+Killed
+osoe-launch: rank 0 exited with status 4
+osoe: PE 1: the local lead, rank 0 (pid 1249724), has ended while this PE waited for local PEs to join the node (call shmem_init)
+osoe: PE 1: control segment /osoe.1249719.0.0.0 (osoe-stat /osoe.1249719.0.0.0, while any PE of this node is alive)
+osoe-launch: rank 1 exited with status 1
+osoe-launch: left behind: /dev/shm/osoe.1249719.0.0.0.heap.1
+osoe-launch: left behind: /dev/shm/osoe.1249719.0.0.0.heap.0
+osoe-launch: left behind: /dev/shm/osoe.1249719.0.0.0

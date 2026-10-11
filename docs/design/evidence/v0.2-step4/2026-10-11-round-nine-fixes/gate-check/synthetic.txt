@@ -1,0 +1,7 @@
+shmem.ack-echo.0-1 (shmem.ack-echo.0-1.900004): the tool's ERROR: SEGV on unknown address 0x000000000000
+shmem.circulant.4 (shmem.circulant.4.900001): a race in the library's internal region, at its past-the-team-words, not among those explained: memcpy/memcpy/osoe_am_parse against memcpy/round_take/osoe_internode_generic_reduce
+shmem.circulant.4 (shmem.circulant.4.900002): a race no progress helper made, between T6 and worker
+shmem.helpers.deaf.0-1 (shmem.helpers.deaf.0-1.900003): a report of another kind: thread leak
+5 report files, 4 reports, 1 passed in 1 tests
+  passed: shmem.circulant.4: 1
+THREAD SANITIZER GATE FAILED: 4 report files
