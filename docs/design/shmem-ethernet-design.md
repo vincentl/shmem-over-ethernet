@@ -287,8 +287,9 @@ sealed behind it — plus any publication-window stall (§3.6); an earlier draft
 
 *Measured in v0.2 step 4, the bound left out the kernel.* Nothing limited a
 socket's unsent queue, and at a gigabit the kernel held some 2.6 MB of a put
-stream: a fetch-add behind it waited 14 to 22 ms on the Pi, whatever the
-connection buffer. Each data wire now limits it (`TCP_NOTSENT_LOWAT`, §3.3) to
+stream: a fetch-add behind it waited 17 to 20 ms on the Pi at v0.2 step 3's
+tree, and about 21 ms at each connection buffer tried, 128 KiB to 512 KiB. Each
+data wire now limits it (`TCP_NOTSENT_LOWAT`, §3.3) to
 the link's bandwidth times 128 µs, at least 16 KiB, once the link is measured
 at the end of `shmem_init`, so the bound is two segments, the limit and what is in
 flight - 3.3 to 3.9 ms for that fetch-add, the stream at line rate

@@ -20,7 +20,19 @@ slices; and the adversarial reads of v0.2's parts, a fresh agent's read of a
 part before it merged and again after its fixes where the first found
 something serious (`v0.2-step2-adversarial-read.md` to
 `v0.2-step4-part3-second-adversarial-read.md`, each named for its part and its
-read). Start with a round's synthesis, whose first section is its verdict:
+read), and of the changes after step 4's merge point, each named for its change
+(`v0.2-step4-review-fixes-adversarial-read.md`,
+`v0.2-step4-grant-fields-adversarial-read.md`,
+`v0.2-single-node-configure-adversarial-read.md`,
+`v0.2-loopback-keepalive-adversarial-read.md`,
+`v0.2-blocking-gets-adversarial-read.md`,
+`v0.2-zero-copy-memlock-adversarial-read.md` and its second,
+`v0.2-zero-copy-refused-second-adversarial-read.md`,
+`v0.2-helper-wake-adversarial-read.md`, and the fast-link kit's two,
+`v0.2-fast-link-kit-adversarial-read.md` and
+`v0.2-fast-link-kit-second-adversarial-read.md`); and a fresh agent's
+fact-check of the 0.2 release note's draft, line by line against its sources
+(`v0.2-release-notes-fact-check.md`). Start with a round's synthesis, whose first section is its verdict:
 `archive/v0.2-step4-review.md` is round eight's, and
 `archive/phase1-step7-slice4-review.md` round six's, on the first release's
 candidate. What the later rounds led to is in `docs/decisions/`

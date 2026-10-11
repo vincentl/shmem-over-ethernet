@@ -107,6 +107,53 @@ done; an open one, what is left.
   scan behind it). The commits keep the author's address, and the public
   repository is named `shmem-over-ethernet` (the same record, item 4).
 
+## For the 0.2 tag
+
+Written 2026-10-10, from the items above that every tag needs, the after-release
+list's one that names "the tag", and the author's answers of the v0.2 arc. Open
+until the tree to be tagged has them; the author tags.
+
+- [ ] **Part 4 on a link above a gigabit, or 0.2 without it** - the author's
+  call: "0.2 may ship without it if the hardware is not there in time"
+  (`docs/decisions/2026-10-09.md` item 3); `docs/fast-link.md` is its runbook.
+- [ ] **The review's findings settled on the candidate.** Round eight, at step
+  4's merge point, said *release after named changes*, and they were made
+  (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
+  adversarially before it merges. A change that lands between that review and the
+  candidate is weighed for a further full round.
+- [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
+  to be tagged, at no helpers and at two and three where the merge point ran
+  them; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
+  last run at 0.1.0's tag; the single-node build in its presets and on Rocky
+  Linux 9.
+- [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
+  two PEs at no helpers and at two, and its team programs at 70 PEs, as at step
+  4's merge point (`docs/decisions/2026-10-10-step4-merge-point.md`), which ran
+  them before its review's fixes and every change since.
+- [ ] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
+  for 0.1.0 (above): the sixteen cases in the development VM's Slurm, and
+  `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on.
+- [ ] **The x86-64 item at two and three helpers too** (portability P3, under
+  "After the release").
+- [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
+  tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
+- [ ] **The README's commands on the Pi cluster, and its quick start on Raspberry
+  Pi OS**, as for 0.1.0.
+- [ ] **The release note**: `docs/release-notes/0.2.0.md`, drafted 2026-10-10 and
+  fact-checked against its sources, made true of the tree tagged - its numbers
+  marked "at the tag" filled in from the runs above, its provisional checks
+  replaced by the tag's, anything merged after `5748c97` added, and its line on
+  0.1.0's `osoe-pacer mix` hang kept (`docs/decisions/2026-10-09.md` item 4,
+  the author: "fine").
+- [ ] **The version**: `CMakeLists.txt`'s `0.1.0` to `0.2.0` in the commit the tag
+  names, with the README's places that give the current version - its Status,
+  the version strings and the library's file name, the repository table's row,
+  `SHMEM_VERSION`'s row - and the README's Status linking the new note.
+- [ ] **The soname** - the author's call: `libosoe.so.0`, as 0.1.0's - the
+  installed headers and the exported names are 0.1.0's, so a program built
+  against 0.1.0 should link and run against 0.2, which no one has tried - or a
+  new one. The library's file is `libosoe.so.0.2.0` either way.
+
 ## After the release
 
 What the reviews rated *after release*, kept here so that none is lost; none
@@ -256,7 +303,8 @@ rated them (round six's readiness Q5-5).
   README's limits say the start-up is a chain a larger system may need changed.
 - **From the review of v0.2 step 4's merge point**
   (`docs/reviews/archive/v0.2-step4-review.md`), each rated after the release
-  or minor, and none made before the tag:
+  or minor, none to be made before the tag, and two with a half built already
+  (2026-10-10):
   - the ThreadSanitizer gate at a helper count tells the library's own
     collective words in the heap mapping from a program's heap, passes a
     report there only against a short list with a reason each, and requires a
