@@ -1,0 +1,23 @@
+srun: job 137 queued and waiting for resources
+srun: job 137 has been allocated resources
+# OSU OpenSHMEM Broadcast Latency Test v7.5.2
+# Size       Avg Latency(us)
+4                     178.54
+8                     182.63
+16                    173.03
+32                    178.82
+64                    175.45
+128                   192.00
+256                   173.97
+512                   173.43
+1024                  174.20
+2048                  181.60
+4096                  182.15
+8192                  215.88
+16384                 251.25
+32768                 276.59
+65536                 351.68
+131072                630.78
+262144               1171.87
+524288               2197.44
+1048576              4421.95

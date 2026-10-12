@@ -1,0 +1,24 @@
+# 02:10:15 nodes=2 pes_per_node=1 OSOE_GET_LANDING_BYTES=262144
+# ~/osoe/build/release/kit/get-pieces 21 67108864
+salloc: Pending job allocation 50
+salloc: job 50 queued and waiting for resources
+salloc: job 50 has been allocated resources
+salloc: Granted job allocation 50
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.50.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 38776 ns, a message cost of 0 ns, 2793044664 bytes a second (3068 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 357509
+osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.50.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 38776 ns, a message cost of 0 ns, 2793044664 bytes a second (3112 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 357509
+get-pieces pes=2 peer=1 repetitions=21 (median microseconds)
+bytes=16384 put_quiet_us=97.9 get_us=103.2 get_nbi_quiet_us=102.4 get_over_put=1.05 nbi_over_put=1.05
+bytes=65536 put_quiet_us=102.3 get_us=113.9 get_nbi_quiet_us=104.1 get_over_put=1.11 nbi_over_put=1.02
+bytes=262144 put_quiet_us=167.0 get_us=208.2 get_nbi_quiet_us=205.0 get_over_put=1.25 nbi_over_put=1.23
+bytes=1048576 put_quiet_us=437.2 get_us=637.0 get_nbi_quiet_us=805.1 get_over_put=1.46 nbi_over_put=1.84
+bytes=4194304 put_quiet_us=1603.8 get_us=3210.3 get_nbi_quiet_us=3112.7 get_over_put=2.00 nbi_over_put=1.94
+bytes=16777216 put_quiet_us=5996.1 get_us=12024.4 get_nbi_quiet_us=11987.1 get_over_put=2.01 nbi_over_put=2.00
+bytes=67108864 put_quiet_us=23654.4 get_us=47949.2 get_nbi_quiet_us=46907.4 get_over_put=2.03 nbi_over_put=1.98
+salloc: Relinquishing job allocation 50
+salloc: Job allocation 50 has been revoked.
+# exit 0

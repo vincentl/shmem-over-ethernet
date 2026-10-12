@@ -20,10 +20,11 @@ specification, or takes a choice it leaves open, is listed under
 tree has v0.2's work on it since ([the plan](docs/prompts/task-v0.2.md)) and calls
 itself 0.1.0 until v0.2 is released. [Installing](#installing) says where the
 library and the tools show the version. It has been tested on
-aarch64 only: on x86-64 it builds and passes the tests an emulator can run, but
-its network path has never run on an x86-64 kernel - there the quick start's
-second run, `ctest --preset release` and `osoe-pacer --quick` across nodes are
-its first tests. It was written with Claude Code, under its
+aarch64 - the Raspberry Pi cluster and an aarch64 virtual machine - and, since
+2026-10-12, natively on x86-64: eight Google Cloud `c4-standard-16` (Debian 13,
+Linux 6.12) passed the four presets at no helpers, two and three, tier 3, the
+single-node build and `osoe-pacer`, across nodes at 23 Gbit/s
+([the results](docs/fast-link-results.md)). It was written with Claude Code, under its
 author's direction ([How osoe was made](#how-osoe-was-made)).
 
 ## OpenSHMEM in two minutes
@@ -218,12 +219,16 @@ The single-node build:
 - CMake 3.25 or newer, and GCC or Clang, as above; no liburing and no pkg-config
 - Python 3, optionally, as above
 
-osoe has run on aarch64 only, on the Raspberry Pi cluster and in an aarch64
-virtual machine. An x86-64 build passed every test an emulator on an aarch64
+osoe has run on aarch64, on the Raspberry Pi cluster and in an aarch64 virtual
+machine, and natively on x86-64: on 2026-10-12 eight Google Cloud
+`c4-standard-16` (Intel Xeon Platinum 8581C, Debian 13, Linux 6.12) passed the
+four presets at no helpers, two and three - ThreadSanitizer's gate with them -
+tier 3, the single-node build and `osoe-pacer`'s runs, across nodes at 23 Gbit/s
+([the results](docs/fast-link-results.md)). Before that, an x86-64 build passed every test an emulator on an aarch64
 kernel can run - the full build with a shim standing in for the futex2 calls the
 emulator refuses, the single-node build with none, since the emulator passes the
 classic futex through - and an aarch64 build made to order memory as x86-64 does
-passed the whole suite; no x86-64 kernel has run it: see Limits, "Launching".
+passed the whole suite.
 
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories - `sudo apt install build-essential cmake pkg-config

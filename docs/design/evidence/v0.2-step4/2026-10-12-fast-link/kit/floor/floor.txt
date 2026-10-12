@@ -1,0 +1,31 @@
+# 01:29:02 nodes=2 pes_per_node=1 
+# ~/osoe/build/release/shmem/tests/shmem_test_floor
+salloc: Granted job allocation 7
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.7.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 147683 ns, a message cost of 0 ns, 1922619193 bytes a second (9510 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 246095
+osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.7.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 147683 ns, a message cost of 0 ns, 1922619193 bytes a second (9465 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 246095
+pair 0 fastest_us floor=36.2 get=53.6 put_quiet=50.4 fetch_add=52.4 median_us floor=53.8 get=84.1 put_quiet=86.2 fetch_add=87.0 stream_mib_per_s floor=2719 library=2712
+pair 1 fastest_us floor=36.1 get=53.3 put_quiet=54.2 fetch_add=54.3 median_us floor=58.3 get=74.3 put_quiet=86.0 fetch_add=87.1 stream_mib_per_s floor=2721 library=2718
+pair 2 fastest_us floor=35.5 get=52.6 put_quiet=52.6 fetch_add=53.6 median_us floor=46.7 get=84.4 put_quiet=86.2 fetch_add=86.8 stream_mib_per_s floor=2721 library=2697
+pair 3 fastest_us floor=36.4 get=53.2 put_quiet=54.7 fetch_add=52.8 median_us floor=48.9 get=84.8 put_quiet=86.4 fetch_add=86.9 stream_mib_per_s floor=2720 library=2718
+pair 4 fastest_us floor=31.1 get=50.6 put_quiet=41.6 fetch_add=49.2 median_us floor=43.9 get=80.1 put_quiet=71.1 fetch_add=69.8 stream_mib_per_s floor=2720 library=2718
+pair 5 fastest_us floor=33.5 get=54.9 put_quiet=52.5 fetch_add=52.0 median_us floor=44.3 get=83.8 put_quiet=74.8 fetch_add=73.5 stream_mib_per_s floor=2721 library=2718
+pair 6 fastest_us floor=33.3 get=44.9 put_quiet=49.5 fetch_add=42.6 median_us floor=38.0 get=80.1 put_quiet=70.3 fetch_add=69.5 stream_mib_per_s floor=2721 library=2717
+ratio, the median of 7 pairs (range):
+  fastest get/floor=1.481 (1.35-1.64)
+  fastest put_quiet/floor=1.484 (1.34-1.57)
+  fastest fetch_add/floor=1.504 (1.28-1.58)
+  median put_quiet/get=1.019 (0.88-1.16)
+  median fetch_add/get=1.025 (0.87-1.17)
+  stream library/floor=0.999 (0.991-0.999)
+  reported: median get/floor=1.808 (1.27-2.11)
+  reported: median put_quiet/floor=1.688 (1.47-1.85)
+  reported: median fetch_add/floor=1.657 (1.49-1.86)
+pins not checked: they are the project's regression guard (a fastest trip at most 3.0x the floor's, a median at most 1.5x a get's, the stream at least 0.30x the floor's), set on its own machines; set OSOE_TEST_FLOOR_PINS=1 to check them, as cmake -DOSOE_TEST_PINS=ON does for ctest
+salloc: Relinquishing job allocation 7
+salloc: Job allocation 7 has been revoked.
+# exit 0

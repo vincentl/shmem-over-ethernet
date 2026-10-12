@@ -1,0 +1,15 @@
+# 2026-10-12T01:29:02Z floor.sh on slurm-controller
+# kit ab4425cac710d144ee6032b85a0b1191e246e83d
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+01:29:12 exit 0 floor.txt:  ~/osoe/build/release/shmem/tests/shmem_test_floor
+01:34:12 echo-uring 1 connections each way done
+01:39:12 echo-uring 2 connections each way done
+01:44:13 echo-uring 4 connections each way done
+01:49:13 echo-uring 8 connections each way done
+01:54:13 echo-uring 16 connections each way done
+01:54:24 iperf3 1 streams each way done
+01:54:35 iperf3 2 streams each way done
+01:54:46 iperf3 4 streams each way done
+01:54:57 iperf3 8 streams each way done
+01:55:08 iperf3 16 streams each way done
+# done 01:55:08

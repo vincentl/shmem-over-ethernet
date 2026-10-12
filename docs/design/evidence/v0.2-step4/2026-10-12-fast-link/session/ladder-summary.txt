@@ -1,0 +1,40 @@
+== out/ladder
+jobs: 33, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+hol: a fetch-add's round trip, microseconds, alone and behind the stream; the stream's MiB/s
+  hol-buffer-128k     alone  median 87.0 (74.0-87.0, n=3)  p99 206 (139-219, n=3)    
+  hol-buffer-128k     stream median 516 (477-548, n=3)     p99 698 (658-710, n=3)     stream 2705 (2702-2706, n=3)
+                      link 1744 (637-2578) MiB/s, hop 106 (51.3-113) us, message 0 us; unsent limit 234127 (85469-346005) B
+  hol-buffer-1m       alone  median 88.0 (87.0-88.0, n=3)  p99 157 (152-189, n=3)    
+  hol-buffer-1m       stream median 747 (657-859, n=3)     p99 1157 (1045-1209, n=3)  stream 2704 (2704-2704, n=3)
+                      link 3113 (1263-4613) MiB/s, hop 139 (113-158) us, message 0 us; unsent limit 417870 (169539-619192) B
+  hol-buffer-4m       alone  median 86.0 (76.0-88.0, n=3)  p99 192 (130-224, n=3)    
+  hol-buffer-4m       stream median 756 (669-803, n=3)     p99 1402 (1310-1488, n=3)  stream 2704 (2697-2704, n=3)
+                      link 3192 (1292-3328) MiB/s, hop 107 (50.9-128) us, message 0 us; unsent limit 428387 (173352-446653) B
+  hol-receive-16kx256 alone  median 85.0 (77.0-89.0, n=3)  p99 184 (170-197, n=3)    
+  hol-receive-16kx256 stream median 586 (569-624, n=3)     p99 787 (748-884, n=3)     stream 2702 (2700-2702, n=3)
+                      link 2005 (1742-3049) MiB/s, hop 49.2 (47.9-50.7) us, message 0 us; unsent limit 269138 (233749-409177) B
+  hol-receive-64kx64  alone  median 88.0 (85.0-89.0, n=3)  p99 169 (117-200, n=3)    
+  hol-receive-64kx64  stream median 567 (527-612, n=3)     p99 767 (675-894, n=3)     stream 2703 (2703-2704, n=3)
+                      link 1096 (773-2343) MiB/s, hop 51.9 (44.5-158) us, message 0 us; unsent limit 147130 (103755-314474) B
+  hol-unsent-0        alone  median 85.0 (85.0-87.0, n=3)  p99 186 (159-206, n=3)    
+  hol-unsent-0        stream median 1960 (1637-2093, n=3)  p99 2756 (2278-2938, n=3)  stream 2706 (2705-2706, n=3)
+                      link 3273 (3086-3943) MiB/s, hop 49.2 (42.2-58.2) us, message 0 us; unsent limit 0 B (0: the system's)
+  hol-unsent-1m       alone  median 85.0 (85.0-85.0, n=3)  p99 179 (154-224, n=3)    
+  hol-unsent-1m       stream median 789 (780-789, n=3)     p99 1019 (989-1037, n=3)   stream 2705 (2703-2705, n=3)
+                      link 1426 (1388-1735) MiB/s, hop 118 (101-123) us, message 0 us; unsent limit 1048576 B
+  hol-unsent-256k     alone  median 88.0 (86.0-96.0, n=3)  p99 119 (105-158, n=3)    
+  hol-unsent-256k     stream median 582 (582-588, n=3)     p99 751 (740-777, n=3)     stream 2703 (2702-2704, n=3)
+                      link 2535 (1559-3834) MiB/s, hop 112 (50.4-121) us, message 0 us; unsent limit 262144 B
+  hol-unsent-4m       alone  median 85.0 (85.0-90.0, n=3)  p99 182 (102-184, n=3)    
+  hol-unsent-4m       stream median 1376 (1374-1379, n=3)  p99 1995 (1981-2005, n=3)  stream 2705 (2703-2705, n=3)
+                      link 2735 (1957-2992) MiB/s, hop 48.1 (48.1-50.2) us, message 0 us; unsent limit 4194304 B
+  hol-unsent-64k      alone  median 85.0 (75.0-88.0, n=3)  p99 104 (102-135, n=3)    
+  hol-unsent-64k      stream median 524 (521-535, n=3)     p99 700 (692-714, n=3)     stream 2703 (2699-2704, n=3)
+                      link 1169 (516-2181) MiB/s, hop 113 (113-171) us, message 0 us; unsent limit 65536 B
+  hol-unsent-rule     alone  median 86.0 (83.0-87.0, n=3)  p99 118 (104-177, n=3)    
+  hol-unsent-rule     stream median 618 (616-621, n=3)     p99 787 (776-896, n=3)     stream 2704 (2704-2705, n=3)
+                      link 3110 (3029-3150) MiB/s, hop 52.3 (45.7-102) us, message 0 us; unsent limit 417395 (406569-422841) B

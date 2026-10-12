@@ -1,0 +1,40 @@
+# 2026-10-12T02:11:33Z fan-in.sh on slurm-controller
+# kit ab4425cac710d144ee6032b85a0b1191e246e83d
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 120 s
+02:11:34 exit 0 fan-in-pes1-h0-buffers256-r1.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:34 exit 0 fan-in-pes1-h0-buffers64-r1.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:35 exit 0 fan-in-pes1-h2-buffers256-r1.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:35 exit 0 fan-in-pes1-h2-buffers64-r1.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:36 exit 0 fan-in-pes4-h0-buffers256-r1.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:37 exit 0 fan-in-pes4-h0-buffers64-r1.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:38 exit 0 fan-in-pes4-h2-buffers256-r1.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:38 exit 0 fan-in-pes4-h2-buffers64-r1.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:39 exit 0 fan-in-pes16-h0-buffers256-r1.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:40 exit 0 fan-in-pes16-h0-buffers64-r1.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:41 exit 0 fan-in-pes16-h2-buffers256-r1.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:42 exit 0 fan-in-pes16-h2-buffers64-r1.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:42 exit 0 fan-in-pes1-h0-buffers64-r2.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:43 exit 0 fan-in-pes1-h0-buffers256-r2.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:44 exit 0 fan-in-pes1-h2-buffers64-r2.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:44 exit 0 fan-in-pes1-h2-buffers256-r2.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:45 exit 0 fan-in-pes4-h0-buffers64-r2.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:46 exit 0 fan-in-pes4-h0-buffers256-r2.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:46 exit 0 fan-in-pes4-h2-buffers64-r2.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:47 exit 0 fan-in-pes4-h2-buffers256-r2.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:48 exit 0 fan-in-pes16-h0-buffers64-r2.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:49 exit 0 fan-in-pes16-h0-buffers256-r2.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:50 exit 0 fan-in-pes16-h2-buffers64-r2.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:50 exit 0 fan-in-pes16-h2-buffers256-r2.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:51 exit 0 fan-in-pes1-h0-buffers256-r3.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:52 exit 0 fan-in-pes1-h0-buffers64-r3.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:53 exit 0 fan-in-pes1-h2-buffers256-r3.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:53 exit 0 fan-in-pes1-h2-buffers64-r3.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 320
+02:11:54 exit 0 fan-in-pes4-h0-buffers256-r3.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:55 exit 0 fan-in-pes4-h0-buffers64-r3.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:55 exit 0 fan-in-pes4-h2-buffers256-r3.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:56 exit 0 fan-in-pes4-h2-buffers64-r3.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 80
+02:11:57 exit 0 fan-in-pes16-h0-buffers256-r3.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:58 exit 0 fan-in-pes16-h0-buffers64-r3.txt: OSOE_PROGRESS_HELPERS=0 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:59 exit 0 fan-in-pes16-h2-buffers256-r3.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=256 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+02:11:59 exit 0 fan-in-pes16-h2-buffers64-r3.txt: OSOE_PROGRESS_HELPERS=2 OSOE_WIRE_BUFFERS=64 FAN_IN_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/fan-in 65536 16 20
+# done 02:11:59

@@ -1,0 +1,47 @@
+# 01:34:12 2 connections each way between slurm-node-02 and slurm-node-01
+# exit toward the first node 124
+# exit toward the second node 124
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-02: error: *** STEP 13.0 ON slurm-node-02 CANCELLED AT 2026-10-12T01:39:12 ***
+srun: error: slurm-node-02: task 0: Killed
+connection=2 small short_sends=19 (client)
+connection=2 small stream_mib_per_s=208.2 mebibytes=1
+connection=2 uring round_trip_ns min=44294 median=83184 p99=136114 rounds=2000
+connection=2 blocking round_trip_ns min=37644 median=65248 p99=105086 rounds=2000
+connection=2 uring stream_mib_per_s=989.6 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2438.8 mebibytes=1024
+connection=2 uring round_trip_ns min=53046 median=88760 p99=119882 rounds=2000
+connection=2 blocking round_trip_ns min=45863 median=79609 p99=467877 rounds=2000
+connection=2 uring stream_mib_per_s=1423.4 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2338.4 mebibytes=1024
+connection=2 uring round_trip_ns min=38097 median=51166 p99=67435 rounds=2000
+connection=2 blocking round_trip_ns min=38029 median=49553 p99=66513 rounds=2000
+connection=2 uring stream_mib_per_s=2700.6 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2708.8 mebibytes=1024
+connection=2 uring round_trip_ns min=38674 median=51520 p99=69279 rounds=2000
+connection=2 blocking round_trip_ns min=36194 median=49163 p99=65790 rounds=2000
+connection=2 uring stream_mib_per_s=2719.4 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2715.6 mebibytes=1024
+connection=2 uring round_trip_ns min=35754 median=50199 p99=66955 rounds=2000
+connection=2 blocking round_trip_ns min=37654 median=50034 p99=67485 rounds=2000
+connection=2 uring stream_mib_per_s=2699.5 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2713.3 mebibytes=1024
+connection=2 uring round_trip_ns min=40364 median=51609 p99=68714 rounds=2000
+connection=2 blocking round_trip_ns min=37908 median=49035 p99=65721 rounds=2000
+connection=2 uring stream_mib_per_s=2715.4 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2712.2 mebibytes=1024
+connection=2 uring round_trip_ns min=37760 median=52168 p99=177905 rounds=2000
+connection=2 blocking round_trip_ns min=34896 median=49222 p99=65725 rounds=2000
+connection=2 uring stream_mib_per_s=2707.0 mebibytes=1024
+connection=2 blocking stream_mib_per_s=2714.4 mebibytes=1024
+connection=2 memory copy_mib_per_s=14249.5 copy8_seq_cst_fence_ns=6.18
+connection=2 ratio one_way_latency_over_copy8=4063 copy_bandwidth_over_stream=5.24
+connection=2 ratio uring_over_blocking fastest_round_trip=1.069 median_round_trip=1.052 stream=0.997 (median of 7 pairs)
+connection=2 exit 0 after 2 attempts
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-01: error: *** STEP 14.0 ON slurm-node-01 CANCELLED AT 2026-10-12T01:39:12 ***
+srun: error: slurm-node-01: task 0: Killed

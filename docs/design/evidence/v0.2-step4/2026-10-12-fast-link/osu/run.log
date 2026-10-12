@@ -1,0 +1,21 @@
+== put 02:20:50
+exit 0
+== get 02:21:04
+exit 0
+== put_bw 02:21:17
+exit 0
+== get_bw 02:21:18
+exit 0
+== atomics 02:21:31
+exit 0
+== barrier 8x16 02:21:32
+exit 0
+== broadcast 8x16 02:21:32
+exit 0
+== collect 8x16 02:21:40
+exit 0
+== fcollect 8x16 02:22:26
+exit 0
+== reduce 8x16 02:23:09
+exit 0
+DONE 02:23:18

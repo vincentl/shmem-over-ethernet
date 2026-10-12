@@ -1,0 +1,21 @@
+# 02:10:41 nodes=2 pes_per_node=1 OSOE_GET_LANDING_BYTES=16777216
+# ~/osoe/build/release/kit/get-pieces 21 67108864
+salloc: Granted job allocation 54
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.54.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 44162 ns, a message cost of 0 ns, 3613851922 bytes a second (3146 us of this start)
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.54.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 44162 ns, a message cost of 0 ns, 3613851922 bytes a second (3106 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 462573
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 462573
+get-pieces pes=2 peer=1 repetitions=21 (median microseconds)
+bytes=16384 put_quiet_us=117.8 get_us=105.0 get_nbi_quiet_us=106.2 get_over_put=0.89 nbi_over_put=0.90
+bytes=65536 put_quiet_us=138.0 get_us=143.7 get_nbi_quiet_us=133.0 get_over_put=1.04 nbi_over_put=0.96
+bytes=262144 put_quiet_us=210.4 get_us=172.0 get_nbi_quiet_us=173.8 get_over_put=0.82 nbi_over_put=0.83
+bytes=1048576 put_quiet_us=477.7 get_us=453.5 get_nbi_quiet_us=453.9 get_over_put=0.95 nbi_over_put=0.95
+bytes=4194304 put_quiet_us=1569.2 get_us=1575.3 get_nbi_quiet_us=1593.5 get_over_put=1.00 nbi_over_put=1.02
+bytes=16777216 put_quiet_us=5999.1 get_us=6000.3 get_nbi_quiet_us=5991.4 get_over_put=1.00 nbi_over_put=1.00
+bytes=67108864 put_quiet_us=23647.7 get_us=23661.9 get_nbi_quiet_us=23638.6 get_over_put=1.00 nbi_over_put=1.00
+salloc: Relinquishing job allocation 54
+salloc: Job allocation 54 has been revoked.
+# exit 0

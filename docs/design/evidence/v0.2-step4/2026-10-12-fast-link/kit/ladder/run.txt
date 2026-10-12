@@ -1,0 +1,37 @@
+# 2026-10-12T02:12:00Z ladder.sh on slurm-controller
+# kit ab4425cac710d144ee6032b85a0b1191e246e83d
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 120 s
+02:12:12 exit 0 hol-unsent-0-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=0 ~/osoe/build/release/kit/hol 10
+02:12:24 exit 0 hol-unsent-rule-r1.txt: SHMEM_DEBUG=1 ~/osoe/build/release/kit/hol 10
+02:12:37 exit 0 hol-receive-16kx256-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_BYTES=16384 OSOE_WIRE_BUFFERS=256 ~/osoe/build/release/kit/hol 10
+02:12:49 exit 0 hol-receive-64kx64-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_BYTES=65536 OSOE_WIRE_BUFFERS=64 ~/osoe/build/release/kit/hol 10
+02:13:01 exit 0 hol-buffer-4m-r1.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=4194304 ~/osoe/build/release/kit/hol 10
+02:13:14 exit 0 hol-buffer-1m-r1.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=1048576 ~/osoe/build/release/kit/hol 10
+02:13:26 exit 0 hol-buffer-128k-r1.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=131072 ~/osoe/build/release/kit/hol 10
+02:13:38 exit 0 hol-unsent-4m-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=4194304 ~/osoe/build/release/kit/hol 10
+02:13:50 exit 0 hol-unsent-1m-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=1048576 ~/osoe/build/release/kit/hol 10
+02:14:03 exit 0 hol-unsent-256k-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=262144 ~/osoe/build/release/kit/hol 10
+02:14:15 exit 0 hol-unsent-64k-r1.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=65536 ~/osoe/build/release/kit/hol 10
+02:14:27 exit 0 hol-unsent-64k-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=65536 ~/osoe/build/release/kit/hol 10
+02:14:40 exit 0 hol-unsent-256k-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=262144 ~/osoe/build/release/kit/hol 10
+02:14:52 exit 0 hol-unsent-1m-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=1048576 ~/osoe/build/release/kit/hol 10
+02:15:04 exit 0 hol-unsent-4m-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=4194304 ~/osoe/build/release/kit/hol 10
+02:15:17 exit 0 hol-buffer-128k-r2.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=131072 ~/osoe/build/release/kit/hol 10
+02:15:29 exit 0 hol-buffer-1m-r2.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=1048576 ~/osoe/build/release/kit/hol 10
+02:15:41 exit 0 hol-buffer-4m-r2.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=4194304 ~/osoe/build/release/kit/hol 10
+02:15:54 exit 0 hol-receive-64kx64-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_BYTES=65536 OSOE_WIRE_BUFFERS=64 ~/osoe/build/release/kit/hol 10
+02:16:06 exit 0 hol-receive-16kx256-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_BYTES=16384 OSOE_WIRE_BUFFERS=256 ~/osoe/build/release/kit/hol 10
+02:16:18 exit 0 hol-unsent-rule-r2.txt: SHMEM_DEBUG=1 ~/osoe/build/release/kit/hol 10
+02:16:30 exit 0 hol-unsent-0-r2.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=0 ~/osoe/build/release/kit/hol 10
+02:16:43 exit 0 hol-unsent-256k-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=262144 ~/osoe/build/release/kit/hol 10
+02:16:55 exit 0 hol-unsent-64k-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=65536 ~/osoe/build/release/kit/hol 10
+02:17:07 exit 0 hol-unsent-0-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=0 ~/osoe/build/release/kit/hol 10
+02:17:20 exit 0 hol-unsent-rule-r3.txt: SHMEM_DEBUG=1 ~/osoe/build/release/kit/hol 10
+02:17:32 exit 0 hol-receive-16kx256-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_BYTES=16384 OSOE_WIRE_BUFFERS=256 ~/osoe/build/release/kit/hol 10
+02:17:44 exit 0 hol-receive-64kx64-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_BYTES=65536 OSOE_WIRE_BUFFERS=64 ~/osoe/build/release/kit/hol 10
+02:17:57 exit 0 hol-buffer-4m-r3.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=4194304 ~/osoe/build/release/kit/hol 10
+02:18:09 exit 0 hol-buffer-1m-r3.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=1048576 ~/osoe/build/release/kit/hol 10
+02:18:21 exit 0 hol-buffer-128k-r3.txt: SHMEM_DEBUG=1 OSOE_AM_BUFFER=131072 ~/osoe/build/release/kit/hol 10
+02:18:34 exit 0 hol-unsent-4m-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=4194304 ~/osoe/build/release/kit/hol 10
+02:18:46 exit 0 hol-unsent-1m-r3.txt: SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=1048576 ~/osoe/build/release/kit/hol 10
+# done 02:18:46

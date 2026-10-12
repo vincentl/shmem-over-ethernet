@@ -1,0 +1,23 @@
+srun: job 140 queued and waiting for resources
+srun: job 140 has been allocated resources
+# OSU OpenSHMEM Reduce Latency Test v7.5.2
+# Size       Avg Latency(us)
+4                     184.01
+8                     175.21
+16                    172.98
+32                    173.15
+64                    178.59
+128                   175.13
+256                   175.79
+512                   176.45
+1024                  176.03
+2048                  195.54
+4096                  203.69
+8192                  225.84
+16384                 271.34
+32768                 371.51
+65536                 531.34
+131072               1017.67
+262144               1956.89
+524288               3825.52
+1048576              7477.43

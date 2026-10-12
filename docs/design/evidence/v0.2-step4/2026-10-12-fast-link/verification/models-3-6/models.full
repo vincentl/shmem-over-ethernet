@@ -1,0 +1,24 @@
+Internal ctest changing into directory: ~/verify-tree-models-3-6/build/release
+Test project ~/verify-tree-models-3-6/build/release
+    Start 742: model.wire
+1/7 Test #742: model.wire .......................   Passed    0.15 sec
+    Start 745: model.ack
+2/7 Test #745: model.ack ........................   Passed   70.84 sec
+    Start 750: model.lead_wake
+3/7 Test #750: model.lead_wake ..................   Passed   84.12 sec
+    Start 751: model.rendezvous
+4/7 Test #751: model.rendezvous .................   Passed    0.04 sec
+    Start 763: model.deadlock
+5/7 Test #763: model.deadlock ...................   Passed   20.50 sec
+    Start 778: model.shape_timing.grid
+6/7 Test #778: model.shape_timing.grid ..........   Passed    0.24 sec
+    Start 779: model.circulant
+7/7 Test #779: model.circulant ..................   Passed  379.46 sec
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+model    = 555.35 sec*proc (7 tests)
+tier1    = 175.89 sec*proc (6 tests)
+
+Total Test time (real) = 555.37 sec

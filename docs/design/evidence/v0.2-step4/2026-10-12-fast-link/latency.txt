@@ -1,0 +1,12 @@
+# The latency checks of 2026-10-12, from slurm-node-01 (compact placement, gVNIC, MTU 8896),
+# taken by the lead through the head node between the floor and the verification's second half.
+scheduling: automatic restart FALSE, maintenance TERMINATE (the compact placement's file applied)
+ping -c 40 -i 0.05 -q, coalescing at the image's rx-usecs 20, tx-usecs 50 (adaptive n/a):
+  slurm-node-02: rtt min/avg/max/mdev = 0.236/0.293/0.824/0.095 ms
+  slurm-node-05: rtt min/avg/max/mdev = 0.229/0.302/0.857/0.094 ms
+  slurm-node-08: rtt min/avg/max/mdev = 0.232/0.299/0.781/0.086 ms
+ping -c 100 -i 0.02 -q, slurm-node-01 to slurm-node-02:
+  coalescing off (ethtool -C ens3 rx-usecs 0 tx-usecs 0 on both): rtt min/avg/max/mdev = 0.140/0.268/0.676/0.052 ms
+  coalescing back at 20 and 50:                                    rtt min/avg/max/mdev = 0.210/0.268/0.416/0.032 ms
+osoe's start-up link model, hop (median of its rounds): 148 us in the floor's jobs (a PE a node, the
+nodes otherwise idle); 44.7 to 52.3 us in the gets' and fan-in's (every PE of the node running)

@@ -1,0 +1,8 @@
+small enobufs=251 rearms=251
+small enobufs=250 rearms=250
+small enobufs=247 rearms=247
+small enobufs=247 rearms=247
+small enobufs=249 rearms=249
+small enobufs=246 rearms=246
+small enobufs=246 rearms=246
+small enobufs=240 rearms=240

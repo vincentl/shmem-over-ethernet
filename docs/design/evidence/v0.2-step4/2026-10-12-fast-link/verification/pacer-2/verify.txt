@@ -1,0 +1,12 @@
+# slurm-node-04, 16 CPUs, started 2026-10-12T01:46:21Z
+== build release 01:46:21
+warnings: 0
+== pacer mix at 2 helpers 01:46:31
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mailbox at 2 helpers 01:47:33
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer collectives at 2 helpers 01:48:33
+exit 0 osoe-pacer failures=0 0 deadlock lines
+== pacer mix-ten-minutes at 2 helpers 01:49:33
+exit 0 osoe-pacer failures=0 0 deadlock lines
+DONE 01:59:37

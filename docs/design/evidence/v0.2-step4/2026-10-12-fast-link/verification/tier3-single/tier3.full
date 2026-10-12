@@ -1,0 +1,238 @@
+Internal ctest changing into directory: ~/verify-tree-tier3-single/build/tier3
+Test project ~/verify-tree-tier3-single/build/tier3
+        Start 741: tier3.pi.wire-pair
+  1/114 Test #741: tier3.pi.wire-pair ....................................   Passed    0.38 sec
+        Start 742: tier3.pi.progress
+  2/114 Test #742: tier3.pi.progress .....................................   Passed    0.15 sec
+        Start 743: tier3.pi.internode.0-1-2
+  3/114 Test #743: tier3.pi.internode.0-1-2 ..............................   Passed    0.34 sec
+        Start 744: tier3.pi.internode.0-0-1-1-2-2
+  4/114 Test #744: tier3.pi.internode.0-0-1-1-2-2 ........................   Passed    0.35 sec
+        Start 745: tier3.pi.internode.0-0-0-1-2-2
+  5/114 Test #745: tier3.pi.internode.0-0-0-1-2-2 ........................   Passed    0.35 sec
+        Start 746: tier3.pi.internode.0-1-2-0-1-0
+  6/114 Test #746: tier3.pi.internode.0-1-2-0-1-0 ........................   Passed    0.35 sec
+        Start 747: tier3.pi.barrier-am.0-1-2
+  7/114 Test #747: tier3.pi.barrier-am.0-1-2 .............................   Passed    0.25 sec
+        Start 748: tier3.pi.get-nbi.0-1-2-0-1-0
+  8/114 Test #748: tier3.pi.get-nbi.0-1-2-0-1-0 ..........................   Passed    0.39 sec
+        Start 749: tier3.pi.scan.0-1-2-0-1-0
+  9/114 Test #749: tier3.pi.scan.0-1-2-0-1-0 .............................   Passed    0.47 sec
+        Start 750: tier3.pi.context.0-1-2-0-1-0
+ 10/114 Test #750: tier3.pi.context.0-1-2-0-1-0 ..........................   Passed    0.35 sec
+        Start 751: tier3.pi.team-split.0-1-2-0-1-0
+ 11/114 Test #751: tier3.pi.team-split.0-1-2-0-1-0 .......................   Passed    1.86 sec
+        Start 752: tier3.pi.team-split.reuse.0-1-2-0-1-0
+ 12/114 Test #752: tier3.pi.team-split.reuse.0-1-2-0-1-0 .................   Passed    0.33 sec
+        Start 753: tier3.pi.team-threads.0-1
+ 13/114 Test #753: tier3.pi.team-threads.0-1 .............................   Passed    0.29 sec
+        Start 754: tier3.pi.reduce.0-1-2-0-1-0
+ 14/114 Test #754: tier3.pi.reduce.0-1-2-0-1-0 ...........................   Passed    0.36 sec
+        Start 755: tier3.pi.broadcast.0-1-2-0-1-0
+ 15/114 Test #755: tier3.pi.broadcast.0-1-2-0-1-0 ........................   Passed    0.36 sec
+        Start 756: tier3.pi.active-set.0-1-2-0-1-0
+ 16/114 Test #756: tier3.pi.active-set.0-1-2-0-1-0 .......................   Passed    0.50 sec
+        Start 757: tier3.pi.collect.0-1-2-0-1-0
+ 17/114 Test #757: tier3.pi.collect.0-1-2-0-1-0 ..........................   Passed    0.38 sec
+        Start 758: tier3.pi.alltoall.0-1-2-0-1-0
+ 18/114 Test #758: tier3.pi.alltoall.0-1-2-0-1-0 .........................   Passed    0.41 sec
+        Start 759: tier3.pi.statics.0-1-2-0-1-0
+ 19/114 Test #759: tier3.pi.statics.0-1-2-0-1-0 ..........................   Passed    0.64 sec
+        Start 760: tier3.pi.lock.0-1-2-0-1-0
+ 20/114 Test #760: tier3.pi.lock.0-1-2-0-1-0 .............................   Passed    1.29 sec
+        Start 761: tier3.pi.deadlock.mismatch.0-1-2-0-1-0
+ 21/114 Test #761: tier3.pi.deadlock.mismatch.0-1-2-0-1-0 ................   Passed    2.54 sec
+        Start 762: tier3.pi.deadlock.computing.0-1-2-0-1-0
+ 22/114 Test #762: tier3.pi.deadlock.computing.0-1-2-0-1-0 ...............   Passed    4.33 sec
+        Start 763: tier3.pi.reduce.0-1-2-3-4.k2
+ 23/114 Test #763: tier3.pi.reduce.0-1-2-3-4.k2 ..........................   Passed    0.53 sec
+        Start 764: tier3.pi.reply-starvation.0-1-1-1-1-1-1
+ 24/114 Test #764: tier3.pi.reply-starvation.0-1-1-1-1-1-1 ...............   Passed    0.64 sec
+        Start 765: tier3.pi.tree.k2.n8.p8
+ 25/114 Test #765: tier3.pi.tree.k2.n8.p8 ................................   Passed    1.59 sec
+        Start 766: tier3.pi.tree.k4.n13.p16
+ 26/114 Test #766: tier3.pi.tree.k4.n13.p16 ..............................   Passed    2.67 sec
+        Start 767: tier3.pi.job.0-1-2-3
+ 27/114 Test #767: tier3.pi.job.0-1-2-3 ..................................   Passed    0.52 sec
+        Start 768: tier3.pi.floor
+ 28/114 Test #768: tier3.pi.floor ........................................   Passed   24.43 sec
+        Start 769: tier3.pi.global-exit.0-1
+ 29/114 Test #769: tier3.pi.global-exit.0-1 ..............................   Passed    0.53 sec
+        Start 770: tier3.pi.global-exit.0-1-2-0-1-0
+ 30/114 Test #770: tier3.pi.global-exit.0-1-2-0-1-0 ......................   Passed    0.52 sec
+        Start 771: tier3.pi.global-exit.immediate.0-0-1-2-3-4-5-6-7
+ 31/114 Test #771: tier3.pi.global-exit.immediate.0-0-1-2-3-4-5-6-7 ......   Passed    0.60 sec
+        Start 772: tier3.pi.global-exit.immediate.0-0-1-1
+ 32/114 Test #772: tier3.pi.global-exit.immediate.0-0-1-1 ................   Passed    0.37 sec
+        Start 773: tier3.pi.global-exit.stream.0-0-1-1
+ 33/114 Test #773: tier3.pi.global-exit.stream.0-0-1-1 ...................   Passed    0.58 sec
+        Start 774: tier3.pi.global-exit.stream.two-buffers.0-0-1-1
+ 34/114 Test #774: tier3.pi.global-exit.stream.two-buffers.0-0-1-1 .......   Passed    0.60 sec
+        Start 775: tier3.pi.vanished-node.0-1
+ 35/114 Test #775: tier3.pi.vanished-node.0-1 ............................   Passed    5.34 sec
+        Start 776: tier3.pi.vanished-node.0-0-1-1
+ 36/114 Test #776: tier3.pi.vanished-node.0-0-1-1 ........................   Passed    6.27 sec
+        Start 777: tier3.pi.vanished-node-inflight.0-1
+ 37/114 Test #777: tier3.pi.vanished-node-inflight.0-1 ...................   Passed    5.41 sec
+        Start 778: tier3.pi.differential
+ 38/114 Test #778: tier3.pi.differential .................................   Passed    1.34 sec
+        Start 779: tier3.lossy.wire-pair
+ 39/114 Test #779: tier3.lossy.wire-pair .................................   Passed    0.28 sec
+        Start 780: tier3.lossy.progress
+ 40/114 Test #780: tier3.lossy.progress ..................................   Passed    0.15 sec
+        Start 781: tier3.lossy.internode.0-1-2
+ 41/114 Test #781: tier3.lossy.internode.0-1-2 ...........................   Passed    0.35 sec
+        Start 782: tier3.lossy.internode.0-0-1-1-2-2
+ 42/114 Test #782: tier3.lossy.internode.0-0-1-1-2-2 .....................   Passed    0.35 sec
+        Start 783: tier3.lossy.internode.0-0-0-1-2-2
+ 43/114 Test #783: tier3.lossy.internode.0-0-0-1-2-2 .....................   Passed    0.35 sec
+        Start 784: tier3.lossy.internode.0-1-2-0-1-0
+ 44/114 Test #784: tier3.lossy.internode.0-1-2-0-1-0 .....................   Passed    0.35 sec
+        Start 785: tier3.lossy.barrier-am.0-1-2
+ 45/114 Test #785: tier3.lossy.barrier-am.0-1-2 ..........................   Passed    0.25 sec
+        Start 786: tier3.lossy.get-nbi.0-1-2-0-1-0
+ 46/114 Test #786: tier3.lossy.get-nbi.0-1-2-0-1-0 .......................   Passed    0.41 sec
+        Start 787: tier3.lossy.scan.0-1-2-0-1-0
+ 47/114 Test #787: tier3.lossy.scan.0-1-2-0-1-0 ..........................   Passed    0.46 sec
+        Start 788: tier3.lossy.context.0-1-2-0-1-0
+ 48/114 Test #788: tier3.lossy.context.0-1-2-0-1-0 .......................   Passed    0.37 sec
+        Start 789: tier3.lossy.team-split.0-1-2-0-1-0
+ 49/114 Test #789: tier3.lossy.team-split.0-1-2-0-1-0 ....................   Passed    2.09 sec
+        Start 790: tier3.lossy.team-split.reuse.0-1-2-0-1-0
+ 50/114 Test #790: tier3.lossy.team-split.reuse.0-1-2-0-1-0 ..............   Passed    0.33 sec
+        Start 791: tier3.lossy.team-threads.0-1
+ 51/114 Test #791: tier3.lossy.team-threads.0-1 ..........................   Passed    0.30 sec
+        Start 792: tier3.lossy.reduce.0-1-2-0-1-0
+ 52/114 Test #792: tier3.lossy.reduce.0-1-2-0-1-0 ........................   Passed    0.37 sec
+        Start 793: tier3.lossy.broadcast.0-1-2-0-1-0
+ 53/114 Test #793: tier3.lossy.broadcast.0-1-2-0-1-0 .....................   Passed    0.30 sec
+        Start 794: tier3.lossy.active-set.0-1-2-0-1-0
+ 54/114 Test #794: tier3.lossy.active-set.0-1-2-0-1-0 ....................   Passed    1.39 sec
+        Start 795: tier3.lossy.collect.0-1-2-0-1-0
+ 55/114 Test #795: tier3.lossy.collect.0-1-2-0-1-0 .......................   Passed    0.58 sec
+        Start 796: tier3.lossy.alltoall.0-1-2-0-1-0
+ 56/114 Test #796: tier3.lossy.alltoall.0-1-2-0-1-0 ......................   Passed    0.39 sec
+        Start 797: tier3.lossy.statics.0-1-2-0-1-0
+ 57/114 Test #797: tier3.lossy.statics.0-1-2-0-1-0 .......................   Passed    0.70 sec
+        Start 798: tier3.lossy.lock.0-1-2-0-1-0
+ 58/114 Test #798: tier3.lossy.lock.0-1-2-0-1-0 ..........................   Passed    1.98 sec
+        Start 799: tier3.lossy.deadlock.mismatch.0-1-2-0-1-0
+ 59/114 Test #799: tier3.lossy.deadlock.mismatch.0-1-2-0-1-0 .............   Passed    2.53 sec
+        Start 800: tier3.lossy.deadlock.computing.0-1-2-0-1-0
+ 60/114 Test #800: tier3.lossy.deadlock.computing.0-1-2-0-1-0 ............   Passed    4.34 sec
+        Start 801: tier3.lossy.reply-starvation.0-1-1-1-1-1-1
+ 61/114 Test #801: tier3.lossy.reply-starvation.0-1-1-1-1-1-1 ............   Passed    0.51 sec
+        Start 802: tier3.lossy.tree.k2.n8.p8
+ 62/114 Test #802: tier3.lossy.tree.k2.n8.p8 .............................   Passed    2.46 sec
+        Start 803: tier3.lossy.tree.k4.n13.p16
+ 63/114 Test #803: tier3.lossy.tree.k4.n13.p16 ...........................   Passed    5.16 sec
+        Start 804: tier3.lossy.job.0-1-2-3
+ 64/114 Test #804: tier3.lossy.job.0-1-2-3 ...............................   Passed    0.54 sec
+        Start 805: tier3.lossy.floor
+ 65/114 Test #805: tier3.lossy.floor .....................................   Passed   53.41 sec
+        Start 806: tier3.lossy.global-exit.0-1
+ 66/114 Test #806: tier3.lossy.global-exit.0-1 ...........................   Passed    0.50 sec
+        Start 807: tier3.lossy.global-exit.0-1-2-0-1-0
+ 67/114 Test #807: tier3.lossy.global-exit.0-1-2-0-1-0 ...................   Passed    0.54 sec
+        Start 808: tier3.lossy.global-exit.immediate.0-0-1-2-3-4-5-6-7
+ 68/114 Test #808: tier3.lossy.global-exit.immediate.0-0-1-2-3-4-5-6-7 ...   Passed    0.60 sec
+        Start 809: tier3.lossy.global-exit.immediate.0-0-1-1
+ 69/114 Test #809: tier3.lossy.global-exit.immediate.0-0-1-1 .............   Passed    0.35 sec
+        Start 810: tier3.lossy.global-exit.stream.0-0-1-1
+ 70/114 Test #810: tier3.lossy.global-exit.stream.0-0-1-1 ................   Passed    0.85 sec
+        Start 811: tier3.lossy.global-exit.stream.two-buffers.0-0-1-1
+ 71/114 Test #811: tier3.lossy.global-exit.stream.two-buffers.0-0-1-1 ....   Passed    0.57 sec
+        Start 812: tier3.lossy.vanished-node.0-1
+ 72/114 Test #812: tier3.lossy.vanished-node.0-1 .........................   Passed    5.36 sec
+        Start 813: tier3.lossy.vanished-node.0-0-1-1
+ 73/114 Test #813: tier3.lossy.vanished-node.0-0-1-1 .....................   Passed    6.30 sec
+        Start 814: tier3.lossy.vanished-node-inflight.0-1
+ 74/114 Test #814: tier3.lossy.vanished-node-inflight.0-1 ................   Passed    5.39 sec
+        Start 815: tier3.lossy.differential
+ 75/114 Test #815: tier3.lossy.differential ..............................   Passed    1.47 sec
+        Start 816: tier3.small.wire-pair
+ 76/114 Test #816: tier3.small.wire-pair .................................   Passed    0.21 sec
+        Start 817: tier3.small.progress
+ 77/114 Test #817: tier3.small.progress ..................................   Passed    0.16 sec
+        Start 818: tier3.small.internode.0-1-2
+ 78/114 Test #818: tier3.small.internode.0-1-2 ...........................   Passed    0.32 sec
+        Start 819: tier3.small.internode.0-0-1-1-2-2
+ 79/114 Test #819: tier3.small.internode.0-0-1-1-2-2 .....................   Passed    0.31 sec
+        Start 820: tier3.small.internode.0-0-0-1-2-2
+ 80/114 Test #820: tier3.small.internode.0-0-0-1-2-2 .....................   Passed    0.32 sec
+        Start 821: tier3.small.internode.0-1-2-0-1-0
+ 81/114 Test #821: tier3.small.internode.0-1-2-0-1-0 .....................   Passed    0.35 sec
+        Start 822: tier3.small.barrier-am.0-1-2
+ 82/114 Test #822: tier3.small.barrier-am.0-1-2 ..........................   Passed    0.25 sec
+        Start 823: tier3.small.get-nbi.0-1-2-0-1-0
+ 83/114 Test #823: tier3.small.get-nbi.0-1-2-0-1-0 .......................   Passed    0.36 sec
+        Start 824: tier3.small.scan.0-1-2-0-1-0
+ 84/114 Test #824: tier3.small.scan.0-1-2-0-1-0 ..........................   Passed    0.43 sec
+        Start 825: tier3.small.context.0-1-2-0-1-0
+ 85/114 Test #825: tier3.small.context.0-1-2-0-1-0 .......................   Passed    0.31 sec
+        Start 826: tier3.small.team-split.0-1-2-0-1-0
+ 86/114 Test #826: tier3.small.team-split.0-1-2-0-1-0 ....................   Passed    1.86 sec
+        Start 827: tier3.small.team-split.reuse.0-1-2-0-1-0
+ 87/114 Test #827: tier3.small.team-split.reuse.0-1-2-0-1-0 ..............   Passed    0.30 sec
+        Start 828: tier3.small.team-threads.0-1
+ 88/114 Test #828: tier3.small.team-threads.0-1 ..........................   Passed    0.26 sec
+        Start 829: tier3.small.reduce.0-1-2-0-1-0
+ 89/114 Test #829: tier3.small.reduce.0-1-2-0-1-0 ........................   Passed    0.35 sec
+        Start 830: tier3.small.broadcast.0-1-2-0-1-0
+ 90/114 Test #830: tier3.small.broadcast.0-1-2-0-1-0 .....................   Passed    0.32 sec
+        Start 831: tier3.small.active-set.0-1-2-0-1-0
+ 91/114 Test #831: tier3.small.active-set.0-1-2-0-1-0 ....................   Passed    0.48 sec
+        Start 832: tier3.small.collect.0-1-2-0-1-0
+ 92/114 Test #832: tier3.small.collect.0-1-2-0-1-0 .......................   Passed    0.34 sec
+        Start 833: tier3.small.alltoall.0-1-2-0-1-0
+ 93/114 Test #833: tier3.small.alltoall.0-1-2-0-1-0 ......................   Passed    0.38 sec
+        Start 834: tier3.small.statics.0-1-2-0-1-0
+ 94/114 Test #834: tier3.small.statics.0-1-2-0-1-0 .......................   Passed    0.59 sec
+        Start 835: tier3.small.lock.0-1-2-0-1-0
+ 95/114 Test #835: tier3.small.lock.0-1-2-0-1-0 ..........................   Passed    1.10 sec
+        Start 836: tier3.small.deadlock.mismatch.0-1-2-0-1-0
+ 96/114 Test #836: tier3.small.deadlock.mismatch.0-1-2-0-1-0 .............   Passed    2.52 sec
+        Start 837: tier3.small.deadlock.computing.0-1-2-0-1-0
+ 97/114 Test #837: tier3.small.deadlock.computing.0-1-2-0-1-0 ............   Passed    4.32 sec
+        Start 838: tier3.small.reply-starvation.0-1-1-1-1-1-1
+ 98/114 Test #838: tier3.small.reply-starvation.0-1-1-1-1-1-1 ............   Passed    0.36 sec
+        Start 839: tier3.small.tree.k2.n8.p8
+ 99/114 Test #839: tier3.small.tree.k2.n8.p8 .............................   Passed    1.40 sec
+        Start 840: tier3.small.tree.k4.n13.p16
+100/114 Test #840: tier3.small.tree.k4.n13.p16 ...........................   Passed    2.53 sec
+        Start 841: tier3.small.job.0-1-2-3
+101/114 Test #841: tier3.small.job.0-1-2-3 ...............................   Passed    0.51 sec
+        Start 842: tier3.small.floor
+102/114 Test #842: tier3.small.floor .....................................   Passed   15.85 sec
+        Start 843: tier3.small.global-exit.0-1
+103/114 Test #843: tier3.small.global-exit.0-1 ...........................   Passed    0.50 sec
+        Start 844: tier3.small.global-exit.0-1-2-0-1-0
+104/114 Test #844: tier3.small.global-exit.0-1-2-0-1-0 ...................   Passed    0.52 sec
+        Start 845: tier3.small.global-exit.immediate.0-0-1-2-3-4-5-6-7
+105/114 Test #845: tier3.small.global-exit.immediate.0-0-1-2-3-4-5-6-7 ...   Passed    0.59 sec
+        Start 846: tier3.small.global-exit.immediate.0-0-1-1
+106/114 Test #846: tier3.small.global-exit.immediate.0-0-1-1 .............   Passed    0.35 sec
+        Start 847: tier3.small.global-exit.stream.0-0-1-1
+107/114 Test #847: tier3.small.global-exit.stream.0-0-1-1 ................   Passed    0.61 sec
+        Start 848: tier3.small.global-exit.stream.two-buffers.0-0-1-1
+108/114 Test #848: tier3.small.global-exit.stream.two-buffers.0-0-1-1 ....   Passed    0.58 sec
+        Start 849: tier3.small.vanished-node.0-1
+109/114 Test #849: tier3.small.vanished-node.0-1 .........................   Passed    6.34 sec
+        Start 850: tier3.small.vanished-node.0-0-1-1
+110/114 Test #850: tier3.small.vanished-node.0-0-1-1 .....................   Passed    6.26 sec
+        Start 851: tier3.small.vanished-node-inflight.0-1
+111/114 Test #851: tier3.small.vanished-node-inflight.0-1 ................   Passed    5.39 sec
+        Start 852: tier3.small.differential
+112/114 Test #852: tier3.small.differential ..............................   Passed    1.26 sec
+        Start 853: tier3.pi.keepalive.default-on.0-1
+113/114 Test #853: tier3.pi.keepalive.default-on.0-1 .....................   Passed    0.25 sec
+        Start 854: tier3.pi.start-up.wrong-address
+114/114 Test #854: tier3.pi.start-up.wrong-address .......................   Passed   20.18 sec
+
+100% tests passed, 0 tests failed out of 114
+
+Label Time Summary:
+internode    = 250.54 sec*proc (114 tests)
+tier3        = 250.54 sec*proc (114 tests)
+
+Total Test time (real) = 250.59 sec

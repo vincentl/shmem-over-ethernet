@@ -1,0 +1,185 @@
+# 01:39:12 4 connections each way between slurm-node-02 and slurm-node-01
+# exit toward the first node 124
+# exit toward the second node 124
+srun: job 18 queued and waiting for resources
+srun: job 18 has been allocated resources
+connection=2 small short_sends=18 (client)
+connection=2 small stream_mib_per_s=392.3 mebibytes=1
+connection=2 uring round_trip_ns min=42712 median=67397 p99=116281 rounds=2000
+connection=2 blocking round_trip_ns min=39320 median=64556 p99=120982 rounds=2000
+connection=2 uring stream_mib_per_s=682.6 mebibytes=1024
+connection=2 blocking stream_mib_per_s=732.0 mebibytes=1024
+connection=2 uring round_trip_ns min=43470 median=91491 p99=131277 rounds=2000
+connection=2 blocking round_trip_ns min=45617 median=85730 p99=129395 rounds=2000
+connection=2 uring stream_mib_per_s=756.2 mebibytes=1024
+connection=2 blocking stream_mib_per_s=825.1 mebibytes=1024
+connection=2 uring round_trip_ns min=52560 median=89960 p99=134770 rounds=2000
+connection=2 blocking round_trip_ns min=50835 median=85077 p99=119524 rounds=2000
+connection=2 uring stream_mib_per_s=932.5 mebibytes=1024
+connection=2 blocking stream_mib_per_s=803.3 mebibytes=1024
+connection=2 uring round_trip_ns min=40704 median=77203 p99=108257 rounds=2000
+connection=2 blocking round_trip_ns min=38945 median=71812 p99=100938 rounds=2000
+connection=2 uring stream_mib_per_s=1136.9 mebibytes=1024
+connection=2 blocking stream_mib_per_s=919.5 mebibytes=1024
+connection=2 uring round_trip_ns min=46199 median=80085 p99=129453 rounds=2000
+connection=2 blocking round_trip_ns min=42721 median=83519 p99=128258 rounds=2000
+connection=2 uring stream_mib_per_s=882.2 mebibytes=1024
+connection=2 blocking stream_mib_per_s=871.3 mebibytes=1024
+connection=2 uring round_trip_ns min=43486 median=86282 p99=452476 rounds=2000
+connection=2 blocking round_trip_ns min=49801 median=79761 p99=116121 rounds=2000
+connection=2 uring stream_mib_per_s=844.2 mebibytes=1024
+connection=2 blocking stream_mib_per_s=1367.4 mebibytes=1024
+connection=2 uring round_trip_ns min=37395 median=66241 p99=125642 rounds=2000
+connection=2 blocking round_trip_ns min=34796 median=61937 p99=1169817 rounds=2000
+connection=2 uring stream_mib_per_s=1317.2 mebibytes=1024
+connection=2 blocking stream_mib_per_s=899.7 mebibytes=1024
+connection=2 memory copy_mib_per_s=14133.3 copy8_seq_cst_fence_ns=6.42
+connection=2 ratio one_way_latency_over_copy8=5161 copy_bandwidth_over_stream=10.73
+connection=2 ratio uring_over_blocking fastest_round_trip=1.045 median_round_trip=1.067 stream=1.013 (median of 7 pairs)
+connection=2 exit 0 after 1 attempts
+connection=3 small short_sends=18 (client)
+connection=3 small stream_mib_per_s=489.9 mebibytes=1
+connection=3 uring round_trip_ns min=41578 median=50428 p99=69834 rounds=2000
+connection=3 blocking round_trip_ns min=45897 median=50392 p99=141513 rounds=2000
+connection=3 uring stream_mib_per_s=796.9 mebibytes=1024
+connection=3 blocking stream_mib_per_s=733.8 mebibytes=1024
+connection=3 uring round_trip_ns min=51384 median=92405 p99=138231 rounds=2000
+connection=3 blocking round_trip_ns min=40157 median=86956 p99=481803 rounds=2000
+connection=3 uring stream_mib_per_s=1681.2 mebibytes=1024
+connection=3 blocking stream_mib_per_s=766.9 mebibytes=1024
+connection=3 uring round_trip_ns min=47113 median=89080 p99=130727 rounds=2000
+connection=3 blocking round_trip_ns min=48892 median=97976 p99=143275 rounds=2000
+connection=3 uring stream_mib_per_s=902.3 mebibytes=1024
+connection=3 blocking stream_mib_per_s=835.8 mebibytes=1024
+connection=3 uring round_trip_ns min=46161 median=89824 p99=128267 rounds=2000
+connection=3 blocking round_trip_ns min=49290 median=91590 p99=139091 rounds=2000
+connection=3 uring stream_mib_per_s=558.4 mebibytes=1024
+connection=3 blocking stream_mib_per_s=817.3 mebibytes=1024
+connection=3 uring round_trip_ns min=46702 median=91808 p99=474092 rounds=2000
+connection=3 blocking round_trip_ns min=46777 median=108208 p99=480304 rounds=2000
+connection=3 uring stream_mib_per_s=795.5 mebibytes=1024
+connection=3 blocking stream_mib_per_s=942.9 mebibytes=1024
+connection=3 uring round_trip_ns min=44791 median=82771 p99=133226 rounds=2000
+connection=3 blocking round_trip_ns min=41025 median=75466 p99=110644 rounds=2000
+connection=3 uring stream_mib_per_s=711.1 mebibytes=1024
+connection=3 blocking stream_mib_per_s=2056.8 mebibytes=1024
+connection=3 uring round_trip_ns min=47960 median=76481 p99=102459 rounds=2000
+connection=3 blocking round_trip_ns min=43628 median=67171 p99=1141165 rounds=2000
+connection=3 uring stream_mib_per_s=905.1 mebibytes=1024
+connection=3 blocking stream_mib_per_s=1721.7 mebibytes=1024
+connection=3 memory copy_mib_per_s=14223.2 copy8_seq_cst_fence_ns=6.28
+connection=3 ratio one_way_latency_over_copy8=4013 copy_bandwidth_over_stream=8.46
+connection=3 ratio uring_over_blocking fastest_round_trip=0.998 median_round_trip=1.001 stream=0.844 (median of 7 pairs)
+connection=3 exit 0 after 1 attempts
+connection=0 small short_sends=19 (client)
+connection=0 small stream_mib_per_s=421.9 mebibytes=1
+connection=0 uring round_trip_ns min=38909 median=63082 p99=110681 rounds=2000
+connection=0 blocking round_trip_ns min=39594 median=68138 p99=93290 rounds=2000
+connection=0 uring stream_mib_per_s=595.7 mebibytes=1024
+connection=0 blocking stream_mib_per_s=822.9 mebibytes=1024
+connection=0 uring round_trip_ns min=40878 median=85789 p99=524553 rounds=2000
+connection=0 blocking round_trip_ns min=50598 median=105101 p99=526678 rounds=2000
+connection=0 uring stream_mib_per_s=691.6 mebibytes=1024
+connection=0 blocking stream_mib_per_s=857.2 mebibytes=1024
+connection=0 uring round_trip_ns min=50467 median=88050 p99=136076 rounds=2000
+connection=0 blocking round_trip_ns min=47271 median=87092 p99=133641 rounds=2000
+connection=0 uring stream_mib_per_s=676.6 mebibytes=1024
+connection=0 blocking stream_mib_per_s=566.5 mebibytes=1024
+connection=0 uring round_trip_ns min=52849 median=123881 p99=477117 rounds=2000
+connection=0 blocking round_trip_ns min=45910 median=99800 p99=457040 rounds=2000
+connection=0 uring stream_mib_per_s=988.2 mebibytes=1024
+connection=0 blocking stream_mib_per_s=896.9 mebibytes=1024
+connection=0 uring round_trip_ns min=54877 median=103728 p99=153268 rounds=2000
+connection=0 blocking round_trip_ns min=44240 median=84254 p99=477479 rounds=2000
+connection=0 uring stream_mib_per_s=733.4 mebibytes=1024
+connection=0 blocking stream_mib_per_s=733.4 mebibytes=1024
+connection=0 uring round_trip_ns min=43517 median=72236 p99=142876 rounds=2000
+connection=0 blocking round_trip_ns min=44401 median=70194 p99=1330124 rounds=2000
+connection=0 uring stream_mib_per_s=1077.9 mebibytes=1024
+connection=0 blocking stream_mib_per_s=1025.4 mebibytes=1024
+connection=0 uring round_trip_ns min=44875 median=62000 p99=131780 rounds=2000
+connection=0 blocking round_trip_ns min=44993 median=62587 p99=142952 rounds=2000
+connection=0 uring stream_mib_per_s=2713.0 mebibytes=1024
+connection=0 blocking stream_mib_per_s=2710.1 mebibytes=1024
+connection=0 memory copy_mib_per_s=14395.5 copy8_seq_cst_fence_ns=6.30
+connection=0 ratio one_way_latency_over_copy8=4924 copy_bandwidth_over_stream=5.31
+connection=0 ratio uring_over_blocking fastest_round_trip=0.997 median_round_trip=1.011 stream=1.001 (median of 7 pairs)
+connection=0 exit 0 after 1 attempts
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-02: error: *** STEP 18.0 ON slurm-node-02 CANCELLED AT 2026-10-12T01:44:12 ***
+srun: error: slurm-node-02: task 0: Killed
+connection=7 small short_sends=18 (client)
+connection=7 small stream_mib_per_s=305.6 mebibytes=1
+connection=7 uring round_trip_ns min=41380 median=79246 p99=115509 rounds=2000
+connection=7 blocking round_trip_ns min=37753 median=76573 p99=117340 rounds=2000
+connection=7 uring stream_mib_per_s=1255.9 mebibytes=1024
+connection=7 blocking stream_mib_per_s=707.1 mebibytes=1024
+connection=7 uring round_trip_ns min=46235 median=92618 p99=140884 rounds=2000
+connection=7 blocking round_trip_ns min=46794 median=83203 p99=138263 rounds=2000
+connection=7 uring stream_mib_per_s=1416.7 mebibytes=1024
+connection=7 blocking stream_mib_per_s=2341.4 mebibytes=1024
+connection=7 uring round_trip_ns min=50324 median=103828 p99=155440 rounds=2000
+connection=7 blocking round_trip_ns min=52905 median=95440 p99=139478 rounds=2000
+connection=7 uring stream_mib_per_s=751.7 mebibytes=1024
+connection=7 blocking stream_mib_per_s=2075.5 mebibytes=1024
+connection=7 uring round_trip_ns min=46480 median=90620 p99=146501 rounds=2000
+connection=7 blocking round_trip_ns min=48057 median=88661 p99=140446 rounds=2000
+connection=7 uring stream_mib_per_s=1622.6 mebibytes=1024
+connection=7 blocking stream_mib_per_s=2707.2 mebibytes=1024
+connection=7 uring round_trip_ns min=44911 median=83624 p99=119978 rounds=2000
+connection=7 blocking round_trip_ns min=41515 median=88084 p99=130843 rounds=2000
+connection=7 uring stream_mib_per_s=1342.8 mebibytes=1024
+connection=7 blocking stream_mib_per_s=2306.1 mebibytes=1024
+connection=7 uring round_trip_ns min=47768 median=89450 p99=126318 rounds=2000
+connection=7 blocking round_trip_ns min=44027 median=86480 p99=131316 rounds=2000
+connection=7 uring stream_mib_per_s=1525.3 mebibytes=1024
+connection=7 blocking stream_mib_per_s=2125.3 mebibytes=1024
+connection=7 uring round_trip_ns min=47986 median=90008 p99=162043 rounds=2000
+connection=7 blocking round_trip_ns min=47163 median=88976 p99=150432 rounds=2000
+connection=7 uring stream_mib_per_s=1649.3 mebibytes=1024
+connection=7 blocking stream_mib_per_s=1991.2 mebibytes=1024
+connection=7 memory copy_mib_per_s=14034.6 copy8_seq_cst_fence_ns=6.31
+connection=7 ratio one_way_latency_over_copy8=6284 copy_bandwidth_over_stream=8.51
+connection=7 ratio uring_over_blocking fastest_round_trip=1.017 median_round_trip=1.034 stream=0.605 (median of 7 pairs)
+connection=7 exit 0 after 2 attempts
+connection=4 small short_sends=18 (client)
+connection=4 small stream_mib_per_s=355.4 mebibytes=1
+connection=4 uring round_trip_ns min=39879 median=72331 p99=106106 rounds=2000
+connection=4 blocking round_trip_ns min=44861 median=83278 p99=118690 rounds=2000
+connection=4 uring stream_mib_per_s=687.3 mebibytes=1024
+connection=4 blocking stream_mib_per_s=646.4 mebibytes=1024
+connection=4 uring round_trip_ns min=53318 median=93397 p99=523859 rounds=2000
+connection=4 blocking round_trip_ns min=41492 median=91016 p99=530669 rounds=2000
+connection=4 uring stream_mib_per_s=1026.3 mebibytes=1024
+connection=4 blocking stream_mib_per_s=1292.6 mebibytes=1024
+connection=4 uring round_trip_ns min=56756 median=99925 p99=158887 rounds=2000
+connection=4 blocking round_trip_ns min=50839 median=88920 p99=137325 rounds=2000
+connection=4 uring stream_mib_per_s=2136.3 mebibytes=1024
+connection=4 blocking stream_mib_per_s=1717.1 mebibytes=1024
+connection=4 uring round_trip_ns min=60157 median=104232 p99=360020 rounds=2000
+connection=4 blocking round_trip_ns min=46627 median=91726 p99=339121 rounds=2000
+connection=4 uring stream_mib_per_s=2658.0 mebibytes=1024
+connection=4 blocking stream_mib_per_s=1500.9 mebibytes=1024
+connection=4 uring round_trip_ns min=45110 median=89966 p99=130657 rounds=2000
+connection=4 blocking round_trip_ns min=41323 median=79488 p99=116904 rounds=2000
+connection=4 uring stream_mib_per_s=2313.1 mebibytes=1024
+connection=4 blocking stream_mib_per_s=1578.1 mebibytes=1024
+connection=4 uring round_trip_ns min=50503 median=81535 p99=114356 rounds=2000
+connection=4 blocking round_trip_ns min=47031 median=83145 p99=118742 rounds=2000
+connection=4 uring stream_mib_per_s=2091.8 mebibytes=1024
+connection=4 blocking stream_mib_per_s=2031.0 mebibytes=1024
+connection=4 uring round_trip_ns min=54564 median=103794 p99=130158 rounds=2000
+connection=4 blocking round_trip_ns min=44845 median=102388 p99=353311 rounds=2000
+connection=4 uring stream_mib_per_s=1864.9 mebibytes=1024
+connection=4 blocking stream_mib_per_s=2710.4 mebibytes=1024
+connection=4 memory copy_mib_per_s=14325.0 copy8_seq_cst_fence_ns=6.32
+connection=4 ratio one_way_latency_over_copy8=5719 copy_bandwidth_over_stream=5.39
+connection=4 ratio uring_over_blocking fastest_round_trip=1.116 median_round_trip=1.026 stream=1.063 (median of 7 pairs)
+connection=4 exit 0 after 2 attempts
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-01: error: *** STEP 19.0 ON slurm-node-01 CANCELLED AT 2026-10-12T01:44:12 ***
+srun: error: slurm-node-01: task 0: Killed

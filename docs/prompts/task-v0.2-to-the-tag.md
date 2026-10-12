@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 171 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 167 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
@@ -68,7 +68,7 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
 
 ## The order of the work
 
-1. **Now, in the VMs, while the cluster is made** - the 125 items that need no
+1. **Now, in the VMs, while the cluster is made** - the 127 items that need no
    cluster, in slices of related items, each slice a branch:
    - **the kit for the cluster's machine** - done on 2026-10-11, set for
      `c2-standard-8` and back to `c4-standard-16` - before the first session;
@@ -91,7 +91,9 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
 2. **The cluster's first session**: the kit's shake-down (H1 to H3), then the
    first native x86-64 runs - the presets at 0, 2 and 3 helpers, tier 3, the
    models, SOS, the pacer, the litmus and the lost-wake test (B8, B9, T7, T35,
-   T36, T45) - since those find defects that would spoil Part 4's numbers.
+   T36, T45) - since those find defects that would spoil Part 4's numbers. Run on
+   2026-10-12 (`docs/fast-link-results.md`): all but SOS, the Rocky 9 build and 13
+   models, with §6, §8 and §9 beside them.
 3. **Part 4's sessions** (H4 to H19, with H25 and H26), as the runbook orders them; each session's
    results brought back (X3) the same day; then the author's decisions A2 to A6,
    and their slices (H20, and whatever they change), and the runs that check
@@ -198,7 +200,7 @@ What was put to the author, the lead's recommendation first:
 
 ## What it costs
 
-The inventory's sizes are 98 small, 65 medium and 8 large, before each slice's
+The inventory's sizes are 95 small, 64 medium and 8 large, before each slice's
 verification - about three hours of a VM - and read. With subagents for the
 mechanical slices, the work in the VMs is some eight to twelve working sessions;
 Part 4 is four cluster sessions of four hours and their analysis; the Pi's items

@@ -1,0 +1,10 @@
+# slurm-node-03, 16 CPUs, started 2026-10-12T01:31:08Z
+== build debug 01:31:08
+warnings: 0
+== debug OSOE_PROGRESS_HELPERS=0 01:31:12
+100% tests passed, 0 tests failed out of 871
+== debug OSOE_PROGRESS_HELPERS=2 01:33:11
+100% tests passed, 0 tests failed out of 871
+== debug OSOE_PROGRESS_HELPERS=3 01:34:58
+100% tests passed, 0 tests failed out of 871
+DONE 01:36:45

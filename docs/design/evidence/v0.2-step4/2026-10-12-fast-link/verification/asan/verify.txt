@@ -1,0 +1,10 @@
+# slurm-node-05, 16 CPUs, started 2026-10-12T01:31:10Z
+== build asan 01:31:10
+warnings: 0
+== asan OSOE_PROGRESS_HELPERS=0 01:31:18
+100% tests passed, 0 tests failed out of 856
+== asan OSOE_PROGRESS_HELPERS=2 01:33:11
+100% tests passed, 0 tests failed out of 856
+== asan OSOE_PROGRESS_HELPERS=3 01:34:46
+100% tests passed, 0 tests failed out of 856
+DONE 01:36:19

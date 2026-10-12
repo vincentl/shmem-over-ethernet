@@ -1,0 +1,24 @@
+Internal ctest changing into directory: ~/verify-tree-models-1-6/build/release
+Test project ~/verify-tree-models-1-6/build/release
+    Start 743: model.credit
+1/7 Test #743: model.credit .....................   Passed    0.14 sec
+    Start 757: model.abort_exit
+2/7 Test #757: model.abort_exit .................   Passed  625.33 sec
+    Start 767: model.posted_bitmap
+3/7 Test #767: model.posted_bitmap ..............   Passed   87.74 sec
+    Start 768: model.lane
+4/7 Test #768: model.lane .......................   Passed    2.74 sec
+    Start 770: model.visit
+5/7 Test #770: model.visit ......................   Passed    0.06 sec
+    Start 772: model.carrier
+6/7 Test #772: model.carrier ....................   Passed    0.02 sec
+    Start 776: model.selftest
+7/7 Test #776: model.selftest ...................   Passed   36.33 sec
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+model    = 752.36 sec*proc (7 tests)
+tier1    = 752.36 sec*proc (7 tests)
+
+Total Test time (real) = 752.38 sec

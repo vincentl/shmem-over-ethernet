@@ -1,0 +1,1764 @@
+# 01:26:46 nodes=8 pes_per_node=1 
+# bash -c first=slurm-node-01
+nodes="slurm-node-01 slurm-node-02 slurm-node-03 slurm-node-04 slurm-node-05 slurm-node-06 slurm-node-07 slurm-node-08 "
+say() { sed "s/^/$(hostname) $1: /"; }
+uname -a | say kernel
+lscpu | say cpu
+free -b | say memory
+df -B1 /dev/shm | say dev-shm
+getconf PAGESIZE | say page-size
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>&1 | say governor
+numactl --hardware 2>&1 | say numa
+address=$(getent ahostsv4 "$first" | awk 'NR == 1 { print $1 }')
+interface=$(ip route get "$address" 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }' | head -1)
+if [ -z "$interface" ] || [ "$interface" = lo ]; then
+    interface=$(ip -o -4 route show default | awk '{ print $5 }' | head -1)
+fi
+echo "$interface" | say interface
+ip -d link show "$interface" | say link
+cat "/sys/class/net/$interface/speed" 2>&1 | say speed
+for option in -i -k -c -l -g; do /usr/sbin/ethtool $option "$interface" 2>&1 | say "ethtool$option"; done
+for key in net.core.netdev_max_backlog net.core.rmem_max net.core.wmem_max net.ipv4.tcp_rmem \
+           net.ipv4.tcp_wmem net.ipv4.tcp_congestion_control net.ipv4.tcp_notsent_lowat \
+           net.ipv4.tcp_mtu_probing net.ipv4.tcp_slow_start_after_idle net.core.somaxconn \
+           net.core.default_qdisc kernel.io_uring_disabled; do
+    echo "$key = $(cat "/proc/sys/${key//.//}" 2>&1)" | say sysctl
+done
+echo "memlock $(ulimit -l), open files $(ulimit -n), stack $(ulimit -s)" | say limits
+loginctl show-user "$(id -un)" -p Linger 2>&1 | say linger
+grep -h '^ *RemoveIPC' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>&1 | say logind
+dpkg-query -W liburing2 liburing-dev 2>&1 | say packages
+for n in $nodes; do echo "$n $(getent ahostsv4 "$n" | awk 'NR == 1 { print $1 }')"; done | say resolves
+salloc: Granted job allocation 4
+salloc: Nodes slurm-node-[01-08] are ready for job
+slurm-node-01 kernel: Linux slurm-node-01 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-01 cpu: Architecture:                            x86_64
+slurm-node-01 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-01 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-01 cpu: Byte Order:                              Little Endian
+slurm-node-01 cpu: CPU(s):                                  16
+slurm-node-01 cpu: On-line CPU(s) list:                     0-15
+slurm-node-01 cpu: Vendor ID:                               GenuineIntel
+slurm-node-01 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-01 cpu: CPU family:                              6
+slurm-node-01 cpu: Model:                                   207
+slurm-node-01 cpu: Thread(s) per core:                      2
+slurm-node-01 cpu: Core(s) per socket:                      8
+slurm-node-01 cpu: Socket(s):                               1
+slurm-node-01 cpu: Stepping:                                2
+slurm-node-01 cpu: BogoMIPS:                                4600.00
+slurm-node-01 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-01 cpu: Hypervisor vendor:                       KVM
+slurm-node-01 cpu: Virtualization type:                     full
+slurm-node-01 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-01 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-01 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-01 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-01 cpu: NUMA node(s):                            1
+slurm-node-01 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-01 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-01 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-01 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-01 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-01 cpu: Vulnerability Mds:                       Not affected
+slurm-node-01 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-01 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-01 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-01 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-01 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-01 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-01 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-01 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-01 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-01 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-01 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-01 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-01 memory:                total        used        free      shared  buff/cache   available
+slurm-node-01 memory: Mem:     63200358400  1095880704 61293690880      684032  1435410432 62104477696
+slurm-node-01 memory: Swap:              0           0           0
+slurm-node-01 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-01 dev-shm: tmpfs          31600177152  4096 31600173056   1% /dev/shm
+slurm-node-01 page-size: 4096
+slurm-node-01 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-03 kernel: Linux slurm-node-03 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-02 kernel: Linux slurm-node-02 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-01 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-03 cpu: Architecture:                            x86_64
+slurm-node-03 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-03 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-03 cpu: Byte Order:                              Little Endian
+slurm-node-03 cpu: CPU(s):                                  16
+slurm-node-03 cpu: On-line CPU(s) list:                     0-15
+slurm-node-03 cpu: Vendor ID:                               GenuineIntel
+slurm-node-03 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-03 cpu: CPU family:                              6
+slurm-node-03 cpu: Model:                                   207
+slurm-node-03 cpu: Thread(s) per core:                      2
+slurm-node-03 cpu: Core(s) per socket:                      8
+slurm-node-03 cpu: Socket(s):                               1
+slurm-node-03 cpu: Stepping:                                2
+slurm-node-01 interface: ens3
+slurm-node-03 cpu: BogoMIPS:                                4600.00
+slurm-node-03 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-01 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-01 link:     link/ether 42:01:0a:0a:00:0b brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-01 link:     altname enp0s3
+slurm-node-01 link:     altname enx42010a0a000b
+slurm-node-03 cpu: Hypervisor vendor:                       KVM
+slurm-node-03 cpu: Virtualization type:                     full
+slurm-node-03 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-03 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-03 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-03 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-03 cpu: NUMA node(s):                            1
+slurm-node-03 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-03 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-03 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-03 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-03 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-03 cpu: Vulnerability Mds:                       Not affected
+slurm-node-03 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-01 speed: 23000
+slurm-node-03 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-03 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-03 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-03 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-03 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-03 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-03 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-03 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-03 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-03 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-03 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-03 memory:                total        used        free      shared  buff/cache   available
+slurm-node-03 memory: Mem:     63200366592  1045393408 61337763840      679936  1442209792 62154973184
+slurm-node-03 memory: Swap:              0           0           0
+slurm-node-03 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-03 dev-shm: tmpfs          31600181248  4096 31600177152   1% /dev/shm
+slurm-node-03 page-size: 4096
+slurm-node-02 cpu: Architecture:                            x86_64
+slurm-node-02 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-02 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-02 cpu: Byte Order:                              Little Endian
+slurm-node-02 cpu: CPU(s):                                  16
+slurm-node-02 cpu: On-line CPU(s) list:                     0-15
+slurm-node-02 cpu: Vendor ID:                               GenuineIntel
+slurm-node-02 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-02 cpu: CPU family:                              6
+slurm-node-02 cpu: Model:                                   207
+slurm-node-02 cpu: Thread(s) per core:                      2
+slurm-node-02 cpu: Core(s) per socket:                      8
+slurm-node-02 cpu: Socket(s):                               1
+slurm-node-02 cpu: Stepping:                                2
+slurm-node-02 cpu: BogoMIPS:                                4600.00
+slurm-node-02 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-02 cpu: Hypervisor vendor:                       KVM
+slurm-node-02 cpu: Virtualization type:                     full
+slurm-node-02 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-02 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-02 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-02 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-02 cpu: NUMA node(s):                            1
+slurm-node-02 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-02 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-02 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-02 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-02 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-02 cpu: Vulnerability Mds:                       Not affected
+slurm-node-02 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-02 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-02 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-02 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-02 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-02 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-02 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-02 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-02 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-02 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-02 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-02 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-01 ethtool-i: driver: gve
+slurm-node-01 ethtool-i: version: 1.0.0
+slurm-node-01 ethtool-i: firmware-version: 
+slurm-node-01 ethtool-i: expansion-rom-version: 
+slurm-node-01 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-01 ethtool-i: supports-statistics: yes
+slurm-node-01 ethtool-i: supports-test: no
+slurm-node-01 ethtool-i: supports-eeprom-access: no
+slurm-node-01 ethtool-i: supports-register-dump: no
+slurm-node-01 ethtool-i: supports-priv-flags: yes
+slurm-node-03 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-01 ethtool-k: Features for ens3:
+slurm-node-01 ethtool-k: rx-checksumming: on
+slurm-node-01 ethtool-k: tx-checksumming: on
+slurm-node-01 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-01 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-01 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-01 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-01 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-01 ethtool-k: scatter-gather: on
+slurm-node-01 ethtool-k: 	tx-scatter-gather: on
+slurm-node-01 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-01 ethtool-k: tcp-segmentation-offload: on
+slurm-node-01 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-01 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-01 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-01 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-01 ethtool-k: generic-segmentation-offload: on
+slurm-node-01 ethtool-k: generic-receive-offload: on
+slurm-node-01 ethtool-k: large-receive-offload: off
+slurm-node-03 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-02 memory:                total        used        free      shared  buff/cache   available
+slurm-node-02 memory: Mem:     63200366592  1040584704 61340176384      684032  1444769792 62159781888
+slurm-node-02 memory: Swap:              0           0           0
+slurm-node-05 kernel: Linux slurm-node-05 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-06 kernel: Linux slurm-node-06 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-04 kernel: Linux slurm-node-04 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-01 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-01 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-01 ethtool-k: ntuple-filters: off
+slurm-node-01 ethtool-k: receive-hashing: on
+slurm-node-01 ethtool-k: highdma: on
+slurm-node-01 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-01 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-01 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-01 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-01 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-03 interface: ens3
+slurm-node-02 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-02 dev-shm: tmpfs          31600181248  4096 31600177152   1% /dev/shm
+slurm-node-05 cpu: Architecture:                            x86_64
+slurm-node-05 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-05 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-05 cpu: Byte Order:                              Little Endian
+slurm-node-05 cpu: CPU(s):                                  16
+slurm-node-05 cpu: On-line CPU(s) list:                     0-15
+slurm-node-05 cpu: Vendor ID:                               GenuineIntel
+slurm-node-05 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-05 cpu: CPU family:                              6
+slurm-node-05 cpu: Model:                                   207
+slurm-node-05 cpu: Thread(s) per core:                      2
+slurm-node-05 cpu: Core(s) per socket:                      8
+slurm-node-05 cpu: Socket(s):                               1
+slurm-node-05 cpu: Stepping:                                2
+slurm-node-06 cpu: Architecture:                            x86_64
+slurm-node-06 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-06 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-06 cpu: Byte Order:                              Little Endian
+slurm-node-06 cpu: CPU(s):                                  16
+slurm-node-06 cpu: On-line CPU(s) list:                     0-15
+slurm-node-06 cpu: Vendor ID:                               GenuineIntel
+slurm-node-06 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-06 cpu: CPU family:                              6
+slurm-node-06 cpu: Model:                                   207
+slurm-node-06 cpu: Thread(s) per core:                      2
+slurm-node-06 cpu: Core(s) per socket:                      8
+slurm-node-06 cpu: Socket(s):                               1
+slurm-node-06 cpu: Stepping:                                2
+slurm-node-01 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-01 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-01 ethtool-k: tx-nocache-copy: off
+slurm-node-01 ethtool-k: loopback: off [fixed]
+slurm-node-01 ethtool-k: rx-fcs: off [fixed]
+slurm-node-01 ethtool-k: rx-all: off [fixed]
+slurm-node-01 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-01 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-01 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-01 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-01 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-01 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-01 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-01 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-01 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-01 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-01 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-02 page-size: 4096
+slurm-node-05 cpu: BogoMIPS:                                4600.00
+slurm-node-05 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-06 cpu: BogoMIPS:                                4600.00
+slurm-node-06 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-01 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-01 ethtool-k: rx-gro-list: off
+slurm-node-01 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-01 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-01 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-01 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-01 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-01 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-02 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-05 cpu: Hypervisor vendor:                       KVM
+slurm-node-05 cpu: Virtualization type:                     full
+slurm-node-05 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-05 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-05 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-05 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-05 cpu: NUMA node(s):                            1
+slurm-node-05 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-05 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-05 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-05 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-05 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-05 cpu: Vulnerability Mds:                       Not affected
+slurm-node-05 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-06 cpu: Hypervisor vendor:                       KVM
+slurm-node-06 cpu: Virtualization type:                     full
+slurm-node-06 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-06 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-06 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-06 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-06 cpu: NUMA node(s):                            1
+slurm-node-06 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-06 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-06 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-06 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-06 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-06 cpu: Vulnerability Mds:                       Not affected
+slurm-node-06 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-01 ethtool-c: Coalesce parameters for ens3:
+slurm-node-01 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-01 ethtool-c: stats-block-usecs:	n/a
+slurm-node-01 ethtool-c: sample-interval:	n/a
+slurm-node-01 ethtool-c: pkt-rate-low:		n/a
+slurm-node-01 ethtool-c: pkt-rate-high:		n/a
+slurm-node-01 ethtool-c: 
+slurm-node-01 ethtool-c: rx-usecs:	20
+slurm-node-01 ethtool-c: rx-frames:	n/a
+slurm-node-01 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-01 ethtool-c: rx-frames-irq:	n/a
+slurm-node-01 ethtool-c: 
+slurm-node-01 ethtool-c: tx-usecs:	50
+slurm-node-01 ethtool-c: tx-frames:	n/a
+slurm-node-01 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-01 ethtool-c: tx-frames-irq:	n/a
+slurm-node-01 ethtool-c: 
+slurm-node-01 ethtool-c: rx-usecs-low:	n/a
+slurm-node-01 ethtool-c: rx-frame-low:	n/a
+slurm-node-01 ethtool-c: tx-usecs-low:	n/a
+slurm-node-01 ethtool-c: tx-frame-low:	n/a
+slurm-node-01 ethtool-c: 
+slurm-node-01 ethtool-c: rx-usecs-high:	n/a
+slurm-node-01 ethtool-c: rx-frame-high:	n/a
+slurm-node-02 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-05 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-05 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-05 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-05 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-05 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-05 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-05 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-05 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-05 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-05 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-05 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-06 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-06 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-06 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-06 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-06 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-06 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-06 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-06 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-06 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-06 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-06 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-01 ethtool-c: tx-usecs-high:	n/a
+slurm-node-01 ethtool-c: tx-frame-high:	n/a
+slurm-node-01 ethtool-c: 
+slurm-node-01 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-01 ethtool-c: 
+slurm-node-01 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-01 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-01 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-01 ethtool-c: 
+slurm-node-05 memory:                total        used        free      shared  buff/cache   available
+slurm-node-05 memory: Mem:     63200362496  1062735872 61317779456      684032  1444982784 62137626624
+slurm-node-05 memory: Swap:              0           0           0
+slurm-node-06 memory:                total        used        free      shared  buff/cache   available
+slurm-node-06 memory: Mem:     63200370688  1059659776 61320937472      684032  1444937728 62140710912
+slurm-node-06 memory: Swap:              0           0           0
+slurm-node-01 ethtool-l: Channel parameters for ens3:
+slurm-node-01 ethtool-l: Pre-set maximums:
+slurm-node-01 ethtool-l: RX:		16
+slurm-node-01 ethtool-l: TX:		16
+slurm-node-01 ethtool-l: Other:		n/a
+slurm-node-01 ethtool-l: Combined:	n/a
+slurm-node-01 ethtool-l: Current hardware settings:
+slurm-node-01 ethtool-l: RX:		16
+slurm-node-01 ethtool-l: TX:		16
+slurm-node-01 ethtool-l: Other:		n/a
+slurm-node-01 ethtool-l: Combined:	n/a
+slurm-node-05 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-05 dev-shm: tmpfs          31600181248  4096 31600177152   1% /dev/shm
+slurm-node-01 ethtool-g: Ring parameters for ens3:
+slurm-node-01 ethtool-g: Pre-set maximums:
+slurm-node-01 ethtool-g: RX:			4096
+slurm-node-01 ethtool-g: RX Mini:		n/a
+slurm-node-01 ethtool-g: RX Jumbo:		n/a
+slurm-node-01 ethtool-g: TX:			4096
+slurm-node-01 ethtool-g: TX push buff len:	n/a
+slurm-node-01 ethtool-g: Current hardware settings:
+slurm-node-01 ethtool-g: RX:			1024
+slurm-node-01 ethtool-g: RX Mini:		n/a
+slurm-node-01 ethtool-g: RX Jumbo:		n/a
+slurm-node-01 ethtool-g: TX:			1024
+slurm-node-01 ethtool-g: RX Buf Len:		n/a
+slurm-node-01 ethtool-g: CQE Size:		n/a
+slurm-node-01 ethtool-g: TX Push:		off
+slurm-node-01 ethtool-g: RX Push:		off
+slurm-node-01 ethtool-g: TX push buff len:	n/a
+slurm-node-01 ethtool-g: TCP data split:		off
+slurm-node-01 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-01 sysctl: net.core.rmem_max = 134217728
+slurm-node-01 sysctl: net.core.wmem_max = 134217728
+slurm-node-01 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-01 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-05 page-size: 4096
+slurm-node-01 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-03 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-03 link:     link/ether 42:01:0a:0a:00:0d brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-03 link:     altname enp0s3
+slurm-node-03 link:     altname enx42010a0a000d
+slurm-node-02 interface: ens3
+slurm-node-05 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-06 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-06 dev-shm: tmpfs          31600185344  4096 31600181248   1% /dev/shm
+slurm-node-04 cpu: Architecture:                            x86_64
+slurm-node-04 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-04 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-04 cpu: Byte Order:                              Little Endian
+slurm-node-04 cpu: CPU(s):                                  16
+slurm-node-04 cpu: On-line CPU(s) list:                     0-15
+slurm-node-04 cpu: Vendor ID:                               GenuineIntel
+slurm-node-04 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-04 cpu: CPU family:                              6
+slurm-node-04 cpu: Model:                                   207
+slurm-node-04 cpu: Thread(s) per core:                      2
+slurm-node-04 cpu: Core(s) per socket:                      8
+slurm-node-04 cpu: Socket(s):                               1
+slurm-node-04 cpu: Stepping:                                2
+slurm-node-08 kernel: Linux slurm-node-08 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-07 kernel: Linux slurm-node-07 6.12.111+deb13-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28) x86_64 GNU/Linux
+slurm-node-01 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-03 speed: 23000
+slurm-node-02 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-02 link:     link/ether 42:01:0a:0a:00:0c brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-02 link:     altname enp0s3
+slurm-node-02 link:     altname enx42010a0a000c
+slurm-node-05 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-06 page-size: 4096
+slurm-node-04 cpu: BogoMIPS:                                4600.00
+slurm-node-04 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-08 cpu: Architecture:                            x86_64
+slurm-node-08 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-08 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-08 cpu: Byte Order:                              Little Endian
+slurm-node-08 cpu: CPU(s):                                  16
+slurm-node-08 cpu: On-line CPU(s) list:                     0-15
+slurm-node-08 cpu: Vendor ID:                               GenuineIntel
+slurm-node-08 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-08 cpu: CPU family:                              6
+slurm-node-08 cpu: Model:                                   207
+slurm-node-08 cpu: Thread(s) per core:                      2
+slurm-node-08 cpu: Core(s) per socket:                      8
+slurm-node-08 cpu: Socket(s):                               1
+slurm-node-08 cpu: Stepping:                                2
+slurm-node-01 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-03 ethtool-i: driver: gve
+slurm-node-03 ethtool-i: version: 1.0.0
+slurm-node-03 ethtool-i: firmware-version: 
+slurm-node-03 ethtool-i: expansion-rom-version: 
+slurm-node-03 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-03 ethtool-i: supports-statistics: yes
+slurm-node-03 ethtool-i: supports-test: no
+slurm-node-03 ethtool-i: supports-eeprom-access: no
+slurm-node-03 ethtool-i: supports-register-dump: no
+slurm-node-03 ethtool-i: supports-priv-flags: yes
+slurm-node-02 speed: 23000
+slurm-node-06 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-04 cpu: Hypervisor vendor:                       KVM
+slurm-node-04 cpu: Virtualization type:                     full
+slurm-node-04 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-04 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-04 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-04 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-04 cpu: NUMA node(s):                            1
+slurm-node-04 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-04 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-04 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-04 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-04 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-04 cpu: Vulnerability Mds:                       Not affected
+slurm-node-04 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-08 cpu: BogoMIPS:                                4600.00
+slurm-node-08 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-01 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-03 ethtool-k: Features for ens3:
+slurm-node-03 ethtool-k: rx-checksumming: on
+slurm-node-03 ethtool-k: tx-checksumming: on
+slurm-node-03 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-03 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-03 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-03 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-03 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-03 ethtool-k: scatter-gather: on
+slurm-node-03 ethtool-k: 	tx-scatter-gather: on
+slurm-node-03 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-03 ethtool-k: tcp-segmentation-offload: on
+slurm-node-03 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-03 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-03 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-03 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-03 ethtool-k: generic-segmentation-offload: on
+slurm-node-03 ethtool-k: generic-receive-offload: on
+slurm-node-03 ethtool-k: large-receive-offload: off
+slurm-node-06 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-04 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-04 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-04 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-04 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-04 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-04 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-04 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-04 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-04 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-04 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-04 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-08 cpu: Hypervisor vendor:                       KVM
+slurm-node-08 cpu: Virtualization type:                     full
+slurm-node-08 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-08 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-08 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-08 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-08 cpu: NUMA node(s):                            1
+slurm-node-08 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-08 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-08 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-08 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-08 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-08 cpu: Vulnerability Mds:                       Not affected
+slurm-node-08 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-01 sysctl: net.core.somaxconn = 65535
+slurm-node-03 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-03 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-03 ethtool-k: ntuple-filters: off
+slurm-node-03 ethtool-k: receive-hashing: on
+slurm-node-03 ethtool-k: highdma: on
+slurm-node-03 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-03 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-03 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-03 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-03 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-04 memory:                total        used        free      shared  buff/cache   available
+slurm-node-04 memory: Mem:     63200370688  1047224320 61335560192      684032  1442783232 62153146368
+slurm-node-04 memory: Swap:              0           0           0
+slurm-node-08 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-08 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-08 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-08 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-08 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-08 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-08 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-08 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-08 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-08 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-08 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-01 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-03 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-03 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-03 ethtool-k: tx-nocache-copy: off
+slurm-node-03 ethtool-k: loopback: off [fixed]
+slurm-node-03 ethtool-k: rx-fcs: off [fixed]
+slurm-node-03 ethtool-k: rx-all: off [fixed]
+slurm-node-03 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-03 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-03 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-03 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-03 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-03 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-03 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-03 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-03 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-03 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-03 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-04 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-04 dev-shm: tmpfs          31600185344  4096 31600181248   1% /dev/shm
+slurm-node-01 sysctl: kernel.io_uring_disabled = 0
+slurm-node-03 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-03 ethtool-k: rx-gro-list: off
+slurm-node-03 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-03 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-03 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-03 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-03 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-03 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-04 page-size: 4096
+slurm-node-03 ethtool-c: Coalesce parameters for ens3:
+slurm-node-03 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-03 ethtool-c: stats-block-usecs:	n/a
+slurm-node-03 ethtool-c: sample-interval:	n/a
+slurm-node-03 ethtool-c: pkt-rate-low:		n/a
+slurm-node-03 ethtool-c: pkt-rate-high:		n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-c: rx-usecs:	20
+slurm-node-03 ethtool-c: rx-frames:	n/a
+slurm-node-03 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-03 ethtool-c: rx-frames-irq:	n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-c: tx-usecs:	50
+slurm-node-03 ethtool-c: tx-frames:	n/a
+slurm-node-03 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-03 ethtool-c: tx-frames-irq:	n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-c: rx-usecs-low:	n/a
+slurm-node-03 ethtool-c: rx-frame-low:	n/a
+slurm-node-03 ethtool-c: tx-usecs-low:	n/a
+slurm-node-03 ethtool-c: tx-frame-low:	n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-c: rx-usecs-high:	n/a
+slurm-node-03 ethtool-c: rx-frame-high:	n/a
+slurm-node-04 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-03 ethtool-c: tx-usecs-high:	n/a
+slurm-node-03 ethtool-c: tx-frame-high:	n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-03 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-03 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-03 ethtool-c: 
+slurm-node-03 ethtool-l: Channel parameters for ens3:
+slurm-node-03 ethtool-l: Pre-set maximums:
+slurm-node-03 ethtool-l: RX:		16
+slurm-node-03 ethtool-l: TX:		16
+slurm-node-03 ethtool-l: Other:		n/a
+slurm-node-03 ethtool-l: Combined:	n/a
+slurm-node-03 ethtool-l: Current hardware settings:
+slurm-node-03 ethtool-l: RX:		16
+slurm-node-03 ethtool-l: TX:		16
+slurm-node-03 ethtool-l: Other:		n/a
+slurm-node-03 ethtool-l: Combined:	n/a
+slurm-node-04 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-03 ethtool-g: Ring parameters for ens3:
+slurm-node-03 ethtool-g: Pre-set maximums:
+slurm-node-03 ethtool-g: RX:			4096
+slurm-node-03 ethtool-g: RX Mini:		n/a
+slurm-node-03 ethtool-g: RX Jumbo:		n/a
+slurm-node-03 ethtool-g: TX:			4096
+slurm-node-03 ethtool-g: TX push buff len:	n/a
+slurm-node-03 ethtool-g: Current hardware settings:
+slurm-node-03 ethtool-g: RX:			1024
+slurm-node-03 ethtool-g: RX Mini:		n/a
+slurm-node-03 ethtool-g: RX Jumbo:		n/a
+slurm-node-03 ethtool-g: TX:			1024
+slurm-node-03 ethtool-g: RX Buf Len:		n/a
+slurm-node-03 ethtool-g: CQE Size:		n/a
+slurm-node-03 ethtool-g: TX Push:		off
+slurm-node-03 ethtool-g: RX Push:		off
+slurm-node-03 ethtool-g: TX push buff len:	n/a
+slurm-node-03 ethtool-g: TCP data split:		off
+slurm-node-02 ethtool-i: driver: gve
+slurm-node-02 ethtool-i: version: 1.0.0
+slurm-node-02 ethtool-i: firmware-version: 
+slurm-node-02 ethtool-i: expansion-rom-version: 
+slurm-node-02 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-02 ethtool-i: supports-statistics: yes
+slurm-node-02 ethtool-i: supports-test: no
+slurm-node-02 ethtool-i: supports-eeprom-access: no
+slurm-node-02 ethtool-i: supports-register-dump: no
+slurm-node-02 ethtool-i: supports-priv-flags: yes
+slurm-node-05 interface: ens3
+slurm-node-07 cpu: Architecture:                            x86_64
+slurm-node-07 cpu: CPU op-mode(s):                          32-bit, 64-bit
+slurm-node-07 cpu: Address sizes:                           52 bits physical, 57 bits virtual
+slurm-node-07 cpu: Byte Order:                              Little Endian
+slurm-node-07 cpu: CPU(s):                                  16
+slurm-node-07 cpu: On-line CPU(s) list:                     0-15
+slurm-node-07 cpu: Vendor ID:                               GenuineIntel
+slurm-node-07 cpu: Model name:                              INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz
+slurm-node-07 cpu: CPU family:                              6
+slurm-node-07 cpu: Model:                                   207
+slurm-node-07 cpu: Thread(s) per core:                      2
+slurm-node-07 cpu: Core(s) per socket:                      8
+slurm-node-07 cpu: Socket(s):                               1
+slurm-node-07 cpu: Stepping:                                2
+slurm-node-08 memory:                total        used        free      shared  buff/cache   available
+slurm-node-08 memory: Mem:     63200362496  1043275776 61338865664      684032  1443389440 62157086720
+slurm-node-08 memory: Swap:              0           0           0
+slurm-node-07 cpu: BogoMIPS:                                4600.00
+slurm-node-07 cpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid cldemote movdiri movdir64b fsrm md_clear serialize tsxldtrk amx_bf16 avx512_fp16 amx_tile amx_int8 arch_capabilities
+slurm-node-07 cpu: Hypervisor vendor:                       KVM
+slurm-node-07 cpu: Virtualization type:                     full
+slurm-node-07 cpu: L1d cache:                               384 KiB (8 instances)
+slurm-node-07 cpu: L1i cache:                               256 KiB (8 instances)
+slurm-node-07 cpu: L2 cache:                                16 MiB (8 instances)
+slurm-node-07 cpu: L3 cache:                                260 MiB (1 instance)
+slurm-node-07 cpu: NUMA node(s):                            1
+slurm-node-07 cpu: NUMA node0 CPU(s):                       0-15
+slurm-node-07 cpu: Vulnerability Gather data sampling:      Not affected
+slurm-node-07 cpu: Vulnerability Indirect target selection: Not affected
+slurm-node-07 cpu: Vulnerability Itlb multihit:             Not affected
+slurm-node-07 cpu: Vulnerability L1tf:                      Not affected
+slurm-node-07 cpu: Vulnerability Mds:                       Not affected
+slurm-node-07 cpu: Vulnerability Meltdown:                  Not affected
+slurm-node-07 cpu: Vulnerability Mmio stale data:           Not affected
+slurm-node-07 cpu: Vulnerability Reg file data sampling:    Not affected
+slurm-node-07 cpu: Vulnerability Retbleed:                  Not affected
+slurm-node-07 cpu: Vulnerability Spec rstack overflow:      Not affected
+slurm-node-07 cpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+slurm-node-07 cpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+slurm-node-07 cpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+slurm-node-07 cpu: Vulnerability Srbds:                     Not affected
+slurm-node-07 cpu: Vulnerability Tsa:                       Not affected
+slurm-node-07 cpu: Vulnerability Tsx async abort:           Not affected
+slurm-node-07 cpu: Vulnerability Vmscape:                   Not affected
+slurm-node-01 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-03 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-07 memory:                total        used        free      shared  buff/cache   available
+slurm-node-07 memory: Mem:     63200362496  1047453696 61335003136      684032  1442869248 62152908800
+slurm-node-07 memory: Swap:              0           0           0
+slurm-node-02 ethtool-k: Features for ens3:
+slurm-node-02 ethtool-k: rx-checksumming: on
+slurm-node-02 ethtool-k: tx-checksumming: on
+slurm-node-02 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-02 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-02 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-02 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-02 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-02 ethtool-k: scatter-gather: on
+slurm-node-02 ethtool-k: 	tx-scatter-gather: on
+slurm-node-02 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-02 ethtool-k: tcp-segmentation-offload: on
+slurm-node-02 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-02 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-02 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-02 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-02 ethtool-k: generic-segmentation-offload: on
+slurm-node-02 ethtool-k: generic-receive-offload: on
+slurm-node-02 ethtool-k: large-receive-offload: off
+slurm-node-02 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-02 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-02 ethtool-k: ntuple-filters: off
+slurm-node-02 ethtool-k: receive-hashing: on
+slurm-node-02 ethtool-k: highdma: on
+slurm-node-02 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-02 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-02 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-02 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-02 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-02 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-02 ethtool-k: tx-nocache-copy: off
+slurm-node-02 ethtool-k: loopback: off [fixed]
+slurm-node-02 ethtool-k: rx-fcs: off [fixed]
+slurm-node-02 ethtool-k: rx-all: off [fixed]
+slurm-node-02 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-02 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-02 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-02 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-02 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-02 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-02 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-02 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-02 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-02 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-02 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-02 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-02 ethtool-k: rx-gro-list: off
+slurm-node-02 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-02 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-02 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-02 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-02 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-02 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-05 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-05 link:     link/ether 42:01:0a:0a:00:0f brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-05 link:     altname enp0s3
+slurm-node-05 link:     altname enx42010a0a000f
+slurm-node-08 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-08 dev-shm: tmpfs          31600181248  4096 31600177152   1% /dev/shm
+slurm-node-03 sysctl: net.core.rmem_max = 134217728
+slurm-node-02 ethtool-c: Coalesce parameters for ens3:
+slurm-node-02 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-02 ethtool-c: stats-block-usecs:	n/a
+slurm-node-02 ethtool-c: sample-interval:	n/a
+slurm-node-02 ethtool-c: pkt-rate-low:		n/a
+slurm-node-02 ethtool-c: pkt-rate-high:		n/a
+slurm-node-02 ethtool-c: 
+slurm-node-02 ethtool-c: rx-usecs:	20
+slurm-node-02 ethtool-c: rx-frames:	n/a
+slurm-node-02 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-02 ethtool-c: rx-frames-irq:	n/a
+slurm-node-02 ethtool-c: 
+slurm-node-02 ethtool-c: tx-usecs:	50
+slurm-node-02 ethtool-c: tx-frames:	n/a
+slurm-node-02 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-02 ethtool-c: tx-frames-irq:	n/a
+slurm-node-02 ethtool-c: 
+slurm-node-02 ethtool-c: rx-usecs-low:	n/a
+slurm-node-02 ethtool-c: rx-frame-low:	n/a
+slurm-node-02 ethtool-c: tx-usecs-low:	n/a
+slurm-node-02 ethtool-c: tx-frame-low:	n/a
+slurm-node-02 ethtool-c: 
+slurm-node-02 ethtool-c: rx-usecs-high:	n/a
+slurm-node-02 ethtool-c: rx-frame-high:	n/a
+slurm-node-02 ethtool-c: tx-usecs-high:	n/a
+slurm-node-02 ethtool-c: tx-frame-high:	n/a
+slurm-node-02 ethtool-c: 
+slurm-node-02 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-02 ethtool-c: 
+slurm-node-02 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-02 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-02 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-02 ethtool-c: 
+slurm-node-05 speed: 23000
+slurm-node-08 page-size: 4096
+slurm-node-03 sysctl: net.core.wmem_max = 134217728
+slurm-node-02 ethtool-l: Channel parameters for ens3:
+slurm-node-02 ethtool-l: Pre-set maximums:
+slurm-node-02 ethtool-l: RX:		16
+slurm-node-02 ethtool-l: TX:		16
+slurm-node-02 ethtool-l: Other:		n/a
+slurm-node-02 ethtool-l: Combined:	n/a
+slurm-node-02 ethtool-l: Current hardware settings:
+slurm-node-02 ethtool-l: RX:		16
+slurm-node-02 ethtool-l: TX:		16
+slurm-node-02 ethtool-l: Other:		n/a
+slurm-node-02 ethtool-l: Combined:	n/a
+slurm-node-05 ethtool-i: driver: gve
+slurm-node-05 ethtool-i: version: 1.0.0
+slurm-node-05 ethtool-i: firmware-version: 
+slurm-node-05 ethtool-i: expansion-rom-version: 
+slurm-node-05 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-05 ethtool-i: supports-statistics: yes
+slurm-node-05 ethtool-i: supports-test: no
+slurm-node-05 ethtool-i: supports-eeprom-access: no
+slurm-node-05 ethtool-i: supports-register-dump: no
+slurm-node-05 ethtool-i: supports-priv-flags: yes
+slurm-node-08 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-03 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-02 ethtool-g: Ring parameters for ens3:
+slurm-node-02 ethtool-g: Pre-set maximums:
+slurm-node-02 ethtool-g: RX:			4096
+slurm-node-02 ethtool-g: RX Mini:		n/a
+slurm-node-02 ethtool-g: RX Jumbo:		n/a
+slurm-node-02 ethtool-g: TX:			4096
+slurm-node-02 ethtool-g: TX push buff len:	n/a
+slurm-node-02 ethtool-g: Current hardware settings:
+slurm-node-02 ethtool-g: RX:			1024
+slurm-node-02 ethtool-g: RX Mini:		n/a
+slurm-node-02 ethtool-g: RX Jumbo:		n/a
+slurm-node-02 ethtool-g: TX:			1024
+slurm-node-02 ethtool-g: RX Buf Len:		n/a
+slurm-node-02 ethtool-g: CQE Size:		n/a
+slurm-node-02 ethtool-g: TX Push:		off
+slurm-node-02 ethtool-g: RX Push:		off
+slurm-node-02 ethtool-g: TX push buff len:	n/a
+slurm-node-02 ethtool-g: TCP data split:		off
+slurm-node-08 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-05 ethtool-k: Features for ens3:
+slurm-node-05 ethtool-k: rx-checksumming: on
+slurm-node-05 ethtool-k: tx-checksumming: on
+slurm-node-05 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-05 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-05 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-05 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-05 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-05 ethtool-k: scatter-gather: on
+slurm-node-05 ethtool-k: 	tx-scatter-gather: on
+slurm-node-05 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-05 ethtool-k: tcp-segmentation-offload: on
+slurm-node-05 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-05 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-05 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-05 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-05 ethtool-k: generic-segmentation-offload: on
+slurm-node-05 ethtool-k: generic-receive-offload: on
+slurm-node-05 ethtool-k: large-receive-offload: off
+slurm-node-05 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-05 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-05 ethtool-k: ntuple-filters: off
+slurm-node-05 ethtool-k: receive-hashing: on
+slurm-node-05 ethtool-k: highdma: on
+slurm-node-05 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-05 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-05 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-05 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-05 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-05 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-05 ethtool-k: tx-nocache-copy: off
+slurm-node-05 ethtool-k: loopback: off [fixed]
+slurm-node-05 ethtool-k: rx-fcs: off [fixed]
+slurm-node-05 ethtool-k: rx-all: off [fixed]
+slurm-node-05 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-05 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-05 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-05 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-05 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-05 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-05 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-05 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-05 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-05 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-05 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-05 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-05 ethtool-k: rx-gro-list: off
+slurm-node-05 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-05 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-05 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-05 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-05 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-05 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-03 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-06 interface: ens3
+slurm-node-02 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-03 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-05 ethtool-c: Coalesce parameters for ens3:
+slurm-node-05 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-05 ethtool-c: stats-block-usecs:	n/a
+slurm-node-05 ethtool-c: sample-interval:	n/a
+slurm-node-05 ethtool-c: pkt-rate-low:		n/a
+slurm-node-05 ethtool-c: pkt-rate-high:		n/a
+slurm-node-05 ethtool-c: 
+slurm-node-05 ethtool-c: rx-usecs:	20
+slurm-node-05 ethtool-c: rx-frames:	n/a
+slurm-node-05 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-05 ethtool-c: rx-frames-irq:	n/a
+slurm-node-05 ethtool-c: 
+slurm-node-05 ethtool-c: tx-usecs:	50
+slurm-node-05 ethtool-c: tx-frames:	n/a
+slurm-node-05 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-05 ethtool-c: tx-frames-irq:	n/a
+slurm-node-05 ethtool-c: 
+slurm-node-05 ethtool-c: rx-usecs-low:	n/a
+slurm-node-05 ethtool-c: rx-frame-low:	n/a
+slurm-node-05 ethtool-c: tx-usecs-low:	n/a
+slurm-node-05 ethtool-c: tx-frame-low:	n/a
+slurm-node-05 ethtool-c: 
+slurm-node-05 ethtool-c: rx-usecs-high:	n/a
+slurm-node-05 ethtool-c: rx-frame-high:	n/a
+slurm-node-05 ethtool-c: tx-usecs-high:	n/a
+slurm-node-05 ethtool-c: tx-frame-high:	n/a
+slurm-node-05 ethtool-c: 
+slurm-node-05 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-05 ethtool-c: 
+slurm-node-05 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-05 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-05 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-05 ethtool-c: 
+slurm-node-04 interface: ens3
+slurm-node-02 sysctl: net.core.rmem_max = 134217728
+slurm-node-03 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-06 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-06 link:     link/ether 42:01:0a:0a:00:10 brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-06 link:     altname enp0s3
+slurm-node-06 link:     altname enx42010a0a0010
+slurm-node-05 ethtool-l: Channel parameters for ens3:
+slurm-node-05 ethtool-l: Pre-set maximums:
+slurm-node-05 ethtool-l: RX:		16
+slurm-node-05 ethtool-l: TX:		16
+slurm-node-05 ethtool-l: Other:		n/a
+slurm-node-05 ethtool-l: Combined:	n/a
+slurm-node-05 ethtool-l: Current hardware settings:
+slurm-node-05 ethtool-l: RX:		16
+slurm-node-05 ethtool-l: TX:		16
+slurm-node-05 ethtool-l: Other:		n/a
+slurm-node-05 ethtool-l: Combined:	n/a
+slurm-node-04 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-04 link:     link/ether 42:01:0a:0a:00:0e brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-04 link:     altname enp0s3
+slurm-node-04 link:     altname enx42010a0a000e
+slurm-node-03 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-02 sysctl: net.core.wmem_max = 134217728
+slurm-node-05 ethtool-g: Ring parameters for ens3:
+slurm-node-05 ethtool-g: Pre-set maximums:
+slurm-node-05 ethtool-g: RX:			4096
+slurm-node-05 ethtool-g: RX Mini:		n/a
+slurm-node-05 ethtool-g: RX Jumbo:		n/a
+slurm-node-05 ethtool-g: TX:			4096
+slurm-node-05 ethtool-g: TX push buff len:	n/a
+slurm-node-05 ethtool-g: Current hardware settings:
+slurm-node-05 ethtool-g: RX:			1024
+slurm-node-05 ethtool-g: RX Mini:		n/a
+slurm-node-05 ethtool-g: RX Jumbo:		n/a
+slurm-node-05 ethtool-g: TX:			1024
+slurm-node-05 ethtool-g: RX Buf Len:		n/a
+slurm-node-05 ethtool-g: CQE Size:		n/a
+slurm-node-05 ethtool-g: TX Push:		off
+slurm-node-05 ethtool-g: RX Push:		off
+slurm-node-05 ethtool-g: TX push buff len:	n/a
+slurm-node-05 ethtool-g: TCP data split:		off
+slurm-node-06 speed: 23000
+slurm-node-03 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-04 speed: 23000
+slurm-node-02 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-05 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-06 ethtool-i: driver: gve
+slurm-node-06 ethtool-i: version: 1.0.0
+slurm-node-06 ethtool-i: firmware-version: 
+slurm-node-06 ethtool-i: expansion-rom-version: 
+slurm-node-06 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-06 ethtool-i: supports-statistics: yes
+slurm-node-06 ethtool-i: supports-test: no
+slurm-node-06 ethtool-i: supports-eeprom-access: no
+slurm-node-06 ethtool-i: supports-register-dump: no
+slurm-node-06 ethtool-i: supports-priv-flags: yes
+slurm-node-03 sysctl: net.core.somaxconn = 65535
+slurm-node-04 ethtool-i: driver: gve
+slurm-node-04 ethtool-i: version: 1.0.0
+slurm-node-04 ethtool-i: firmware-version: 
+slurm-node-04 ethtool-i: expansion-rom-version: 
+slurm-node-04 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-04 ethtool-i: supports-statistics: yes
+slurm-node-04 ethtool-i: supports-test: no
+slurm-node-04 ethtool-i: supports-eeprom-access: no
+slurm-node-04 ethtool-i: supports-register-dump: no
+slurm-node-04 ethtool-i: supports-priv-flags: yes
+slurm-node-07 dev-shm: Filesystem       1B-blocks  Used   Available Use% Mounted on
+slurm-node-07 dev-shm: tmpfs          31600181248  4096 31600177152   1% /dev/shm
+slurm-node-02 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-05 sysctl: net.core.rmem_max = 134217728
+slurm-node-03 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-06 ethtool-k: Features for ens3:
+slurm-node-06 ethtool-k: rx-checksumming: on
+slurm-node-06 ethtool-k: tx-checksumming: on
+slurm-node-06 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-06 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-06 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-06 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-06 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-06 ethtool-k: scatter-gather: on
+slurm-node-06 ethtool-k: 	tx-scatter-gather: on
+slurm-node-06 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-06 ethtool-k: tcp-segmentation-offload: on
+slurm-node-06 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-06 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-06 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-06 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-06 ethtool-k: generic-segmentation-offload: on
+slurm-node-06 ethtool-k: generic-receive-offload: on
+slurm-node-06 ethtool-k: large-receive-offload: off
+slurm-node-06 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-06 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-06 ethtool-k: ntuple-filters: off
+slurm-node-06 ethtool-k: receive-hashing: on
+slurm-node-06 ethtool-k: highdma: on
+slurm-node-06 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-06 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-06 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-06 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-06 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-06 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-06 ethtool-k: tx-nocache-copy: off
+slurm-node-06 ethtool-k: loopback: off [fixed]
+slurm-node-06 ethtool-k: rx-fcs: off [fixed]
+slurm-node-06 ethtool-k: rx-all: off [fixed]
+slurm-node-06 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-06 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-06 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-06 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-06 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-06 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-06 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-06 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-06 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-06 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-06 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-06 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-06 ethtool-k: rx-gro-list: off
+slurm-node-06 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-06 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-06 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-06 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-06 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-06 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-02 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-04 ethtool-k: Features for ens3:
+slurm-node-04 ethtool-k: rx-checksumming: on
+slurm-node-04 ethtool-k: tx-checksumming: on
+slurm-node-04 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-04 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-04 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-04 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-04 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-04 ethtool-k: scatter-gather: on
+slurm-node-04 ethtool-k: 	tx-scatter-gather: on
+slurm-node-04 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-04 ethtool-k: tcp-segmentation-offload: on
+slurm-node-04 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-04 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-04 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-04 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-04 ethtool-k: generic-segmentation-offload: on
+slurm-node-04 ethtool-k: generic-receive-offload: on
+slurm-node-04 ethtool-k: large-receive-offload: off
+slurm-node-04 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-04 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-04 ethtool-k: ntuple-filters: off
+slurm-node-04 ethtool-k: receive-hashing: on
+slurm-node-04 ethtool-k: highdma: on
+slurm-node-04 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-04 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-04 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-04 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-04 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-04 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-04 ethtool-k: tx-nocache-copy: off
+slurm-node-04 ethtool-k: loopback: off [fixed]
+slurm-node-04 ethtool-k: rx-fcs: off [fixed]
+slurm-node-04 ethtool-k: rx-all: off [fixed]
+slurm-node-04 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-04 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-04 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-04 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-04 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-04 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-04 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-04 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-04 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-04 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-04 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-04 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-04 ethtool-k: rx-gro-list: off
+slurm-node-04 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-04 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-04 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-04 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-04 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-04 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-07 page-size: 4096
+slurm-node-03 sysctl: kernel.io_uring_disabled = 0
+slurm-node-05 sysctl: net.core.wmem_max = 134217728
+slurm-node-02 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-06 ethtool-c: Coalesce parameters for ens3:
+slurm-node-06 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-06 ethtool-c: stats-block-usecs:	n/a
+slurm-node-06 ethtool-c: sample-interval:	n/a
+slurm-node-06 ethtool-c: pkt-rate-low:		n/a
+slurm-node-06 ethtool-c: pkt-rate-high:		n/a
+slurm-node-06 ethtool-c: 
+slurm-node-06 ethtool-c: rx-usecs:	20
+slurm-node-06 ethtool-c: rx-frames:	n/a
+slurm-node-06 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-06 ethtool-c: rx-frames-irq:	n/a
+slurm-node-06 ethtool-c: 
+slurm-node-06 ethtool-c: tx-usecs:	50
+slurm-node-06 ethtool-c: tx-frames:	n/a
+slurm-node-06 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-06 ethtool-c: tx-frames-irq:	n/a
+slurm-node-06 ethtool-c: 
+slurm-node-06 ethtool-c: rx-usecs-low:	n/a
+slurm-node-06 ethtool-c: rx-frame-low:	n/a
+slurm-node-06 ethtool-c: tx-usecs-low:	n/a
+slurm-node-06 ethtool-c: tx-frame-low:	n/a
+slurm-node-06 ethtool-c: 
+slurm-node-06 ethtool-c: rx-usecs-high:	n/a
+slurm-node-06 ethtool-c: rx-frame-high:	n/a
+slurm-node-06 ethtool-c: tx-usecs-high:	n/a
+slurm-node-06 ethtool-c: tx-frame-high:	n/a
+slurm-node-06 ethtool-c: 
+slurm-node-06 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-06 ethtool-c: 
+slurm-node-06 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-06 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-06 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-06 ethtool-c: 
+slurm-node-04 ethtool-c: Coalesce parameters for ens3:
+slurm-node-04 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-04 ethtool-c: stats-block-usecs:	n/a
+slurm-node-04 ethtool-c: sample-interval:	n/a
+slurm-node-04 ethtool-c: pkt-rate-low:		n/a
+slurm-node-04 ethtool-c: pkt-rate-high:		n/a
+slurm-node-04 ethtool-c: 
+slurm-node-04 ethtool-c: rx-usecs:	20
+slurm-node-04 ethtool-c: rx-frames:	n/a
+slurm-node-04 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-04 ethtool-c: rx-frames-irq:	n/a
+slurm-node-04 ethtool-c: 
+slurm-node-04 ethtool-c: tx-usecs:	50
+slurm-node-04 ethtool-c: tx-frames:	n/a
+slurm-node-04 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-04 ethtool-c: tx-frames-irq:	n/a
+slurm-node-04 ethtool-c: 
+slurm-node-04 ethtool-c: rx-usecs-low:	n/a
+slurm-node-04 ethtool-c: rx-frame-low:	n/a
+slurm-node-04 ethtool-c: tx-usecs-low:	n/a
+slurm-node-04 ethtool-c: tx-frame-low:	n/a
+slurm-node-04 ethtool-c: 
+slurm-node-04 ethtool-c: rx-usecs-high:	n/a
+slurm-node-04 ethtool-c: rx-frame-high:	n/a
+slurm-node-04 ethtool-c: tx-usecs-high:	n/a
+slurm-node-04 ethtool-c: tx-frame-high:	n/a
+slurm-node-04 ethtool-c: 
+slurm-node-04 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-04 ethtool-c: 
+slurm-node-04 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-04 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-04 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-04 ethtool-c: 
+slurm-node-07 governor: cat: /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor: No such file or directory
+slurm-node-03 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-02 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-05 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-06 ethtool-l: Channel parameters for ens3:
+slurm-node-06 ethtool-l: Pre-set maximums:
+slurm-node-06 ethtool-l: RX:		16
+slurm-node-06 ethtool-l: TX:		16
+slurm-node-06 ethtool-l: Other:		n/a
+slurm-node-06 ethtool-l: Combined:	n/a
+slurm-node-06 ethtool-l: Current hardware settings:
+slurm-node-06 ethtool-l: RX:		16
+slurm-node-06 ethtool-l: TX:		16
+slurm-node-06 ethtool-l: Other:		n/a
+slurm-node-06 ethtool-l: Combined:	n/a
+slurm-node-04 ethtool-l: Channel parameters for ens3:
+slurm-node-04 ethtool-l: Pre-set maximums:
+slurm-node-04 ethtool-l: RX:		16
+slurm-node-04 ethtool-l: TX:		16
+slurm-node-04 ethtool-l: Other:		n/a
+slurm-node-04 ethtool-l: Combined:	n/a
+slurm-node-04 ethtool-l: Current hardware settings:
+slurm-node-04 ethtool-l: RX:		16
+slurm-node-04 ethtool-l: TX:		16
+slurm-node-04 ethtool-l: Other:		n/a
+slurm-node-04 ethtool-l: Combined:	n/a
+slurm-node-07 numa: /usr/bin/bash: line 10: numactl: command not found
+slurm-node-08 interface: ens3
+slurm-node-02 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-05 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-06 ethtool-g: Ring parameters for ens3:
+slurm-node-06 ethtool-g: Pre-set maximums:
+slurm-node-06 ethtool-g: RX:			4096
+slurm-node-06 ethtool-g: RX Mini:		n/a
+slurm-node-06 ethtool-g: RX Jumbo:		n/a
+slurm-node-06 ethtool-g: TX:			4096
+slurm-node-06 ethtool-g: TX push buff len:	n/a
+slurm-node-06 ethtool-g: Current hardware settings:
+slurm-node-06 ethtool-g: RX:			1024
+slurm-node-06 ethtool-g: RX Mini:		n/a
+slurm-node-06 ethtool-g: RX Jumbo:		n/a
+slurm-node-06 ethtool-g: TX:			1024
+slurm-node-06 ethtool-g: RX Buf Len:		n/a
+slurm-node-06 ethtool-g: CQE Size:		n/a
+slurm-node-06 ethtool-g: TX Push:		off
+slurm-node-06 ethtool-g: RX Push:		off
+slurm-node-06 ethtool-g: TX push buff len:	n/a
+slurm-node-06 ethtool-g: TCP data split:		off
+slurm-node-04 ethtool-g: Ring parameters for ens3:
+slurm-node-04 ethtool-g: Pre-set maximums:
+slurm-node-04 ethtool-g: RX:			4096
+slurm-node-04 ethtool-g: RX Mini:		n/a
+slurm-node-04 ethtool-g: RX Jumbo:		n/a
+slurm-node-04 ethtool-g: TX:			4096
+slurm-node-04 ethtool-g: TX push buff len:	n/a
+slurm-node-04 ethtool-g: Current hardware settings:
+slurm-node-04 ethtool-g: RX:			1024
+slurm-node-04 ethtool-g: RX Mini:		n/a
+slurm-node-04 ethtool-g: RX Jumbo:		n/a
+slurm-node-04 ethtool-g: TX:			1024
+slurm-node-04 ethtool-g: RX Buf Len:		n/a
+slurm-node-04 ethtool-g: CQE Size:		n/a
+slurm-node-04 ethtool-g: TX Push:		off
+slurm-node-04 ethtool-g: RX Push:		off
+slurm-node-04 ethtool-g: TX push buff len:	n/a
+slurm-node-04 ethtool-g: TCP data split:		off
+slurm-node-02 sysctl: net.core.somaxconn = 65535
+slurm-node-05 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-06 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-04 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-08 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-08 link:     link/ether 42:01:0a:0a:00:12 brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-08 link:     altname enp0s3
+slurm-node-08 link:     altname enx42010a0a0012
+slurm-node-02 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-05 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-04 sysctl: net.core.rmem_max = 134217728
+slurm-node-06 sysctl: net.core.rmem_max = 134217728
+slurm-node-08 speed: 23000
+slurm-node-02 sysctl: kernel.io_uring_disabled = 0
+slurm-node-05 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-04 sysctl: net.core.wmem_max = 134217728
+slurm-node-06 sysctl: net.core.wmem_max = 134217728
+slurm-node-02 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-08 ethtool-i: driver: gve
+slurm-node-08 ethtool-i: version: 1.0.0
+slurm-node-08 ethtool-i: firmware-version: 
+slurm-node-08 ethtool-i: expansion-rom-version: 
+slurm-node-08 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-08 ethtool-i: supports-statistics: yes
+slurm-node-08 ethtool-i: supports-test: no
+slurm-node-08 ethtool-i: supports-eeprom-access: no
+slurm-node-08 ethtool-i: supports-register-dump: no
+slurm-node-08 ethtool-i: supports-priv-flags: yes
+slurm-node-05 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-04 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-06 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-05 sysctl: net.core.somaxconn = 65535
+slurm-node-04 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-08 ethtool-k: Features for ens3:
+slurm-node-08 ethtool-k: rx-checksumming: on
+slurm-node-08 ethtool-k: tx-checksumming: on
+slurm-node-08 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-08 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-08 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-08 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-08 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-08 ethtool-k: scatter-gather: on
+slurm-node-08 ethtool-k: 	tx-scatter-gather: on
+slurm-node-08 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-08 ethtool-k: tcp-segmentation-offload: on
+slurm-node-08 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-08 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-08 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-08 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-08 ethtool-k: generic-segmentation-offload: on
+slurm-node-08 ethtool-k: generic-receive-offload: on
+slurm-node-08 ethtool-k: large-receive-offload: off
+slurm-node-08 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-08 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-08 ethtool-k: ntuple-filters: off
+slurm-node-08 ethtool-k: receive-hashing: on
+slurm-node-08 ethtool-k: highdma: on
+slurm-node-08 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-08 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-08 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-08 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-08 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-08 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-08 ethtool-k: tx-nocache-copy: off
+slurm-node-08 ethtool-k: loopback: off [fixed]
+slurm-node-08 ethtool-k: rx-fcs: off [fixed]
+slurm-node-08 ethtool-k: rx-all: off [fixed]
+slurm-node-08 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-08 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-08 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-08 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-08 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-08 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-08 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-08 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-08 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-08 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-08 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-06 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-08 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-08 ethtool-k: rx-gro-list: off
+slurm-node-08 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-08 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-08 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-08 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-08 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-08 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-07 interface: ens3
+slurm-node-04 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-05 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-06 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-08 ethtool-c: Coalesce parameters for ens3:
+slurm-node-08 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-08 ethtool-c: stats-block-usecs:	n/a
+slurm-node-08 ethtool-c: sample-interval:	n/a
+slurm-node-08 ethtool-c: pkt-rate-low:		n/a
+slurm-node-08 ethtool-c: pkt-rate-high:		n/a
+slurm-node-08 ethtool-c: 
+slurm-node-08 ethtool-c: rx-usecs:	20
+slurm-node-08 ethtool-c: rx-frames:	n/a
+slurm-node-08 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-08 ethtool-c: rx-frames-irq:	n/a
+slurm-node-08 ethtool-c: 
+slurm-node-08 ethtool-c: tx-usecs:	50
+slurm-node-08 ethtool-c: tx-frames:	n/a
+slurm-node-08 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-08 ethtool-c: tx-frames-irq:	n/a
+slurm-node-08 ethtool-c: 
+slurm-node-08 ethtool-c: rx-usecs-low:	n/a
+slurm-node-08 ethtool-c: rx-frame-low:	n/a
+slurm-node-08 ethtool-c: tx-usecs-low:	n/a
+slurm-node-08 ethtool-c: tx-frame-low:	n/a
+slurm-node-08 ethtool-c: 
+slurm-node-08 ethtool-c: rx-usecs-high:	n/a
+slurm-node-08 ethtool-c: rx-frame-high:	n/a
+slurm-node-08 ethtool-c: tx-usecs-high:	n/a
+slurm-node-08 ethtool-c: tx-frame-high:	n/a
+slurm-node-08 ethtool-c: 
+slurm-node-08 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-08 ethtool-c: 
+slurm-node-08 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-08 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-08 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-08 ethtool-c: 
+slurm-node-04 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-06 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-05 sysctl: kernel.io_uring_disabled = 0
+slurm-node-07 link: 2: ens3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8896 qdisc mq state UP mode DEFAULT group default qlen 1000
+slurm-node-07 link:     link/ether 42:01:0a:0a:00:11 brd ff:ff:ff:ff:ff:ff promiscuity 0 allmulti 0 minmtu 68 maxmtu 8896 addrgenmode eui64 numtxqueues 16 numrxqueues 16 gso_max_size 65536 gso_max_segs 65535 tso_max_size 262143 tso_max_segs 65535 gro_max_size 65536 gso_ipv4_max_size 65536 gro_ipv4_max_size 65536 parentbus pci parentdev 0000:00:03.0 
+slurm-node-07 link:     altname enp0s3
+slurm-node-07 link:     altname enx42010a0a0011
+slurm-node-08 ethtool-l: Channel parameters for ens3:
+slurm-node-08 ethtool-l: Pre-set maximums:
+slurm-node-08 ethtool-l: RX:		16
+slurm-node-08 ethtool-l: TX:		16
+slurm-node-08 ethtool-l: Other:		n/a
+slurm-node-08 ethtool-l: Combined:	n/a
+slurm-node-08 ethtool-l: Current hardware settings:
+slurm-node-08 ethtool-l: RX:		16
+slurm-node-08 ethtool-l: TX:		16
+slurm-node-08 ethtool-l: Other:		n/a
+slurm-node-08 ethtool-l: Combined:	n/a
+slurm-node-04 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-06 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-05 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-04 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-07 speed: 23000
+slurm-node-06 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-08 ethtool-g: Ring parameters for ens3:
+slurm-node-08 ethtool-g: Pre-set maximums:
+slurm-node-08 ethtool-g: RX:			4096
+slurm-node-08 ethtool-g: RX Mini:		n/a
+slurm-node-08 ethtool-g: RX Jumbo:		n/a
+slurm-node-08 ethtool-g: TX:			4096
+slurm-node-08 ethtool-g: TX push buff len:	n/a
+slurm-node-08 ethtool-g: Current hardware settings:
+slurm-node-08 ethtool-g: RX:			1024
+slurm-node-08 ethtool-g: RX Mini:		n/a
+slurm-node-08 ethtool-g: RX Jumbo:		n/a
+slurm-node-08 ethtool-g: TX:			1024
+slurm-node-08 ethtool-g: RX Buf Len:		n/a
+slurm-node-08 ethtool-g: CQE Size:		n/a
+slurm-node-08 ethtool-g: TX Push:		off
+slurm-node-08 ethtool-g: RX Push:		off
+slurm-node-08 ethtool-g: TX push buff len:	n/a
+slurm-node-08 ethtool-g: TCP data split:		off
+slurm-node-04 sysctl: net.core.somaxconn = 65535
+slurm-node-07 ethtool-i: driver: gve
+slurm-node-07 ethtool-i: version: 1.0.0
+slurm-node-07 ethtool-i: firmware-version: 
+slurm-node-07 ethtool-i: expansion-rom-version: 
+slurm-node-07 ethtool-i: bus-info: 0000:00:03.0
+slurm-node-07 ethtool-i: supports-statistics: yes
+slurm-node-07 ethtool-i: supports-test: no
+slurm-node-07 ethtool-i: supports-eeprom-access: no
+slurm-node-07 ethtool-i: supports-register-dump: no
+slurm-node-07 ethtool-i: supports-priv-flags: yes
+slurm-node-06 sysctl: net.core.somaxconn = 65535
+slurm-node-08 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-04 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-06 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-07 ethtool-k: Features for ens3:
+slurm-node-07 ethtool-k: rx-checksumming: on
+slurm-node-07 ethtool-k: tx-checksumming: on
+slurm-node-07 ethtool-k: 	tx-checksum-ipv4: off [fixed]
+slurm-node-07 ethtool-k: 	tx-checksum-ip-generic: on
+slurm-node-07 ethtool-k: 	tx-checksum-ipv6: off [fixed]
+slurm-node-07 ethtool-k: 	tx-checksum-fcoe-crc: off [fixed]
+slurm-node-07 ethtool-k: 	tx-checksum-sctp: off [fixed]
+slurm-node-07 ethtool-k: scatter-gather: on
+slurm-node-07 ethtool-k: 	tx-scatter-gather: on
+slurm-node-07 ethtool-k: 	tx-scatter-gather-fraglist: off [fixed]
+slurm-node-07 ethtool-k: tcp-segmentation-offload: on
+slurm-node-07 ethtool-k: 	tx-tcp-segmentation: on
+slurm-node-07 ethtool-k: 	tx-tcp-ecn-segmentation: on
+slurm-node-07 ethtool-k: 	tx-tcp-mangleid-segmentation: off
+slurm-node-07 ethtool-k: 	tx-tcp6-segmentation: on
+slurm-node-07 ethtool-k: generic-segmentation-offload: on
+slurm-node-07 ethtool-k: generic-receive-offload: on
+slurm-node-07 ethtool-k: large-receive-offload: off
+slurm-node-07 ethtool-k: rx-vlan-offload: off [fixed]
+slurm-node-07 ethtool-k: tx-vlan-offload: off [fixed]
+slurm-node-07 ethtool-k: ntuple-filters: off
+slurm-node-07 ethtool-k: receive-hashing: on
+slurm-node-07 ethtool-k: highdma: on
+slurm-node-07 ethtool-k: rx-vlan-filter: off [fixed]
+slurm-node-07 ethtool-k: vlan-challenged: off [fixed]
+slurm-node-07 ethtool-k: tx-gso-robust: off [fixed]
+slurm-node-07 ethtool-k: tx-fcoe-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-gre-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-gre-csum-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-ipxip4-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-ipxip6-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-udp_tnl-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-udp_tnl-csum-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-gso-partial: off [fixed]
+slurm-node-07 ethtool-k: tx-tunnel-remcsum-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-sctp-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-esp-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-udp-segmentation: off [fixed]
+slurm-node-07 ethtool-k: tx-gso-list: off [fixed]
+slurm-node-07 ethtool-k: tx-nocache-copy: off
+slurm-node-07 ethtool-k: loopback: off [fixed]
+slurm-node-07 ethtool-k: rx-fcs: off [fixed]
+slurm-node-07 ethtool-k: rx-all: off [fixed]
+slurm-node-07 ethtool-k: tx-vlan-stag-hw-insert: off [fixed]
+slurm-node-07 ethtool-k: rx-vlan-stag-hw-parse: off [fixed]
+slurm-node-07 ethtool-k: rx-vlan-stag-filter: off [fixed]
+slurm-node-07 ethtool-k: l2-fwd-offload: off [fixed]
+slurm-node-07 ethtool-k: hw-tc-offload: off [fixed]
+slurm-node-07 ethtool-k: esp-hw-offload: off [fixed]
+slurm-node-07 ethtool-k: esp-tx-csum-hw-offload: off [fixed]
+slurm-node-07 ethtool-k: rx-udp_tunnel-port-offload: off [fixed]
+slurm-node-07 ethtool-k: tls-hw-tx-offload: off [fixed]
+slurm-node-07 ethtool-k: tls-hw-rx-offload: off [fixed]
+slurm-node-07 ethtool-k: rx-gro-hw: off [fixed]
+slurm-node-07 ethtool-k: tls-hw-record: off [fixed]
+slurm-node-07 ethtool-k: rx-gro-list: off
+slurm-node-07 ethtool-k: macsec-hw-offload: off [fixed]
+slurm-node-07 ethtool-k: rx-udp-gro-forwarding: off
+slurm-node-07 ethtool-k: hsr-tag-ins-offload: off [fixed]
+slurm-node-07 ethtool-k: hsr-tag-rm-offload: off [fixed]
+slurm-node-07 ethtool-k: hsr-fwd-offload: off [fixed]
+slurm-node-07 ethtool-k: hsr-dup-offload: off [fixed]
+slurm-node-08 sysctl: net.core.rmem_max = 134217728
+slurm-node-06 sysctl: kernel.io_uring_disabled = 0
+slurm-node-04 sysctl: kernel.io_uring_disabled = 0
+slurm-node-01 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-07 ethtool-c: Coalesce parameters for ens3:
+slurm-node-07 ethtool-c: Adaptive RX: n/a  TX: n/a
+slurm-node-07 ethtool-c: stats-block-usecs:	n/a
+slurm-node-07 ethtool-c: sample-interval:	n/a
+slurm-node-07 ethtool-c: pkt-rate-low:		n/a
+slurm-node-07 ethtool-c: pkt-rate-high:		n/a
+slurm-node-07 ethtool-c: 
+slurm-node-07 ethtool-c: rx-usecs:	20
+slurm-node-07 ethtool-c: rx-frames:	n/a
+slurm-node-07 ethtool-c: rx-usecs-irq:	n/a
+slurm-node-07 ethtool-c: rx-frames-irq:	n/a
+slurm-node-07 ethtool-c: 
+slurm-node-07 ethtool-c: tx-usecs:	50
+slurm-node-07 ethtool-c: tx-frames:	n/a
+slurm-node-07 ethtool-c: tx-usecs-irq:	n/a
+slurm-node-07 ethtool-c: tx-frames-irq:	n/a
+slurm-node-07 ethtool-c: 
+slurm-node-07 ethtool-c: rx-usecs-low:	n/a
+slurm-node-07 ethtool-c: rx-frame-low:	n/a
+slurm-node-07 ethtool-c: tx-usecs-low:	n/a
+slurm-node-07 ethtool-c: tx-frame-low:	n/a
+slurm-node-07 ethtool-c: 
+slurm-node-07 ethtool-c: rx-usecs-high:	n/a
+slurm-node-07 ethtool-c: rx-frame-high:	n/a
+slurm-node-07 ethtool-c: tx-usecs-high:	n/a
+slurm-node-07 ethtool-c: tx-frame-high:	n/a
+slurm-node-07 ethtool-c: 
+slurm-node-07 ethtool-c: CQE mode RX: n/a  TX: n/a
+slurm-node-07 ethtool-c: 
+slurm-node-07 ethtool-c: tx-aggr-max-bytes:	n/a
+slurm-node-07 ethtool-c: tx-aggr-max-frames:	n/a
+slurm-node-07 ethtool-c: tx-aggr-time-usecs:	n/a
+slurm-node-07 ethtool-c: 
+slurm-node-06 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-04 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-01 logind: RemoveIPC=no
+slurm-node-08 sysctl: net.core.wmem_max = 134217728
+slurm-node-07 ethtool-l: Channel parameters for ens3:
+slurm-node-07 ethtool-l: Pre-set maximums:
+slurm-node-07 ethtool-l: RX:		16
+slurm-node-07 ethtool-l: TX:		16
+slurm-node-07 ethtool-l: Other:		n/a
+slurm-node-07 ethtool-l: Combined:	n/a
+slurm-node-07 ethtool-l: Current hardware settings:
+slurm-node-07 ethtool-l: RX:		16
+slurm-node-07 ethtool-l: TX:		16
+slurm-node-07 ethtool-l: Other:		n/a
+slurm-node-07 ethtool-l: Combined:	n/a
+slurm-node-08 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-07 ethtool-g: Ring parameters for ens3:
+slurm-node-07 ethtool-g: Pre-set maximums:
+slurm-node-07 ethtool-g: RX:			4096
+slurm-node-07 ethtool-g: RX Mini:		n/a
+slurm-node-07 ethtool-g: RX Jumbo:		n/a
+slurm-node-07 ethtool-g: TX:			4096
+slurm-node-07 ethtool-g: TX push buff len:	n/a
+slurm-node-07 ethtool-g: Current hardware settings:
+slurm-node-07 ethtool-g: RX:			1024
+slurm-node-07 ethtool-g: RX Mini:		n/a
+slurm-node-07 ethtool-g: RX Jumbo:		n/a
+slurm-node-07 ethtool-g: TX:			1024
+slurm-node-07 ethtool-g: RX Buf Len:		n/a
+slurm-node-07 ethtool-g: CQE Size:		n/a
+slurm-node-07 ethtool-g: TX Push:		off
+slurm-node-07 ethtool-g: RX Push:		off
+slurm-node-07 ethtool-g: TX push buff len:	n/a
+slurm-node-07 ethtool-g: TCP data split:		off
+slurm-node-01 packages: liburing-dev:amd64	2.9-1
+slurm-node-01 packages: liburing2:amd64	2.9-1
+slurm-node-08 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-07 sysctl: net.core.netdev_max_backlog = 250000
+slurm-node-08 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-07 sysctl: net.core.rmem_max = 134217728
+slurm-node-08 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-07 sysctl: net.core.wmem_max = 134217728
+slurm-node-07 sysctl: net.ipv4.tcp_rmem = 4096	87380	67108864
+slurm-node-08 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-08 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-07 sysctl: net.ipv4.tcp_wmem = 4096	65536	67108864
+slurm-node-08 sysctl: net.core.somaxconn = 65535
+slurm-node-07 sysctl: net.ipv4.tcp_congestion_control = cubic
+slurm-node-08 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-07 sysctl: net.ipv4.tcp_notsent_lowat = 4294967295
+slurm-node-07 sysctl: net.ipv4.tcp_mtu_probing = 0
+slurm-node-08 sysctl: kernel.io_uring_disabled = 0
+slurm-node-07 sysctl: net.ipv4.tcp_slow_start_after_idle = 0
+slurm-node-08 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-07 sysctl: net.core.somaxconn = 65535
+slurm-node-07 sysctl: net.core.default_qdisc = fq_codel
+slurm-node-07 sysctl: kernel.io_uring_disabled = 0
+slurm-node-07 limits: memlock unlimited, open files 1024, stack 8192
+slurm-node-03 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-03 logind: RemoveIPC=no
+slurm-node-03 packages: liburing-dev:amd64	2.9-1
+slurm-node-03 packages: liburing2:amd64	2.9-1
+slurm-node-05 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-05 logind: RemoveIPC=no
+slurm-node-06 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-04 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-05 packages: liburing-dev:amd64	2.9-1
+slurm-node-05 packages: liburing2:amd64	2.9-1
+slurm-node-06 logind: RemoveIPC=no
+slurm-node-04 logind: RemoveIPC=no
+slurm-node-01 resolves: slurm-node-01 10.10.0.11
+slurm-node-01 resolves: slurm-node-02 10.10.0.12
+slurm-node-01 resolves: slurm-node-03 10.10.0.13
+slurm-node-01 resolves: slurm-node-04 10.10.0.14
+slurm-node-01 resolves: slurm-node-05 10.10.0.15
+slurm-node-01 resolves: slurm-node-06 10.10.0.16
+slurm-node-01 resolves: slurm-node-07 10.10.0.17
+slurm-node-01 resolves: slurm-node-08 10.10.0.18
+slurm-node-02 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-02 logind: RemoveIPC=no
+slurm-node-06 packages: liburing-dev:amd64	2.9-1
+slurm-node-06 packages: liburing2:amd64	2.9-1
+slurm-node-04 packages: liburing-dev:amd64	2.9-1
+slurm-node-04 packages: liburing2:amd64	2.9-1
+slurm-node-02 packages: liburing-dev:amd64	2.9-1
+slurm-node-02 packages: liburing2:amd64	2.9-1
+slurm-node-08 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-03 resolves: slurm-node-01 10.10.0.11
+slurm-node-03 resolves: slurm-node-02 10.10.0.12
+slurm-node-03 resolves: slurm-node-03 10.10.0.13
+slurm-node-03 resolves: slurm-node-04 10.10.0.14
+slurm-node-03 resolves: slurm-node-05 10.10.0.15
+slurm-node-03 resolves: slurm-node-06 10.10.0.16
+slurm-node-03 resolves: slurm-node-07 10.10.0.17
+slurm-node-03 resolves: slurm-node-08 10.10.0.18
+slurm-node-08 logind: RemoveIPC=no
+slurm-node-07 linger: Failed to get user: User ID 208909988 is not logged in or lingering
+slurm-node-08 packages: liburing-dev:amd64	2.9-1
+slurm-node-08 packages: liburing2:amd64	2.9-1
+slurm-node-07 logind: RemoveIPC=no
+slurm-node-07 packages: liburing-dev:amd64	2.9-1
+slurm-node-07 packages: liburing2:amd64	2.9-1
+slurm-node-05 resolves: slurm-node-01 10.10.0.11
+slurm-node-05 resolves: slurm-node-02 10.10.0.12
+slurm-node-05 resolves: slurm-node-03 10.10.0.13
+slurm-node-05 resolves: slurm-node-04 10.10.0.14
+slurm-node-05 resolves: slurm-node-05 10.10.0.15
+slurm-node-05 resolves: slurm-node-06 10.10.0.16
+slurm-node-05 resolves: slurm-node-07 10.10.0.17
+slurm-node-05 resolves: slurm-node-08 10.10.0.18
+slurm-node-02 resolves: slurm-node-01 10.10.0.11
+slurm-node-02 resolves: slurm-node-02 10.10.0.12
+slurm-node-02 resolves: slurm-node-03 10.10.0.13
+slurm-node-02 resolves: slurm-node-04 10.10.0.14
+slurm-node-02 resolves: slurm-node-05 10.10.0.15
+slurm-node-02 resolves: slurm-node-06 10.10.0.16
+slurm-node-02 resolves: slurm-node-07 10.10.0.17
+slurm-node-02 resolves: slurm-node-08 10.10.0.18
+slurm-node-06 resolves: slurm-node-01 10.10.0.11
+slurm-node-06 resolves: slurm-node-02 10.10.0.12
+slurm-node-06 resolves: slurm-node-03 10.10.0.13
+slurm-node-06 resolves: slurm-node-04 10.10.0.14
+slurm-node-06 resolves: slurm-node-05 10.10.0.15
+slurm-node-06 resolves: slurm-node-06 10.10.0.16
+slurm-node-06 resolves: slurm-node-07 10.10.0.17
+slurm-node-06 resolves: slurm-node-08 10.10.0.18
+slurm-node-04 resolves: slurm-node-01 10.10.0.11
+slurm-node-04 resolves: slurm-node-02 10.10.0.12
+slurm-node-04 resolves: slurm-node-03 10.10.0.13
+slurm-node-04 resolves: slurm-node-04 10.10.0.14
+slurm-node-04 resolves: slurm-node-05 10.10.0.15
+slurm-node-04 resolves: slurm-node-06 10.10.0.16
+slurm-node-04 resolves: slurm-node-07 10.10.0.17
+slurm-node-04 resolves: slurm-node-08 10.10.0.18
+slurm-node-08 resolves: slurm-node-01 10.10.0.11
+slurm-node-08 resolves: slurm-node-02 10.10.0.12
+slurm-node-08 resolves: slurm-node-03 10.10.0.13
+slurm-node-08 resolves: slurm-node-04 10.10.0.14
+slurm-node-08 resolves: slurm-node-05 10.10.0.15
+slurm-node-08 resolves: slurm-node-06 10.10.0.16
+slurm-node-08 resolves: slurm-node-07 10.10.0.17
+slurm-node-08 resolves: slurm-node-08 10.10.0.18
+slurm-node-07 resolves: slurm-node-01 10.10.0.11
+slurm-node-07 resolves: slurm-node-02 10.10.0.12
+slurm-node-07 resolves: slurm-node-03 10.10.0.13
+slurm-node-07 resolves: slurm-node-04 10.10.0.14
+slurm-node-07 resolves: slurm-node-05 10.10.0.15
+slurm-node-07 resolves: slurm-node-06 10.10.0.16
+slurm-node-07 resolves: slurm-node-07 10.10.0.17
+slurm-node-07 resolves: slurm-node-08 10.10.0.18
+salloc: Relinquishing job allocation 4
+salloc: Job allocation 4 has been revoked.
+# exit 0
