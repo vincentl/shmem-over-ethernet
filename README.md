@@ -1066,9 +1066,9 @@ specification or takes a choice the specification leaves open.
   nodes come near it - one node's rings took at most 2.6 MiB at the 4,097-node
   ceiling, on a Pi's 16 KiB pages at up to three helpers - and [`osoe-launch`](#running-a-program-on-one-machine-with-osoe-launch)
   gives a Pi's numbers.
-- **A program linked statically is refused**: `oshcc -static` says so, since the
-  C library's own state would then be gathered with the program's symmetric
-  statics.
+- **A program linked statically is refused**: `oshcc -static` says so - and
+  `--static` and `-static-pie` - since the C library's own state would then be
+  gathered with the program's symmetric statics.
 - **Tested on aarch64.** osoe has been developed and tested on aarch64: the
   Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 the tagged
   tree built without warnings and passed every test that can run under Rosetta,
