@@ -235,7 +235,8 @@ rated them (round six's readiness Q5-5).
   lower ceiling's tests; the cost model's Träff's optimistic against the Pi from
   256 KiB, and `osoe-bench`'s back-to-back 64 KiB reduction no faster for it -
   both worth a look when the progress helpers change what a node carries both
-  ways at once.
+  ways at once (looked at on 2026-10-12, H21 in `docs/pi-cluster-results.md`:
+  the optimism stands at every helper count, and the 64 KiB was the binding).
 - **A lead that dies between making its segment and finishing it** (correctness
   F2); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
   racing its child (F4); F5's small items.
