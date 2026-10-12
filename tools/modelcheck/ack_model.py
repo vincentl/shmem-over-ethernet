@@ -71,7 +71,8 @@ both. Anything else is a result, not a formality.
 What is modelled, and what is left to the models that own it
   * The wire is one reliable in-order segment slot per direction, filled by a
     send step and emptied by the peer's receive step. The byte ring underneath
-    it, and its wake protocol, are `wire_model.py`'s subject.
+    it - a socket since phase 1 step 3 slice 1, when `wire_model.py`'s ring went -
+    is not modelled.
   * A writer's reserve-and-commit into the open buffer is one atomic step, and
     so is the lead's seal against it. That atomicity is exactly what §3.5's
     reservation protocol provides and what `reservation_model.py` checks; here

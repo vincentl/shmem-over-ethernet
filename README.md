@@ -9,8 +9,9 @@ alone, to develop programs on a desktop, needs only the compiler, CMake and make
 ([On a desktop](#on-a-desktop-the-single-node-build)). It was developed in an
 aarch64 virtual machine and on a cluster of four Raspberry Pi 5 boards, and is
 designed to stay usable at hundreds of nodes with 256 processes each - a scale
-it has not run at: the largest job across separate machines so far is the Pi
-cluster's 16 PEs, four on each node.
+it has not run at: the largest job across separate machines so far is 128 PEs
+(OpenSHMEM's processes, [defined below](#openshmem-in-two-minutes)), 16 on each
+of eight Google Cloud nodes, and the Pi cluster's is 16, four on each node.
 
 **Status.** Every routine of OpenSHMEM 1.6's C interface is implemented, the
 deprecated ones of its Annex F included. What departs from the
@@ -22,9 +23,12 @@ itself 0.1.0 until v0.2 is released. [Installing](#installing) says where the
 library and the tools show the version. It has been tested on
 aarch64 - the Raspberry Pi cluster and an aarch64 virtual machine - and, since
 2026-10-12, natively on x86-64: eight Google Cloud `c4-standard-16` (Debian 13,
-Linux 6.12) passed the four presets at no helpers, two and three, tier 3, the
-single-node build and `osoe-pacer`, across nodes at 23 Gbit/s
-([the results](docs/fast-link-results.md)). It was written with Claude Code, under its
+Linux 6.12) passed the four build presets (`debug`, `release`, and the
+sanitizers `asan` and `tsan`) at no helpers, two and three (progress helpers:
+extra threads that share a node's network traffic), tier 3 (tests over network
+namespaces), the single-node build and the stress tester `osoe-pacer`, each on a
+node by itself, and ran jobs of up to 128 PEs across the nodes over a link of 23
+Gbit/s ([the results](docs/fast-link-results.md)). It was written with Claude Code, under its
 author's direction ([How osoe was made](#how-osoe-was-made)).
 
 ## OpenSHMEM in two minutes
@@ -223,7 +227,8 @@ osoe has run on aarch64, on the Raspberry Pi cluster and in an aarch64 virtual
 machine, and natively on x86-64: on 2026-10-12 eight Google Cloud
 `c4-standard-16` (Intel Xeon Platinum 8581C, Debian 13, Linux 6.12) passed the
 four presets at no helpers, two and three - ThreadSanitizer's gate with them -
-tier 3, the single-node build and `osoe-pacer`'s runs, across nodes at 23 Gbit/s
+tier 3, the single-node build and `osoe-pacer`'s runs, each on a node by itself,
+and jobs of up to 128 PEs ran across the nodes at 23 Gbit/s
 ([the results](docs/fast-link-results.md)). Before that, an x86-64 build passed every test an emulator on an aarch64
 kernel can run - the full build with a shim standing in for the futex2 calls the
 emulator refuses, the single-node build with none, since the emulator passes the
@@ -268,7 +273,7 @@ checks of the build itself and jobs of a few processes. On four cores of an idle
 virtual machine it took about eleven minutes, one for the build and ten for the
 tests. Both may run four at a time, as this project's own runs do (`cmake
 --build --preset release -j4`, `ctest --preset release -j4`). The 40 tests of
-the model checker (`tools/modelcheck`, which needs Python 3) took 62 minutes in
+the model checker (`tools/modelcheck`, which needs Python 3; 39 since `model.wire` was retired) took 62 minutes in
 a development VM one at a time on 2026-10-11, the longest of them,
 `model.reservation`, 14 of those, and check the design, which does not vary with the machine. They
 want memory more than cores: the largest, `model.abort`, holds 3 GiB at its
@@ -663,10 +668,11 @@ build tree.
   connection mesh is linear in it, two connections to each of a node's n - 1
   peers ("Scaling with nodes", below); within a node, linear or better in the
   PEs there - tested with at most 15 PEs on a node, and timed with 4 on the Pi
-  cluster and, for the barrier alone, up to 32 on one four-core virtual machine
-  (design §5.3): a node's barrier arrival is one cache line that all its PEs add
-  to, and in a reduction the node's lead PE combines the node's vectors one
-  after another on its own thread, O(PEs × bytes).
+  cluster, 16 on the Google Cloud one and, for the barrier alone, up to 32 on
+  one four-core virtual machine (design §5.3): a node's barrier arrival is one
+  cache line that all its PEs add to, and in a reduction the node's lead PE
+  combines the node's vectors one after another on its own thread,
+  O(PEs × bytes).
 - **Cores are not assumed spare.** A node runs a PE on every core with the
   library's progress thread beside them, so oversubscription is the normal case:
   nothing spins. A waiting PE sleeps on a futex, and a start-up wait for an
@@ -786,11 +792,12 @@ line, the release of a reduction or broadcast is one futex wake of every PE
 waiting, and the node's lead combines its PEs' vectors one after another, so a
 reduction costs the lead O(P × bytes). A barrier's release on a team that
 spans nodes is a chain of wakes O(log P) deep, and on a team of one node one
-wake of every PE. Only the one-node barrier is timed past 4 PEs a node: linear
+wake of every PE. The one-node barrier is timed past 4 PEs a node: linear
 to 32 on a four-core virtual machine, so oversubscribed past 4 - 11 µs at 2 PEs
 and 42 at 32 when the machine was quiet (design §5.3), 13 to 18 and 105 to 116
 under a review's load. The other phases are timed with 4 PEs a node on the Pi
-cluster, and nothing beyond 32.
+cluster and with 16 on Google Cloud's (OSU's collectives at 8 nodes of 16 PEs),
+and nothing beyond 32.
 
 ### Memory
 
@@ -844,8 +851,9 @@ times these:
   node it has not been measured. Progress helpers (`OSOE_PROGRESS_HELPERS`)
   spread a node's data wires over more threads, a share of the other nodes
   each; on four nodes of the Pi cluster they cost broadcasts and alltoalls more
-  than they bought, and with many peers on a fast link they have not been
-  measured (Limits).
+  than they bought, and on a fast link they have been measured only in a
+  fan-in, where two helpers raised a receiving node's rate by half or more, and
+  not in the sweep that decides their default (Limits).
 - **`alltoall`** sends P(N - P) blocks into a node, a message each up to a
   chunk and, for an `alltoalls` with a stride, one an element, all applied by
   that thread.
@@ -1032,8 +1040,15 @@ specification or takes a choice the specification leaves open.
   or more took 1.00 to 1.06 times a put and quiet of the same size, and a
   nonblocking one 0.98 to 1.06; over the development VM's loopback, where a
   round trip's time carries about the zone's 256 KiB, about 2.7 times at a
-  mebibyte and 3.3 at 4 MiB. The zone's size for a fast link waits for one
-  (`docs/decisions/2026-10-10-blocking-gets.md`;
+  mebibyte and 3.3 at 4 MiB. On Google Cloud's link of 23 Gbit/s a blocking get
+  took 1.6 times a put and quiet at a mebibyte and 1.8 to 1.95 times from 4 MiB
+  with the default zone, and what a put did from a zone of 1 MiB, while eight
+  PEs on each node getting from the other nodes ran fastest with the default,
+  13,601 MiB/s a job against 8,786 with 16 MiB
+  (`docs/fast-link-results.md`). The zone's size for a
+  fast link is to come from a per-node budget, as the author decided on those
+  numbers, and is not built yet (`docs/decisions/2026-10-12.md`;
+  `docs/decisions/2026-10-10-blocking-gets.md`;
   `docs/design/blocking-get-proposal.md`, (d)). A thread whose place's
   context block lies past block 4,095, the last a get's token can name - as
   the last places' do from `OSOE_MAX_CONTEXTS` 4,080 at the default
@@ -1069,17 +1084,26 @@ specification or takes a choice the specification leaves open.
 - **A program linked statically is refused**: `oshcc -static` says so - and
   `--static` and `-static-pie` - since the C library's own state would then be
   gathered with the program's symmetric statics.
-- **Tested on aarch64.** osoe has been developed and tested on aarch64: the
-  Raspberry Pi 5 cluster and an aarch64 virtual machine. On x86-64 the tagged
-  tree built without warnings and passed every test that can run under Rosetta,
-  an x86-64 user space on an aarch64 kernel - 369 of its 718, with a shim
-  standing in for the futex2 calls Rosetta refuses; the emulator refused the
-  rest io_uring or seccomp - and v0.2 step 1's full build passed its one-node
-  tests but four, each failure the emulator's or the cross build's. Rosetta
-  refuses io_uring, so no x86-64 process has sent a message to another node: the
-  network path, and the timing pins that
-  were set on aarch64, are untested there, and no x86-64 kernel has run any of
-  it. What x86-64's memory order would do to the protocols across nodes was
+- **Tested on aarch64, and on x86-64 since 2026-10-12.** osoe has been developed
+  and tested on aarch64: the Raspberry Pi 5 cluster and an aarch64 virtual
+  machine. It has run natively on x86-64 in one session, on eight Google Cloud
+  nodes ([Requirements](#requirements) says which runs, [the
+  results](docs/fast-link-results.md) has them): the floor's timing pins, set on
+  aarch64, held, and messages crossed between separate machines - the floor's
+  round trips, a bare stream, gets, a fan-in and OSU's benchmarks, up to 128 PEs.
+  The suite and the stress tester, which check results, ran each on one node, a
+  job's logical nodes talking over loopback, so neither has run across separate
+  x86-64 machines; and Sandia OpenSHMEM's suite and 13 of the 40 models (Python,
+  so the same result on any machine) have not run natively at all. Before that,
+  on x86-64 the tagged tree built without warnings and passed every test that
+  can run under Rosetta, an x86-64 user space on an aarch64 kernel - 369 of its
+  718, with a shim standing in for the futex2 calls Rosetta refuses; the
+  emulator refused the rest io_uring or seccomp - and v0.2 step 1's full build
+  passed its one-node tests but four, each failure the emulator's or the cross
+  build's. Rosetta refuses io_uring, so no x86-64 process had sent a message to
+  another node: the network path, and the timing pins that were set on aarch64,
+  were untested there, and no x86-64 kernel had run any of it. What x86-64's
+  memory order would do to the protocols across nodes was
   checked instead on aarch64, built to order memory as x86-64 does - stores
   released, loads acquired, a store-buffering litmus test telling the two
   orders apart: the whole suite passed so, the lanes, scan and pipeline tests
@@ -1093,8 +1117,8 @@ specification or takes a choice the specification leaves open.
   it; on the userlands of Debian 12, Ubuntu 22.04 to 26.04 and Fedora 44, in
   containers on Rocky's kernel; and as an x86-64 build under Rosetta with no
   shim, since Rosetta passes the classic futex through: 343 of its 349 tests,
-  each failure the emulator's or the cross build's. No x86-64 kernel has run
-  it.
+  each failure the emulator's or the cross build's. Natively on x86-64 it has
+  run on Debian 13's kernel alone.
 - **Every node of a job must have the same architecture.** The rendezvous
   compares the job's size, the heap's size, the build's table of message
   handlers, the collectives' fan-out, team count, pipeline depth, small
@@ -1222,13 +1246,18 @@ specification or takes a choice the specification leaves open.
   peer's operations stay on one wire and one thread, applied in order, so a
   stream between two nodes is still one thread's: what helpers add is the
   traffic to several peers at once. On the Pi cluster's four nodes of four PEs,
-  the one place they have been timed, two helpers made a 64 KiB broadcast and a
-  4 KiB alltoall 6 to 35% slower under Slurm's default binding, where a lead's
-  threads share its core, and 2 to 9% slower with `--cpu-bind=none`; a 64 KiB
-  reduction took 15 to 37% less time bound and about the same unbound
+  the one place their collectives have been timed, two helpers made a 64 KiB
+  broadcast and a 4 KiB alltoall 6 to 35% slower under Slurm's default binding,
+  where a lead's threads share its core, and 2 to 9% slower with
+  `--cpu-bind=none`; a 64 KiB reduction took 15 to 37% less time bound and
+  about the same unbound
   (`docs/reviews/archive/v0.2-step4-scale-and-performance.md`, S4). What they
-  buy with many peers at once on a link faster than one thread has not been
-  measured. On the Pi
+  buy with many peers at once on a link faster than one thread has been
+  measured once, in a fan-in of seven nodes' PEs into one PE on Google Cloud's
+  23 Gbit/s link, where the receiving node's CPU set the rate and two helpers
+  raised it by half or more (`docs/fast-link-results.md`); the sweep at 0, 1, 2
+  and 4 helpers over streams, the mailbox and collectives, which decides their
+  default, has not run. On the Pi
   cluster's gigabit one thread already runs a stream at the link's rate, and the
   four-core virtual machine the suite runs on has no core to spare for a
   helper. They are built and tested - the suite runs at two and at three
@@ -1236,8 +1265,11 @@ specification or takes a choice the specification leaves open.
   thread, an io_uring ring and a megabyte of receive buffers apiece; by default
   there are none. "Put streams run at line rate"
   is a measurement at 1 Gbit/s - 111 to 112 MiB/s on the Pi cluster, a bare
-  stream's own rate - and says nothing above it. No faster link has been
-  measured. Over loopback between two nodes of a four-core virtual machine
+  stream's own rate - and says nothing above it. On Google Cloud's link, the
+  one faster link measured, the library's stream ran at 0.999 of a bare
+  stream's rate, and a bare stream each way already reached the 2,718 MiB/s
+  that Google allows a `c4-standard-16` (`docs/fast-link-results.md`). Over
+  loopback between two nodes of a four-core virtual machine
   running nothing else, the library moved 10.7 to 10.9 GiB/s where a bare
   io_uring stream between the same two processes moved 13.9 to 15.0 - about
   three quarters of it, 0.73 to 0.75 by the median of each run
@@ -1255,8 +1287,9 @@ specification or takes a choice the specification leaves open.
   stream: its time is the kernel's copy, the TCP stack and the one copy into the
   heap. The cost per message of
   one thread serving 256 PEs has not been measured on any machine: the Pi
-  cluster's nodes run four PEs each, and the stress tester's sixteen-PE mailbox,
-  a pipelined point-to-point pattern, with `--cpu-bind=none`, ran at 256,000
+  cluster's nodes run four PEs each, Google Cloud's at most 16, and the stress
+  tester's sixteen-PE mailbox, a pipelined point-to-point pattern, with
+  `--cpu-bind=none`, ran at 256,000
   messages a second over a minute. And it grows with the PEs of a node waiting
   to send to one other node at once: each reopening of that connection's
   buffer wakes all of them. Until v0.2 step 4 a buffer reopened at the defaults
@@ -1349,7 +1382,7 @@ that one could be added without touching the OpenSHMEM layer.
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
   run before every merge, on the exact tree that merges: about 870 tests in
-  release, and the model checker's 40 tests beside them, which run in that build
+  release, and the model checker's 39 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
@@ -1571,7 +1604,7 @@ moves every message of the node, and the helpers that can share the work
 |---|---|---|
 | `OSOE_AGENT_SLICE_US` | `100` | The scheduler slice each agent thread asks for, in microseconds: `100` to `100000`, or `0` for the kernel's own. A short slice lets it preempt sooner when it wakes on a core it shares - the same fair share, no priority over anyone. Linux 6.12 and later; an older kernel ignores it. It is a trade, measured on the Pi cluster against `0` with 16 PEs on four nodes. Under Slurm's default binding it gave a pipelined mailbox 1.3 to 1.7 times the messages a second, a 64 KiB reduce 24% less time and a 4 KiB alltoall 10% less, and cost the barrier 8% and an 8-byte reduce or broadcast 11 and 13%. Unbound (`--cpu-bind=none`) it left a 64 KiB reduce as it was, gave the mailbox 2% more and the alltoall 8% less time, and cost the barrier 2 to 4% and an 8-byte reduce or broadcast 10 to 12%. A job that fills its nodes gets Slurm's binding without asking, which is why `100` is the default. |
 | `OSOE_AGENT_CPUS` | `task` | Where each agent thread, and each progress helper, may run: `task`, on its own PE's CPUs; `node`, on any CPU any PE of its node was bound to - the job's own cores there, never another's. The PEs' threads keep their binding either way. On the Pi cluster, bound, `node` gave the mailbox a fifth more messages a second where the slice was not in force (`OSOE_AGENT_SLICE_US=0`: 42,900 to 51,300) and nothing measurable beside it (58,500 against 57,500 to 62,900), and beside the slice made the barrier and an 8-byte reduce or broadcast 7 to 15% slower and a 64 KiB reduce 18%. The thread is named `osoe-agent`, as `top -H` and `ps -L` show it. |
-| `OSOE_PROGRESS_HELPERS` | `0` | Threads of each node lead's process beside its agent that hold the node's data wires: `0` to `64`. The peer node that is p-th in node order, counting from 0 and leaving the node itself out, is helper 1 + (p mod the count)'s; the lead's agent keeps every control wire, which carry the barrier's and the deadlock detector's messages. Each helper is started after the agent, placed and given a slice as the agents are (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`), named `osoe-helper-N`, and stopped at `shmem_finalize` once it has closed its wires. A peer's traffic is always one thread's, so helpers spread a node's traffic with several peers at once, not one stream; on four nodes of the Pi cluster two of them made broadcasts and alltoalls slower, bound or not, and a 64 KiB reduction faster only under Slurm's binding ("By default one thread a node moves every message between nodes", Limits), and what they buy with many peers on a fast link has not been measured, which is why the default is none. A count above the node's peers leaves the extra helpers idle, each with its ring and receive buffers. Under `OSOE_AGENT_CPUS=task`, the default, the helpers run on the lead PE's CPUs as its agent does: where Slurm binds each task to one core, the lead's main thread, its agent and every helper share that core, and helpers add threads but no CPU - `node` lets them run on any CPU of the node's tasks. `osoe-stat` shows each owner of the node's wires - the agent and every helper - with its wires, passes, wakes and counters; a helper's own thread-scope counters, such as `transport.notify.calls` for the puts it lands, are not kept. Nodes may differ; a node's PEs may not, in a job of more than one node. *Checked* among a node's PEs. |
+| `OSOE_PROGRESS_HELPERS` | `0` | Threads of each node lead's process beside its agent that hold the node's data wires: `0` to `64`. The peer node that is p-th in node order, counting from 0 and leaving the node itself out, is helper 1 + (p mod the count)'s; the lead's agent keeps every control wire, which carry the barrier's and the deadlock detector's messages. Each helper is started after the agent, placed and given a slice as the agents are (`OSOE_AGENT_CPUS`, `OSOE_AGENT_SLICE_US`), named `osoe-helper-N`, and stopped at `shmem_finalize` once it has closed its wires. A peer's traffic is always one thread's, so helpers spread a node's traffic with several peers at once, not one stream; on four nodes of the Pi cluster two of them made broadcasts and alltoalls slower, bound or not, and a 64 KiB reduction faster only under Slurm's binding ("By default one thread a node moves every message between nodes", Limits), and on a fast link they have been measured only in a fan-in, where two helpers raised a receiving node's rate by half or more, and not yet in the sweep that decides the default, which is why it is none. A count above the node's peers leaves the extra helpers idle, each with its ring and receive buffers. Under `OSOE_AGENT_CPUS=task`, the default, the helpers run on the lead PE's CPUs as its agent does: where Slurm binds each task to one core, the lead's main thread, its agent and every helper share that core, and helpers add threads but no CPU - `node` lets them run on any CPU of the node's tasks. `osoe-stat` shows each owner of the node's wires - the agent and every helper - with its wires, passes, wakes and counters; a helper's own thread-scope counters, such as `transport.notify.calls` for the puts it lands, are not kept. Nodes may differ; a node's PEs may not, in a job of more than one node. *Checked* among a node's PEs. |
 
 **The transport's buffers**, which a program rarely needs to change
 
@@ -1832,10 +1865,18 @@ each node has printed where its PEs wait.
 
 ### Further reading
 
+- [Where to find what](docs/README.md) - the index of `docs/`: using osoe, how
+  it works, and the record of how it was built
 - [Design notes](docs/design/shmem-ethernet-design.md) - every protocol and data
   structure, and why
 - [The Pi cluster's results](docs/pi-cluster-results.md), and its
   [runbook](docs/pi-cluster.md)
+- [The fast link's results](docs/fast-link-results.md), and its
+  [runbook](docs/fast-link.md)
+- [Release notes](docs/release-notes/) - what each release is, what changed, and
+  what was checked before its tag
+- [The reviews](docs/reviews/README.md) - the adversarial reviews of the design
+  and of the tree, and how one is run
 - [Decisions in force](docs/decisions/README.md), each linked to the dated
   record that explains it
 - [Specification reference](docs/reference/README.md)

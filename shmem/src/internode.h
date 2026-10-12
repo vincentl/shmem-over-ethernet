@@ -109,9 +109,13 @@
  * would write a reduction's or a broadcast's result straight into each child's
  * buffer, where the generic implementation's tree stages it through its
  * slots; its gather already writes straight into each peer's buffer
- * (osoe_internode_collect). It stays the lead's own memory: nothing but this
- * call writes it before the lead's release (§5.5, invariant 16), and nothing
- * reads it by reference afterwards (above).
+ * (osoe_internode_collect). Each writes a peer's buffer only once that peer
+ * has entered the collective, the gather's rule (below): until then the
+ * peer's members may still be copying the collective before's result out of
+ * it (§5.5). It stays the lead's own memory: nothing but this collective's
+ * calls - its own, and its peers' writing into it - writes it before the
+ * lead's release (§5.5, invariant 16), and nothing reads it by reference
+ * afterwards (above).
  *
  * **One exception, a reduction's buffer in private memory**: collect's lengths
  * (collectives.c; phase 1 step 8 slice 2, the author's C4), a vector of the
@@ -151,7 +155,8 @@
  *     rest - long double, complex, a vector past the engine's limit - handed to
  *     the generic implementation.
  *   - osoe_internode_broadcast: likewise, where a multicast of the root's
- *     buffer is the offload the RoCE review names (§6).
+ *     buffer is the offload the RoCE review names (§6) - to receivers that
+ *     have entered, by the rule above.
  *   - osoe_internode_collect: the generic implementation, an allgather whose
  *     puts into each peer's buffer, once that peer has entered the collective
  *     (below), and fenced adds become RDMA writes and atomics with no change

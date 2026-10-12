@@ -1,22 +1,27 @@
 # Running osoe on a fast link: v0.2 step 4's Part 4
 
-The runbook for the measurements that wait for a link faster than the Pi
+The runbook for the measurements that need a link faster than the Pi
 cluster's gigabit: v0.2 step 4's Part 4
 (`docs/prompts/done/v0.2-step4-progress-helpers-prompt.md`, "Part 4: gated on a
 fast link"), and the questions earlier parts left to it. Written before any such
-machine exists, so that one is not paid for while scripts are written: every
+machine existed, so that one was not paid for while scripts were written: every
 section's script has run end to end on the development VM's logical nodes
 (`KIT_LAUNCHER=osoe-launch`, `docs/fast-link/dry-run.sh`, at every helper count
 the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
 `2026-10-10-fast-link-dry-run/` for the kit as its two reads left it,
 `2026-10-11-fast-link-kit-fixes/` for the kit as round nine left it, and
-`2026-10-11-kit-c4-standard-16/` for the kit as it is), and none yet on a
-cluster. In the development VM's Slurm, one node of four CPUs, the kit's
-`launch`, `on` and `spawn` have run, with `facts.sh`'s `scontrol` and `sinfo`,
-`helpers.sh`'s jobs and `slurm-setup.sh`'s reading of `slurmd -C`. Never run at
-all: the rest of `slurm-setup.sh`, `build.sh`'s copying to other nodes, a job
-across nodes under Slurm, and `floor.sh`'s second direction, which one machine
-cannot run. The kit was read adversarially twice before any node was rented
+`2026-10-11-kit-c4-standard-16/` for the kit as it was set for
+`c4-standard-16`). The first session on a cluster, on 2026-10-12
+(`docs/fast-link-results.md`), ran §1 and §2, §3's probe and suite, §4, §6, §8
+and §9 on eight `c4-standard-16`; §5, §7 and §10 have run only in the VM, and
+so has `verify.sh`, which made that session's by-hand `cluster-verify.sh` a
+section of §3. In the development VM's Slurm, one node of four CPUs, the kit's
+`launch`, `on` and `spawn` have run, with `facts.sh`'s
+`scontrol` and `sinfo`, `helpers.sh`'s jobs and `slurm-setup.sh`'s reading of
+`slurmd -C`. Never run at all before that session: the rest of `slurm-setup.sh`,
+`build.sh`'s copying to other nodes, a job across nodes under Slurm, and
+`floor.sh`'s second direction, which one machine cannot run. The kit was read
+adversarially twice before any node was rented
 (`docs/reviews/archive/v0.2-fast-link-kit-adversarial-read.md` and
 `v0.2-fast-link-kit-second-adversarial-read.md`) and again in round nine's
 review (`v0.2-before-part4-review.md`, its third change), and their findings
@@ -43,7 +48,8 @@ What Part 4 decides, and from what:
 | The receive pool at many peers sending at once | the review of step 4's merge point, scale S3 | §9 |
 
 And beside them, osoe's first x86-64 kernel and its first node counts past the
-Pi's four (§10).
+Pi's four - which the first session had, at eight nodes (§3, §8, §9) - and the
+cluster at size (§10).
 
 Every number this produces is evidence for a decision the author makes; none
 changes a default by itself. The README's sentences each section replaces are
@@ -400,8 +406,9 @@ unsent limit its own link measurement gave:
   records - against 0 (the system's), 64 KiB, 256 KiB, 1 MiB and 4 MiB. Each
   with `hol` (a fetch-add's round trip behind a 1 MiB put stream on the same
   connection, four PEs, two a node) and the stream's rate: the limit trades the
-  one for the other, and its rule's 128 µs of turnaround is a guess no one has
-  timed on a fast link (the scale review, S5).
+  one for the other, and its rule's 128 µs of turnaround was a guess no one had
+  timed on a fast link (the scale review, S5); the first session did, and a
+  lower limit beat the rule a little (`docs/fast-link-results.md`).
 - **The connection buffer** (`OSOE_AM_BUFFER`): 128 KiB, 256 KiB (the default),
   1 MiB and 4 MiB, with the stream and `hol`.
 - **The receive buffers** (`OSOE_WIRE_BYTES` × `OSOE_WIRE_BUFFERS`): 16 KiB × 64
@@ -483,9 +490,10 @@ names the directory of its programs, built as `docs/pi-cluster.md` §8 builds
 them - the suite fetched into the reading corpus first, which the repository
 does not hold - at the same path on every node: inside the tree but not under
 `build/`, and built before `build.sh` runs, or with `build.sh` run again after
-it, so that `build.sh` copies it. The first runs of osoe on x86-64 hardware and on
-more than four nodes: a failure here is the first finding to bring back. About
-an hour.
+it, so that `build.sh` copies it. The first session ran osoe on x86-64 hardware
+and on eight nodes already (§3, §8, §9); here `osoe-bench`, `osoe-pacer` and SOS
+run across them for the first time, and a failure is the first finding to bring
+back. About an hour.
 
 ## 11. What to bring back, and what it replaces
 
@@ -497,9 +505,10 @@ in the form of `docs/pi-cluster-results.md`.
 The README's sentences the numbers replace or confirm:
 
 - **The helpers:** the `OSOE_PROGRESS_HELPERS` row, the "What does not scale"
-  entry on helpers, "What they buy with many peers at once ... has not been
-  measured", the wake's cost at many PEs a node, and "No faster link has been
-  measured" (§5);
+  entry on helpers, "What they buy with many peers at once ... has been
+  measured once, in a fan-in" and the sweep that "has not run", the wake's cost
+  at many PEs a node, and the sentence on Google Cloud's link after "says
+  nothing above it" (§5);
 - **The zero-copy send:** the `OSOE_WIRE_ZERO_COPY` row's "Not timed on a fast
   link: v0.2 step 4's last part, on one, decides its default and whether a
   connection needs more than two buffers" (§7);
@@ -507,8 +516,9 @@ The README's sentences the numbers replace or confirm:
   `OSOE_WIRE_BUFFERS`, and `OSOE_WIRE_UNSENT_BYTES` rows (§6);
 - **Gets:** the Limits entry on a large get and the landing zone, and the
   `OSOE_GET_LANDING_BYTES` row (§8);
-- **The platforms:** "aarch64 only" where it says so of measured hardware, and
-  the Pi cluster as the only real cluster (§3, §10).
+- **The platforms:** the opening's "largest job across separate machines", and
+  the Limits entry "Tested on aarch64, and on x86-64 since 2026-10-12" (§3,
+  §10).
 
 Not measured by the kit, and left open: a barrier behind the stream at each
 helper count - its messages go on the control wires, which the lead's agent

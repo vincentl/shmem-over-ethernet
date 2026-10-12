@@ -2684,7 +2684,7 @@ And what changed when the tree was held to that table:
 | Quiet's point a `seq_cst` store to a thread-local word | **No, it guaranteed nothing**: C11 relates that store to no other location. On aarch64 (`stlr`) loads after quiet missed another thread's store ~3.6 M times in 6 M rounds, as often as with nothing there | `seq_cst` fence | `dmb ish`; `mfence` for `xchg` on x86-64 |
 | Fence's point the same store | **Too weak in C11, and a full fence was too strong**: fence needs W→W only | release fence | none on x86-64; `dmb ish` on aarch64 |
 | Futex words that are their own predicate at `seq_cst` (slice 2), and the landing slot's `ready` | **No**: the kernel orders the compare; C11 governs only the header before it | `release` | an `xchg` fewer per word on x86-64 |
-| The wire's `produced` and `consumed` at `seq_cst` (the shared-memory wire's, gone with it when phase 1 step 3 slice 1 put a socket in its place) | **No**: message passing into a separate wake word, not two-sided. `wire_model.py` now runs every case under SC and x86-TSO with both as release stores: the design holds, each broken variant is still caught | `release` | an `xchg` fewer per send and per receive on x86-64 |
+| The wire's `produced` and `consumed` at `seq_cst` (the shared-memory wire's, gone with it when phase 1 step 3 slice 1 put a socket in its place) | **No**: message passing into a separate wake word, not two-sided. `wire_model.py` ran every case under SC and x86-TSO with both as release stores: the design held, each broken variant still caught (the model retired with the wire, 2026-10-12) | `release` | an `xchg` fewer per send and per receive on x86-64 |
 
 The measurements are evidence that the gaps are real on a shipping target, not
 the argument; the argument is the C11 column. §4.6 has the fence and quiet
@@ -3887,8 +3887,9 @@ through that address against its own writes by the next fence or wait (§4.6). o
 intranode backend does, because it applies writes in the calling thread. The AM
 backend does not, so every PE it carries gets `NULL`, including a local PE under
 force-remote. The rule is phrased as a property rather than "local or not" so that a
-future direct path, such as CXL memory, is not excluded. `shmem_ptr`,
-`shmem_team_ptr`, and `shmem_addr_accessible` consult it and nothing else.
+future direct path, such as CXL memory, is not excluded. `shmem_ptr` and
+`shmem_team_ptr` consult it and nothing else; `shmem_addr_accessible` does not -
+accessibility is reachability through OpenSHMEM, which every PE of the job has.
 
 **Binding.** Backends are chosen at build time. There is no table of function
 pointers, and a backend's fast path may become `static inline` behind the same
@@ -8036,7 +8037,7 @@ step. Tests carry ctest labels: `env` for `tools/probe`, and tier labels
 what CI can run anywhere. The model checker's tests (`tools/modelcheck`, which
 needs Python 3) carry `model` beside `tier1`. They take about an hour (40 tests
 in 62 minutes in the development VM on 2026-10-11, the longest
-`model.reservation` at 14) and run in
+`model.reservation` at 14; 39 since `model.wire` was retired) and run in
 the release build only, so the `release` test preset leaves that label out and
 the `models` preset runs it alone: `ctest --preset models`, or `cmake --workflow
 --preset models` from a clean tree. The project's own verification is the four
