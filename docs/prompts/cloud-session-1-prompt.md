@@ -70,7 +70,13 @@ Record, in the manifest's first section: the kernel (`uname -r`), the distributi
 `ulimit -l`, whether `/dev/shm` is writable, whether `unshare -rn true` works (tier 3 runs its
 logical nodes in network namespaces), the compilers (gcc and clang versions), cmake, Python 3 and
 liburing (install the distribution's liburing development package, cmake, ninja or make, gcc,
-clang and Python 3 if the package manager allows). Then:
+clang and Python 3 if the package manager allows). The sandbox is a fresh Ubuntu 24.04 VM on x86-64 (4 vCPUs, 16 GB, 30 GB of disk), and you run
+as root. The environment's setup script (the appendix) installed the tools; what it cannot keep -
+mounts, limits, kernel settings - you set here, and record each one: if `/dev/shm` is under 4 GiB,
+`mount -o remount,size=8G /dev/shm`; run every suite under `ulimit -l unlimited`; and if the probe
+reports io_uring refused, read `sysctl kernel.io_uring_disabled` and set it to 0 if it lets you.
+Running as root, a test that expects a permission refused may behave differently: group such
+failures as their own cause. Then:
 
 1. Configure and build the `release` preset (`cmake --preset release`, `cmake --build build/release -j$(nproc)`); record the warnings' count.
 2. Run the probe, `build/release/tools/probe/probe`, and copy every line into the manifest: it
@@ -135,3 +141,29 @@ item, committed and pushed each time. In it:
 
 Stop when the items are done, when nothing more can be verified here, or when the session's own
 budget is spent - the manifest is the last thing written each time.
+
+## Appendix: the environment's setup script
+
+What the author put in the cloud environment's **Setup script** field (it runs as root before the
+environment's first session, and its result is cached for later ones):
+
+```bash
+#!/bin/bash
+# osoe's cloud environment on Ubuntu 24.04 (docs/prompts/cloud-session-1-prompt.md).
+set -x
+export DEBIAN_FRONTEND=noninteractive
+# The full build's tools; gcc-14 for C23 (T42); an aarch64 cross compiler (B6).
+apt-get update -q || true
+apt-get install -y -q --no-install-recommends build-essential pkg-config cmake ninja-build \
+    python3 gcc-14 clang gcc-aarch64-linux-gnu libc6-dev-arm64-cross iproute2 util-linux \
+    procps git || true
+# liburing 2.9, as Debian 13 ships it: Ubuntu 24.04's is 2.5, and osoe needs 2.6 or newer.
+if ! pkg-config --atleast-version=2.6 liburing 2>/dev/null; then
+    cd /tmp && rm -rf liburing \
+        && git clone -q --depth 1 --branch liburing-2.9 https://github.com/axboe/liburing.git \
+        && cd liburing && ./configure --prefix=/usr/local \
+        && make -j"$(nproc)" -C src && make install && ldconfig || true
+fi
+pkg-config --modversion liburing || true
+exit 0
+```
