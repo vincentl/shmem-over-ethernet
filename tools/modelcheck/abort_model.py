@@ -405,13 +405,13 @@ CASES = [
     ('goodbye', TWO_CALLERS, True),
     ('goodbye', FATAL, True),
     ('goodbye', CRASH, True),
-    ('tree', ONE_CALLER, False),
-    ('exit_first', ONE_CALLER, False),
+    ('tree', ONE_CALLER, 'STATUS'),
+    ('exit_first', ONE_CALLER, 'STATUS'),
     ('closing_drops', ONE_CALLER, True),
-    ('resend', ONE_CALLER, False),
+    ('resend', ONE_CALLER, 'ONCE'),
     ('no_abort', CRASH, True),
-    ('no_abort', ONE_CALLER, False),
-    ('send_error_ends', ONE_CALLER, False),
+    ('no_abort', ONE_CALLER, 'STATUS'),
+    ('send_error_ends', ONE_CALLER, 'STATUS'),
 ]
 
 if __name__ == '__main__':
@@ -421,5 +421,5 @@ if __name__ == '__main__':
         name, _, _ = case(variant, starts)
         if not keep(name):
             continue
-        ok &= report(run(variant, starts), expect_ok=expect, tso=False)
+        ok &= report(run(variant, starts), expect=expect, tso=False)
     sys.exit(0 if ok else 1)

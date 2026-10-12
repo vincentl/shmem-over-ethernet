@@ -47,6 +47,8 @@ Properties
   P1  mutual exclusion: never two PEs in the critical region;
   P2  first come, first served: a PE enters in the order its swap - or its
       successful test's compare-and-swap - took effect (ghost $queue);
+  SUCCESSOR  a release that waits for its successor's link wakes to a word
+      that names one (no_andn's failure);
   and no trapped state: every PE finishes all its rounds from every state (the
   engine's AG EF done, with STUCK at dead ends).
 
@@ -90,9 +92,9 @@ def enter_checks(me):
     return [
         ('CS', ('ghost', lambda M, L: ({IN: M[IN] + 1}, {}), '@P1')),
         ('P1', ('check', lambda M, L: None if M[IN] == 1 else
-                'two PEs in the critical region', '@P2')),
+                'P1: two PEs in the critical region', '@P2')),
         ('P2', ('check', lambda M, L, me=me: None if M.get(QUEUE, ()) and M[QUEUE][0] == me
-                else f'PE {me} entered out of turn: queue {M.get(QUEUE, ())}', '@LEAVE')),
+                else f'P2: PE {me} entered out of turn: queue {M.get(QUEUE, ())}', '@LEAVE')),
         ('LEAVE', ('ghost', lambda M, L: ({IN: M[IN] - 1, QUEUE: M[QUEUE][1:]}, {}), '@R')),
     ]
 
@@ -110,7 +112,7 @@ def release(design, me):
               ('WAITNEXT', ('nd', lambda M, L, me=me: [({}, {'n': M[node(me)]}, 'woke')]
                             if M[node(me)] != 0 else [], '@HAVENEXT')),
               ('HAVENEXT', ('check', lambda M, L: None if (L['n'] & SUCCESSOR) != 0 else
-                            f"a release woke to node {L['n']:#x}, with no successor",
+                            f"SUCCESSOR: a release woke to node {L['n']:#x}, with no successor",
                             '@GRANT'))]
     if design == 'grant_tail':
         B += [('GRANT', ('load', lambda L: TAIL, 't', '@GRANT2')),
@@ -187,7 +189,8 @@ def case(design, pes, rounds, testers=0):
     return f'lock/{design} pes={pes} rounds={rounds} testers={testers}', threads, mem
 
 
-# (design, PEs, rounds each, of which testers, expect_ok)
+# (design, PEs, rounds each, of which testers, expect): True, or the property the breakage
+# must fail
 CASES = [
     ('design', 2, 2, 0, True),
     ('design', 3, 1, 0, True),
@@ -195,14 +198,14 @@ CASES = [
     ('design', 3, 2, 1, True),
     ('design', 4, 1, 1, True),
 
-    ('reset_late', 3, 1, 0, False),
-    ('no_wait_next', 3, 1, 0, False),
-    ('store_clear', 3, 2, 0, False),
-    ('test_swaps', 3, 1, 1, False),
-    ('no_link', 2, 1, 0, False),
-    ('grant_tail', 3, 1, 0, False),
-    ('enter_early', 2, 1, 0, False),
-    ('no_andn', 3, 1, 0, False),
+    ('reset_late', 3, 1, 0, 'STUCK'),
+    ('no_wait_next', 3, 1, 0, 'STUCK'),
+    ('store_clear', 3, 2, 0, 'STUCK'),
+    ('test_swaps', 3, 1, 1, 'STUCK'),
+    ('no_link', 2, 1, 0, 'STUCK'),
+    ('grant_tail', 3, 1, 0, 'P2'),
+    ('enter_early', 2, 1, 0, 'P1'),
+    ('no_andn', 3, 1, 0, 'SUCCESSOR'),
 ]
 
 if __name__ == '__main__':
@@ -213,5 +216,5 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         res = explore(name, threads, mem0, max_seconds=900, liveness_max_states=4_000_000)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     sys.exit(0 if ok else 1)

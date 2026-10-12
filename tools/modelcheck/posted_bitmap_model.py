@@ -133,8 +133,8 @@ def lead(design):
         if L['h'] == (L[f'c{b}'] or 0):
             return None                 # not new: nothing to forward
         return (None if L['h'] == M[FORWARDED(b)] + 1 else
-                f"team {b}: epoch {L['h']} forwarded after {M[FORWARDED(b)]}: an arrival was "
-                f"{'repeated' if L['h'] <= M[FORWARDED(b)] else 'skipped'}")
+                f"ORDER: team {b}: epoch {L['h']} forwarded after {M[FORWARDED(b)]}: an arrival "
+                f"was {'repeated' if L['h'] <= M[FORWARDED(b)] else 'skipped'}")
 
     B = [('L', ('br', lambda L: (L['n'] or 0) >= TEAMS * EPOCHS, '@LEND', '@W')),
          ('W', ('load', lambda L: WAKE, 'w', '@S0')),
@@ -206,11 +206,11 @@ def case(design):
 
 CASES = [
     ('design', True),
-    ('summary_first', False),
-    ('wake_first', False),
-    ('bits_first', False),
-    ('clear_after', False),
-    ('kept_bits', False),
+    ('summary_first', 'STUCK'),
+    ('wake_first', 'STUCK'),
+    ('bits_first', 'STUCK'),
+    ('clear_after', 'STUCK'),
+    ('kept_bits', 'ORDER'),
 ]
 
 
@@ -223,7 +223,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
                       done=lambda M: M[DONE] == TEAMS + 2)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

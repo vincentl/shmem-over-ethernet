@@ -137,7 +137,7 @@ def quiet(design, allops, variant='', measure=False):
 
     def complete(M, L):
         bad = [k for k in L['pre'] if M[LAND(k)] != M[SIZE(k)]]
-        return f'quiet returned with prior get(s) {bad} incomplete' if bad else None
+        return f'COMPLETE: quiet returned with prior get(s) {bad} incomplete' if bad else None
 
     def extra(M, L):
         if not measure:
@@ -194,9 +194,9 @@ def quiet(design, allops, variant='', measure=False):
     return assemble(B)
 
 
-def run(name, design, issuers_ops, nquiets, variant='', expect_ok=None, measure=False):
+def run(name, design, issuers_ops, nquiets, variant='', expect=None, measure=False):
     res = run_res(name, design, issuers_ops, nquiets, variant, measure)
-    return report(res, expect_ok=expect_ok), res
+    return report(res, expect=expect), res
 
 
 def run_res(name, design, issuers_ops, nquiets, variant='', measure=False):
@@ -217,9 +217,10 @@ def run_res(name, design, issuers_ops, nquiets, variant='', measure=False):
 
 
 CASES = [
-    # name, design, issuers' gets as (id, size), quiets, variant, expected to pass
+    # name, design, issuers' gets as (id, size), quiets, variant, expect: True, or the
+    # property the variant must fail
     ('equality: 2 issuers, 1 quiet', 'equality', [[(0, 2)], [(1, 1)]], 1, '', True),
-    ('snapshot: 2 issuers, 1 quiet', 'snapshot', [[(0, 2)], [(1, 1)]], 1, '', False),
+    ('snapshot: 2 issuers, 1 quiet', 'snapshot', [[(0, 2)], [(1, 1)]], 1, '', 'COMPLETE'),
     ('design: 2 issuers, 2 quiets', 'design', [[(0, 2)], [(1, 1)]], 2, '', True),
     ('design: 1 issuer x 2 gets, 2 quiets', 'design', [[(0, 1), (1, 2)]], 2, '', True),
     ('design: issuers of 2 gets and 1 get, 2 quiets', 'design', [[(0, 1), (1, 2)], [(2, 2)]], 2, '', True),
@@ -228,8 +229,8 @@ CASES = [
     ('design: 2 issuers, 3 quiets', 'design', [[(0, 1)], [(1, 2)]], 3, '', True),
     ('design/nopiggy: 2 issuers, 2 quiets', 'design', [[(0, 2)], [(1, 1)]], 2, 'nopiggy', True),
     ('design/order: 2 issuers, 2 quiets', 'design', [[(0, 2)], [(1, 1)]], 2, 'order', True),
-    ('design/noretag: 1 issuer, 2 quiets', 'design', [[(0, 1)]], 2, 'noretag', False),
-    ('design/nolock: 1 issuer, 2 quiets', 'design', [[(0, 1)]], 2, 'nolock', False),
+    ('design/noretag: 1 issuer, 2 quiets', 'design', [[(0, 1)]], 2, 'noretag', 'COMPLETE'),
+    ('design/nolock: 1 issuer, 2 quiets', 'design', [[(0, 1)]], 2, 'nolock', 'COMPLETE'),
 ]
 
 if __name__ == '__main__':

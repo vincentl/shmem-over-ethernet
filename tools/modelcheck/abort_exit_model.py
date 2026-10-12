@@ -830,30 +830,30 @@ CASES = [
     ('built', 'on_b', KILLS, True),
     ('built', 'same_node_both', KILLS, True),
     ('built', 'both', BUILT, True),
-    ('built', 'both', KILLS, False),            # the residual: two nodes, two callers
+    ('built', 'both', KILLS, 'NO_KILL'),        # the residual: two nodes, two callers
     ('built', 'nonlead', PART_B, True),
     ('built', 'nonlead', NO_HELP, True),        # the carrier's wait: no sweep needed
-    ('no_carrier_wait', 'nonlead', NO_HELP, False),     # Part B's finding, without it
-    ('caller_exits', 'lead', BUILT, False),
-    ('pidfd_fatal', 'on_b', BUILT, False),
-    ('wake_first', 'nonlead', BUILT, False),
+    ('no_carrier_wait', 'nonlead', NO_HELP, 'STUCK'),   # Part B's finding, without it
+    ('caller_exits', 'lead', BUILT, 'STATUS'),
+    ('pidfd_fatal', 'on_b', BUILT, 'STATUS'),
+    ('wake_first', 'nonlead', BUILT, 'STUCK'),
     ('no_rewake', 'on_b', BUILT, True),         # a second line now (see the variant)
     ('built', 'finish', KILLS, True),
-    ('finalize_returns', 'finish', BUILT, False),
+    ('finalize_returns', 'finish', BUILT, 'ONE_END'),
     ('built', 'early', KILLS, True),
-    ('no_init_wait', 'early', BUILT, False),
+    ('no_init_wait', 'early', BUILT, 'STATUS'),
     ('built', 'exiting', KILLS, True),
-    ('exit_everywhere', 'exiting', BUILT, False),
-    ('built', 'caller_exiting', BUILT, False),     # ends at the grace in the code
-    ('status_everywhere', 'nonlead', BUILT, False),
-    ('caller_zero', 'nonlead', BUILT, False),
-    ('called_carries', 'nonlead', KILLS, False),
-    ('called_carries', 'same_node_both', KILLS, False),
-    ('no_carrier_wait', 'nonlead', KILLS, False),
-    ('no_lead_wait', 'nonlead', KILLS, False),
-    ('no_remote_wait', 'nonlead', KILLS, False),
-    ('wait_every_node', 'nonlead', KILLS, False),
-    ('no_exclusion', 'both', BUILT, False),
+    ('exit_everywhere', 'exiting', BUILT, 'STUCK'),
+    ('built', 'caller_exiting', BUILT, 'STUCK'),   # ends at the grace in the code
+    ('status_everywhere', 'nonlead', BUILT, 'STATUS'),
+    ('caller_zero', 'nonlead', BUILT, 'JOB_STATUS'),
+    ('called_carries', 'nonlead', KILLS, 'NO_KILL'),
+    ('called_carries', 'same_node_both', KILLS, 'NO_KILL'),
+    ('no_carrier_wait', 'nonlead', KILLS, 'NO_KILL'),
+    ('no_lead_wait', 'nonlead', KILLS, 'NO_KILL'),
+    ('no_remote_wait', 'nonlead', KILLS, 'NO_KILL'),
+    ('wait_every_node', 'nonlead', KILLS, 'STUCK'),
+    ('no_exclusion', 'both', BUILT, 'STUCK'),
 ]
 
 if __name__ == '__main__':
@@ -863,5 +863,5 @@ if __name__ == '__main__':
         name = case(variant, which, options)[0]
         if not keep(name):
             continue
-        ok &= report(run(variant, which, options), expect_ok=expect, tso=False)
+        ok &= report(run(variant, which, options), expect=expect, tso=False)
     sys.exit(0 if ok else 1)

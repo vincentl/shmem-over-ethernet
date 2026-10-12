@@ -151,8 +151,8 @@ def writer(o, nrec, variant=''):
     return assemble(B)
 
 
-def run(name, waiters, writes, tso=False, variant='', expect_ok=None):
-    return report(run_res(name, waiters, writes, tso, variant), expect_ok=expect_ok, tso=tso)
+def run(name, waiters, writes, tso=False, variant='', expect=None):
+    return report(run_res(name, waiters, writes, tso, variant), expect=expect, tso=tso)
 
 
 def run_res(name, waiters, writes, tso=False, variant=''):
@@ -170,7 +170,7 @@ REUSE = ([[(0, 1), (1, 1)], [(1, 1)]], [0, 1])         # thread 0 watches elemen
 THREE = ([[(0, 2)], [(1, 1)], [(0, 1)]], [0, 1])       # three records
 
 CASES = [
-    # name, (waiters, writes), tso, variant, expected to pass
+    # name, (waiters, writes), tso, variant, expect: True, the property it must fail, or None
     ('design: array and scalar waits overlap', TWO_OVERLAP, False, '', True),
     ('design: array and scalar waits overlap', TWO_OVERLAP, True, '', True),
     ('design: two threads on one variable', SAME, False, '', True),
@@ -179,12 +179,12 @@ CASES = [
     ('design: one thread watches twice', REUSE, True, '', True),
     ('design: three records', THREE, False, '', True),
     ('design: three records', THREE, True, '', True),
-    ('firstmatch: two threads on one variable', SAME, False, 'firstmatch', False),
-    ('checkfirst: array and scalar waits overlap', TWO_OVERLAP, False, 'checkfirst', False),
-    ('notifyfirst: array and scalar waits overlap', TWO_OVERLAP, False, 'notifyfirst', False),
-    ('plainbit: array and scalar waits overlap', TWO_OVERLAP, True, 'plainbit', False),
+    ('firstmatch: two threads on one variable', SAME, False, 'firstmatch', 'LOST WAKE'),
+    ('checkfirst: array and scalar waits overlap', TWO_OVERLAP, False, 'checkfirst', 'LOST WAKE'),
+    ('notifyfirst: array and scalar waits overlap', TWO_OVERLAP, False, 'notifyfirst', 'LOST WAKE'),
+    ('plainbit: array and scalar waits overlap', TWO_OVERLAP, True, 'plainbit', 'LOST WAKE'),
     ('plainrng: array and scalar waits overlap', TWO_OVERLAP, True, 'plainrng', None),
-    ('plainput: array and scalar waits overlap', TWO_OVERLAP, True, 'plainput', False),
+    ('plainput: array and scalar waits overlap', TWO_OVERLAP, True, 'plainput', 'LOST WAKE'),
     ('tworange: one thread watches twice', REUSE, False, 'tworange', None),
     ('tworange: one thread watches twice', REUSE, True, 'tworange', None),
 ]

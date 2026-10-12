@@ -57,6 +57,7 @@ Usage:
 """
 import sys
 
+import engine
 from engine import DEL
 
 import rabenseifner_model as fold
@@ -123,8 +124,8 @@ def combine_check(n, count, broken=None):
         for r, (to, sent, frm, received, combines) in enumerate(parts):
             got = outgoing.get((frm, r))
             if got is None or [e for e, _ in got] != received:
-                return (f'N {n}, {count} elements, {phase} round s = {s}: lead {r} expects '
-                        f'{len(received)} elements from lead {frm}, which sends it '
+                return (f'ROUND: N {n}, {count} elements, {phase} round s = {s}: lead {r} '
+                        f'expects {len(received)} elements from lead {frm}, which sends it '
                         f'{"nothing" if got is None else len(got)}')
             for e, value in got:
                 if combines:
@@ -136,7 +137,7 @@ def combine_check(n, count, broken=None):
     for r in range(n):
         for e in range(count):
             if have[r][e] != whole:
-                return f'N {n}, {count} elements: lead {r}\'s element {e} is {have[r][e]}'
+                return f'RESULT: N {n}, {count} elements: lead {r}\'s element {e} is {have[r][e]}'
     return None
 
 
@@ -183,7 +184,8 @@ def intervals_check(n, count):
             if (to, frm, combines) != (want[0], want[2], want[4]) or \
                     sorted(elements(sent)) != sorted(want[1]) or \
                     sorted(elements(received)) != sorted(want[3]):
-                return f'N {n}, {count} elements, round {rnd}: lead {r}\'s intervals differ'
+                return (f'INTERVALS: N {n}, {count} elements, round {rnd}: lead {r}\'s '
+                        f'intervals differ')
     return None
 
 
@@ -239,27 +241,30 @@ def check():
             for r in range(n):
                 most = 2 * ((n - 1) * ((count + n - 1) // n))
                 if sent[r] > most or received[r] > most:
-                    failures.append(f'N {n}, {count} elements: lead {r} sends {sent[r]} and '
-                                    f'receives {received[r]}, more than {most}')
+                    failures.append(f'VOLUME: N {n}, {count} elements: lead {r} sends {sent[r]} '
+                                    f'and receives {received[r]}, more than {most}')
             if len(rounds(n)) != 2 * (n - 1).bit_length():
-                failures.append(f'N {n}: {len(rounds(n))} rounds, not 2 ceil(log2 N)')
+                failures.append(f'ROUND_COUNT: N {n}: {len(rounds(n))} rounds, not 2 ceil(log2 N)')
             # against the fold the brief described (rabenseifner_model.py): the
             # same at a power of two, less on the busiest link at every other N
             if count >= 64 * n:
                 f_out, f_in = fold.bytes_sent(n, count)
                 c_out = max(sent)
                 if (n & (n - 1)) == 0 and c_out > f_out or (n & (n - 1)) and c_out >= f_out:
-                    failures.append(f'N {n}, {count} elements: the busiest lead sends {c_out}, '
-                                    f'the fold\'s {f_out}')
+                    failures.append(f'FOLD: N {n}, {count} elements: the busiest lead sends '
+                                    f'{c_out}, the fold\'s {f_out}')
     print(f'arithmetic: {cases} node counts and lengths, {len(failures)} failures')
     for f in failures[:10]:
         print('  ' + f)
     broken_ok = True
-    for broken in ('wrong_lead', 'allgather_order'):
-        caught = any(combine_check(n, count, broken) for n in range(3, 20)
-                     for count in fold.counts_for(n))
-        print(f'broken {broken}: {"fails, as it must" if caught else "PASSES - the check is blind"}')
-        broken_ok &= caught
+    for broken, expect in (('wrong_lead', 'ROUND'), ('allgather_order', 'RESULT')):
+        why = next(filter(None, (combine_check(n, count, broken) for n in range(3, 20)
+                                 for count in fold.counts_for(n))), None)
+        wrong = engine.judge(why is None, engine.named(why), expect)
+        print(f'broken {broken}: ' + ('PASSES - the check is blind' if why is None else
+                                      f'fails {engine.named(why)}') +
+              (', as it must' if wrong is None else '   <-- UNEXPECTED' + wrong))
+        broken_ok &= wrong is None
     return not failures and broken_ok
 
 
@@ -620,9 +625,10 @@ PROTOCOL_CASES = [
     ('four leads, a reduction twice', 4, 4, 1, ('circulant', 'circulant')),
     ('five leads, a reduction twice', 5, 5, 1, ('circulant', 'circulant')),
 ]
-BREAKAGES = ['no_credit', 'no_rs_grant', 'stale_rs_grant', 'early_ag_grant',
-             'one_ag_grant_at_a_time', 'shared_counters', 'sender_field_late',
-             'credit_every_piece']
+# each breakage, and the property it must fail
+BREAKAGES = {'no_credit': 'UP', 'no_rs_grant': 'LANE', 'stale_rs_grant': 'LANE',
+             'early_ag_grant': 'UP', 'one_ag_grant_at_a_time': 'UP', 'shared_counters': 'UP',
+             'sender_field_late': 'SENDER', 'credit_every_piece': 'QUIET'}
 
 
 def protocol(want):
@@ -636,7 +642,7 @@ def protocol(want):
         threads.append(assemble(observer(n)))
         res = explore(f'{design}: {name}', threads, {}, max_seconds=1800,
                       liveness_max_states=3_000_000, progress=60)
-        report(res, expect_ok=expect)
+        report(res, expect=expect)
         return res
 
     for name, n, count, W, kinds in PROTOCOL_CASES:
@@ -647,16 +653,17 @@ def protocol(want):
         cases = [c for c in PROTOCOL_CASES if want(f'{design}: {c[0]}')]
         if not cases:
             continue
-        breakage_failed[design] = False
+        breakage_failed[design] = None
         for name, n, count, W, kinds in cases:
             res = run(design, name, n, count, W, kinds, None)
             if not res.ok:
-                breakage_failed[design] = True
+                # A limit is recorded by its verdict, which names no property: unexpected.
+                breakage_failed[design] = res.failed or res.verdict
                 break
     return ok
 
 
-breakage_failed = {}
+breakage_failed = {}        # breakage -> what its first failing case fails, or None
 
 
 def main(argv):
@@ -684,8 +691,13 @@ def main(argv):
     subs = argv[2:]
     ok &= protocol(lambda name: not subs or any(s in name for s in subs))
     for design, failed in breakage_failed.items():
-        print(f'breakage {design}: {"fails, as it must" if failed else "PASSES - the model is blind to it"}')
-        ok &= failed
+        wrong = engine.judge(failed is None, failed, BREAKAGES[design])
+        if wrong is None:
+            print(f'breakage {design}: fails {failed}, as it must')
+        else:
+            print(f'breakage {design}: {"fails" if failed else "PASSES - the model is blind to it"}'
+                  f'   <-- UNEXPECTED{wrong}')
+        ok &= wrong is None
     return 0 if ok else 1
 
 

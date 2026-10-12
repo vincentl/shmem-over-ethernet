@@ -647,14 +647,14 @@ CASES = [
     ('scan_late_word', 3, 2, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {1: 1}, 'S'),
                                              ('P', 0, {0: 1}, 'S')], 1, True),
     # Breakages, each expected to fail.
-    ('scan_no_grant', 3, 2, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {1: 1}, 'S')], 2, False),
-    ('scan_no_grant', 3, 1, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {}, 'S')], 2, False),
+    ('scan_no_grant', 3, 2, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {1: 1}, 'S')], 2, 'LANE'),
+    ('scan_no_grant', 3, 1, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {}, 'S')], 2, 'LANE'),
     ('scan_early_word', 2, 2, 1, 2, {'T': [0, 1]},
-     [('T', 0, {}, 'S'), ('T', 0, {1: 1}, 'S')], 2, False),
+     [('T', 0, {}, 'S'), ('T', 0, {1: 1}, 'S')], 2, 'WORD'),
     ('scan_shared_words', 3, 1, 1, 2, T3, [('T', 0, {}, 'S'), ('T', 1, {}, 'b'),
-                                           ('T', 0, {}, 'S')], 2, False),
-    ('scan_shared_words', 3, 1, 1, 2, P10_Q12, [('Q', 0, {}), ('Q', 0, {}, 'S')], 2, False),
-    ('scan_one_lane', 3, 2, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {1: 1}, 'S')], 2, False),
+                                           ('T', 0, {}, 'S')], 2, 'DOWN'),
+    ('scan_shared_words', 3, 1, 1, 2, P10_Q12, [('Q', 0, {}), ('Q', 0, {}, 'S')], 2, 'GRANT'),
+    ('scan_one_lane', 3, 2, 1, 2, P10_Q12, [('P', 0, {}, 'S'), ('Q', 0, {1: 1}, 'S')], 2, 'LANE'),
     ('scan_one_lane', 2, 2, 1, 2, {'P': [1, 0], 'Q': [1, 0]},
      [('P', 0, {}, 'S'), ('Q', 0, {}, 'S'), ('P', 0, {}, 'S')], 2, True),
 ]
@@ -670,7 +670,7 @@ def main():
             continue
         res = explore(name, progs, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, count=count: M[FIN] == count)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

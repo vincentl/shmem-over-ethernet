@@ -290,7 +290,7 @@ def finished(M):
     return M[FINISHED] == 1
 
 
-# (design, quiet requests, writer operations, tso, expect_ok)
+# (design, quiet requests, writer operations, tso, expect: True, or the property it must fail)
 CASES = [
     ('design', 1, 0, False, True),
     ('design', 1, 1, False, True),
@@ -298,14 +298,14 @@ CASES = [
     ('design', 2, 1, True, True),
     ('deaf', 1, 0, False, True),
     ('deaf', 1, 1, True, True),
-    ('request_first', 1, 0, False, False),
-    ('no_bump', 1, 0, False, False),
-    ('done_early', 1, 0, False, False),
-    ('deaf_unwatched', 1, 0, False, False),
-    ('stale_answer', 2, 1, False, False),
-    ('snapshot_first', 1, 0, False, False),
+    ('request_first', 1, 0, False, 'STUCK'),
+    ('no_bump', 1, 0, False, 'STUCK'),
+    ('done_early', 1, 0, False, 'RING'),
+    ('deaf_unwatched', 1, 0, False, 'STUCK'),
+    ('stale_answer', 2, 1, False, 'FRESH'),
+    ('snapshot_first', 1, 0, False, 'FALSE DEAF'),
     ('turns_plain', 1, 2, False, True),
-    ('turns_plain', 1, 2, True, False),
+    ('turns_plain', 1, 2, True, 'FALSE DEAF'),
 ]
 
 if __name__ == '__main__':
@@ -317,5 +317,5 @@ if __name__ == '__main__':
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=900, done=finished,
                       liveness_max_states=4_000_000)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

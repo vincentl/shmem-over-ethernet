@@ -332,7 +332,10 @@ def run(variant, messages, header_only_limit, check_quiesces, tso, out=sys.stdou
                    max_depth=2_000_000, liveness_max_states=3_000_000)
 
 
-#            variant   messages  header-only  QUIESCES?  TSO?   expect ok
+#            variant   messages  header-only  QUIESCES?  TSO?   expect
+#
+# expect is True, or the property the case must fail: QUIESCES where its check is live, and
+# where it is off TRAPPED or STUCK, TERMINATES failing as the engine reports it.
 #
 # Read the TERMINATES rows in pairs. A run at a cap and the same run one higher
 # that visit the *same number of states* prove the cap did not bind: raising it
@@ -340,7 +343,7 @@ def run(variant, messages, header_only_limit, check_quiesces, tso, out=sys.stdou
 # model's. The `design` rows at 2 and 3 show the test has teeth - at 2 the cap
 # really does starve it - and the rows at 3 and 4 then show it does not bind.
 CASES = [
-    ('design',  1, 2, False, False, False),     # the cap can starve this model ...
+    ('design',  1, 2, False, False, 'TRAPPED'),   # the cap can starve this model ...
     ('design',  1, 3, False, False, True),      # ... and at 3 it no longer does:
     ('design',  1, 4, False, False, True),      #     same state count as 3
     ('design',  1, 3, True,  False, True),
@@ -350,27 +353,27 @@ CASES = [
     ('design',  2, 3, False, False, True),
     ('design',  2, 4, False, False, True),
 
-    ('current', 1, 3, True,  False, False),     # C1: the echo asks when nobody wants
-    ('current', 1, 4, True,  False, False),
-    ('current', 1, 3, True,  True,  False),
-    ('current', 2, 3, True,  False, False),
+    ('current', 1, 3, True,  False, 'QUIESCES'),  # C1: the echo asks when nobody wants
+    ('current', 1, 4, True,  False, 'QUIESCES'),
+    ('current', 1, 3, True,  True,  'QUIESCES'),
+    ('current', 2, 3, True,  False, 'QUIESCES'),
     # TERMINATES cannot be asked of `current`: the echo is the only thing that
     # carries a late acknowledgement there (that is C2's "load-bearing by
     # accident"), so every finite cap on it starves `quiet`. The state counts
     # below grow with the cap, which is how one can tell the cap is what
     # decided - unlike `naive`, where they do not.
-    ('current', 1, 3, False, False, False),
-    ('current', 1, 4, False, False, False),
+    ('current', 1, 3, False, False, 'TRAPPED'),
+    ('current', 1, 4, False, False, 'TRAPPED'),
 
-    ('naive',   1, 3, False, False, False),     # C2: quiet waits for an ack
-    ('naive',   1, 4, False, False, False),     #     nothing will ever send
-    ('naive',   1, 3, False, True,  False),
-    ('naive',   2, 3, False, False, False),
+    ('naive',   1, 3, False, False, 'TRAPPED'),   # C2: quiet waits for an ack
+    ('naive',   1, 4, False, False, 'TRAPPED'),   #     nothing will ever send
+    ('naive',   1, 3, False, True,  'TRAPPED'),
+    ('naive',   2, 3, False, False, 'TRAPPED'),
     # The naive fix stops the unbounded echo but still sends a request nobody
     # wants: a `want_ack` taken from the shared word outlives the quiet that
     # set it when some other segment's cumulative ack satisfies that quiet
     # first. Bounded, so not C1 - but not right either.
-    ('naive',   1, 3, True,  False, False),
+    ('naive',   1, 3, True,  False, 'QUIESCES'),
 ]
 
 if __name__ == '__main__':
@@ -381,5 +384,5 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         res = run(variant, messages, limit, quiesces, tso)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

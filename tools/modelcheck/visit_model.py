@@ -49,10 +49,12 @@ Usage: visit_model.py
 import sys
 from collections import deque
 
+import engine
+
 FREE, OPEN, SEALED, SENDING, LENT = 'FREE', 'OPEN', 'SEALED', 'SENDING', 'LENT'
-# (design, STUCK expected at a quiet, STUCK expected at the close)
-DESIGNS = (('copy', False, False), ('zero_copy', False, False),
-           ('zc_unmarked', True, False), ('zc_both_lent', True, True))
+# (design, what it must do at a quiet, at the close): True to hold, or the property it must fail
+DESIGNS = (('copy', True, True), ('zero_copy', True, True),
+           ('zc_unmarked', 'STUCK', True), ('zc_both_lent', 'STUCK', 'STUCK'))
 
 
 def initial(writes):
@@ -243,18 +245,21 @@ if __name__ == '__main__':
     ok = True
     for closing in (False, True):
         for mode, at_quiet, at_close in DESIGNS:
-            expect_failure = at_close if closing else at_quiet
+            expect = at_close if closing else at_quiet
             for writes in (1, 2, 3, 4):
                 n, failure, path = explore(mode, writes, closing)
                 verdict = failure.split(':')[0] if failure else 'ok'
                 what = 'close' if closing else 'quiet'
-                print(f'visit/{mode:<13} {what:<5} writes={writes} states={n:>6} -> {verdict}')
+                # From two writes, every breakage must fail its property and every design
+                # hold; with one a breakage may do either, and only a design that fails is wrong.
+                wrong = engine.judge(failure is None, engine.named(failure), expect)
+                if writes < 2 and expect is not True:
+                    wrong = None
+                mark = '' if wrong is None else '   <-- UNEXPECTED' + wrong
+                print(f'visit/{mode:<13} {what:<5} writes={writes} states={n:>6} -> {verdict}'
+                      f'{mark}')
                 if failure:
                     print('    ' + failure)
                     print('    trace: ' + ' ; '.join(path))
-                # From two writes, every breakage must fail and every design hold.
-                if writes >= 2:
-                    ok &= (failure is not None) == expect_failure
-                elif failure is not None and not expect_failure:
-                    ok = False
+                ok &= wrong is None
     sys.exit(0 if ok else 1)

@@ -175,10 +175,10 @@ def writer(o, variant=''):
     return assemble(B)
 
 
-def run(name, waits, writes, tso=False, variant='', expect_ok=None):
+def run(name, waits, writes, tso=False, variant='', expect=None):
     threads = [waiter(waits, variant)] + [writer(o, variant) for o in writes]
     res = explore(name, threads, {BLK: 0}, tso=tso)
-    return report(res, expect_ok=expect_ok, tso=tso)
+    return report(res, expect=expect, tso=tso)
 
 
 # (the ranges one PE waits on in turn, the elements written)
@@ -189,7 +189,7 @@ STRADDLE = ([(3, 2)], [3, 4])               # [3,5) rounds out to the block [0,8
 REUSE = ([(0, 1), (5, 1)], [0, 5])          # one wait, then another on a different element
 
 CASES = [
-    # name, (waits, writes), tso, variant, expected to pass
+    # name, (waits, writes), tso, variant, expect: True, or the property it must fail
     ('design: one variable', SCALAR, False, '', True),
     ('design: one variable', SCALAR, True, '', True),
     ('design: two writers', TWO_WRITERS, False, '', True),
@@ -203,16 +203,16 @@ CASES = [
     ('tworange: two waits in turn', REUSE, False, 'tworange', True),
     ('tworange: two waits in turn', REUSE, True, 'tworange', True),
     ('tworange: array wait', ARRAY, True, 'tworange', True),
-    ('checkfirst: one variable', SCALAR, False, 'checkfirst', False),
-    ('notifyfirst: one variable', SCALAR, False, 'notifyfirst', False),
-    ('plainblk: one variable', SCALAR, True, 'plainblk', False),
-    ('plainput: one variable', SCALAR, True, 'plainput', False),
+    ('checkfirst: one variable', SCALAR, False, 'checkfirst', 'LOST WAKE'),
+    ('notifyfirst: one variable', SCALAR, False, 'notifyfirst', 'LOST WAKE'),
+    ('plainblk: one variable', SCALAR, True, 'plainblk', 'LOST WAKE'),
+    ('plainput: one variable', SCALAR, True, 'plainput', 'LOST WAKE'),
     # A predicate that covers only a range's ends passes every case an earlier
     # draft of this model had, and loses a wake on a three-element array. That
     # is what makes these cases able to see a hole in the middle of a range.
     ('endpoints: one variable (passes)', SCALAR, False, 'endpoints', True),
     ('endpoints: range straddling a boundary (passes)', STRADDLE, False, 'endpoints', True),
-    ('endpoints: array wait', ARRAY, False, 'endpoints', False),
+    ('endpoints: array wait', ARRAY, False, 'endpoints', 'LOST WAKE'),
 ]
 
 if __name__ == '__main__':

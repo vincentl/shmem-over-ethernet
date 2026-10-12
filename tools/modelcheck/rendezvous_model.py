@@ -225,33 +225,29 @@ def run(variant, deviation, out=sys.stdout):
                    liveness=True, max_seconds=600)
 
 
-# (variant, deviation, the verdict it must reach)
+# (variant, deviation, expect: True, or the property it must fail)
 CASES = [
-    ('design', 'agree', 'ok'),
-    ('design', 'value@3', 'ok'),
-    ('design', 'count@3=9', 'ok'),
-    ('design', 'count@1=9', 'ok'),
-    ('design', 'count@2=3', 'ok'),
-    ('design', 'count@0=9', 'ok'),
-    ('design', 'count@0=2', 'ok'),
-    ('children_first', 'agree', 'ok'),
-    ('children_first', 'value@3', 'ok'),
+    ('design', 'agree', True),
+    ('design', 'value@3', True),
+    ('design', 'count@3=9', True),
+    ('design', 'count@1=9', True),
+    ('design', 'count@2=3', True),
+    ('design', 'count@0=9', True),
+    ('design', 'count@0=2', True),
+    ('children_first', 'agree', True),
+    ('children_first', 'value@3', True),
     ('children_first', 'count@3=9', 'STUCK'),
     ('no_hello_count', 'count@3=9', 'STUCK'),
-    ('root_checks_only', 'value@3', 'VIOLATION'),
+    ('root_checks_only', 'value@3', 'AGREE'),
 ]
 
 if __name__ == '__main__':
     keep = select(sys.argv)
     ok = True
-    for variant, deviation, verdict in CASES:
+    for variant, deviation, expect in CASES:
         name, _, _ = case(variant, deviation)
         if not keep(name):
             continue
         res = run(variant, deviation)
-        right = res.complete and res.verdict == verdict
-        ok &= report(res, expect_ok=verdict == 'ok', tso=False,
-                     extra='' if right or not res.complete else
-                     f'   <-- EXPECTED {verdict}')
-        ok &= right
+        ok &= report(res, expect=expect, tso=False)
     sys.exit(0 if ok else 1)

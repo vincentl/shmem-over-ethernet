@@ -324,7 +324,7 @@ def agent(i, design):
     B = [('A0', ('set', 'phase', lambda L: 0, '@LOOP')),
          ('LOOP', ('nd', choose, '@CHECK')),
          ('CHECK', ('check', lambda M, L: None if not M[VIOLATION] else
-                    f'declared, but {deadlocked(M) or "?"}', '@AFTER')),
+                    f'SAFETY: declared, but {deadlocked(M) or "?"}', '@AFTER')),
          ('AFTER', ('br', lambda L: L.get('phase') == 6, '@END', '@LOOP')),
          ('END', ('done',))]
     return assemble(B)
@@ -360,7 +360,7 @@ SCENARIOS = {
     'barrier': ([], [('barrier', 2)], [('wait',)]),
 }
 
-# (design, scenario, expect_ok)
+# (design, scenario, expect): True, or the property the breakage must fail
 CASES = [
     ('design', 'deadlock', True),
     ('design', 'put_wakes', True),
@@ -369,9 +369,9 @@ CASES = [
     ('design', 'get_far', True),
     ('design', 'compute', True),
     ('design', 'barrier', True),
-    ('helper_unseen', 'get_far', False),
-    ('answer_unpassed', 'put_wakes', False),
-    ('helper_unasked', 'put_silent', False),
+    ('helper_unseen', 'get_far', 'SAFETY'),
+    ('answer_unpassed', 'put_wakes', 'SAFETY'),
+    ('helper_unasked', 'put_silent', 'SAFETY'),
 ]
 
 
@@ -388,7 +388,7 @@ def main():
         # the check that the job is found.
         res = explore(name, threads, mem, max_seconds=1500, liveness_max_states=6_000_000,
                       idle_ok=lambda i, M, L: i >= N, done=lambda M: M[DECLARED] == 1)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

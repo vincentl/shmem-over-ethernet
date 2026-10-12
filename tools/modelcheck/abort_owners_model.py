@@ -78,17 +78,19 @@ Variants (expected verdict):
 import sys
 from collections import deque
 
+import engine
+
 VARIANTS = {
-    # name: (n_mode, excuse, p_ending, reset, stream, flush_checks_error, expect_ok)
+    # name: (n_mode, excuse, p_ending, reset, stream, flush_checks_error, expect)
     'wait': ('wait', True, False, False, False, True, True),
     'wait_no_excuse': ('wait', False, False, False, False, True, True),
-    'no_wait': ('no_wait', True, False, False, False, True, False),
+    'no_wait': ('no_wait', True, False, False, False, True, 'NO_FATAL'),
     'abrupt_p_ending': ('abrupt', True, True, False, False, True, True),
-    'abrupt_p_ending_no_excuse': ('abrupt', False, True, False, False, True, False),
+    'abrupt_p_ending_no_excuse': ('abrupt', False, True, False, False, True, 'NO_FATAL'),
     'abrupt_p_ending_fin_stream': ('abrupt', True, True, False, True, True, True),
     'abrupt_p_ending_reset_idle': ('abrupt', True, True, True, False, True, True),
     'abrupt_p_ending_reset_stream': ('abrupt', True, True, True, True, True, True),
-    'abrupt_p_ending_reset_stream_unchecked': ('abrupt', True, True, True, True, False, False),
+    'abrupt_p_ending_reset_stream_unchecked': ('abrupt', True, True, True, True, False, 'NO_FATAL'),
     'wait_reset_stream': ('wait', True, False, True, True, True, True),
 }
 
@@ -207,11 +209,14 @@ def main():
     for name, variant in VARIANTS.items():
         expect = variant[-1]
         held, states, trace = run(name)
-        print(f'abort_owners/{name}: {"holds" if held else "FAILS: a fatal at P"} '
-              f'({states} states){"" if held == expect else "  <-- UNEXPECTED"}', flush=True)
+        failure = None if held else 'NO_FATAL: a fatal at P'
+        wrong = engine.judge(held, engine.named(failure), expect)
+        mark = '' if wrong is None else '   <-- UNEXPECTED' + wrong
+        print(f'abort_owners/{name}: {"holds" if held else "FAILS: " + failure} '
+              f'({states} states){mark}', flush=True)
         if trace:
             print('   trace: ' + ' ; '.join(trace))
-        ok &= held == expect
+        ok &= wrong is None
     return 0 if ok else 1
 
 

@@ -331,12 +331,12 @@ def run(variant, out=sys.stdout):
 
 CASES = [
     ('design', True),
-    ('goodbye_early', False),
-    ('no_goodbye', False),
-    ('close_early', False),
+    ('goodbye_early', 'STUCK'),
+    ('no_goodbye', 'NO_EARLY_EOF'),
+    ('close_early', 'NO_RESET'),
     ('two_wires', True),
-    ('two_wires_one_goodbye', False),
-    ('two_wires_close_either', False),
+    ('two_wires_one_goodbye', 'NO_EARLY_EOF'),
+    ('two_wires_close_either', 'NO_RESET'),
 ]
 
 if __name__ == '__main__':
@@ -346,5 +346,5 @@ if __name__ == '__main__':
         name, _, _ = case(variant)
         if not keep(name):
             continue
-        ok &= report(run(variant), expect_ok=expect, tso=False)
+        ok &= report(run(variant), expect=expect, tso=False)
     sys.exit(0 if ok else 1)

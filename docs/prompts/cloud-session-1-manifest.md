@@ -357,6 +357,97 @@ at `82c5263`.
 - **Not verified here**: nothing. T32 (below) names `kept_bits`'s ORDER and the
   others' STUCK in the model's cases.
 
+### T32: model tests that say which property fails - done, `allgather_model.py` left to the lead
+
+*Round four's correctness F5 (`docs/reviews/archive/phase1-release-fixes-correctness.md`):
+`report` checked pass or fail, not which property failed, so an expected
+failure passed the suite whatever it violated - "which is how a check stops
+being reached without a test noticing, the defect the project has found
+twice"; F5 suggested that a case carry its expected message and `report`
+compare it.* Still so at `82c5263`: every breakage's case said `False`, and
+`report` compared `expect_ok != res.ok`.
+
+- **The engine** (`tools/modelcheck/engine.py`; this session's own work, not a
+  subagent's): a check names the property it holds by beginning its message with
+  the name and a colon (`ORDER: team 0: ...`; capitals, words separated by
+  spaces allowed, `FALSE DEAF`); `Result.failed` is that name for a VIOLATION,
+  `VIOLATION` where a message names none, the verdict itself for LOST WAKE, STUCK
+  and TRAPPED, and None for a result that holds or did not finish;
+  `report(res, expect=...)` takes True, or the property the case must fail, and a
+  mismatch prints `<-- UNEXPECTED: fails X, where it must fail Y` (or `holds,
+  where it must fail Y`) and fails the run; `engine.named()` and `engine.judge()`
+  do the same for the models that search with their own code. `expect_ok=`, the
+  older spelling, still takes True or False, its False any failure - for
+  `allgather_model.py`, the lead's, which this session did not touch. The
+  docstring's "Properties" paragraph says all this; `tools/modelcheck/README.md`'s
+  "Writing a model" says it to a model's author.
+- **`selftest.py`** holds the engine to it: its must-fail cases now compare the
+  property (`failed`), not the verdict, and a new one - the ring writer of its
+  own case not waiting for room - must fail BOUND, the name its check's message
+  now begins with; and `report` itself is held to the comparison: that case named
+  BOUND is expected, named STUCK or True is not.
+- **The models**: every model but `allgather_model.py` - 40 files, the six of
+  §4.11's `SHMEM_THREAD_MULTIPLE` designs and `rabenseifner_model.py`, which no
+  test runs, among them - converted by four Sonnet subagents on separate files
+  under this brief: every check's message, and every failure string of the seven
+  models that search with their own code, now begins with its property's name;
+  every breakage's `False` became the property it fails *now* - so that no verdict
+  changes - and `report(..., expect_ok=...)` became `expect=`; the seven
+  own-search models (`abort_owners`, `carrier`, `control_ack`, `visit`,
+  `shape_timing`, and the protocol and arithmetic parts of `circulant` and
+  `rabenseifner`) judge by name with `engine.judge`, where `carrier` had printed
+  no mark at all and `circulant` and `rabenseifner` had counted a TIME or STATE
+  LIMIT as a breakage failing; a limit is now unexpected. Nothing else changed:
+  no instruction, label, branch or update - for the eleven models whose
+  messages were already named, an AST comparison against their originals
+  confirms it outside the case tables. Reviewed here, every file: the names are the docstrings' where
+  they have one; where they had none the subagents chose, and this session
+  reviewed each, renamed one (`rabenseifner`'s `STEP_OF`, now `SCHEDULE`) and
+  wrote the interleaving models' new ones into their docstrings' lists -
+  OVERWRITE (`arrival`), CREDITS (`credit`), SUCCESSOR (`lock`), CAPACITY
+  (`split_numbers`), FOUND (`team_block`), APPLIED_MONOTONE (`control_ack`).
+  The others name a check function's failures in a model that lists no
+  properties - COMPLETE (`dirty_set`, `get_completion`), TORN
+  (`blocked_record`), NO_FATAL (`abort_owners`), LIVE_END (`carrier`), TABLE,
+  TERMS, CHOICES, PINS, CIRCULANT (`shape_timing`), ROUND, RESULT, INTERVALS,
+  VOLUME, ROUND_COUNT, FOLD (`circulant`), RESULT, SCHEDULE (`rabenseifner`).
+  `credit_model.py`'s per-bound expectations were rewritten as plain
+  conditionals. `tree_barrier_model.py` runs each breakage twice, every check on
+  and its own check alone: the first must fail what it fails now (P3 for
+  `forward_early` and `no_reset`, P2 for `release_twice`), the second the
+  docstring's property (`BREAKS`, beside the `FIRST` substrings it kept).
+- **Verdicts unchanged, shown**: each subagent ran every breakage on the files
+  before and after its edits - result lines (states, depth,
+  verdict) identical in every pair, messages differing only by their new
+  prefix - and every file that is not large whole after; the large ones' design
+  cases ran in the suite below. Each also checked, on scratch copies, that a
+  wrong name, a breakage that holds and a design that fails each print
+  `<-- UNEXPECTED` and exit 1.
+- **Failing without the change**: the gap F5 named, shown on T30's breakage. In
+  a scratch copy where `kept_bits` also takes `wake_first`'s defect, it fails
+  STUCK at 72 states, not ORDER: the old engine, the case expecting any
+  failure, passes it (exit 0); the new one prints `<-- UNEXPECTED: fails STUCK,
+  where it must fail ORDER` and exits 1. And `selftest.py`'s new cases need the
+  new engine: against the old one they cannot run (`Result` has no `failed`,
+  `report` no `expect`).
+- **Ran**: `selftest.py` alone first (exit 0: the reductions preserve every
+  verdict; `trapped: wire reader never advances` caught TRAPPED, `named: ring
+  writer does not wait` caught BOUND; `report` right in its three cases);
+  the static checks, 13 of 13; then the whole model suite one at a time,
+  `ctest --test-dir build/release -L model -j1 -V`, on these files: running
+  when this was committed - its first 15 tests passed, `model.reservation` in
+  2,167 s of its 2,400 s timeout, `model.abort` in 1,407 s, none with an
+  UNEXPECTED line - its whole count in the next commit's entry, as is
+  `get_completion_model.py` whole, which no preset registers; the other five of
+  §4.11's models and `rabenseifner_model.py` ran whole under the subagents,
+  exit 0 each.
+- **Left**: `allgather_model.py`, the lead's - its breakages still say `False`,
+  which `report` takes as before (`expect_ok`), so the model suite passes it
+  unchanged; converting it is the same edit as the others'.
+- **Not verified here**: nothing beyond the models' own runs. In the VM:
+  `ctest --preset models -j1` (39 tests) and, with `-DOSOE_MULTIPLE_MODELS=ON`,
+  the six of §4.11.
+
 ## Decisions taken that might have been the author's
 
 - **B4: the cache routines stay in `shmem.h`**, documented where they are and
@@ -373,19 +464,80 @@ at `82c5263`.
 - **Tier 1's sample was cut at 30 minutes** by this session's limit on a
   background command, not by choice: three models had not finished (Part 1).
   The brief bounded tier 2 at 30 minutes and tier 1 by its timeouts.
+- **T32's conversion ran four subagents at once**, each running one model at a
+  time - breakages and the smaller models only, a few hundred MB each - so up to
+  four models ran together then; the model suite itself ran at `-j1`.
+- **T30 is two commits**: `44e1975` carries the change, `a9f3877` its manifest
+  entry, which the first's message claims - the script that was to write it
+  failed, and the first had been pushed (no force-push).
+- **`model.reservation` takes 2,167 s of its 2,400 s timeout here** at `-j1`;
+  at four at a time, in tier 1's sample, it had not finished in 30 minutes. On a
+  slower core it would time out.
 
 ## Findings
 
 *Stale, wrong or missing things met on the way that no item covers - proposed,
 not fixed.*
 
-*None yet.*
+- **The probe's 64-bit futex line raises a stale alarm.** `tools/probe/probe-full-build.c:89`
+  prints "U64 NOT implemented (design 4.9 must change)" on every Linux - here as
+  on the VMs - but §4.9 changed long ago: a waiter sleeps on a library-owned
+  32-bit sequence word, and the design's table says "64-bit futex support: Not
+  implemented". *Proposed*: "U64 not implemented, as §4.9 assumes"; and §4.9's
+  "verified on 6.12 aarch64 by `tools/probe`" can add 6.18 x86-64.
+- **The README's test counts are stale.** "871 tests", "470 labelled
+  `internode`" (Building, How osoe is tested) and "400 of the full build's 871"
+  describe an older tree: at `82c5263` the release preset registers 878 tests
+  outside the models and 476 labelled `internode`; this branch adds four
+  (`shmem.headers.c23`, `shmem.profiler-plain-names`, `base.lock-free`,
+  `base.lock-free.never`), so 882. *Proposed*: refresh the counts at the merge,
+  or write them as "about".
+- **Breakages whose docstrings name another property than they fail** - each
+  case now names what it fails, the docstring left as it was (T32):
+  `arrival`'s `consume_reread` fails OVERWRITE (its `order` docstring says it
+  shows as STUCK); `credit`'s `race_take` fails CREDITS, at the origin, under
+  both bounds (the comment before its cases says it breaks the descriptor
+  bound); `landing_extent`'s `release_early` fails STUCK (documented OWN);
+  `lock`'s `reset_late`, `no_wait_next`, `store_clear`, `no_link` and
+  `test_swaps` fail STUCK (documented "trapped", and "P1 or trapped");
+  `pe_quiet`'s `at_least` fails PUTS (documented "(PUTS, GETS)");
+  `get_completion`'s `snapshot`, listed under Designs, fails COMPLETE;
+  `abort_exit`'s `no_carrier_wait` without kills fails STUCK (its entry says
+  NO_KILL, which it fails with kills); `helper_request`'s `request_first`
+  (documented LOST WAKE) and `no_bump`, and `lead_wake`'s `ring_no_bump`
+  ("still a lost wake"), fail STUCK; `team_block`'s `free_first` fails NAMED
+  alone - with NAMED's check off it holds, so the docstring's "(NAMED, OWN)"
+  is half wrong; `watch_list` lists `plainrng` and `tworange` under Breakages,
+  but their cases expect nothing and hold. *Proposed*: the docstrings brought to
+  what the runs show.
+- **STUCK or LOST WAKE is the thread order's choice.** At a state with no
+  successor the engine reports the first thread, by index, that is blocked or
+  asleep, so a lost wake shows as STUCK whenever a blocked thread comes first -
+  the three above, and `arrival_model.py`'s docstring says as much. *Proposed*:
+  report LOST WAKE whenever any thread sleeps there - a change of verdict for
+  those cases, so not made here.
+- **Checks no breakage reaches**, as ORDER was before T30: `split_numbers`' ONE
+  and `team_block`'s OWN (the step D review's G3 broke both by hand - `own_mask`,
+  and `no_holders` without REWRITE's check - and listed neither);
+  `landing_extent`'s OWN; `pe_quiet`'s GETS; `circulant`'s GRANT; and the guards
+  `control_ack`'s APPLIED_MONOTONE, `split_numbers`' CAPACITY and `team_block`'s
+  FOUND. *Proposed*: a breakage for each of the first four, as T30 made one for
+  ORDER.
+- **The evidence's frozen models** (`docs/design/evidence/am-backend/`'s
+  `arrival_model.py`, `credit_model.py` and their outputs) keep the old
+  messages, as the record of what ran: not a defect, noted so that a diff
+  against them is not surprising.
 
 ## For the lead's merge
 
 - **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
   (documented; the move put to the author, under Decisions); B3 (done); B5
-  (fixed before, verified here with Clang 18); P12 (done); T30 (done).
+  (fixed before, verified here with Clang 18); P12 (done); T30 (done); T32
+  (done but `allgather_model.py`, which the lead converts).
+- **A README line, once `allgather_model.py` names its breakages** (T32): How
+  osoe is tested's "Each model also carries deliberately broken variants that
+  must fail" can add "each naming the property it must fail, which the checker
+  compares".
 - **A README line, if the lead wants it** (B5): under Requirements, that a Linux
   Clang, 18.1.3 on Ubuntu 24.04, has built the full build without a warning and
   passed its release suite (2026-10-12, `cloud-session-1`).

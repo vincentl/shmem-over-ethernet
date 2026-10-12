@@ -116,7 +116,7 @@ def quiet(allops, variant=''):
 
     def complete(M, L):
         bad = [k for k in L['pre'] if not M[APPLIED(k)]]
-        return f'quiet returned with prior put(s) {bad} not applied' if bad else None
+        return f'COMPLETE: quiet returned with prior put(s) {bad} not applied' if bad else None
 
     lock = variant != 'unlocked'
     B = [('Q0', ('gpre', call, '@K0' if lock else '@Q1')),
@@ -142,8 +142,8 @@ def quiet(allops, variant=''):
     return assemble(B)
 
 
-def run(name, issuers_ops, nquiets, variant='', expect_ok=None):
-    return report(run_res(name, issuers_ops, nquiets, variant), expect_ok=expect_ok)
+def run(name, issuers_ops, nquiets, variant='', expect=None):
+    return report(run_res(name, issuers_ops, nquiets, variant), expect=expect)
 
 
 def run_res(name, issuers_ops, nquiets, variant=''):
@@ -160,7 +160,7 @@ def run_res(name, issuers_ops, nquiets, variant=''):
 
 
 CASES = [
-    # name, issuers' puts, quiets, variant, expected to pass
+    # name, issuers' puts, quiets, variant, expect: True, or the property the variant must fail
     ('design: 2 issuers x 1 put, 2 quiets', [[0], [1]], 2, '', True),
     ('design: issuers of 2 puts and 1 put, 2 quiets', [[0, 1], [2]], 2, '', True),
     ('design: 1 issuer x 3 puts, 2 quiets', [[0, 1, 2]], 2, '', True),
@@ -174,10 +174,10 @@ CASES = [
     ('resetstop: 2 issuers x 2 puts, 2 quiets', [[0, 1], [2, 3]], 2, 'resetstop', True),
     ('resetstop: 1 issuer x 3 puts, 3 quiets', [[0, 1, 2]], 3, 'resetstop', True),
     ('resetstop: 3 issuers x 1 put, 2 quiets', [[0], [1], [2]], 2, 'resetstop', True),
-    ('unlocked: 2 issuers x 1 put, 2 quiets', [[0], [1]], 2, 'unlocked', False),
-    ('naive: 1 issuer x 2 puts, 2 quiets', [[0, 1]], 2, 'naive', False),
-    ('bitfirst: 1 issuer x 2 puts, 2 quiets', [[0, 1]], 2, 'bitfirst', False),
-    ('plainmax: 2 issuers x 1 put, 1 quiet', [[0], [1]], 1, 'plainmax', False),
+    ('unlocked: 2 issuers x 1 put, 2 quiets', [[0], [1]], 2, 'unlocked', 'COMPLETE'),
+    ('naive: 1 issuer x 2 puts, 2 quiets', [[0, 1]], 2, 'naive', 'COMPLETE'),
+    ('bitfirst: 1 issuer x 2 puts, 2 quiets', [[0, 1]], 2, 'bitfirst', 'COMPLETE'),
+    ('plainmax: 2 issuers x 1 put, 1 quiet', [[0], [1]], 1, 'plainmax', 'COMPLETE'),
 ]
 
 if __name__ == '__main__':

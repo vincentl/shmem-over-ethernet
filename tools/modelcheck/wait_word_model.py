@@ -135,7 +135,7 @@ def case(design, targets):
     return f'wait_word/{design} targets={shape}', threads, mem
 
 
-# (design, waiters' targets, tso, expect_ok)
+# (design, waiters' targets, tso, expect): True, or the property it must fail
 CASES = [
     ('always_wake', [1, 2], True, True),
     ('design', [1], False, True),
@@ -144,12 +144,12 @@ CASES = [
     ('design', [2, 2], True, True),
     ('design', [1, 2, 2], True, True),
 
-    ('count_first', [1], False, False),
-    ('register_late', [1], False, False),
+    ('count_first', [1], False, 'LOST WAKE'),
+    ('register_late', [1], False, 'LOST WAKE'),
     ('release_level', [1], False, True),     # SC cannot show it
-    ('release_level', [1], True, False),
-    ('wake_one', [1, 2], False, False),
-    ('no_bump', [1], False, False),
+    ('release_level', [1], True, 'LOST WAKE'),
+    ('wake_one', [1, 2], False, 'LOST WAKE'),
+    ('no_bump', [1], False, 'LOST WAKE'),
 ]
 
 if __name__ == '__main__':
@@ -161,5 +161,5 @@ if __name__ == '__main__':
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=900,
                       liveness_max_states=4_000_000)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

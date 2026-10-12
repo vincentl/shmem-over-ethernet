@@ -257,7 +257,7 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
     for j in range(len(kids)):
         up.append((f'U{j}', ('check', lambda M, L, j=j, t=s_t:
                              None if M[TAG(UP(pe, t, j, slot(L['up'])))] == tag(x, L['up']) else
-                             f'PE {pe} read up-slot {j} with tag '
+                             f'VALUE: PE {pe} read up-slot {j} with tag '
                              f'{M[TAG(UP(pe, t, j, slot(L["up"])))]}, waiting for piece '
                              f'{L["up"]} of scan {x} ({tag(x, L["up"])})')))
         up.append((f'UT{j}', ('ghost', lambda M, L, j=j, t=s_t:
@@ -276,7 +276,7 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
                      f'up-slot {position}')]
         up += [('UP', ('nd', put_up)),
                ('UPO', ('check', lambda M, L: None if not M[OVERWRITE] else
-                        f'PE {pe} overwrote an unread up-slot')),
+                        f'SLOT: PE {pe} overwrote an unread up-slot')),
                ('UPA', ('add', lambda L, t=t, ppe=ppe, position=position: UPC(ppe, t, position),
                         lambda L: 1, '_'))]
     up.append(('UN', ('set', 'up', lambda L: L['up'] + 1)))
@@ -287,7 +287,7 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
         if ppe is not None:
             D += [(f'{prefix}V', ('check', lambda M, L, t=s_t:
                                   None if M[TAG(DOWN(pe, t, slot(L[var])))] == tag(x, L[var]) else
-                                  f'PE {pe} read its down-slot with tag '
+                                  f'VALUE: PE {pe} read its down-slot with tag '
                                   f'{M[TAG(DOWN(pe, t, slot(L[var])))]}, waiting for piece '
                                   f'{L[var]} of scan {x} ({tag(x, L[var])})')),
                   (f'{prefix}T', ('ghost', lambda M, L, t=s_t:
@@ -298,8 +298,8 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
         D.append((f'{prefix}X', ('check', lambda M, L, rank=rank:
                                  None if L['before'] == sum(source(x, L[var], r, members, pieces)
                                                             for r in range(rank)) else
-                                 f'PE {pe}\'s exclusive result for piece {L[var]} of scan {x} '
-                                 f'is {L["before"]:b}')))
+                                 f'RESULT: PE {pe}\'s exclusive result for piece {L[var]} of '
+                                 f'scan {x} is {L["before"]:b}')))
         for j, kpe in enumerate(kpes):
             def put_down(M, L, j=j, kpe=kpe, t=s_t):
                 key = DOWN(kpe, t, slot(L[var]))
@@ -312,7 +312,7 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
                          f'{kpe}\'s down-slot')]
             D += [(f'{prefix}Q{j}', ('nd', put_down)),
                   (f'{prefix}QO{j}', ('check', lambda M, L: None if not M[OVERWRITE] else
-                                      f'PE {pe} overwrote an unread down-slot')),
+                                      f'SLOT: PE {pe} overwrote an unread down-slot')),
                   (f'{prefix}QA{j}', ('add', lambda L, kpe=kpe, t=t: DOWNC(kpe, t),
                                       lambda L: 1, '_'))]
         return D
@@ -358,7 +358,7 @@ def case(design, members, k, depth, pieces, order):
     return name, threads, mem, members
 
 
-# (design, members, fan-out, depth, pieces, order, expect_ok)
+# (design, members, fan-out, depth, pieces, order, expect): True, or the property it must fail
 CASES = [
     ('design', 3, 2, 2, 3, 'A', True),           # a root and two leaves
     ('design', 4, 1, 2, 3, 'A', True),           # a chain: members both parent and child
@@ -368,11 +368,11 @@ CASES = [
     ('design', 4, 1, 3, 4, 'A', True),           # deeper than the pieces' halfway
     ('design', 5, 2, 2, 3, 'A', True),           # a member with children below the root
     ('design', 3, 1, 2, 3, 'ABA', True),         # back to A: its slots where it left them
-    ('window', 3, 1, 2, 4, 'A', False),
-    ('count_before_copy', 3, 1, 2, 4, 'A', False),
-    ('root_early', 3, 2, 2, 3, 'A', False),
-    ('ring_short', 3, 1, 2, 4, 'A', False),
-    ('summed', 3, 2, 2, 3, 'A', False),
+    ('window', 3, 1, 2, 4, 'A', 'SLOT'),
+    ('count_before_copy', 3, 1, 2, 4, 'A', 'SLOT'),
+    ('root_early', 3, 2, 2, 3, 'A', 'RESULT'),
+    ('ring_short', 3, 1, 2, 4, 'A', 'RESULT'),
+    ('summed', 3, 2, 2, 3, 'A', 'VALUE'),
     # Step E: the slots a member's lane, shared by its teams, and the grant.
     ('lanes', 4, 2, 2, 2, 'AB', True),
     ('lanes', 3, 1, 2, 3, 'ABA', True),
@@ -387,15 +387,15 @@ CASES = [
     ('lanes_no_grant', 3, 1, 2, 2, 'AB', True),
     # ...and the grant matters where a child is outside the scan its parent is
     # in: PE 2, in Q alone, puts into PE 1's lane while PE 1 is in P's scan.
-    ('lanes_no_grant', 3, 1, 2, 2, 'PQ', False),
-    ('lanes_stale_grant', 3, 1, 2, 2, 'QPQ', False),
+    ('lanes_no_grant', 3, 1, 2, 2, 'PQ', 'SLOT'),
+    ('lanes_stale_grant', 3, 1, 2, 2, 'QPQ', 'SLOT'),
     # Small scans through each team number's own slots, between large ones
     # through the lanes: on one team, on two whose parent is shared, with a
     # child outside the scan its parent is in.
     ('lanes', 3, 2, 2, 2, 'aAa', True),
     ('lanes', 3, 1, 2, 2, 'pQqP', True),
     ('lanes', 3, 1, 2, 2, 'pqpq', True),
-    ('lanes_node_small', 3, 1, 2, 2, 'pq', False),
+    ('lanes_node_small', 3, 1, 2, 2, 'pq', 'SLOT'),
 ]
 
 
@@ -408,7 +408,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, n=n: M[FIN] == n)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

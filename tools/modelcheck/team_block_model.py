@@ -40,6 +40,8 @@ Checked
            block.
   FREE     the lead finds its name unmapped once it has left its team, so that
            its number is in its free mask at its next split.
+  FOUND    the member finds A's block mapped under A's name once the split's
+           sync has returned.
   and, by the engine: no stuck thread, and from every reachable state the run can
   still finish (AG EF done).
 
@@ -132,7 +134,7 @@ def write_block(p, name, team, members, then):
     def check(M, L):
         held = [pe for pe in range(3) if M[HOLDER(L['b'], pe)]]
         return None if not held else \
-            f'block {L["b"]} written for team {TEAM[team]} while PE {held[0]} holds it'
+            f'REWRITE: block {L["b"]} written for team {TEAM[team]} while PE {held[0]} holds it'
     return [(p + 'h', ('check', check, '@' + p + 'g')),
             (p + 'g', ('load', lambda L: GEN(L['b']), 'g', '@' + p + 'G')),
             (p + 'G', ('store', lambda L: GEN(L['b']), lambda L: L['g'] + 1, True, '@' + p + 'C')),
@@ -158,8 +160,8 @@ def post(p, then):
 def read_counters(p, team, then):
     return [(p + 'r', ('load', lambda L: COUNTERS(L['b']), 'c', '@' + p + 'rc')),
             (p + 'rc', ('check', lambda M, L, t=team: None if L['c'] == L['g'] else
-                        f'a member of team {TEAM[t]} read block {L["b"]}\'s counters of generation '
-                        f'{L["c"]}, its own being {L["g"]}', then))]
+                        f'OWN: a member of team {TEAM[t]} read block {L["b"]}\'s counters of '
+                        f'generation {L["c"]}, its own being {L["g"]}', then))]
 
 
 def leave(design, p, pe, name, then):
@@ -236,7 +238,7 @@ def lead(design):
     # block is still mapped under (lead, number), and the lead finds it free as
     # soon as it has left A, whoever holds A's block still (FREE).
     B_ += [('bm', ('check', lambda M, L: None if M[MAP(0)] == 0 else
-                   'the lead left team A and found its name still mapped, its number not '
+                   'FREE: the lead left team A and found its name still mapped, its number not '
                    'free for team B', '@bc'))]
     B_ += claim('b', '@bh')
     B_ += write_block('b', 0, B, (0,), '@ba')
@@ -250,8 +252,8 @@ def member(design):
     B_ = []
     B_ += sync('a', 1, '@f')
     B_ += [('f', ('load', lambda L: MAP(0), 'v', '@fz')),
-           ('fz', ('check', lambda M, L: None if L['v'] else 'a member of team A found no block',
-                   '@fb')),
+           ('fz', ('check', lambda M, L: None if L['v'] else
+                   'FOUND: a member of team A found no block', '@fb')),
            ('fb', ('set', 'b', lambda L: L['v'] - 1, '@fg')),
            ('fg', ('load', lambda L: GEN(L['b']), 'g', '@fr'))]
     B_ += read_counters('f', A, '@ds')
@@ -314,16 +316,17 @@ def engine(design):
     def apply(M, L):
         b, g = L['b'], L['eg']
         if L[f'learnt{b}'] != g:
-            return (f'the engine applied {"an arrival" if L["kind"] == 1 else "a message"} of '
-                    f'generation {g} to block {b}\'s state, learnt at generation {L[f"learnt{b}"]}')
+            return (f'ENGINE: the engine applied '
+                    f'{"an arrival" if L["kind"] == 1 else "a message"} of generation {g} to '
+                    f'block {b}\'s state, learnt at generation {L[f"learnt{b}"]}')
         return None
 
     def own(M, L):
         name, team = divmod(L['m'], 8)
         if L['b'] != M[TEAM_BLOCK(team)] or L['eg'] != M[TEAM_GEN(team)]:
-            return (f'a message for team {TEAM[team]} under name {name} resolved to block {L["b"]} '
-                    f'at generation {L["eg"]}, the team\'s being block {M[TEAM_BLOCK(team)]} at '
-                    f'{M[TEAM_GEN(team)]}')
+            return (f'NAMED: a message for team {TEAM[team]} under name {name} resolved to block '
+                    f'{L["b"]} at generation {L["eg"]}, the team\'s being block '
+                    f'{M[TEAM_BLOCK(team)]} at {M[TEAM_GEN(team)]}')
         return None
 
     def is_a(M, L):
@@ -341,8 +344,8 @@ def engine(design):
         # A message: its name through the map, then the block's generation.
         ('Q', ('load', lambda L: MAP(L['m'] // 8), 'v', '@Qz')),
         ('Qz', ('check', lambda M, L: None if L['v'] else
-                f'a message for team {TEAM[L["m"] % 8]} under name {L["m"] // 8} found no block '
-                f'in the map', '@Qb')),
+                f'NAMED: a message for team {TEAM[L["m"] % 8]} under name {L["m"] // 8} found no '
+                f'block in the map', '@Qb')),
         ('Qb', ('set', 'b', lambda L: L['v'] - 1, '@Qg')),
         ('Qg', ('load', lambda L: GEN(L['b']), 'eg', '@Qo')),
         ('Qo', ('check', own, '@QL')),
@@ -375,11 +378,11 @@ def case(design):
 
 CASES = [
     ('design', True),
-    ('no_holders', False),
-    ('no_relearn', False),
-    ('map_early', False),
-    ('last_clears', False),
-    ('free_first', False),
+    ('no_holders', 'REWRITE'),
+    ('no_relearn', 'ENGINE'),
+    ('map_early', 'NAMED'),
+    ('last_clears', 'FREE'),
+    ('free_first', 'NAMED'),
 ]
 
 
@@ -392,7 +395,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=1800,
                       done=lambda M: M[DONE] == 5)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

@@ -131,8 +131,8 @@ def node(design, n, nodes, fanout, depth, collectives, pieces):
                 nxt = f'{label}K{i + 1}' if i + 1 < len(kid_pos) else then
                 W += [(f'{label}K{i}', ('check', lambda M, L, c=c, v=var:
                                         None if M[SLOT(n, c, L[v] % depth)] == tagbase + L[v] else
-                                        f'node {n} read {M[SLOT(n, c, L[v] % depth)]} from child '
-                                        f'position {c}, waiting for piece {tagbase + L[v]}',
+                                        f'UP: node {n} read {M[SLOT(n, c, L[v] % depth)]} from '
+                                        f'child position {c}, waiting for piece {tagbase + L[v]}',
                                         '@' + nxt if not nxt.startswith('@') else nxt))]
             W[0] = (W[0][0], W[0][1][:2] + ('@' + W[0][1][2],))
             return W
@@ -191,14 +191,14 @@ def node(design, n, nodes, fanout, depth, collectives, pieces):
                       (p + 'LATE', ('set', 'fw', lambda L: L['down'] - 1, '@' + p + 'LATE1')),
                       (p + 'LATE1', ('check', lambda M, L, tb=tagbase:
                                      None if M[RSLOT(n, L['fw'] % depth)] == tb + L['fw'] else
-                                     f'node {n} read release {M[RSLOT(n, L["fw"] % depth)]}, '
+                                     f'DOWN: node {n} read release {M[RSLOT(n, L["fw"] % depth)]}, '
                                      f'waiting for {tb + L["fw"]}', '@' + p + 'LF'))]
                 B += forward(p + 'LF', 'fw', '@' + p + 'LATE2')
                 B += [(p + 'LATE2', ('set', 'pend', lambda L: 0, '@' + p + 'LOOP'))]
             else:
                 B += [(p + 'RX', ('check', lambda M, L, tb=tagbase:
                                   None if M[RSLOT(n, L['down'] % depth)] == tb + L['down'] else
-                                  f'node {n} read release {M[RSLOT(n, L["down"] % depth)]}, '
+                                  f'DOWN: node {n} read release {M[RSLOT(n, L["down"] % depth)]}, '
                                   f'waiting for {tb + L["down"]}', '@' + p + 'FW')),
                       (p + 'LATE', ('br', lambda L: True, '@' + p + 'RW', '@' + p + 'RW'))]   # not reached
                 B += forward(p + 'FW', 'down', '@' + p + 'NX')
@@ -229,7 +229,7 @@ def case(design, nodes, fanout, depth, roots, pieces):
     return name, threads, mem, nodes
 
 
-# (design, nodes, fanout, depth, roots, pieces, expect_ok)
+# (design, nodes, fanout, depth, roots, pieces, expect): True, or the property it must fail
 CASES = [
     ('design', 3, 2, 2, (0,), 4, True),
     ('design', 3, 1, 2, (0,), 4, True),          # a chain: a node both parent and child
@@ -238,10 +238,10 @@ CASES = [
     ('design', 3, 1, 1, (0, 2), 3, True),        # depth 1 is today's protocol
     ('design', 5, 2, 2, (0, 2, 4), 3, True),     # three collectives, three trees
     ('design', 5, 4, 2, (0, 3), 4, True),        # a wide parent
-    ('window', 3, 2, 2, (0,), 4, False),
-    ('summed', 3, 2, 2, (0,), 4, False),
-    ('count_before_copy', 3, 1, 2, (0,), 4, False),   # a chain: a release overwritten
-    ('count_before_copy', 3, 2, 2, (0,), 4, False),   # leaves only: the same
+    ('window', 3, 2, 2, (0,), 4, 'UP'),
+    ('summed', 3, 2, 2, (0,), 4, 'UP'),
+    ('count_before_copy', 3, 1, 2, (0,), 4, 'DOWN'),  # a chain: a release overwritten
+    ('count_before_copy', 3, 2, 2, (0,), 4, 'DOWN'),  # leaves only: the same
 ]
 
 
@@ -254,7 +254,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, n=n: M[FIN] == n)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

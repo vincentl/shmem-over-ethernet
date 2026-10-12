@@ -82,7 +82,7 @@ def issuer(design, i, gets, extents):
                              lambda L: L['w'] | (1 << L['b']), 'ok', '@' + p + 'K'))]
         B += [(p + 'K', ('br', lambda L: L['ok'], '@' + p + 'X', '@' + p + 'C')),
               (p + 'X', ('check', lambda M, L: None if M[OWNER(L['b'])] == 0 else
-                         f'extent {L["b"]} held by thread {M[OWNER(L["b"])] - 1} and '
+                         f'EXCLUSIVE: extent {L["b"]} held by thread {M[OWNER(L["b"])] - 1} and '
                          f'claimed again', '@' + p + 'O')),
               (p + 'O', ('ghost', lambda M, L, i=i: ({OWNER(L['b']): i + 1}, {}), '@' + p + 'S')),
               # Send: the request carries the extent; from here its reply may land.
@@ -93,8 +93,8 @@ def issuer(design, i, gets, extents):
         def copy_out(label, then, tag=tag, p=p):
             return [(p + label, ('check', lambda M, L, tag=tag:
                                  None if M[DATA(L['b'])] == tag else
-                                 f'thread copied reply {M[DATA(L["b"])]} out of extent {L["b"]}, '
-                                 f'expected its own {tag}', '@' + p + label + 'a')),
+                                 f'OWN: thread copied reply {M[DATA(L["b"])]} out of extent '
+                                 f'{L["b"]}, expected its own {tag}', '@' + p + label + 'a')),
                     # The extent is empty again before it is given back.
                     (p + label + 'a', ('store', lambda L: LANDED(L['b']), lambda L: 0, True,
                                        then))]
@@ -147,15 +147,15 @@ def case(design, threads_n, gets, extents):
     return name, threads, mem
 
 
-# (design, threads, gets, extents, expect_ok)
+# (design, threads, gets, extents, expect): True, or the property the breakage must fail
 CASES = [
     ('design', 2, 2, 1, True),
     ('design', 3, 1, 2, True),
     ('design', 3, 2, 2, True),
-    ('store_claim', 2, 1, 2, False),
-    ('release_early', 2, 2, 1, False),
-    ('wake_first', 2, 2, 1, False),
-    ('no_wake', 2, 2, 1, False),
+    ('store_claim', 2, 1, 2, 'EXCLUSIVE'),
+    ('release_early', 2, 2, 1, 'STUCK'),
+    ('wake_first', 2, 2, 1, 'LOST WAKE'),
+    ('no_wake', 2, 2, 1, 'LOST WAKE'),
 ]
 
 
@@ -169,7 +169,7 @@ def main():
         total = threads_n * gets
         res = explore(name, threads, mem, max_seconds=600,
                       done=lambda M, total=total: M[DONE] == total)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

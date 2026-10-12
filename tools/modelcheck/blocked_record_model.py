@@ -101,7 +101,8 @@ def writer(variant=''):
 def torn(M, L):
     """Publication k wrote k to both fields, so halves that disagree are torn."""
     if L['r'] != L['d']:
-        return f"torn read: routine={L['r']} from one publication, detail={L['d']} from another"
+        return (f"TORN: torn read: routine={L['r']} from one publication, "
+                f"detail={L['d']} from another")
     return None
 
 
@@ -136,21 +137,21 @@ def reader(variant=''):
     return assemble(B)
 
 
-def run(name, tso=False, variant='', expect_ok=None):
+def run(name, tso=False, variant='', expect=None):
     threads = [writer(variant), reader(variant)]
     res = explore(name, threads, {GEN: 0, ROUTINE: 0, DETAIL: 0}, tso=tso)
-    return report(res, expect_ok=expect_ok, tso=tso)
+    return report(res, expect=expect, tso=tso)
 
 
 CASES = [
-    # name, tso, variant, expected to pass
+    # name, tso, variant, expect: True, or the property the variant must fail
     ('design: two seq_cst bumps', False, '', True),
     ('design: two seq_cst bumps', True, '', True),
-    ('nogen:     no generation word', False, 'nogen', False),
-    ('nogen:     no generation word', True, 'nogen', False),
-    ('bumpafter: fields written before the window', False, 'bumpafter', False),
-    ('hoist:     a field store above the opening bump', True, 'hoist', False),
-    ('noverify:  reader does not re-read the generation', False, 'noverify', False),
+    ('nogen:     no generation word', False, 'nogen', 'TORN'),
+    ('nogen:     no generation word', True, 'nogen', 'TORN'),
+    ('bumpafter: fields written before the window', False, 'bumpafter', 'TORN'),
+    ('hoist:     a field store above the opening bump', True, 'hoist', 'TORN'),
+    ('noverify:  reader does not re-read the generation', False, 'noverify', 'TORN'),
 ]
 
 if __name__ == '__main__':
