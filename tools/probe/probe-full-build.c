@@ -180,6 +180,13 @@ static void probe_uring_setup(void)
     struct io_uring_probe *pr = io_uring_get_probe_ring(&ring);
     CHECK("opcode FUTEX_WAIT", pr && io_uring_opcode_supported(pr, IORING_OP_FUTEX_WAIT), "");
     CHECK("opcode RECV", pr && io_uring_opcode_supported(pr, IORING_OP_RECV), "");
+    /* The zero-copy send's opcode, the other thing it needs beside the
+     * locked-memory limit (above): an info line, not a check, since the send
+     * is off by default and OSOE_WIRE_ZERO_COPY=on is refused by name where
+     * the opcode is missing (wire.c; the review of v0.2 step 4's merge point,
+     * portability P1). */
+    printf("info opcode SEND_ZC, for OSOE_WIRE_ZERO_COPY=on: %s\n",
+           pr && io_uring_opcode_supported(pr, IORING_OP_SEND_ZC) ? "supported" : "missing");
     io_uring_free_probe(pr);
 
     /* IORING_OP_FUTEX_WAIT with a stale value must complete with -EAGAIN (3.10). */

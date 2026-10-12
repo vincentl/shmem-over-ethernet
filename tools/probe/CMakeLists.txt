@@ -21,3 +21,11 @@ osoe_warnings(probe)
 # builds register it, each probing what its own library needs.
 add_test(NAME env.probe COMMAND probe)
 set_tests_properties(env.probe PROPERTIES LABELS "env" TIMEOUT 60)
+
+# The full build's probe says whether the kernel has the zero-copy send's
+# opcode, which OSOE_WIRE_ZERO_COPY=on needs and nothing else does.
+if(NOT OSOE_SINGLE_NODE)
+  add_test(NAME env.probe.zero-copy-line
+    COMMAND sh -c "$<TARGET_FILE:probe> | grep -q '^info opcode SEND_ZC, for OSOE_WIRE_ZERO_COPY=on: \\(supported\\|missing\\)$'")
+  set_tests_properties(env.probe.zero-copy-line PROPERTIES LABELS "env" TIMEOUT 60)
+endif()
