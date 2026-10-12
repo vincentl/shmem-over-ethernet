@@ -1,10 +1,12 @@
 #!/bin/bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
-# docs/fast-link.md §1: Slurm on the list's nodes, the first its controller,
+# docs/fast-link.md §1: Slurm on the list's nodes, the controller the list's
+# first node or CONTROLLER - a head node off the list, which then gets munge's
+# key, slurm.conf and slurmctld but no node line, and runs no job -
 # from the single-host install that ran in the development VM
 # (build/scratch/step3/slurm/install-slurm.sh, 2026-09-23) - untested across
-# machines until a cluster runs it. Run on the first node, as a user with sudo
-# on every node and ssh from this node to each; slurm-wlm and munge already
+# machines until a cluster runs it. Run on the controller, as a user with sudo
+# on every node and ssh from this machine to each; slurm-wlm and munge already
 # installed, without their recommended packages (§1). TaskPlugin=task/none, so
 # that nothing binds a step's tasks: under task/affinity a job of one task is
 # confined to the core Slurm allocated it, whatever --cpu-bind=none says, and
@@ -14,21 +16,26 @@
 # why).
 # NODES holds Slurm's names for the nodes - the short host names slurmd -C
 # reports - not addresses. Every node's host key is taken on first contact.
-# usage: slurm-setup.sh NODES
+# usage: [CONTROLLER=HOST] slurm-setup.sh NODES
 set -eu
 NODES_FILE=$1
 FIRST=$(sed -n 1p "$NODES_FILE")
+CONTROLLER=${CONTROLLER:-$FIRST}
 COUNT=$(grep -c . "$NODES_FILE")
-[ "$(hostname -s)" = "${FIRST%%.*}" ] || echo "note: running on $(hostname -s), not the list's first node $FIRST"
+[ "$(hostname -s)" = "${CONTROLLER%%.*}" ] || echo "note: running on $(hostname -s), not the controller $CONTROLLER"
 SSH="ssh -o StrictHostKeyChecking=accept-new"
 everywhere() { for n in $(grep . "$NODES_FILE"); do $SSH "$n" "$@"; done; }
+# What munge's key and slurm.conf go to: the list's nodes, and the controller
+# when it is a head node off the list.
+TARGETS=$(grep . "$NODES_FILE"; grep -qxF "$CONTROLLER" "$NODES_FILE" || echo "$CONTROLLER")
 
-# munge: the first node's key, on every node, by its standard input rather
-# than its command line, where ps would show it; read once, before the loop,
-# since the first node's own copy is rewritten in it.
+# munge: this machine's key - the controller's - on every node and on the
+# controller, by its standard input rather than its command line, where ps
+# would show it; read once, before the loop, since this machine's own copy is
+# rewritten in it.
 sudo test -s /etc/munge/munge.key || sudo mungekey --create
 KEY=$(sudo base64 -w0 /etc/munge/munge.key)
-for n in $(grep . "$NODES_FILE"); do
+for n in $TARGETS; do
     echo "$KEY" |
         $SSH "$n" "base64 -d | sudo tee /etc/munge/munge.key.new > /dev/null &&
                    sudo mv /etc/munge/munge.key.new /etc/munge/munge.key &&
@@ -73,7 +80,7 @@ fi
 CONF=$(cat <<CONF
 # The fast-link cluster's Slurm (docs/fast-link/slurm-setup.sh).
 ClusterName=fastlink
-SlurmctldHost=${FIRST%%.*}
+SlurmctldHost=${CONTROLLER%%.*}
 MpiDefault=none
 ProctrackType=proctrack/linuxproc
 # Nothing binds a step's tasks, so that a job of one task may use every core of
@@ -98,7 +105,7 @@ CONF
 )
 echo "$CONF"
 ENCODED=$(echo "$CONF" | base64 -w0)
-for n in $(grep . "$NODES_FILE"); do
+for n in $TARGETS; do
     $SSH "$n" "sudo mkdir -p /var/lib/slurm/slurmctld /var/lib/slurm/slurmd /var/log/slurm &&
               sudo chown -R slurm:slurm /var/lib/slurm /var/log/slurm &&
               echo '$ENCODED' | base64 -d | sudo tee /etc/slurm/slurm.conf > /dev/null"
@@ -112,7 +119,7 @@ everywhere "sudo mkdir -p /etc/systemd/logind.conf.d /etc/security/limits.d /etc
             printf '[Service]\nLimitMEMLOCK=infinity\n' | sudo tee /etc/systemd/system/slurmd.service.d/memlock.conf > /dev/null &&
             sudo systemctl daemon-reload && sudo systemctl restart systemd-logind"
 
-$SSH "$FIRST" "sudo systemctl enable slurmctld && sudo systemctl restart slurmctld"
+$SSH "$CONTROLLER" "sudo systemctl enable slurmctld && sudo systemctl restart slurmctld"
 everywhere "sudo systemctl enable slurmd && sudo systemctl restart slurmd"
 sleep 5
 sinfo -N -l

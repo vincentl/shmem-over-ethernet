@@ -77,10 +77,11 @@ helpers' (§5).
   instances: "allow all TCP between the nodes" is the rule to give.
 - One user, with one user id, on every node, since Slurm runs tasks by user id
   (Google's OS Login gives it; accounts made on each instance from metadata
-  keys may not), able to `ssh` from the first node to every other - the keys
-  that reach the nodes from outside do not reach them from the first node - and
-  with `sudo` on every node.
-- The tree on the first node, by `git clone` or a copy, so that its commit is
+  keys may not), able to `ssh` from the first node, or a head node off the list, to
+  every node - the keys that reach the nodes from outside do not reach them
+  from there unless the agent is forwarded (`ForwardAgent`) - and with `sudo`
+  on every node.
+- The tree on the first node, or the head node, by `git clone` or a copy, so that its commit is
   known. `NODES` holds Slurm's names for the nodes: the short host names
   `slurmd -C` reports, not addresses.
 
@@ -114,7 +115,9 @@ count.
 ## 1. Setup
 
 The kit is this file's directory, `docs/fast-link/`. On the first node, which
-also runs Slurm's controller, as a user with `sudo`:
+also runs Slurm's controller - or on a head node off the list, which runs the
+controller, the builds and the lead's `ssh` so that no measured node does - as a
+user with `sudo`:
 
 ```sh
 sudo apt-get update
@@ -140,10 +143,11 @@ for n in $(tail -n +2 NODES); do ssh -o StrictHostKeyChecking=accept-new $n \
      slurm-wlm munge"; done
 ```
 
-Then, on the first node:
+Then, on the same machine:
 
 ```sh
 docs/fast-link/slurm-setup.sh NODES       # munge's key, slurm.conf, the daemons, on every node
+CONTROLLER=$(hostname -s) docs/fast-link/slurm-setup.sh NODES   # instead, on a head node off the list
 docs/fast-link/build.sh NODES             # the tree to every node at the same path, built there
 ```
 

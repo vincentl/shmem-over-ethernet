@@ -1,0 +1,36 @@
+== this branch
+case first (CONTROLLER=unset): exit 0
+  pass  munge's key to: node-a node-b
+  pass  slurm.conf to: node-a node-b
+  pass  slurmd -C on: node-a node-b
+  pass  slurmctld on: node-a
+  pass  slurmd on: node-a node-b
+  pass  SlurmctldHost: SlurmctldHost=node-a
+case head (CONTROLLER=head): exit 0
+  pass  munge's key to: head node-a node-b
+  pass  slurm.conf to: head node-a node-b
+  pass  slurmd -C on: node-a node-b
+  pass  slurmctld on: head
+  pass  slurmd on: node-a node-b
+  pass  SlurmctldHost: SlurmctldHost=head
+  pass  node lines: NodeName=node-a NodeName=node-b
+failures: 0
+status 0
+== main (the control: its head-node case must fail)
+case first (CONTROLLER=unset): exit 0
+  pass  munge's key to: node-a node-b
+  pass  slurm.conf to: node-a node-b
+  pass  slurmd -C on: node-a node-b
+  pass  slurmctld on: node-a
+  pass  slurmd on: node-a node-b
+  pass  SlurmctldHost: SlurmctldHost=node-a
+case head (CONTROLLER=head): exit 0
+  FAIL  munge's key to: expected 'head node-a node-b', got 'node-a node-b'
+  FAIL  slurm.conf to: expected 'head node-a node-b', got 'node-a node-b'
+  pass  slurmd -C on: node-a node-b
+  FAIL  slurmctld on: expected 'head', got 'node-a'
+  pass  slurmd on: node-a node-b
+  FAIL  SlurmctldHost: expected 'SlurmctldHost=head', got 'SlurmctldHost=node-a'
+  pass  node lines: NodeName=node-a NodeName=node-b
+failures: 4
+status 1

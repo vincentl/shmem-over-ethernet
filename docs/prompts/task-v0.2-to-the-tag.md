@@ -36,21 +36,23 @@ and every deletion are the author's.
   locked-memory limit; the Pi's 6.18 covers that. gVNIC, a compact placement
   policy, and one VPC whose MTU is 8896 (the author, 2026-10-11) in every
   session: a change between sessions makes their numbers incomparable.
-- **No separate head node.** The kit runs Slurm's controller on the first node
-  and copies the build to every node with `rsync` (`build.sh`), with no shared
-  file system - which on the Pi stalled tests in NFSv4 opens under load
-  (`docs/decisions/2026-10-11.md`, "On the Pi cluster"). A small head node
-  (`e2-standard-4`) only keeps the controller, the builds and the lead's ssh off
-  a measured node; it is the author's call, and costs the kit a two-line change
-  (the controller off `NODES`).
-- **Access the lead needs**: `ssh` from the author's Mac to the first node (an
-  external address, a firewall rule for the author's, the Mac's key through OS
-  Login, which also gives one user id on every node, as Slurm needs); `ssh` from
-  the first node to every other as the same user (a key made there and
-  authorized through OS Login); passwordless `sudo` on every node (OS Login's
-  admin role); all TCP between the nodes; `apt` out (Cloud NAT where a node has
-  no external address). No `gcloud` credentials: the author gives the names and
-  each session's window.
+- **A head node**, the author's choice of 2026-10-11 (his Terraform:
+  `slurm-controller`, an `e2-standard-4`): it runs Slurm's controller, the
+  builds' copying and the lead's `ssh`, so that no measured node does -
+  `slurm-setup.sh` with `CONTROLLER` set, `build.sh` from it, which copies the
+  tree to every node with `rsync` and builds it there. The head node exports
+  `/shared` (NFS, root squashed) as a site's would; the kit does not use it - on
+  the Pi, tests run from NFSv4 stalled in its opens under load
+  (`docs/decisions/2026-10-11.md`, "On the Pi cluster").
+- **Access the lead needs**: `ssh` from the author's Mac to the head node through
+  IAP - an entry in the Mac's ssh configuration whose `ProxyCommand` is gcloud's
+  IAP tunnel, the lead running no `gcloud` command itself - as the author's OS
+  Login user, which also gives one user id on every node, as Slurm needs; the
+  agent forwarded from the head node to every compute node; passwordless `sudo`
+  on every node (OS Login's admin role); all TCP between the nodes; `apt` out
+  through Cloud NAT, no node having an external address. No `gcloud`
+  credentials of the lead's own: the author gives the names and each session's
+  window.
 - **A custom image** after the first setup - the packages, Slurm's daemons
   stopped, `RemoveIPC=no`, the limits - saves each later session its half hour.
 - **The kit is written for `c4-standard-16`**, its 8, 16 and 32 PEs a node one
@@ -165,7 +167,8 @@ a scan, each modelled and tested, and the crossover among the three measured
 What was put to the author, the lead's recommendation first:
 
 - **A1, the cluster** - answered in part on 2026-10-11 (eight `c4-standard-16`,
-  an MTU of 8896): the head node, each session's window and the budget remain.
+  an MTU of 8896, a head node reached through IAP): each session's window and
+  the budget remain.
 - **A7, the scope.** `task-v0.2.md` put out of v0.2 RoCE and Soft-RoCE, the mesh
   schedule and `process_vm_readv` for statics. *Recommended:* RoCE and Soft-RoCE
   stay out - a backend is new work, not an open item, and `c4-standard-16` has no

@@ -4,7 +4,8 @@
 # without .git or build/, and on every node at once, its release build and the
 # kit's probes compiled into build/release/kit with the build's own oshcc - so
 # that everything a step runs is at the same path on every node, without a
-# shared file system. Run on the first node, from the tree. Under
+# shared file system. Run on the first node, or on a head node off the list,
+# from the tree. Under
 # KIT_LAUNCHER=osoe-launch, one machine: the build here alone. Each node's
 # configure and build log lands in its build-release.txt, whose failing lines
 # come back here; a build that fails removes the node's build/release whole,
