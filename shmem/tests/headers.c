@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * The public headers under every language standard they promise (C99, C11 and
- * C17 here; C++ in headers.cpp), with every warning an error. Declarations and
- * calls only: the test is the compile, since what breaks here breaks a program
- * at its first #include. What each mode sees differs - the C11 generics, and
- * the two-form routines under one name (shmem_sync's, and the signal updates':
- * with a context, or without), which C11 tells apart by argument count and C99
- * does not have - so each mode compiles the calls it has.
+ * The public headers under every language standard they promise (C99, C11, C17
+ * and C23 here; C++ in headers.cpp), with every warning an error. Declarations
+ * and calls only: the test is the compile, since what breaks here breaks a
+ * program at its first #include. What each mode sees differs - the C11
+ * generics, and the two-form routines under one name (shmem_sync's, and the
+ * signal updates': with a context, or without), which C11 and later tell apart
+ * by argument count and C99 does not have - so each mode compiles the calls it
+ * has.
  */
 #include <shmem.h>
 #include <pshmem.h>

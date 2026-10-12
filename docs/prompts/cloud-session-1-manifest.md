@@ -123,7 +123,40 @@ changed; the exact commands run and their pass counts; its failing-without-the-
 change evidence; and what this sandbox could not verify, with the commands for
 the development VM.*
 
-*None yet: written as each item is done.*
+### T42: a C23 compile test of the public headers - done
+
+*R9 P9-6 (`docs/reviews/archive/v0.2-before-part4-portability.md`): the headers
+were tested under C99, C11 and C17 only, while GCC 15 compiles every program that
+names no standard as `gnu23`.* Still open at `82c5263`:
+`shmem/tests/CMakeLists.txt`'s loop ran `c99 c11 c17`.
+
+- **The change**: `shmem.headers.c23` (tier 1, 30 s), beside the three -
+  `headers.c` under `-std=c23 -Wall -Wextra -Wpedantic -Werror -fsyntax-only` -
+  with the build's compiler where it takes `-std=c23` (CMake's
+  `check_c_compiler_flag`), otherwise the first of `gcc-15`, `gcc-14` and `clang`
+  that does; where none does it is registered all the same and skips, saying
+  `SKIPPED: no compiler here takes -std=c23 (...)`. `headers.c`'s comment names
+  C23. Here the build's GCC 13 refuses `-std=c23` ("did you mean '-std=c2x'?"), so
+  the test runs `gcc-14`; in the development VM, Debian 13's GCC 14 takes it
+  itself. Files: `shmem/tests/CMakeLists.txt`, `shmem/tests/headers.c`.
+- **Ran**: `cmake --build build/release -j4` (0 warnings), then
+  `ctest --test-dir build/release -R '^shmem\.(memory-orders|strict-c11|boundary|static-link|exports|settings-documented|license-lines|single-node\.configure|version\.|headers\.)' -j4`:
+  **19 of 19** (the static checks and the six header tests).
+- **The skip, shown**: a configure that can see no C23 compiler
+  (`-DCMAKE_IGNORE_PATH="/usr/bin;/bin;/usr/local/bin;/usr/sbin;/sbin"` with the
+  compiler and `make` given, the single-node build so that pkg-config is not
+  needed) registers the test, and `ctest -R shmem.headers.c23` reports it
+  `***Skipped` with its line.
+- **Failing without the change**: the headers pass under C23 today, so the
+  evidence is a mutant beside its control. With `shmem.h`'s `shmem_barrier`
+  declared old-style, `void shmem_barrier();`, the three existing tests still pass
+  (`cc -std=c99|c11|c17 ... headers.c`: exit 0 each - no test before this one
+  could see it), and the new one fails: `gcc-14 -std=c23 ...` exits 1, "too many
+  arguments to function 'shmem_barrier'" - C23 reads `()` as `(void)`. On the
+  real header it passes (above).
+- **Not verified here**: nothing beyond the release build; the VM's own run is
+  `ctest --preset release -R '^shmem\.headers\.'`, where `shmem.headers.c23`
+  should name GCC 14, the build's compiler, in its command (`ctest -V`).
 
 ## Decisions taken that might have been the author's
 
@@ -146,4 +179,4 @@ not fixed.*
 
 ## For the lead's merge
 
-*Nothing yet.*
+- **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`).

@@ -2528,6 +2528,41 @@ foreach(standard c99 c11 c17)
             ${CMAKE_CURRENT_SOURCE_DIR}/headers.c)
   set_tests_properties(shmem.headers.${standard} PROPERTIES LABELS "tier1" TIMEOUT 30)
 endforeach()
+# And C23, as GCC 15 and later compile every program that names no standard
+# (gnu23), so every program oshcc builds there (the ninth review's P9-6): with
+# the build's compiler where it takes -std=c23, otherwise the first of gcc-15,
+# gcc-14 and clang that does - Ubuntu 24.04's gcc is 13, whose C23 is -std=c2x.
+# Where none does, the test is registered all the same and skips, saying so.
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-std=c23 OSOE_C_COMPILER_TAKES_C23)
+set(osoe_c23_compiler "")
+if(OSOE_C_COMPILER_TAKES_C23)
+  set(osoe_c23_compiler "${CMAKE_C_COMPILER}")
+else()
+  foreach(name gcc-15 gcc-14 clang)
+    find_program(osoe_c23_candidate NAMES ${name} NO_CACHE)
+    if(osoe_c23_candidate)
+      execute_process(COMMAND ${osoe_c23_candidate} -std=c23 -E -x c /dev/null
+                      RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
+      if(rc EQUAL 0)
+        set(osoe_c23_compiler "${osoe_c23_candidate}")
+        break()
+      endif()
+    endif()
+  endforeach()
+endif()
+if(osoe_c23_compiler)
+  add_test(NAME shmem.headers.c23
+    COMMAND ${osoe_c23_compiler} -std=c23 -Wall -Wextra -Wpedantic -Werror
+            -fsyntax-only -I${PROJECT_SOURCE_DIR}/shmem/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/headers.c)
+else()
+  add_test(NAME shmem.headers.c23
+    COMMAND ${CMAKE_COMMAND} -E echo
+            "SKIPPED: no compiler here takes -std=c23 (${CMAKE_C_COMPILER}, gcc-15, gcc-14, clang)")
+  set_tests_properties(shmem.headers.c23 PROPERTIES SKIP_REGULAR_EXPRESSION "SKIPPED:")
+endif()
+set_tests_properties(shmem.headers.c23 PROPERTIES LABELS "tier1" TIMEOUT 30)
 find_program(OSOE_CXX_COMPILER NAMES c++ g++ clang++)
 if(OSOE_CXX_COMPILER)
   foreach(standard c++11 c++17)
