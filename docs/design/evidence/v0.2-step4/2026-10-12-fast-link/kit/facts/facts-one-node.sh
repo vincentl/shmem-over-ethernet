@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
 first=slurm-node-01
 nodes="slurm-node-01 slurm-node-02 slurm-node-03 slurm-node-04 slurm-node-05 slurm-node-06 slurm-node-07 slurm-node-08 "
 say() { sed "s/^/$(hostname) $1: /"; }

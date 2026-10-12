@@ -46,7 +46,7 @@ dpkg-query -W liburing2 liburing-dev 2>&1 | say packages
 for n in $nodes; do echo "$n $(getent ahostsv4 "$n" | awk 'NR == 1 { print $1 }')"; done | say resolves
 EOF
 )"
-echo "$ONE_NODE" > "$OUT/facts-one-node.sh"
+{ echo "# SPDX-License-Identifier: LGPL-3.0-or-later"; echo "$ONE_NODE"; } > "$OUT/facts-one-node.sh"
 launch "$NODE_COUNT" 1 "$OUT/facts.txt" -- bash -c "$ONE_NODE"
 if [ "$KIT_LAUNCHER" = srun ]; then
     scontrol show config > "$OUT/slurm-config.txt" 2>&1

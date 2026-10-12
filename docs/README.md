@@ -71,6 +71,9 @@ review prompts were written on the author's machine and name its paths where a
 command ran. On 2026-10-02 those paths were edited - the repository's own
 directory reads `<repo>`, any other path under the home directory reads `~` - so
 a script that names `<repo>` records what ran, and is not one to run as written.
+On 2026-10-12 the cluster's first session's evidence had its user's name, which
+spells an email address, made `<user>` and its home `~`, and the kit's generated
+`facts-one-node.sh` given the licence line, as `facts.sh` now writes it.
 The same day the four copies of the specification's examples
 (`spec-example-*.c`, in
 `docs/reviews/evidence/phase1-step2-slice1/conformance/`) were given the notice
