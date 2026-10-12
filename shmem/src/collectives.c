@@ -328,7 +328,11 @@ static void prefix_sums(const char *routine, uint64_t *words, uint64_t count)
 /*
  * A gather (spec §9.10.8): member r's block into every member's dest at
  * places[r] - or, with places NULL, at r * block, every block `block` bytes -
- * `total` bytes in all. This PE's own block is `block` bytes of source.
+ * `total` bytes in all. This PE's own block is `block` bytes of source. Only
+ * the lead reads `places`, and not all of them: at each of its own members'
+ * ranks and the rank after it, and in the internode phase at each of its
+ * intervals' ends (internode-generic.c) - every one of which collect fills
+ * where it takes each node's total (collect_varying).
  *
  * The lead copies each local member's block to its place once every member has
  * arrived - O(L n) of its own, under the O(P n) each member spends copying the
@@ -430,17 +434,103 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
 }
 
 /*
- * collect's places are the prefix sums of every member's length (phase 1 step
- * 8 slice 2; the author's C4, docs/prompts/done/phase1-step8-slice2-prompt.md).
- * They need not be symmetric - only the lead reads them - so nothing is
- * borrowed from the heap: each member leaves its length in its own word of the
- * team number's line (internal-region.h), the lead sets its members' lengths
- * at their ranks in a vector of the team's size in its own memory, the
- * internode reduction's tree sums the nodes' vectors into every lead's, the
- * lead turns the result into places and leaves the total in its own word, and
- * the members read it there after the release. Then the gather itself, whose
- * places only the lead reads. The lengths, eight bytes a member, cost O(members)
- * bytes a level of the tree, in pieces; the data keeps the allgather.
+ * collect's places from each node's total (collect_varying's comment), on the
+ * lead: `places` holds this node's members' lengths at their ranks. Their sum,
+ * this node's total, goes at its position in a vector of the team's nodes,
+ * zero elsewhere, which the internode reduction sums between the nodes; then,
+ * the nodes taken in team-rank order (`runs`), each node's base - the totals
+ * before it - at the first rank of its run, and for this node its members'
+ * places from its base, the total at `members`. A sum past what eight bytes
+ * count is refused, as prefix_sums refuses it. A sum at this node's position
+ * other than its own total would be leads disagreeing about the team's nodes:
+ * a broken invariant, named.
+ */
+static void places_from_node_totals(const char *routine, struct osoe_team *t, uint32_t epoch,
+                                    const struct osoe_team_node_run *runs, uint64_t *places,
+                                    struct osoe_element length)
+{
+    uint32_t nodes = t->nodes, own = t->own_node_run;
+    uint32_t first = runs[own].first_rank, end = first + t->local_members;
+    uint64_t *totals = calloc(nodes, sizeof *totals);
+    if (!totals)
+        osoe_fatal("%s: out of memory for the totals of %s's %u nodes", routine, t->name, nodes);
+    uint64_t own_total = 0;
+    for (uint32_t r = first; r < end; r++) {
+        if (places[r] > UINT64_MAX - own_total)
+            osoe_fatal("%s: the members' blocks add up to more bytes than there are", routine);
+        own_total += places[r];
+    }
+    totals[runs[own].position] = own_total;
+    osoe_internode_reduce(t->block_index, epoch, totals, nodes, OSOE_REDUCTION_SUM, length,
+                          routine);
+    if (totals[runs[own].position] != own_total)
+        osoe_fatal("%s: %s's nodes' totals hold %llu bytes at this node's position, %u, where "
+                   "its members here give %llu: the leads disagree about the team's nodes",
+                   routine, t->name, (unsigned long long)totals[runs[own].position],
+                   runs[own].position, (unsigned long long)own_total);
+    uint64_t base = 0;
+    for (uint32_t j = 0; j < nodes; j++) {
+        uint64_t node_total = totals[runs[j].position];
+        if (node_total > UINT64_MAX - base)
+            osoe_fatal("%s: the members' blocks add up to more bytes than there are", routine);
+        if (j == own) {
+            uint64_t at = base;
+            for (uint32_t r = first; r < end; r++) {
+                uint64_t member_length = places[r];
+                places[r] = at;
+                at += member_length;
+            }
+        } else {
+            places[runs[j].first_rank] = base;
+        }
+        base += node_total;
+    }
+    places[t->members] = base;
+    free(totals);
+}
+
+/*
+ * collect's places (phase 1 step 8 slice 2, the author's C4,
+ * docs/prompts/done/phase1-step8-slice2-prompt.md; and his A11 of 2026-10-11,
+ * P29 of docs/prompts/v0.2-open-items.md). They need not be symmetric - only
+ * the lead reads them - so nothing is borrowed from the heap: each member
+ * leaves its length in its own word of the team number's line
+ * (internal-region.h), and the lead finds the places it reads in a vector of
+ * the team's size plus one in its own memory, the last word the total, which
+ * it leaves in its own word for its members to read after the release. Then
+ * the gather itself. The places come one of two ways:
+ *
+ *   - **each node's total**, for a team spanning nodes each of which holds one
+ *     run of consecutive team ranks - every team strided in world ranks over a
+ *     block distribution: the internode reduction sums a vector of the team's
+ *     nodes, each lead's own total at its node's position, and each node's base
+ *     is the totals of the nodes before it in team-rank order - the node set's
+ *     order under a positive stride and its reverse under a negative one, the
+ *     set being sorted by node (places_from_node_totals). The lead fills the
+ *     places of every run's first rank, of its own members, and the total at
+ *     `members`: all the gather reads (gather), since an interval of the
+ *     allgather is consecutive ranks on one node merged with the next where
+ *     they touch, and so starts and ends where a node's run does. Eight bytes
+ *     a node, at each level of the reduction's tree;
+ *   - **the members' vector**, for a team on one node and one where some
+ *     node's members are not one run - a cyclic or plane distribution's, whose
+ *     intervals end among a node's members: the lead sets its members' lengths
+ *     at their ranks in a vector of the team's size, the reduction sums the
+ *     nodes' vectors into every lead's, and the lead turns the result into
+ *     every member's place (prefix_sums). Eight bytes a member, at each level
+ *     of the tree, in pieces.
+ *
+ * Which way a team takes is found once, at its first such collect, by its lead
+ * on each node (team.h, osoe_team_node_runs), from what every PE holds alike -
+ * the team's ranks and the job's rank map - so every lead takes the same one.
+ * Were two ever to differ, their reductions would differ in size, which the
+ * reduction's checks name where its pieces meet (internode-generic.c): a
+ * piece's header carries its bytes, and a large one's grant its epoch,
+ * identity and bytes - but for a lead that takes as small what its child takes
+ * as large, whose child waits for a grant until the deadlock detector names the
+ * hang (shmem.lanes.class-split-hang). The lead publishes how many lengths it
+ * summed, a node's or a member's each (team.tree.collect_lengths, node.h). The
+ * data keeps the allgather either way.
  */
 static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
                            const void *source, size_t block)
@@ -463,12 +553,16 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
     uint64_t *places = NULL, total;
     struct osoe_element length = { OSOE_ELEMENT_UNSIGNED_INTEGER, sizeof(uint64_t) };
     if (lead) {
-        /* Entered before the members' wait, as every reduction is
-         * (data_collective_at): the lengths are eight bytes a member, so a
-         * team of more than OSOE_SMALL_COLLECTIVE_BYTES / 8 members sums them
-         * as a large reduction, whose children wait for its grant. */
+        /* Each node's total where every node's members are one run, else the
+         * members' vector (the comment above), the reduction entered before
+         * the members' wait as every reduction is (data_collective_at): eight
+         * bytes a length, so more than OSOE_SMALL_COLLECTIVE_BYTES / 8 of them
+         * are summed as a large reduction, whose children wait for its grant. */
+        const struct osoe_team_node_run *runs =
+            t->internode ? osoe_team_node_runs(t, routine) : NULL;
+        uint64_t summed = runs ? t->nodes : members;
         if (t->internode)
-            osoe_internode_reduce_enter(t->block_index, k + 1, members, OSOE_REDUCTION_SUM,
+            osoe_internode_reduce_enter(t->block_index, k + 1, summed, OSOE_REDUCTION_SUM,
                                         length, routine);
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * local, routine);
         places = calloc(members + 1, sizeof *places);
@@ -478,10 +572,19 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
         for (uint32_t m = 0; m < local; m++)
             places[t->local_ranks[m]] =
                 *(const uint64_t *)member_copy(t->local_ids[m], length_at);
+        if (runs) {
+            places_from_node_totals(routine, t, k + 1, runs, places, length);
+        } else {
+            if (t->internode)
+                osoe_internode_reduce(t->block_index, k + 1, places, members,
+                                      OSOE_REDUCTION_SUM, length, routine);
+            prefix_sums(routine, places, members);
+        }
+        /* Single-writer publication for osoe-stat and the tests (§3.16), before
+         * the release, as the internode phase publishes its counts. */
         if (t->internode)
-            osoe_internode_reduce(t->block_index, k + 1, places, members, OSOE_REDUCTION_SUM,
-                                  length, routine);
-        prefix_sums(routine, places, members);
+            atomic_store_explicit(&b->tree.collect_lengths, (uint32_t)summed,
+                                  memory_order_release);
         total = places[members];
         *(uint64_t *)member_copy(lead_local_id, total_at) = total;
         if (!osoe_epoch_release_bump_eq(&b->released, k + 1))

@@ -119,11 +119,12 @@
  *
  * **One exception, a reduction's buffer in private memory**: collect's lengths
  * (collectives.c; phase 1 step 8 slice 2, the author's C4), a vector of the
- * team's size that only the lead needs, which no allocator call could place
- * symmetric while another thread may allocate. A backend recognizes it by the
- * address - in no region the transport resolves - and stages the reduction
- * as the generic implementation always does, rather than writing a peer's
- * buffer directly.
+ * team's size - or of its nodes, each node's total, where every node holds one
+ * run of the team's ranks (P29) - that only the lead needs, which no allocator
+ * call could place symmetric while another thread may allocate. A backend
+ * recognizes it by the address - in no region the transport resolves - and
+ * stages the reduction as the generic implementation always does, rather than
+ * writing a peer's buffer directly.
  *
  * What an RDMA backend does with each call (§4.10's discipline: say it, so the
  * interface is checked against more than the one backend it has):

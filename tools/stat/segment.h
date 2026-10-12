@@ -372,14 +372,17 @@ void osoe_segment_close(struct osoe_segment *s);
  *   37  each PE's pool of context blocks ends with a block for each thread
  *       place, contexts_per_pe + threads_per_pe a PE, which its blocking gets
  *       of more than one piece go on (docs/decisions/2026-10-10-blocking-gets.md)
+ *   38  team.tree.collect_lengths, in room the tree state had: the lengths the
+ *       lead's last collect of differing blocks summed between the nodes for
+ *       its places, a node's total each or a member's length each (P29)
  *
- * None of 5 to 37 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 38 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37
  * lengthened the context pool, after which the thread records that hold the
  * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               37
+#define OSOE_SEGMENT_NEWEST_LAYOUT               38
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 

@@ -51,6 +51,13 @@ const char *osoe_team_label(uint32_t number, char *buffer, size_t size);
 
 struct osoe_team_block;
 
+/* One node's run of a team's ranks (osoe_team_node_runs): the run's first team
+ * rank, and the node's position in the team's node set. */
+struct osoe_team_node_run {
+    uint32_t first_rank;
+    uint32_t position;
+};
+
 struct osoe_team {
     const char *name;
     /* enum osoe_team_number: indexes this PE's per-team state. This PE's own
@@ -108,6 +115,20 @@ struct osoe_team {
      * and the job's table of leads is theirs (job.h).
      */
     const uint32_t *node_leads;
+    /*
+     * Whether every node of the team holds one run of consecutive team ranks,
+     * which decides how collect finds its places (collectives.c,
+     * collect_varying): found at the team's first collect of differing blocks
+     * by its local lead on each node, the one PE there that reads it, and kept
+     * there - like `node_leads`, O(the team's nodes) - until the team goes.
+     * `node_runs_found` says whether the walk has been made (osoe_team_node_runs);
+     * `node_runs` is NULL where some node's members are not one run - a cyclic
+     * or plane distribution's - and otherwise each node's run in team-rank
+     * order, `nodes` of them, this node's at `own_node_run`.
+     */
+    bool node_runs_found;
+    const struct osoe_team_node_run *node_runs;
+    uint32_t own_node_run;
     /*
      * A team of one member: SHMEM_TEAM_SHARED under §8.1's force-remote flag,
      * and any team a split makes of one PE. Its sync has nobody to wait for and
@@ -188,5 +209,19 @@ int osoe_team_to_world(const struct osoe_team *t, int pe);
  * root is looked for (collectives.c). O(log N) node lookups.
  */
 uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node);
+
+/*
+ * `t`'s runs of team ranks, one a node in team-rank order (`node_runs`), or
+ * NULL where some node's members are not one run of consecutive team ranks.
+ * Asked by collect on the team's local lead here, for a team with an internode
+ * phase, whose node set that PE keeps. Found at the first call by a walk of the
+ * team's ranks in order - each one's world rank (the progression, or
+ * `world_of_rank`) and its node (job.h), O(members) node lookups - noting each
+ * node's first team rank and its position in the node set, until a node is met
+ * again after its run ended; then kept, O(nodes). Every lead finds the same
+ * answer, from what every PE holds alike: the team's ranks and the job's rank
+ * map.
+ */
+const struct osoe_team_node_run *osoe_team_node_runs(struct osoe_team *t, const char *routine);
 
 #endif /* OSOE_TEAM_H */

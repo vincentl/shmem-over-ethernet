@@ -31,9 +31,9 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-/* 37: each PE's pool of context blocks followed by one for each thread place,
- * its blocking gets' own (v0.2; docs/decisions/2026-10-10-blocking-gets.md). */
-#define OSOE_NODE_LAYOUT 37
+/* 38: team.tree.collect_lengths, the lengths a team's last collect summed
+ * between its nodes for its places (v0.2, P29). */
+#define OSOE_NODE_LAYOUT 38
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -652,10 +652,21 @@ struct osoe_collective_state {
      */
     _Atomic uint32_t algorithm;
     _Atomic uint32_t circulant_rounds;
+    /*
+     * Layout 38 (P29 of docs/prompts/v0.2-open-items.md), in the same room:
+     * the lengths this node's lead's last collect of differing blocks summed
+     * between the nodes for its places - the team's nodes where each node's
+     * members are one run of team ranks, each node's total, and its members
+     * otherwise, a length each (collectives.c, collect_varying). Written by
+     * collect on the lead's application thread before it releases its
+     * members, so that a test pins which way the places were found, and what
+     * they cost, by a count.
+     */
+    _Atomic uint32_t collect_lengths;
 };
 _Static_assert(sizeof(struct osoe_collective_state) == 128,
                "the tree state is 128 bytes since layout 33 - two lines on x86-64 and one on "
-               "aarch64, whose line is 128 - with room for fourteen fields more before it "
+               "aarch64, whose line is 128 - with room for thirteen fields more before it "
                "grows every team block again");
 
 /*

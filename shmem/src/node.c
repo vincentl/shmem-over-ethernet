@@ -1406,6 +1406,7 @@ static void collective_state_reset(struct osoe_collective_state *c)
     atomic_store_explicit(&c->shape_children, 0, memory_order_release);
     atomic_store_explicit(&c->algorithm, 0, memory_order_release);
     atomic_store_explicit(&c->circulant_rounds, 0, memory_order_release);
+    atomic_store_explicit(&c->collect_lengths, 0, memory_order_release);
 }
 
 /*

@@ -1,0 +1,22 @@
+Internal ctest changing into directory: /tmp/collect-node-totals-check/control/build/release
+Test project /tmp/collect-node-totals-check/control/build/release
+    Start 467: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+    Start 468: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+    Start 469: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+    Start 470: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+1/6 Test #467: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.08 sec
+    Start 471: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+2/6 Test #469: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ...   Passed    0.09 sec
+    Start 472: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+3/6 Test #470: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ...   Passed    0.10 sec
+4/6 Test #468: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 .............   Passed    0.11 sec
+5/6 Test #471: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.07 sec
+6/6 Test #472: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 ................   Passed    0.08 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Label Time Summary:
+internode    =   0.53 sec*proc (6 tests)
+tier2        =   0.53 sec*proc (6 tests)
+
+Total Test time (real) =   0.18 sec

@@ -1,0 +1,22 @@
+mutated lines: 1
+build control: warnings 0
+build mutant: warnings 0
+== control 11:21:47
+shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.08 sec
+shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ...   Passed    0.09 sec
+shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ...   Passed    0.10 sec
+shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 .............   Passed    0.11 sec
+shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.07 sec
+shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 ................   Passed    0.08 sec
+100% tests passed, 0 tests failed out of 6
+== mutant 11:21:47
+shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ...***Failed    0.07 sec
+shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ...***Failed    0.07 sec
+shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.09 sec
+shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 .............   Passed    0.09 sec
+shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.07 sec
+shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 ................   Passed    0.08 sec
+67% tests passed, 2 tests failed out of 6
+osoe: PE 2: shmem_collectmem: team 3's member 0 has its place at byte 119 of a result of 120 bytes, out of the places' order: the layout was overwritten after it was made - is dest shorter than the result, so that copying into it ran on past its end?
+osoe: PE 2: control segment /osoe.1490876.0.0.0 (osoe-stat /osoe.1490876.0.0.0, while any PE of this node is alive)
+DONE 11:21:47
