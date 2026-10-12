@@ -23,22 +23,57 @@ import engine
 import dirty_set_model as ds
 import get_completion_model as gc
 import watch_list_model as wl
-import wire_model
+
+# A ring for the engine's own case below: the writer of the shared-memory wire
+# that phase 1 step 3 slice 1 replaced with a socket - py's, as it
+# was when that model was retired with the wire (2026-10-12) - kept only as a
+# subject whose reader can be broken.
+PROD, CONS, WAKE = ('produced',), ('consumed',), ('wake',)
+SLOT = lambda i: ('slot', i)            # the ring itself, cap bytes
+SENT = lambda i: ('$sent', i)           # value of the i'th byte written
+
+
+def ring_writer(nbytes, cap):
+    """Send nbytes bytes, values 1..nbytes so that 0 is 'nothing here'; blocked
+    while the ring is full; each byte stored, checked against overwriting,
+    published, then woken."""
+    B = []
+    for k in range(nbytes):
+        p = f'w{k}_'
+        nxt = f'@w{k + 1}_L' if k + 1 < nbytes else '@WEND'
+        B += [(p + 'L', ('load', lambda L: CONS, 'c', '@' + p + 'P')),
+              (p + 'P', ('load', lambda L: PROD, 'p', '@' + p + 'R')),
+              (p + 'R', ('await', lambda M, L, cap=cap: M[PROD] - M[CONS] < cap,
+                         '@' + p + 'L2')),
+              (p + 'L2', ('load', lambda L: CONS, 'c', '@' + p + 'P2')),
+              (p + 'P2', ('load', lambda L: PROD, 'p', '@' + p + 'W')),
+              (p + 'W', ('store', lambda L, cap=cap: SLOT(L['p'] % cap),
+                         lambda L, k=k: k + 1, False, '@' + p + 'C')),
+              (p + 'C', ('check', lambda M, L, cap=cap:
+                         None if M[PROD] - M[CONS] < cap else
+                         f'wrote byte {L["p"]} over a full ring: {M[PROD] - M[CONS]} outstanding, capacity {cap}',
+                         '@' + p + 'G')),
+              (p + 'G', ('gpre', lambda M, L, k=k: ({SENT(k): k + 1}, {}), '@' + p + 'S')),
+              (p + 'S', ('store', lambda L: PROD, lambda L: L['p'] + 1, False, '@' + p + 'K')),
+              (p + 'K', ('add', lambda L: WAKE, lambda L: 1, '_', '@' + p + 'F')),
+              (p + 'F', ('fwake', lambda L: WAKE, nxt))]
+    B += [('WEND', ('done',))]
+    return engine.assemble(B)
 
 
 def wire_reader_never_advances():
-    """wire_model's reader with the `consumed` store removed: it re-reads byte 0 forever."""
+    """The ring's reader with the `consumed` store removed: it re-reads byte 0 forever."""
     cap, nbytes = 2, 2
-    B = [('R', ('load', lambda L: wire_model.CONS, 'c', '@RDONE?')),
+    B = [('R', ('load', lambda L: CONS, 'c', '@RDONE?')),
          ('RDONE?', ('br', lambda L: L['c'] >= nbytes, '@REND', '@ORDER')),
-         ('ORDER', ('load', lambda L: wire_model.WAKE, 'w', '@PROD')),
-         ('PROD', ('load', lambda L: wire_model.PROD, 'p', '@HAVE?')),
+         ('ORDER', ('load', lambda L: WAKE, 'w', '@PROD')),
+         ('PROD', ('load', lambda L: PROD, 'p', '@HAVE?')),
          ('HAVE?', ('br', lambda L: L['p'] > L['c'], '@TAKE', '@SLEEP')),
-         ('SLEEP', ('fwait', lambda L: wire_model.WAKE, lambda L: L['w'], '@R')),
-         ('TAKE', ('load', lambda L: wire_model.SLOT(L['c'] % cap), 'v', '@R')),
+         ('SLEEP', ('fwait', lambda L: WAKE, lambda L: L['w'], '@R')),
+         ('TAKE', ('load', lambda L: SLOT(L['c'] % cap), 'v', '@R')),
          ('REND', ('done',))]
-    threads = [wire_model.writer('design', nbytes, cap), engine.assemble(B)]
-    mem = {wire_model.PROD: 0, wire_model.CONS: 0, wire_model.WAKE: 0}
+    threads = [ring_writer(nbytes, cap), engine.assemble(B)]
+    mem = {PROD: 0, CONS: 0, WAKE: 0}
     return engine.explore('x', threads, mem, out=sys.stderr)
 
 

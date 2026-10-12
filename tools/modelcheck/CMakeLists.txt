@@ -40,7 +40,7 @@ find_package(Python3 COMPONENTS Interpreter)
 option(OSOE_MULTIPLE_MODELS "run the models of the SHMEM_THREAD_MULTIPLE designs (§4.11)" OFF)
 
 if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  set(osoe_models wire credit arrival ack reservation blocked_record range_watch
+  set(osoe_models credit arrival ack reservation blocked_record range_watch
                   chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close
                   abort abort_exit lock pipeline allgather scan scan_pipeline deadlock
                   team_block split_numbers pool_dry posted_bitmap lane lane_scan visit

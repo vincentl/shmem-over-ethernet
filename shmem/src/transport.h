@@ -41,6 +41,23 @@
  * above this header asks what a backend supports. A backend without native
  * support emulates underneath (§4.10).
  *
+ * A backend on RDMA (internode-backend.h; the fresh read of round three's R7,
+ * 2026-10-12). Beyond each call's own comment: a wait completes its own
+ * context's writes and gets, no other context's; a peer's buffer is written
+ * only once that peer has entered the collective (internode.h); the agent's
+ * completion channel (osoe_transport_agent_wait) has this shape only with
+ * io_uring's futex operation beside the descriptor, and a verbs channel needs
+ * a bridge to the wake word; a wait that sleeps says so first
+ * (osoe_wait_sleeps, base/sweep.h), or the deadlock detector cannot see it,
+ * and osoe_transport_agent_node_quiet's "applied", osoe_transport_agent_abort
+ * and osoe_transport_agent_deadlock_send assume a two-sided channel; where a
+ * region's address comes from, and whether a PE or its lead posts to the NIC,
+ * are node.h's and internal-region.h's, and a node's PEs are processes, not
+ * the threads below. One thing is design, not text: a NIC raises no event at
+ * the target for a write or an atomic, so notify's "exact for rmw" has only
+ * a poll of the declared ranges to stand on, a protocol neither designed nor
+ * modelled - RoCE's design, out of 0.2 (the author's A7).
+ *
  * Threads (§4.11). Under SHMEM_THREAD_MULTIPLE every operation may be called
  * by any number of threads at once, on the same context or different ones,
  * except where the context's mode forbids it: a context created without
@@ -64,7 +81,7 @@
  * the same schedule as osoe_transport_watch_wait, which is the difference between a
  * hang and a clean abort. A blocking call also publishes the "blocked in"
  * record (§3.14) naming what it waits on, and gives up only by §3.15's
- * no-progress rule - never because time has passed. The AM backend's four
+ * no-progress rule - never because time has passed. The AM backend's seven
  * waits do all three (transport-internode.c, struct am_wait), and shmem.unswept-wait
  * and shmem.stopped-node.* are the tests that would see one stop.
  */
@@ -295,8 +312,9 @@ void osoe_transport_agent_deadlock_send(uint32_t node, const struct osoe_deadloc
  * backend does, since its writes apply in the calling thread; the AM backend
  * does not, so every PE it carries - including a local PE under the
  * force-remote flag (§8.1) - gets NULL. This is the one locality function:
- * shmem_ptr, shmem_team_ptr and shmem_addr_accessible consult it and nothing
- * else.
+ * shmem_ptr and shmem_team_ptr consult it and nothing else;
+ * shmem_addr_accessible does not, since accessibility is reachability through
+ * OpenSHMEM, which every PE of the job has (accessible.c).
  */
 void *osoe_transport_direct(int pe, enum osoe_region region, uint64_t offset);
 

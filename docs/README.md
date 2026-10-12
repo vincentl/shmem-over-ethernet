@@ -71,7 +71,9 @@ round's check of a kernel with 16 KiB pages, and
 `docs/reviews/evidence/phase1-step2-slice1/portability/page-size-16k-vm.yaml`
 defines it. Paths under `build/scratch/` name the scratch tree of the session
 that made a run, which git ignores: a record cites them to say where its outputs
-were, not to send a reader there.
+were, not to send a reader there. A native x86-64 run is one on the cluster's
+Google Cloud nodes (`slurm-node-01` to `slurm-node-08`, with `slurm-controller`
+the head node), the first on 2026-10-12.
 
 **What was edited in the evidence.** The evidence, the finished briefs and the
 review prompts were written on the author's machine and name its paths where a

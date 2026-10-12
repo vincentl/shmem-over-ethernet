@@ -62,7 +62,7 @@ Shared words. The members of a node share its arrival counter, its release
 counter and the handoff word (§5.3) with the node's progress thread; the tso
 cases run them under x86-TSO, where the handoff is a plain release store
 behind a locked add. The messages between nodes are abstracted as FIFO
-channels, one per tree edge and direction; their wire is wire_model.py's.
+channels, one per tree edge and direction; their wire, a socket, is the kernel's.
 
 Usage: tree_barrier_model.py [substring ...]   runs the cases whose names match
 """

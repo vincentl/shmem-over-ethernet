@@ -36,11 +36,28 @@
  * number taken again - the last three the generic phase's, in both builds.
  *
  * Every entry point below is one of §4.10's calls, or its share of one, for a
- * job of more than one node - which a backend on RDMA provides too, as the
- * comment beside it says, in its own transport-am.c - and the internode backend
- * also implements internode.h whole, the collectives' seam. Its metrics are the
+ * job of more than one node - which a backend on RDMA provides too, in its own
+ * transport-am.c: two entries say how (osoe_internode_backend_rendezvous and
+ * osoe_internode_backend_link), and transport.h's advertise, agent_wait,
+ * set_range and notify and its note on a backend on RDMA say the rest - and
+ * the internode backend also implements internode.h whole, the collectives'
+ * seam. Its metrics are the
  * control segment's - the `am.*` counters and the connection scope (node.h,
  * metrics.c) - which every build lays out and only this backend writes.
+ *
+ * What a backend may call (the fresh read of round three's R7, 2026-10-12):
+ * the rest of the library and base/ as the AM backend's files do - fatal.h,
+ * blocked.h, metrics.h, job.h, node.h's node, team and context state,
+ * rank-map.h, shm-object.h, the upcalls osoe_transport_notify and
+ * osoe_internode_released, internode-generic.h's collectives as a fallback,
+ * and base/'s wait word, futexes, sweep, deadlines, counters and stall watch.
+ * What only AM calls, a second backend replaces or leaves unused:
+ * am-configuration.h, wire-settings.h, base/ring-check.h, and node.h's
+ * landing zone and thread records. AM still shows outside these files in
+ * three places a second backend meets: the job's agreement on
+ * osoe_am_table_checksum (rendezvous.c, open item P27), the landing zone
+ * node.c sizes from AM's configuration, and the per-node and per-owner AM
+ * metrics node.c lays out (node.h, metrics.h).
  *
  * Contexts are the AM backend's (transport-context.h): this header passes them
  * by pointer, and the internode backend keeps its own state for each behind
