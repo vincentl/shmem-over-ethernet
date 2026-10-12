@@ -189,6 +189,51 @@ interfaces and constant names defined in this specification", and the README
   them). *Recommended:* keep them in `shmem.h` - the move trades one of §5's
   rules for the other and breaks the programs they are kept for.
 
+### B3: Example 48's plain profiling names in C11 - done
+
+*Conformance M1 of round four: a profiler written as §10's Example 48 is
+(`example_code/pshmem_example.c` in the specification's source: `pshmem.h`
+included, the intercepted routine defined by its plain name, forwarding to its
+`pshmem_` spelling) cannot define `shmem_signal_add`, `shmem_signal_set` or
+`shmem_sync` in C11, since `shmem.h`'s macros, which choose those routines'
+forms by argument count, expand the definition ("expected declaration
+specifiers").* Still so at `82c5263`.
+
+- **The change**: the three macros' forms without a context - `OSOE_SIGNAL_SET_3`,
+  `OSOE_SIGNAL_ADD_3`, `OSOE_SYNC_4` - pass their arguments to the parenthesized
+  name as written instead of each in parentheses. A call is unchanged (each
+  argument is already a whole argument of the call), and a definition or
+  declaration by the plain name now expands to one of the name in parentheses,
+  `void (shmem_signal_add)(uint64_t *sig_addr, uint64_t signal, int pe)`, which
+  declares the same function. No change to `pshmem.h`: M1's own suggestion, a
+  `pshmem.h` that drops the C11 macros, would break a program that includes it
+  and calls a C11 form, as `headers.c` does. `shmem.profiler-plain-names` (tier 1)
+  compiles `profiler-plain-names.c` - the three defined by their plain names,
+  then both forms of each called - at `-std=c11` with every warning an error.
+  The README's "C only" limit, design §7.5's paragraph on the signal updates and
+  `shmem.h`'s comments say what is now true; the README also says what stays:
+  the deprecated `shmem_wait` and `shmem_wait_until` on a `long`, whose names
+  C11 gives the type-generic waits, a profiler still writes in parentheses (a
+  generic selection cannot pass a parameter list through). Files:
+  `shmem/include/shmem.h`, `shmem/tests/profiler-plain-names.c`,
+  `shmem/tests/CMakeLists.txt`, `README.md`, `docs/design/shmem-ethernet-design.md`.
+- **Ran**: `cmake --build build/release -j4` (0 warnings); the static checks with
+  `shmem.headers.*`, `shmem.generic-arity.*`, `shmem.profiler-plain-names` and
+  `shmem.profiling_aliases`: **26 of 26**; every test of the suite whose name
+  matches `signal|sync|profile|surface|active-set|deprecated`, models aside
+  (`shmem.signal.L1/L2/L4`, `shmem.profile.*`, `shmem.surface.*`, the active
+  sets, the pacer's deprecated and signal plants): **49 of 49**. Also compiled
+  with Clang 18 at `-std=c11` and GCC 14 at `-std=c23`; `nm` of the object shows
+  `shmem_signal_add`, `shmem_signal_set` and `shmem_sync` defined (`T`) and the
+  four-argument forms calling `shmem_ctx_signal_*` and `shmem_team_sync`.
+- **Failing without the change**: `profiler-plain-names.c` against the headers
+  of the commit before (`git show HEAD:shmem/include/...` into a scratch
+  directory): exit 1, "error: expected declaration specifiers or '...' before
+  '(' token" at `shmem.h:1544`, `OSOE_SIGNAL_ADD_3`'s expansion - M1's error;
+  against the changed headers, exit 0.
+- **Not verified here**: nothing that needs another machine. In the VM:
+  `ctest --preset release -R 'profiler-plain-names|headers|signal|profile'`.
+
 ## Decisions taken that might have been the author's
 
 - **B4: the cache routines stay in `shmem.h`**, documented where they are and
@@ -213,4 +258,4 @@ not fixed.*
 ## For the lead's merge
 
 - **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
-  (documented; the move put to the author, under Decisions).
+  (documented; the move put to the author, under Decisions); B3 (done).

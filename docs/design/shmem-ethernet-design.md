@@ -7301,10 +7301,14 @@ context, dispatched on arity first as the AMO generics are (§7.3).
 `signal_set` and `signal_add` (§9.8.7, §9.8.5) take a leading context in C11
 the same way, by arity alone, since their pointer is a plain `uint64_t *` and
 there is no type to select on; a C11 program that declares or defines either by
-name - a profiling wrapper - writes `(shmem_signal_add)`, as it does
-`(shmem_sync)`. C++ has no context-first form of them in the specification and
-gets none: an overload would make a program that takes the routine's address
-ambiguous (the adversarial read of 2026-10-02). osoe's C++ `shmem_sync(team)`
+its plain name - a profiling wrapper, as the specification's profiling example
+defines `shmem_long_put` - gets the function, as it does `shmem_sync`'s
+deprecated form: the form without a context passes its arguments as written to
+the parenthesized name, so a parameter list makes a declaration of the function
+(the round-four review's conformance M1). C++ has no context-first form of them
+in the specification and gets none: an overload would make a program that takes
+the routine's address ambiguous (the adversarial read of 2026-10-02). osoe's
+C++ `shmem_sync(team)`
 is an extension of that kind - the C/C++ synopsis gives the team form only as
 `shmem_team_sync` - which predates the read and stays. Every
 routine reaches the transport through the body of `putmem` or `getmem` with its

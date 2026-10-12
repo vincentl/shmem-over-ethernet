@@ -2576,6 +2576,17 @@ else()
   message(STATUS "No C++ compiler: the headers' C++ test is not registered")
 endif()
 
+# A profiler written as §10's example is - pshmem.h included, each routine it
+# intercepts defined by its plain name - for the three routines whose C11 forms
+# share a name, which shmem.h makes macros that count their arguments
+# (profiler-plain-names.c; the round-four review's conformance M1). Under C11,
+# where the macros are.
+add_test(NAME shmem.profiler-plain-names
+  COMMAND ${CMAKE_C_COMPILER} -std=c11 -Wall -Wextra -Wpedantic -Werror
+          -fsyntax-only -I${PROJECT_SOURCE_DIR}/shmem/include
+          ${CMAKE_CURRENT_SOURCE_DIR}/profiler-plain-names.c)
+set_tests_properties(shmem.profiler-plain-names PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # A C11 generic called with the wrong number of arguments fails to compile,
 # naming what it takes (generic-arity.c): one wrong call from each family the
 # selection serves.

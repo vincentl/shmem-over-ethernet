@@ -1322,8 +1322,12 @@ specification or takes a choice the specification leaves open.
   type-generic interfaces are C11's `_Generic`, as the specification defines
   them. In C11 the routines whose C11 synopsis gives one name two argument
   lists - `shmem_sync`, `shmem_signal_add`, `shmem_signal_set` - are macros that
-  choose by argument count, so a program that declares or defines one by name, a
-  profiling wrapper, writes `(shmem_signal_add)` in parentheses.
+  choose by argument count, and a program may still declare or define one by
+  its plain name, as a profiling wrapper written as the specification's example
+  in §10 does: the macro leaves it a declaration of the function. The
+  deprecated `shmem_wait` and `shmem_wait_until` on a `long`, whose names C11
+  gives the type-generic waits, a wrapper writes in parentheses,
+  `(shmem_wait_until)`.
 - **MPI in the same program has not been tried**: the test suite's programs that
   mix the two are not built here.
 - **`shmemx.h` is empty.** The cache routines (`shmem_set_cache_inv` and five
