@@ -1329,7 +1329,10 @@ specification or takes a choice the specification leaves open.
 - **`shmemx.h` is empty.** The cache routines (`shmem_set_cache_inv` and five
   more) were deprecated in 1.3 and left the specification after 1.4; osoe keeps
   them as routines that do nothing, for programs that still call them, which is
-  right on a cache-coherent machine, as every one osoe runs on is.
+  right on a cache-coherent machine, as every one osoe runs on is. They are
+  declared in `shmem.h`, where those programs look for them, though §5 allows
+  that header only the specification's interfaces; `shmemx.h`, where §5 puts
+  the rest, would take them only renamed `shmemx_`.
 
 ## Toward RDMA: a RoCE backend
 

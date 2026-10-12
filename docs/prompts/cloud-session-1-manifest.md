@@ -158,9 +158,42 @@ names no standard as `gnu23`.* Still open at `82c5263`:
   `ctest --preset release -R '^shmem\.headers\.'`, where `shmem.headers.c23`
   should name GCC 14, the build's compiler, in its command (`ctest -V`).
 
+### B4: where the cache routines are declared - done as documentation; the move is the author's
+
+*Conformance M5 of round four (`docs/reviews/archive/phase1-release-fixes-conformance.md`;
+the release checklist's "After the release"): the six cache routines, which left
+the specification after 1.4, are declared in `shmem.h`, where §5 allows "only the
+interfaces and constant names defined in this specification", and the README
+"does not say where they are declared".* Still so at `82c5263`
+(`shmem.h:939-946`; the README's limit "`shmemx.h` is empty" named no header).
+
+- **What a move would cost** (read in the specification's source at the `v1.6`
+  tag, `content/language_bindings_and_conformance.tex` and Annex F's table): §5
+  also says every extension in `shmemx.h` "shall use the `shmemx_` prefix", so
+  no header takes `shmem_clear_cache_inv` by the letter - `shmem.h` breaks §5's
+  "only", `shmemx.h` its prefix. And a move breaks the programs the routines are
+  kept for: with GCC 14 an undeclared call is an error, so every one would need
+  `#include <shmemx.h>` added. Both reviews rated the placement harmless (round
+  three's C4.8, round four's M5) and asked only that the README say it.
+- **The change**: the README's limit now says where they are declared and why
+  (`shmem.h`, where those programs look; §5's two rules); `shmem.h`'s comment
+  over them says the same; `shmemx.h`'s says they are not there, and its
+  citation, "(spec §7)", is corrected to §5 - §7 of 1.6 is "Library Handles";
+  the `shmemx.h` rule is §5's. Files: `README.md`, `shmem/include/shmem.h`,
+  `shmem/include/shmemx.h`.
+- **Ran**: `cmake --build build/release -j4` (0 warnings); the static checks,
+  `shmem.headers.*` and `shmem.profiling_aliases`: **20 of 20**.
+- **Failing without the change**: none to show - comments and a README
+  sentence, no behaviour.
+- **For the author**: whether to move them to `shmemx.h` after all (or drop
+  them). *Recommended:* keep them in `shmem.h` - the move trades one of §5's
+  rules for the other and breaks the programs they are kept for.
+
 ## Decisions taken that might have been the author's
 
-*None yet.*
+- **B4: the cache routines stay in `shmem.h`**, documented where they are and
+  why, rather than moved to `shmemx.h` - no header meets §5's letter, and a move
+  breaks the programs that call them. The author may want them moved or dropped.
 
 ## Deviations from the brief
 
@@ -179,4 +212,5 @@ not fixed.*
 
 ## For the lead's merge
 
-- **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`).
+- **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
+  (documented; the move put to the author, under Decisions).

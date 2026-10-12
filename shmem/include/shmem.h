@@ -937,7 +937,11 @@ void *shrealloc(void *ptr, size_t size);
 void *shmemalign(size_t alignment, size_t size);
 
 /* SHMEM_CACHE (Annex F.2.7): no-ops on every cache-coherent machine, which is
- * every machine osoe targets. */
+ * every machine osoe targets. They left the specification after 1.4 and are
+ * declared here all the same, where the programs that still call them look:
+ * §5 allows this header only the specification's interfaces, and shmemx.h,
+ * where it puts the rest, only shmemx_ names, so neither header meets its
+ * letter (the round-four review's conformance M5). */
 void shmem_clear_cache_inv(void);
 void shmem_set_cache_inv(void);
 void shmem_set_cache_line_inv(void *dest);
