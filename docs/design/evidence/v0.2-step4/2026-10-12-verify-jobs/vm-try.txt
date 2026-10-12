@@ -1,0 +1,26 @@
+# B12 and B13 tried in the osoe VM's one-node Slurm (lima-osoe, 4 CPUs, 8 GiB), 2026-10-12, on the
+# verify-jobs branch before its commit: verify.sh NODES /tmp/b12/out static models-0-40, the node list
+# lima-osoe alone, so the second job waits for the first (--exclusive). The driver's output:
+static on lima-osoe: job 542
+models-0-40 on lima-osoe: job 543
+543 osoe-verify-models-0-40 PENDING 
+542 osoe-verify-static RUNNING lima-osoe
+waited 645 s
+--- static
+# lima-osoe, 4 CPUs, 4 cores, 7 GiB, job 542, started 2026-10-12T04:32:25Z
+# kit verify-jobs-uncommitted, tests 4 at once, models 1
+== build release 00:32:25
+warnings: 0
+== static checks 00:32:46
+100% tests passed, 0 tests failed out of 13
+DONE 00:33:11
+--- models-0-40
+# lima-osoe, 4 CPUs, 4 cores, 7 GiB, job 543, started 2026-10-12T04:33:12Z
+# kit verify-jobs-uncommitted, tests 4 at once, models 1
+== build release 00:33:12
+warnings: 0
+== models: 1 of 40, 1 at once 00:33:32
+100% tests passed, 0 tests failed out of 1
+DONE 00:42:53
+--- slurm outputs
+exit 0

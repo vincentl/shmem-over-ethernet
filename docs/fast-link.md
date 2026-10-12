@@ -249,6 +249,25 @@ the node that built it (`ctest -L tier1`). The floor pins (`shmem.floor`,
 `echo-uring`'s) were set on the VM and may fail here: a finding to keep, not a
 reason to stop. About twenty minutes.
 
+The whole verification - round nine's in the development VM, split by part -
+runs as Slurm batch jobs, one a part on a node of the list, each node whole, so
+that `squeue` shows them and the kit's own jobs wait for them:
+
+```sh
+docs/fast-link/verify.sh NODES ~/verify-out     # debug release asan tsan tier3-single models pacer-0 pacer-2
+for n in $(cat NODES); do mkdir -p out/verify/$n; ssh $n tar -C verify-out -cf - . | tar -x -C out/verify/$n; done
+```
+
+Each part copies the tree to `~/verify-tree-PART` on its node and builds there,
+leaving the kit's build alone, and writes `~/verify-out/PART/` there:
+`verify.txt` its verdicts, the full outputs beside it; the second line brings
+them back once the jobs are done. Parts may be named instead - `static`, the
+release build's static checks alone, is the one to run first on a new tree -
+and more parts than nodes queue on them in turn. The models run several at once
+where a node has the cores and the memory (`VERIFY_MODEL_JOBS`, in the script's
+header): on the first session's nodes, one at a time, `model.reservation` alone
+took 1,113 s, and the half of the models that held it outlasted the session.
+
 ## 4. The floor and the bare stream
 
 ```sh
