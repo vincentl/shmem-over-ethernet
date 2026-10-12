@@ -601,6 +601,7 @@ static void forget(struct osoe_team *t)
     free((void *)t->local_ranks);
     free((void *)t->world_of_rank);
     free((void *)t->node_leads);
+    free((void *)t->node_runs);
     *t = (struct osoe_team){ .number = number, .destroyed = true, .generation = generation };
 }
 
@@ -660,6 +661,12 @@ void osoe_team_stop(void)
         if (t)
             forget(t);
     }
+    /* The predefined teams' runs, which their first collect on this lead found
+     * (osoe_team_node_runs); the next session's start builds the teams anew. */
+    free((void *)world_team.node_runs);
+    free((void *)finalize_team.node_runs);
+    world_team.node_runs = finalize_team.node_runs = NULL;
+    world_team.node_runs_found = finalize_team.node_runs_found = false;
     free(created);
     free(numbered);
     free((void *)held);
@@ -773,6 +780,67 @@ uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node)
     }
     return low < t->nodes && osoe_node_of(&osoe.job, t->node_leads[low]) == node ? low
                                                                                  : UINT32_MAX;
+}
+
+/*
+ * The walk of team.h's osoe_team_node_runs: the team's ranks in order, each
+ * one's node, a run starting wherever the node changes - its first team rank
+ * and its node's position kept, O(log N) node lookups (osoe_team_node_index) -
+ * until a position is met a second time, a node's members in two runs, which
+ * ends the walk with no runs. Otherwise every node of the set has its run - as
+ * many runs as the set has nodes - and this node's holds exactly its members
+ * here, which collect's own places lean on; anything else is a broken
+ * invariant, and named.
+ */
+const struct osoe_team_node_run *osoe_team_node_runs(struct osoe_team *t, const char *routine)
+{
+    if (t->node_runs_found)
+        return t->node_runs;
+    uint32_t nodes = t->nodes;
+    if (!t->internode || nodes < 2 || osoe.bootstrap.local_id != t->lead_local_id)
+        osoe_fatal("%s: %s's runs of team ranks asked for on PE %u, which leads no internode "
+                   "phase of it", routine, t->name, osoe.job.me);
+    struct osoe_team_node_run *runs = malloc(sizeof *runs * nodes);
+    unsigned char *met = calloc(nodes, 1);
+    if (!runs || !met)
+        osoe_fatal("%s: out of memory for the runs of %s's %u nodes", routine, t->name, nodes);
+    uint32_t count = 0, own = UINT32_MAX, previous = UINT32_MAX, world = 0;
+    bool one_run = true;
+    for (uint32_t rank = 0; rank < t->members; rank++) {
+        uint32_t node = node_of_member(t, rank, &world);
+        if (node == previous)
+            continue;
+        previous = node;
+        uint32_t position = osoe_team_node_index(t, node);
+        if (position >= nodes)
+            osoe_fatal("%s: %s's rank %u is PE %u, on node %u, which is not in its node set",
+                       routine, t->name, rank, world, node);
+        if (met[position]) {
+            one_run = false;            /* met again after its run ended */
+            break;
+        }
+        met[position] = 1;
+        if (node == osoe.job.node)
+            own = count;
+        runs[count++] = (struct osoe_team_node_run){ rank, position };
+    }
+    free(met);
+    t->node_runs_found = true;
+    if (!one_run) {
+        free(runs);
+        return NULL;
+    }
+    uint32_t here = own == UINT32_MAX ? 0
+                    : (own + 1 < count ? runs[own + 1].first_rank : t->members) -
+                          runs[own].first_rank;
+    if (count != nodes || here != t->local_members)
+        osoe_fatal("%s: %s's ranks, walked in order, make one run on each of %u nodes, of %u "
+                   "members on this one, node %u; its node set has %u nodes, and it lists %u "
+                   "members here", routine, t->name, count, here, osoe.job.node, nodes,
+                   t->local_members);
+    t->node_runs = runs;
+    t->own_node_run = own;
+    return runs;
 }
 
 /* ---- what the internode backend asks of a team (internode.h) ------------ */

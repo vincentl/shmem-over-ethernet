@@ -297,6 +297,12 @@
  * interval's ends mapped to bytes by the call's `block` or `places`, and
  * checked there - the places non-decreasing, from 0 to the result's end - so
  * that no put leaves [0, bytes) whatever the places hold (layout_overwritten).
+ * Those ends, 0 and the team's size are the only places it reads; and where
+ * every node holds one run of the team's ranks each end is the first rank of a
+ * node's run or the team's size, an interval being one node's stretch of ranks,
+ * merged with the next only where the two touch. That is what lets collect
+ * take its places from each node's total rather than from every member's length
+ * (collectives.c, collect_varying).
  * Every put but a step's last operation - its fenced add - says more follows
  * (OSOE_TRANSPORT_MORE). State: the lists, O(intervals) per team.
  *

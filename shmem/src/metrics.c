@@ -272,6 +272,10 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     TEAM("team.tree.algorithm", BLOCK_TREE(algorithm)),
     TEAM("team.tree.circulant_rounds", BLOCK_TREE(circulant_rounds)),
     TEAM("team.tree.lane", BLOCK_TREE(lane)),
+    /* The lengths the lead's last collect of differing blocks summed between
+     * the nodes for its places, a node's total each or a member's length each
+     * (P29; layout 38): which way its places were found, by a count. */
+    TEAM("team.tree.collect_lengths", BLOCK_TREE(collect_lengths)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
     TEAM("team.record.local_members", BLOCK_RECORD(local_members)),

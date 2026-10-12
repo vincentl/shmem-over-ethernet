@@ -4257,9 +4257,9 @@ reused one by one, removes.
   owner take mutexes of their own. Slice 3 removes the context mutex from
   issue.
 - **No collective borrows the heap**: a split's number travels in the parent
-  team's spare internal-region words, and collect's per-member lengths
-  through the reduction tree's fixed slots into private memory (the author's
-  C4).
+  team's spare internal-region words, and collect's lengths - each member's,
+  or since P29 each node's total of them - through the reduction tree's fixed
+  slots into private memory (the author's C4).
 - **The blocked record** stays one per PE: the first of its threads to wait
   owns it until its outermost wait ends, so `osoe-stat` shows one waiting
   thread whole; the other threads' waits show in their watch records.
@@ -5374,17 +5374,41 @@ at a time, 510 at 400 nodes of 256 PEs and *k* = 4 for one long each, about D
 times fewer with the pipeline - which made it the one internode phase whose
 latency grew faster than log *N*, the exception §1's goal carried until the
 allgather replaced it.)* **collect's places
-are the prefix sums of every member's length**: each member leaves its length
-in its own word of the team number's line of the internal region, the lead sets
-its members' lengths at their ranks in a vector of the team's size in its own
-private memory, the internode reduction's tree sums the nodes' vectors, 8-byte
-integers, into every lead's, and the lead turns the result into places and the
-total, which its members read after the release. Nothing is borrowed from the
-symmetric heap (§4.11, the author's C4). The lengths cost O(*P*) bytes a level
-of the tree in every call, 8 a PE - at 500 nodes of 256 PEs, 8 × 128,000 = 1 MB
-reduced, and about 5 MB out of each interior lead (the release review's P6) -
-where `fcollect`'s fixed block needs no such pass; the data itself keeps the
-allgather.
+come from each node's total where they can, and from every member's length
+where they cannot** (the author's C4, and his A11 of 2026-10-11). Each member
+leaves its length in its own word of the team number's line of the internal
+region, and the lead finds the places it reads in its own private memory, and
+the total, which its members read after the release; nothing is borrowed from
+the symmetric heap (§4.11). Where every node of a team spanning nodes holds one
+run of consecutive team ranks - every team strided in world ranks over a block
+distribution - the lead sets its members' sum at its node's position in a
+vector of the team's nodes, the internode reduction's tree sums the nodes'
+vectors, 8-byte integers, into every lead's, and each node's base is the totals
+of the nodes before it in team-rank order: the node set's order under a
+positive stride and its reverse under a negative one, the set being sorted by
+node. The lead sets the bases at the first rank of each node's run, its own
+members' places from its own base, and the total - every place the gather
+reads, its own members' and the allgather's intervals' ends, which are the
+runs' ends when every node is one run (below). That costs 8 bytes a node a
+level of the tree, 4 KB at 500 nodes. Where some node's members are not one
+run, as in a cyclic or plane distribution's teams, whose intervals end among a
+node's members, and on a team of one node, the places are **the prefix sums of
+every member's length**: the lead sets its members' lengths at their ranks in a
+vector of the team's size, the reduction's tree sums the nodes' vectors into
+every lead's, and the lead turns the result into places. Those lengths cost
+O(*P*) bytes a level of the tree in every call, 8 a PE - at 500 nodes of 256
+PEs, 8 × 128,000 = 1 MB reduced, and about 5 MB out of each interior lead (the
+release review's P6) - where `fcollect`'s fixed block needs no such pass. Which
+way a team takes is found once, at its first such collect, by its lead on each
+node: a walk of its ranks against the rank map, O(*P*) lookups once and O(*N*)
+kept, which every lead makes alike. The lead publishes how many lengths it
+summed (`team.tree.collect_lengths`, layout 38), which `shmem.collect-places.*`
+asserts on block and cyclic maps, under a negative stride and with lengths of
+0, a whole node's among them; `allgather_model.py`'s placed cases put shares of
+differing lengths, a zero among them, at places from the totals under both
+orders, a run that wraps past position *N* - 1 in two ranges, and its breakage,
+bases summed in the node set's order under a negative stride, fails. The data
+itself keeps the allgather either way.
 A scan (§9.10.10, built since phase 1 step 10) gives each PE its own place in O(1) memory.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put

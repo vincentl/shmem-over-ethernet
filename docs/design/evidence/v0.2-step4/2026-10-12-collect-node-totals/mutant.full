@@ -1,0 +1,64 @@
+Internal ctest changing into directory: /tmp/collect-node-totals-check/mutant/build/release
+Test project /tmp/collect-node-totals-check/mutant/build/release
+    Start 467: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+    Start 468: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+    Start 469: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+    Start 470: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+1/6 Test #469: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ...***Failed    0.07 sec
+osoe: PE 2: shmem_collectmem: team 3's member 0 has its place at byte 119 of a result of 120 bytes, out of the places' order: the layout was overwritten after it was made - is dest shorter than the result, so that copying into it ran on past its end?
+osoe: PE 2: control segment /osoe.1490876.0.0.0 (osoe-stat /osoe.1490876.0.0.0, while any PE of this node is alive)
+osoe: PE 1: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 4: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 6: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 7: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 8: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 9: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 8 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 4 exited with status 1
+
+    Start 471: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+2/6 Test #470: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ...***Failed    0.07 sec
+osoe: PE 1: shmem_collectmem: team 3's member 0 has its place at byte 93 of a result of 120 bytes, out of the places' order: the layout was overwritten after it was made - is dest shorter than the result, so that copying into it ran on past its end?
+osoe: PE 1: control segment /osoe.1490898.0.0.0 (osoe-stat /osoe.1490898.0.0.0, while any PE of this node is alive)
+osoe: PE 9: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe: PE 4: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe: PE 7: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe: PE 2: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe: PE 3: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 6 killed by signal 15
+
+    Start 472: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+3/6 Test #467: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.09 sec
+4/6 Test #468: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 .............   Passed    0.09 sec
+5/6 Test #471: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.07 sec
+6/6 Test #472: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 ................   Passed    0.08 sec
+
+67% tests passed, 2 tests failed out of 6
+
+Label Time Summary:
+internode    =   0.45 sec*proc (6 tests)
+tier2        =   0.45 sec*proc (6 tests)
+
+Total Test time (real) =   0.16 sec
+
+The following tests FAILED:
+	469 - shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 (Failed) internode tier2
+	470 - shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 (Failed) internode tier2
+Errors while running CTest
