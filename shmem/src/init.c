@@ -22,6 +22,7 @@
 #include "agent.h"
 #include "base/deadline.h"
 #include "base/futex.h"
+#include "base/lock-free.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "barrier.h"
@@ -341,6 +342,15 @@ static void session_start(void)
         osoe_fatal("osoe needs %s (they fail with \"%s\"); this kernel is %s",
                    osoe_futex_requirement(), strerror(futex_error), release);
     }
+    /*
+     * And the atomics the node's processes will share, lock-free: told when
+     * compiling on every machine the library builds for, and otherwise asked
+     * here, of the objects, before any is shared (base/lock-free.h).
+     */
+    if (!osoe_lock_free())
+        osoe_fatal("osoe shares atomic words between processes, and this machine's "
+                   "32- or 64-bit atomics are not lock-free: another process could not "
+                   "see their lock");
     osoe_node_refusal_arm(&osoe.node, &osoe.bootstrap, sessions);
 
     /*

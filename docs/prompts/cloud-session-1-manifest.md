@@ -270,11 +270,58 @@ committed for it.
   cmake --build build/clang-release -j4 && ctest --test-dir build/clang-release
   -LE '^model$' -j4`.
 
+### P12: the shared 64-bit atomics asserted lock-free - done
+
+*The step D review's portability Q4 (`docs/reviews/archive/phase1-step7-slice3-portability.md`):
+`node.h` alone declares 46 `_Atomic uint64_t` fields that processes share, and
+nothing asserts they are lock-free, though C11 expects atomics to be
+address-free - two mappings of one object communicating - only where they are
+lock-free; the futex words' size and alignment are asserted, their
+lock-freedom is not.* Still so at `82c5263`: no `ATOMIC_*_LOCK_FREE` or
+`atomic_is_lock_free` anywhere in the tree.
+
+- **The change**, §3.16's ground - an assertion, no memory order changed:
+  `base/lock-free.h` refuses, when compiling, a compiler whose `<stdatomic.h>`
+  says `int`'s, `long`'s or `long long`'s atomics are never lock-free (`0`) - the
+  types of `uint32_t` and `uint64_t` on LP64 Linux, `long long` too since a C
+  library could make `uint64_t` that - and `osoe_lock_free()` answers `true`
+  where it says always (`2`), and otherwise asks the objects themselves with
+  `atomic_is_lock_free` (`1`, "sometimes", which only the machine can answer);
+  `shmem_init` calls it beside the kernel's futex check, before anything is
+  shared, and refuses by name. C11's own macros only, no builtin (§3.16's first
+  rule). GCC and Clang say always on x86-64 and aarch64, so the start-up branch
+  compiles to nothing here. §3.16's consequences say so. Tests (tier 1):
+  `base.lock-free` builds `test-lock-free.c` with `long`'s atomics made
+  "sometimes" and asks the objects (yes, on this machine); `base.lock-free.never`
+  compiles it with them made "never" and must be refused by the header's
+  assertion, by its message. Files: `base/lock-free.h`,
+  `base/tests/test-lock-free.c`, `base/tests/CMakeLists.txt`, `shmem/src/init.c`,
+  `docs/design/shmem-ethernet-design.md` (§3.16).
+- **Ran**: `cmake --build build/release -j4` (0 warnings); the static checks and
+  `base.lock-free*`: **15 of 15**; the release test preset, `ctest --test-dir
+  build/release -LE '^model$' -j4`: **882 tests, 880 passed, 2 skipped (the root
+  case), none failed**. Both test modes compiled and run with Clang 18 too.
+- **Failing without the change**: `base.lock-free.never`'s compile against the
+  tree before (`git archive HEAD base`): no header, so no assertion's message -
+  the test fails; and against a mutant of the header without its
+  `_Static_assert`: the "never" compile succeeds (exit 0), and the test fails.
+  The start-up branch, shown on a running job: a scratch build whose
+  `osoe_lock_free()` answers `false` refuses `osoe-launch -n 2 -- shmem_test_init`
+  with "osoe: PE 0: osoe shares atomic words between processes, and this
+  machine's 32- or 64-bit atomics are not lock-free: another process could not
+  see their lock", exit 1, nothing left in `/dev/shm`.
+- **Not verified here**: aarch64, whose GCC 14 says always as x86-64's does (by
+  its `__GCC_ATOMIC_*_LOCK_FREE`; not compiled here). In the VM: `ctest --preset
+  release -R 'base\.lock-free|static'`.
+
 ## Decisions taken that might have been the author's
 
 - **B4: the cache routines stay in `shmem.h`**, documented where they are and
   why, rather than moved to `shmemx.h` - no header meets §5's letter, and a move
   breaks the programs that call them. The author may want them moved or dropped.
+- **P12 asserts the 32-bit atomics too**, not only the 64-bit ones the item
+  names: the futex words and the node's 32-bit protocol words are shared the
+  same way, and the same C11 promise covers them.
 
 ## Deviations from the brief
 
@@ -295,7 +342,7 @@ not fixed.*
 
 - **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
   (documented; the move put to the author, under Decisions); B3 (done); B5
-  (fixed before, verified here with Clang 18).
+  (fixed before, verified here with Clang 18); P12 (done).
 - **A README line, if the lead wants it** (B5): under Requirements, that a Linux
   Clang, 18.1.3 on Ubuntu 24.04, has built the full build without a warning and
   passed its release suite (2026-10-12, `cloud-session-1`).

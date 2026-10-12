@@ -2694,6 +2694,13 @@ derivation in full.
 
 - **Futex words** are `_Atomic uint32_t`, with a `_Static_assert` that its size
   and alignment equal `uint32_t`'s (true for GCC on aarch64 and x86-64).
+- **The shared words are lock-free.** Every atomic word processes share is an
+  `_Atomic uint32_t` or an `_Atomic uint64_t`, and C11 expects two mappings of
+  one atomic object to communicate only where it is lock-free (C11 §7.17.5):
+  `base/lock-free.h` refuses, when compiling, a compiler whose `<stdatomic.h>`
+  says those types are never lock-free, and `shmem_init` asks the objects
+  where it says sometimes. GCC and Clang say always on x86-64 and aarch64, so
+  nothing is asked there (the step D review, portability Q4).
 - **Outline atomics** on ARMv8.0 cores without LSE, such as the Pi 4's Cortex-A72,
   link statically from `libgcc.a`; a test binary's `NEEDED` list is libc only
   (review, lead-verified), so invariant 15 holds.
