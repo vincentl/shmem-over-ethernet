@@ -310,9 +310,52 @@ lock-freedom is not.* Still so at `82c5263`: no `ATOMIC_*_LOCK_FREE` or
   with "osoe: PE 0: osoe shares atomic words between processes, and this
   machine's 32- or 64-bit atomics are not lock-free: another process could not
   see their lock", exit 1, nothing left in `/dev/shm`.
-- **Not verified here**: aarch64, whose GCC 14 says always as x86-64's does (by
-  its `__GCC_ATOMIC_*_LOCK_FREE`; not compiled here). In the VM: `ctest --preset
-  release -R 'base\.lock-free|static'`.
+- **aarch64**, with the cross compiler (GCC 13.3): `aarch64-linux-gnu-gcc -dM -E`
+  gives `__GCC_ATOMIC_INT_LOCK_FREE`, `_LONG_` and `_LLONG_` all 2 (always); the
+  "never" mode is refused by the assertion and the "sometimes" mode compiles. Its
+  run was not possible here (no emulator). In the VM: `ctest --preset release -R
+  'base\.lock-free|static'`.
+
+### T30: a breakage that only ORDER catches - done
+
+*The step D review's correctness G3 (`docs/reviews/archive/phase1-step7-slice3-correctness.md`):
+`posted_bitmap_model.py`'s ORDER check was reached by none of its four
+breakages, all STUCK; an agent that keeps no record of the word it consumed
+holds, the comparison being redundant in the design's order; and
+`take_arrival`'s comment described a case that order cannot produce.* Still so
+at `82c5263`.
+
+- **The change**: a breakage, `kept_bits` - the agent loads a bitmap word rather
+  than exchanging it, so a bit it took stays set, and keeps no record of the word
+  it took last (`internode-am.c`'s `consumed`): a later pass the summary sends to
+  that word takes the bit again and forwards the same arrival twice. For ORDER to
+  be the only check that can see it, the model's forward step now counts only
+  what it forwarded: an arrival out of order moves neither the root's count nor
+  the agent's (before, the agent counted it and finished early, and STUCK would
+  have caught a repeat too). The design never forwards out of order, so its
+  states are the same. `take_arrival`'s comment now says that in this order no
+  bit is taken for a word already taken, and that the comparison is kept as the
+  guard against a bit taken twice, which `kept_bits` shows. Files:
+  `tools/modelcheck/posted_bitmap_model.py`, `shmem/src/internode-am.c`
+  (a comment). Commits: `44e1975`, the change, and the next, this entry - the
+  script that was to write it into the first failed, and the first was pushed
+  without it, its message saying otherwise.
+- **Ran**: the model before (`git show HEAD:...`) and after, whole: the five
+  cases they share are identical - design 4,627,960 states ok +live,
+  `summary_first` 157, `wake_first` 72, `bits_first` 159, `clear_after` 243, each
+  STUCK, as the review measured - and `kept_bits` fails at 93 states, "team 1:
+  epoch 2 forwarded after 2: an arrival was repeated"; exit 0. `cmake --build`
+  (0 warnings) and the static checks 13 of 13, for the comment.
+- **Only ORDER catches it, shown**: with ORDER's check made to return nothing
+  (the instruction kept, so the states are the same), `kept_bits` **holds**:
+  4,111,725 states, ok +live - nothing hangs and nothing is trapped. And each
+  half alone holds, as its docstring says: bits loaded with the comparison kept,
+  3,805,475 states ok +live; the comparison dropped with bits exchanged (the
+  review's `no_consume`), 4,627,960 ok +live - the design's own count.
+- **Failing without the change**: the model before has no case that fails ORDER
+  (its four breakages are STUCK, above): the check was reachable by none.
+- **Not verified here**: nothing. T32 (below) names `kept_bits`'s ORDER and the
+  others' STUCK in the model's cases.
 
 ## Decisions taken that might have been the author's
 
@@ -342,7 +385,7 @@ not fixed.*
 
 - **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
   (documented; the move put to the author, under Decisions); B3 (done); B5
-  (fixed before, verified here with Clang 18); P12 (done).
+  (fixed before, verified here with Clang 18); P12 (done); T30 (done).
 - **A README line, if the lead wants it** (B5): under Requirements, that a Linux
   Clang, 18.1.3 on Ubuntu 24.04, has built the full build without a warning and
   passed its release suite (2026-10-12, `cloud-session-1`).
