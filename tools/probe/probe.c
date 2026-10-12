@@ -14,7 +14,8 @@
  *   probe-full-build.c   the full build: the futex2 calls, and 64-bit futex
  *                        support; io_uring ring setup, IORING_OP_FUTEX_WAIT (also
  *                        as the cross-process futex's waiter), multishot recv with
- *                        a provided buffer ring over TCP loopback; and the io_uring
+ *                        a provided buffer ring over TCP loopback; whether
+ *                        IORING_OP_SEND_ZC is there, an info line; and the io_uring
  *                        check shmem_init makes (base/ring-check.c), so that a
  *                        kernel this passes is one a job of several nodes starts
  *                        on.
