@@ -72,6 +72,17 @@ add_test(NAME shmem.memory-orders
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckMemoryOrders.cmake)
 set_tests_properties(shmem.memory-orders PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# The pkg-config search this build was configured with, for the nested
+# configures below, which find liburing again: a cross build names its target's
+# liburing so (PKG_CONFIG_LIBDIR, say), and ctest's own environment need not -
+# without it shmem.strict-c11's nested build found the host's and failed to
+# link (the ninth review's P9-5). Each is passed set or empty, and an empty one
+# is unset there.
+set(osoe_pkg_config_environment)
+foreach(var PKG_CONFIG_LIBDIR PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR)
+  list(APPEND osoe_pkg_config_environment "-D${var}=$ENV{${var}}")
+endforeach()
+
 # A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
 # so this proves it on its own: a nested configure and build of libosoe as a
 # static archive, then a link of a tiny consumer against that archive alone -
@@ -88,6 +99,7 @@ add_test(NAME shmem.static-link
           "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
           "-DURING_LIBRARIES=${LIBURING_LINK_LIBRARIES}"
           -DSINGLE_NODE=${OSOE_SINGLE_NODE}
+          ${osoe_pkg_config_environment}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
 set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
 
@@ -104,6 +116,7 @@ add_test(NAME shmem.strict-c11
           "-DC_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}"
           "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
           -DSINGLE_NODE=${OSOE_SINGLE_NODE}
+          ${osoe_pkg_config_environment}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
 set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 600)
 

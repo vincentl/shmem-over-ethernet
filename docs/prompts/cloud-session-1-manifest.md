@@ -448,6 +448,51 @@ compare it.* Still so at `82c5263`: every breakage's case said `False`, and
   `ctest --preset models -j1` (39 tests) and, with `-DOSOE_MULTIPLE_MODELS=ON`,
   the six of §4.11.
 
+### B6: the cross build's nested strict-C11 check finds the host's liburing - done
+
+*The ninth review's portability P9-5, its last note (`docs/reviews/archive/v0.2-before-part4-portability.md`;
+round eight's P5 before it): in a cross build, `shmem.strict-c11` failed - its
+nested configure, run by ctest, found the host's liburing, the outer configure's
+`PKG_CONFIG_LIBDIR` not being in ctest's environment - and passed with it set
+there.* Still so at `82c5263`: neither `cmake/CheckStrictC11.cmake` nor the test's
+registration passes any pkg-config setting.
+
+- **The setup**, all in the scratchpad, none of it in the tree: liburing 2.9 built
+  for aarch64 from the setup script's clone (`./configure
+  --cc=aarch64-linux-gnu-gcc --prefix=<scratch>/aarch64`, `make -C src`, `make
+  install`); a toolchain file of three lines (`CMAKE_SYSTEM_NAME Linux`,
+  `CMAKE_SYSTEM_PROCESSOR aarch64`, `CMAKE_C_COMPILER aarch64-linux-gnu-gcc`); the
+  cross build configured with `PKG_CONFIG_LIBDIR=<scratch>/aarch64/lib/pkgconfig`
+  in the configure's environment alone, which found "liburing, version 2.9", and
+  built at `-j4`: 0 warnings, an aarch64 `libosoe.so`.
+- **Failing without the change**: `ctest --test-dir build/cross-aarch64 -R
+  '^shmem\.strict-c11$'`, no pkg-config variable in ctest's environment: failed in
+  3.5 s, "/usr/local/lib/liburing.so: error adding symbols: file in wrong format" -
+  the host's x86-64 liburing, the review's failure mirrored. The control, the same
+  with `PKG_CONFIG_LIBDIR` set in ctest's environment: passed, 118 s.
+- **The change**: the build passes the pkg-config search it was configured with
+  - `PKG_CONFIG_LIBDIR`, `PKG_CONFIG_PATH` and `PKG_CONFIG_SYSROOT_DIR`, each as
+  the configure's environment had it - to the two nested checks that find
+  liburing again, `shmem.strict-c11` and `shmem.static-link`, whose scripts set
+  each for their nested configure, or unset it where it was empty. The static
+  link's nested configure had found the host's liburing too; it compiled against
+  its headers only, which is why the review saw it pass. Files:
+  `shmem/tests/CMakeLists.txt`, `cmake/CheckStrictC11.cmake`,
+  `cmake/CheckStaticLink.cmake`.
+- **Passing with the change**: the same cross build reconfigured from the
+  changed tree (its tests now carry `-DPKG_CONFIG_LIBDIR=<scratch>/aarch64/lib/pkgconfig`),
+  `shmem.strict-c11` with no pkg-config variable in ctest's environment:
+  passed in 84 s, the nested cache naming `aarch64-linux-gnu-gcc` and the
+  aarch64 liburing. Natively, where the configure had none of the three (each
+  passed empty, so unset): `shmem.strict-c11`, `shmem.static-link` and
+  `shmem.single-node.configure` pass, and the static checks 13 of 13 (a fresh release build, 0 warnings).
+- **Not verified here**: `shmem.static-link` in a cross build - its probe runs
+  the program it links, and no emulator is here; nor the x86-64 cross build on
+  an aarch64 host that the review ran, the mirror of this one. In the VM, where
+  `osoe-x86` runs x86-64 programs: a cross build configured with
+  `PKG_CONFIG_LIBDIR` set and ctest run without it, `ctest -R
+  '^shmem\.(strict-c11|static-link)$'`.
+
 ## Decisions taken that might have been the author's
 
 - **B4: the cache routines stay in `shmem.h`**, documented where they are and
@@ -533,7 +578,7 @@ not fixed.*
 - **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
   (documented; the move put to the author, under Decisions); B3 (done); B5
   (fixed before, verified here with Clang 18); P12 (done); T30 (done); T32
-  (done but `allgather_model.py`, which the lead converts).
+  (done but `allgather_model.py`, which the lead converts); B6 (done).
 - **A README line, once `allgather_model.py` names its breakages** (T32): How
   osoe is tested's "Each model also carries deliberately broken variants that
   must fail" can add "each naming the property it must fail, which the checker

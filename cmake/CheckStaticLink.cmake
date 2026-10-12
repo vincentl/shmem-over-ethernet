@@ -22,10 +22,19 @@ cmake_minimum_required(VERSION 3.25)
 # v0.2 step 1 review, portability Q2). Its C flags are not passed: the
 # presets' carry the sanitizers.
 #
+# PKG_CONFIG_LIBDIR, PKG_CONFIG_PATH and PKG_CONFIG_SYSROOT_DIR are the
+# environment's when the caller was configured, each set here for the nested
+# configure, or unset where it was empty: a cross build names its target's
+# liburing so, and ctest's environment need not - with its own the nested
+# configure found the host's liburing, and a cross build's nested link failed
+# on it (the ninth review's P9-5).
+#
 #   cmake -DSOURCE_DIR=<repo root> -DSCRATCH_DIR=<scratch build dir>
 #         -DPROBE_SRC=<probe.c> -DC_COMPILER=<cc> -DURING_LIBRARIES=<liburing>
 #         [-DC_COMPILER_TARGET=<target>] [-DTOOLCHAIN_FILE=<file>]
-#         [-DSINGLE_NODE=ON|OFF] -P CheckStaticLink.cmake
+#         [-DSINGLE_NODE=ON|OFF] [-DPKG_CONFIG_LIBDIR=<dirs>]
+#         [-DPKG_CONFIG_PATH=<dirs>] [-DPKG_CONFIG_SYSROOT_DIR=<dir>]
+#         -P CheckStaticLink.cmake
 
 foreach(var SOURCE_DIR SCRATCH_DIR PROBE_SRC C_COMPILER URING_LIBRARIES)
   if(NOT DEFINED ${var})
@@ -46,6 +55,16 @@ endif()
 if(TOOLCHAIN_FILE)
   list(APPEND compiler_options "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}")
 endif()
+
+foreach(var PKG_CONFIG_LIBDIR PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR)
+  if(NOT DEFINED ${var})
+    continue()
+  elseif("${${var}}" STREQUAL "")
+    unset(ENV{${var}})
+  else()
+    set(ENV{${var}} "${${var}}")
+  endif()
+endforeach()
 
 file(REMOVE_RECURSE "${SCRATCH_DIR}")
 file(MAKE_DIRECTORY "${SCRATCH_DIR}")
