@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 169 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 168 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
@@ -61,7 +61,7 @@ and every deletion are the author's.
   author chose the eight cores (branch `kit-c4-standard-16`), keeping that
   change's fixes.
 
-**The Pi cluster** for its items (P4, H21, H22, T6, T9 to T12): only `~/osoe`;
+**The Pi cluster** for its items (P4, H22, T6, T9 to T12): only `~/osoe`;
 `ssh` through the Mac; never to the compute nodes; one session held open while
 jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
 `osoe-load`, `osoe-rocky`, `osoe-x86`; every run under `/tmp/osoe-vm.lock`.
@@ -98,7 +98,7 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
    results brought back (X3) the same day; then the author's decisions A2 to A6,
    and their slices (H20, and whatever they change), and the runs that check
    them.
-4. **The Pi's items** (P4, H21, H22), whenever the Pi is free.
+4. **The Pi's items** (P4, H22), whenever the Pi is free.
 5. **Round ten**: a full adversarial review of the tree with everything above,
    as round nine was (`docs/reviews/adversarial-review-prompt.md`), its findings
    settled as round nine's were.

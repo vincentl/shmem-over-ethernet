@@ -847,7 +847,8 @@ at 4 × 4; `analysis.txt` each line's median of three, its spread and the ratio.
   OSU's smallest sizes at 4 × 4, which read 2 to 8% faster under `link` - the
   same code. In `osoe-bench`'s loop at 4 × 4, reductions back to back with no
   barrier between them, the 64 KiB median is the trees' (2.26 against
-  2.24 ms) and the fastest call 1.17 times faster. Broadcasts and scans, which
+  2.24 ms) and the fastest call 1.17 times faster - under the default
+  binding only, H21 found on 2026-10-12. Broadcasts and scans, which
   take the same shape under both, moved by up to 8% either way between
   rotations: the noise of a three-rotation comparison here.
 - **At the capacity's window** (`comparison-window-4/`, `4b9767e`), as Part 2
@@ -865,7 +866,8 @@ at 4 × 4; `analysis.txt` each line's median of three, its spread and the ratio.
   within 8% to 128 KiB and 11 to 22% optimistic from 256 KiB, so its 1.72 at
   1 MiB is too high: it takes every lead's link carrying both ways at once at
   the full rate, which the Pi's leads did not reach - one progress thread a
-  node moving both directions the likely reason, not measured.
+  node moving both directions the likely reason, not measured
+  (measured on 2026-10-12, H21 below: not the reason).
 
 ## v0.2 step 4: progress helpers (2026-10-07 to 09)
 
@@ -1026,3 +1028,46 @@ what.
   started beside it. With those jobs run alone (`RUN_SERIAL`) and the
   lead-ends test's limit at 30 s, three runs of three passed, 764 of 764, in
   246 to 298 s.
+
+## H21: Träff's model and the 64 KiB reduction back to back, again (2026-10-12)
+
+Step 3 left two things open (`docs/decisions/2026-10-07-circulant-data-path.md`):
+the event simulation's Träff's 11 to 22% optimistic from 256 KiB, one progress
+thread a node moving both directions named the likely reason, and `osoe-bench`'s
+64 KiB reduction back to back at 4 × 4 no faster under Träff's than under the
+trees. Step 3 ran both under Slurm's default binding, where a lead's main thread
+and its progress thread share one core, and before step 4's helpers. Measured
+again on `main` at `02a7944`, release, built with no warning: `link` against
+`tree` under the default binding and under `--cpu-bind=none`, at no helpers and
+at two (`OSOE_PROGRESS_HELPERS=2`), alternating three times - OSU's reduce from
+64 KiB to 4 MiB at 4 × 1 and `osoe-bench` at 4 × 4. The raw outputs, the
+scripts (`h21.sh`, `analyse-h21.py`) and `analysis.txt` - each line's median of
+three, its spread, the ratio, and OSU's lines over the simulation's - are in
+`docs/design/evidence/pi-cluster/2026-10-12-h21/`.
+
+- **The model's optimism is not the threads.** Träff's measured time over the
+  simulation's (`tools/modelcheck/shape_timing.py` at the Pi's link, the sender
+  model) from 256 KiB to 4 MiB is 1.12 to 1.22 under all four: 1.13 to 1.22 at
+  the default binding and no helpers, as step 3 found (1.11 to 1.22, the same
+  method on its files), 1.12 to 1.21 unbound, 1.12 to 1.17 at two helpers bound
+  or not. At 1 MiB two helpers take 16.6 ms to 16.0. Two helpers carry the two
+  directions on threads of their own and unbinding gives the main thread and
+  the agent a core each, and neither closes the gap; the trees' simulation is
+  within 7% at the same sizes at no helpers (0.94 to 1.07). What is left is what
+  only Träff's asks of a lead - its link carrying both ways at once, which the
+  simulation takes at the full rate each way - or a cost a byte the model lacks.
+  A stream both ways at once between two nodes would tell the two apart; it was
+  not run. The chooser's closed forms, both 16 to 18% under the measured times
+  at 1 MiB, keep their ratio.
+- **The 64 KiB reduction back to back was the binding.** In `osoe-bench`'s loop
+  at 4 × 4, Träff's 64 KiB median against the trees': under the default binding
+  at no helpers 2.27 against 2.21 ms, 0.97 times as fast (step 3: 2.26 against
+  2.24); unbound 1.45 against 2.41, 1.65 times; at two helpers 1.44 against 2.76
+  bound, 1.91 times, and 1.43 against 2.45 unbound, 1.71. Bound at no helpers
+  Träff's loses 0.8 ms a call - its fastest call, 1.49 ms, is the unbound
+  median - while the trees' is 8% faster bound than unbound. Two helpers on the
+  lead's core take Träff's loss back, as the merge point's review found (S4),
+  but slow the trees' to 2.76 ms and the 64 KiB broadcast, the same code under
+  both, from 1.51 to 1.54 ms to 1.89 to 2.15. At 4 × 1, one PE a node, OSU's
+  reduce shows no such loss: 1.39 ms at 64 KiB bound, 1.37 unbound. A site
+  that binds each PE to its core (B11, H26) is where it matters.

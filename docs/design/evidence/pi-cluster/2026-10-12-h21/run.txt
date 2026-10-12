@@ -1,0 +1,52 @@
+start 22:55:16
+built: 0, warnings: 0
+osu: 0
+osu-reduce-4x1-bound-h0-link-1: 0 22:57:15
+bench-4x4-bound-h0-link-1: 0 22:58:36
+osu-reduce-4x1-bound-h0-tree-1: 0 22:59:06
+bench-4x4-bound-h0-tree-1: 0 23:00:32
+osu-reduce-4x1-none-h0-link-1: 0 23:00:55
+bench-4x4-none-h0-link-1: 0 23:02:20
+osu-reduce-4x1-none-h0-tree-1: 0 23:02:50
+bench-4x4-none-h0-tree-1: 0 23:04:10
+osu-reduce-4x1-bound-h2-link-1: 0 23:04:34
+bench-4x4-bound-h2-link-1: 0 23:05:56
+osu-reduce-4x1-bound-h2-tree-1: 0 23:06:27
+bench-4x4-bound-h2-tree-1: 0 23:07:57
+osu-reduce-4x1-none-h2-link-1: 0 23:08:21
+bench-4x4-none-h2-link-1: 0 23:09:45
+osu-reduce-4x1-none-h2-tree-1: 0 23:10:16
+bench-4x4-none-h2-tree-1: 0 23:11:43
+osu-reduce-4x1-bound-h0-link-2: 0 23:12:07
+bench-4x4-bound-h0-link-2: 0 23:13:33
+osu-reduce-4x1-bound-h0-tree-2: 0 23:14:03
+bench-4x4-bound-h0-tree-2: 0 23:15:29
+osu-reduce-4x1-none-h0-link-2: 0 23:15:53
+bench-4x4-none-h0-link-2: 0 23:17:17
+osu-reduce-4x1-none-h0-tree-2: 0 23:17:47
+bench-4x4-none-h0-tree-2: 0 23:19:08
+osu-reduce-4x1-bound-h2-link-2: 0 23:19:32
+bench-4x4-bound-h2-link-2: 0 23:20:59
+osu-reduce-4x1-bound-h2-tree-2: 0 23:21:30
+bench-4x4-bound-h2-tree-2: 0 23:23:01
+osu-reduce-4x1-none-h2-link-2: 0 23:23:25
+bench-4x4-none-h2-link-2: 0 23:24:49
+osu-reduce-4x1-none-h2-tree-2: 0 23:25:20
+bench-4x4-none-h2-tree-2: 0 23:26:46
+osu-reduce-4x1-bound-h0-link-3: 0 23:27:10
+bench-4x4-bound-h0-link-3: 0 23:28:37
+osu-reduce-4x1-bound-h0-tree-3: 0 23:29:07
+bench-4x4-bound-h0-tree-3: 0 23:30:33
+osu-reduce-4x1-none-h0-link-3: 0 23:30:57
+bench-4x4-none-h0-link-3: 0 23:32:21
+osu-reduce-4x1-none-h0-tree-3: 0 23:32:51
+bench-4x4-none-h0-tree-3: 0 23:34:17
+osu-reduce-4x1-bound-h2-link-3: 0 23:34:48
+bench-4x4-bound-h2-link-3: 0 23:36:15
+osu-reduce-4x1-bound-h2-tree-3: 0 23:36:46
+bench-4x4-bound-h2-tree-3: 0 23:38:16
+osu-reduce-4x1-none-h2-link-3: 0 23:38:40
+bench-4x4-none-h2-link-3: 0 23:40:04
+osu-reduce-4x1-none-h2-tree-3: 0 23:40:35
+bench-4x4-none-h2-tree-3: 0 23:42:01
+end 23:42:04
