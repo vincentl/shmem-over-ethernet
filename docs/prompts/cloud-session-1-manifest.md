@@ -443,7 +443,9 @@ compare it.* Still so at `82c5263`: every breakage's case said `False`, and
   `selftest.py`'s checks of `report`, which must answer it). This was running
   when T32 was committed (`d86c959`); its count is the next commit's.
   `get_completion_model.py`, whose design cases no preset registers, whole:
-  running at this commit, its result in the next; the other five of §4.11's models and
+  **all as expected**, exit 0, in 34 minutes - every design case holding, the
+  largest 18,902,872 states, its three breakages each failing COMPLETE, its
+  starvation table as before ([2, 4, 6] and [0, 0, 0]); the other five of §4.11's models and
   `rabenseifner_model.py` ran whole under the subagents, exit 0 each.
 - **Left**: `allgather_model.py`, the lead's - its breakages still say `False`,
   which `report` takes as before (`expect_ok`), so the model suite passes it
