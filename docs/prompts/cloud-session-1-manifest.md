@@ -234,6 +234,42 @@ specifiers").* Still so at `82c5263`.
 - **Not verified here**: nothing that needs another machine. In the VM:
   `ctest --preset release -R 'profiler-plain-names|headers|signal|profile'`.
 
+### B5: a Clang user's first command - done: both fixes were in the tree, verified here with a Linux Clang
+
+*Round four's portability Q5 (`docs/reviews/archive/phase1-release-fixes-portability.md`):
+`CC=clang cmake --workflow --preset release` failed `shmem.strict-c11`, on Clang's
+`-Wsometimes-uninitialized` at `test-reply.c`'s `second`, and the nested build
+took `CC` from the environment rather than the outer build's compiler; the
+review had no Linux Clang to run.* Confirming in the tree: both fixes are there -
+`second` is initialized (`shmem/tests/test-reply.c:275`, with a comment naming
+Clang's warning) and `shmem.strict-c11` passes `-DC_COMPILER=${CMAKE_C_COMPILER}`
+to `cmake/CheckStrictC11.cmake` (the v0.2 step 1 review's portability Q2). So
+the item needed no change: this entry is its verification, and no code is
+committed for it.
+
+- **Ran, with Clang 18.1.3**: `CC=clang cmake --preset release -B build/clang-release`
+  (the C compiler identified as Clang), `cmake --build build/clang-release -j4`:
+  **0 warnings**; the static checks with the header tests, `ctest --test-dir
+  build/clang-release -R '<the static checks>|headers\.|profiler-plain-names'`
+  with `CC` unset: **20 of 20**, the nested build's cache naming `/usr/bin/clang`
+  (`shmem.static-link`'s too); then the release test preset, every test but the
+  models - the first command's test step - with `CC=clang` in the environment:
+  **880 tests, 878 passed, 2 skipped (the root case), none failed**, in 5 min 38 s.
+- **The nested build takes the outer compiler, shown**: with `CC=gcc` in ctest's
+  environment, `shmem.strict-c11` of the Clang build passes and its nested cache
+  still names `/usr/bin/clang`.
+- **Failing without the fix**: a copy of the tree with `second` left
+  uninitialized (`uint32_t ticket = 0, first = 0, second;`) through
+  `cmake/CheckStrictC11.cmake` with `-DC_COMPILER=/usr/bin/clang`: exit 1,
+  "Building with -std=c11 warned (F12)", `test-reply.c:282:11: warning: variable
+  'second' is used uninitialized whenever '&&' condition is false
+  [-Wsometimes-uninitialized]` - Q5's warning; on the tree as it is, it passes
+  (above).
+- **Not verified here**: Clang on aarch64 and Apple's Clang, which the review
+  used; in the VM, `CC=clang cmake --preset release -B build/clang-release &&
+  cmake --build build/clang-release -j4 && ctest --test-dir build/clang-release
+  -LE '^model$' -j4`.
+
 ## Decisions taken that might have been the author's
 
 - **B4: the cache routines stay in `shmem.h`**, documented where they are and
@@ -258,4 +294,8 @@ not fixed.*
 ## For the lead's merge
 
 - **Close in `docs/prompts/v0.2-open-items.md`**: T42 (done, `cloud-session-1`); B4
-  (documented; the move put to the author, under Decisions); B3 (done).
+  (documented; the move put to the author, under Decisions); B3 (done); B5
+  (fixed before, verified here with Clang 18).
+- **A README line, if the lead wants it** (B5): under Requirements, that a Linux
+  Clang, 18.1.3 on Ubuntu 24.04, has built the full build without a warning and
+  passed its release suite (2026-10-12, `cloud-session-1`).
