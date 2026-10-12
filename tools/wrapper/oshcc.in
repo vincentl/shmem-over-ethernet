@@ -7,9 +7,10 @@
 # run path to it. A compile-only call (-c, -S, -E, -M, -MM, -fsyntax-only) gets
 # the header path and -fno-pie, so object files build as they would with any
 # other oshcc; so does a query of the compiler (--version, -dumpversion,
-# -print-*), and `oshcc -v` alone is the compiler's. `oshcc -show ...` prints
-# the command it would run instead of running it; --showme, --showme:compile
-# and --showme:link are Open MPI's spellings, which some build systems ask.
+# -print-*), and `oshcc -v` alone is the compiler's. -show, anywhere among the
+# arguments, prints the command it would run instead of running it; --showme,
+# the same, and --showme:compile and --showme:link, first, are Open MPI's
+# spellings, which some build systems ask.
 # osoe's own version is --showme:version, in the same family: --version stays
 # the compiler's, which build systems run to tell what CC is.
 #
@@ -21,8 +22,9 @@
 # compiled -fno-pie cannot go into a position-independent program - win over
 # the wrapper's, and the statics are symmetric by offset still. A shared
 # library (-shared) or a relocatable object (-r) is linked as asked: its data is
-# not yet a program's. -static is refused: the C library's own state would be
-# gathered with the program's, and a fork() would write the parent's copy.
+# not yet a program's. -static is refused, and so are --static, GCC's other
+# spelling, and -static-pie: the C library's own state would be gathered with
+# the program's, and a fork() would write the parent's copy.
 compiler=${OSOE_CC:-@OSOE_WRAPPER_COMPILER@}
 include='@OSOE_WRAPPER_INCLUDE@'
 library='@OSOE_WRAPPER_LIBRARY@'
@@ -32,9 +34,7 @@ statics='@OSOE_WRAPPER_STATICS_SCRIPT@'
 version='@OSOE_VERSION_TEXT@'
 @OSOE_WRAPPER_RELOCATE@
 
-show=no
 case $1 in
-    -show|--showme) show=yes; shift ;;
     --showme:compile) echo "-I$include -fno-pie"; exit 0 ;;
     --showme:version) echo "oshcc (osoe) $version"; exit 0 ;;
     --showme:link)
@@ -42,6 +42,16 @@ case $1 in
              "$libraries -Xlinker -rpath -Xlinker $library"
         exit 0 ;;
 esac
+# Each argument is taken off the front and put back at the end unless it is
+# -show: the list ends as it began, without it.
+show=no
+for argument in "$@"; do
+    shift
+    case $argument in
+        -show|--showme) show=yes ;;
+        *) set -- "$@" "$argument" ;;
+    esac
+done
 if [ $# -eq 1 ] && [ "$1" = -v ]; then
     exec $compiler -v
 fi
@@ -52,7 +62,7 @@ for argument in "$@"; do
         -c|-S|-E|-M|-MM|-fsyntax-only|--version|-dumpversion|-dumpmachine|-dumpspecs|-print-*)
             link=no ;;
         -shared|-r) program=no ;;
-        -static)
+        -static|--static|-static-pie)
             echo "oshcc: -static would gather the C library's own state with the program's" \
                  "symmetric statics (osoe's design notes, §4.3); link dynamically" >&2
             exit 1 ;;

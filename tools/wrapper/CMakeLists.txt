@@ -66,11 +66,13 @@ endif()
 # -show: a compile-only call gets the header path and -fno-pie, and not the
 # library; a program's link gets the library, -no-pie and the statics script; a
 # shared library's or a relocatable link, the library and neither of the other
-# two. --showme:link names the library; -static is refused by name; a query of
-# the compiler, --version, answers as the compiler.
+# two. -show and --showme work anywhere among the arguments; --showme:link names
+# the library; -static, --static and -static-pie are refused by name, and
+# -static-libgcc passes; a query of the compiler, --version, answers as the
+# compiler.
 set(script ${CMAKE_CURRENT_SOURCE_DIR}/osoe-statics.ld)
 add_test(NAME wrapper.show
-  COMMAND sh -c "${oshcc} -show -c x.c | grep -q -- '-I${PROJECT_SOURCE_DIR}/shmem/include -fno-pie' && ! ${oshcc} -show -c x.c | grep -q -- -losoe && ${oshcc} -show -o x x.c | grep -q -- '-no-pie -Xlinker -T -Xlinker ${script} .*-losoe' && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- -no-pie && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- '-Xlinker -T' && ${oshcc} -show -shared -o x.so x.c | grep -q -- -losoe && ! ${oshcc} -show -r -o x.o y.o | grep -q -- -no-pie && ${oshcc} --showme:link | grep -q -- -losoe && ! ${oshcc} -static -o x x.c 2>/dev/null && ${oshcc} -static -o x x.c 2>&1 | grep -q 'link dynamically' && ${oshcc} --version > /dev/null")
+  COMMAND sh -c "${oshcc} -show -c x.c | grep -q -- '-I${PROJECT_SOURCE_DIR}/shmem/include -fno-pie' && ! ${oshcc} -show -c x.c | grep -q -- -losoe && ${oshcc} -show -o x x.c | grep -q -- '-no-pie -Xlinker -T -Xlinker ${script} .*-losoe' && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- -no-pie && ! ${oshcc} -show -shared -o x.so x.c | grep -q -- '-Xlinker -T' && ${oshcc} -show -shared -o x.so x.c | grep -q -- -losoe && ! ${oshcc} -show -r -o x.o y.o | grep -q -- -no-pie && ${oshcc} --showme:link | grep -q -- -losoe && ! ${oshcc} -static -o x x.c 2>/dev/null && ${oshcc} -static -o x x.c 2>&1 | grep -q 'link dynamically' && ${oshcc} --static -o x x.c 2>&1 | grep -q 'link dynamically' && ${oshcc} -static-pie -o x x.c 2>&1 | grep -q 'link dynamically' && ${oshcc} -show -static-libgcc -o x x.c | grep -q -- -static-libgcc && ${oshcc} -c x.c -show | grep -q -- '-I${PROJECT_SOURCE_DIR}/shmem/include -fno-pie' && ${oshcc} -o x x.c --showme | grep -q -- '-no-pie -Xlinker -T' && ! ${oshcc} -o x x.c -show | grep -q -- ' -show' && ${oshcc} --version > /dev/null")
 if(OSOE_INTERNODE)
   # A program with static data, built with nothing but the wrapper: ISx's reduce
   # into a static total with a static pSync, across two nodes.
