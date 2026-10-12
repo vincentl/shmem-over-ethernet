@@ -1,0 +1,45 @@
+== out/fan-in
+jobs: 36, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+fan-in: MiB/s into PE 0
+  pes=1 h=0 buffers=64  4121 (3918-4391, n=3)
+    link 2430 (1986-3140) MiB/s, hop 46.7 (46.4-49.5) us, message 25.8 (20.3-26.8) us; unsent limit 326138 (266526-421421) B
+  pes=1 h=0 buffers=256  3774 (2718-4084, n=3)
+    link 2089 (2047-2725) MiB/s, hop 45.8 (44.4-48.3) us, message 20.3 (4.32-28.3) us; unsent limit 280316 (274787-365739) B
+  pes=1 h=2 buffers=64  6536 (5830-7399, n=3)
+    link 2073 (1963-2583) MiB/s, hop 44.7 (43.4-45.0) us, message 25.9 (22.1-51.3) us; unsent limit 278170 (263516-346619) B
+  pes=1 h=2 buffers=256  5776 (5738-6118, n=3)
+    link 1996 (1700-2312) MiB/s, hop 45.4 (44.9-111) us, message 24.3 (23.1-34.0) us; unsent limit 267844 (228119-310281) B
+  pes=4 h=0 buffers=64  4330 (4167-4651, n=3)
+    link 2067 (413-2215) MiB/s, hop 46.7 (45.2-51.1) us, message 22.5 (21.4-24.0) us; unsent limit 277472 (55484-297248) B
+  pes=4 h=0 buffers=256  4015 (3975-4608, n=3)
+    link 2530 (1474-2744) MiB/s, hop 46.0 (45.7-50.0) us, message 24.1 (21.1-24.6) us; unsent limit 339528 (197898-368352) B
+  pes=4 h=2 buffers=64  6970 (6942-6994, n=3)
+    link 2625 (2618-2686) MiB/s, hop 44.3 (43.7-46.3) us, message 21.9 (16.6-22.6) us; unsent limit 352277 (351404-360454) B
+  pes=4 h=2 buffers=256  7116 (6980-7546, n=3)
+    link 1536 (1456-1872) MiB/s, hop 45.8 (45.6-116) us, message 24.6 (23.9-37.6) us; unsent limit 206187 (195359-251283) B
+  pes=16 h=0 buffers=64  4146 (4002-4229, n=3)
+    link 2525 (2362-3920) MiB/s, hop 51.1 (48.3-54.3) us, message 19.0 (16.8-23.2) us; unsent limit 338906 (316967-526079) B
+  pes=16 h=0 buffers=256  3962 (3913-4064, n=3)
+    link 2748 (2215-3234) MiB/s, hop 52.3 (48.5-53.3) us, message 20.9 (20.0-22.9) us; unsent limit 368857 (297326-434054) B
+  pes=16 h=2 buffers=64  7150 (6611-7900, n=3)
+    link 2243 (2075-2990) MiB/s, hop 47.1 (45.4-49.6) us, message 23.0 (19.0-29.0) us; unsent limit 301037 (278493-401295) B
+  pes=16 h=2 buffers=256  6320 (6310-7037, n=3)
+    link 1474 (1399-2669) MiB/s, hop 49.2 (46.1-54.1) us, message 24.5 (23.1-30.0) us; unsent limit 197862 (187754-358245) B
+
+counters that moved over the window (PE 0's node; median, range)
+  fan-in pes=1 h=0 buffers=64: receive_enobufs 12527 (12454-12854, n=3), receive_rearms 12527 (12454-12854, n=3), sends 4504 (4497-4505, n=3)
+  fan-in pes=1 h=0 buffers=256: receive_enobufs 2182 (2154-2189, n=3), receive_rearms 2182 (2154-2189, n=3), sends 4487 (4487-4488, n=3)
+  fan-in pes=1 h=2 buffers=64: receive_enobufs 6198 (6126-6275, n=3), receive_rearms 6198 (6126-6275, n=3), sends 4492 (4490-4494, n=3)
+  fan-in pes=1 h=2 buffers=256: receive_enobufs 449 (427-457, n=3), receive_rearms 449 (427-457, n=3), sends 4487 (4487-4488, n=3)
+  fan-in pes=4 h=0 buffers=64: receive_enobufs 14920 (14901-14920, n=3), receive_rearms 14920 (14901-14920, n=3), sends 1490 (1486-1529, n=3)
+  fan-in pes=4 h=0 buffers=256: receive_enobufs 3306 (3282-3307, n=3), receive_rearms 3306 (3282-3307, n=3), sends 1163 (1149-1257, n=3)
+  fan-in pes=4 h=2 buffers=64: receive_enobufs 7453 (7441-7501, n=3), receive_rearms 7453 (7441-7501, n=3), sends 1424 (1417-1446, n=3)
+  fan-in pes=4 h=2 buffers=256: receive_enobufs 1580 (1563-1611, n=3), receive_rearms 1580 (1563-1611, n=3), sends 1138 (1134-1175, n=3)
+  fan-in pes=16 h=0 buffers=64: receive_enobufs 15443 (15354-15485, n=3), receive_rearms 15443 (15354-15485, n=3), sends 1244 (1241-1261, n=3)
+  fan-in pes=16 h=0 buffers=256: receive_enobufs 3639 (3632-3641, n=3), receive_rearms 3639 (3632-3641, n=3), sends 949 (945-965, n=3)
+  fan-in pes=16 h=2 buffers=64: receive_enobufs 7861 (7849-7883, n=3), receive_rearms 7861 (7849-7883, n=3), sends 1234 (1232-1246, n=3)
+  fan-in pes=16 h=2 buffers=256: receive_enobufs 1903 (1893-1904, n=3), receive_rearms 1903 (1893-1904, n=3), sends 749 (747-767, n=3)

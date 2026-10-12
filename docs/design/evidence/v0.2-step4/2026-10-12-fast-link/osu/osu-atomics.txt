@@ -1,0 +1,18 @@
+# OSU OpenSHMEM Atomic Operation Rate Test v7.5.2
+# Operation              Million ops/s      Latency (us)
+shmem_int_fadd                    0.01             92.35
+shmem_int_finc                    0.01             86.53
+shmem_int_add                     8.33              0.12
+shmem_int_inc                     3.27              0.31
+shmem_int_cswap                   0.01             88.83
+shmem_int_swap                    0.01             91.89
+shmem_int_set                     8.47              0.12
+shmem_int_fetch                   0.01             85.47
+shmem_longlong_fadd               0.01             91.04
+shmem_longlong_finc               0.01             86.36
+shmem_longlong_add                7.81              0.13
+shmem_longlong_inc                6.17              0.16
+shmem_longlong_cswap              0.01             86.87
+shmem_longlong_swap               0.01             88.30
+shmem_longlong_set               10.42              0.10
+shmem_longlong_fetch              0.01             83.47

@@ -1,0 +1,80 @@
+== out/gets
+jobs: 24, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  get-1m     pes=8 h=- zone=262144     job 13601 (13506-14024, n=3)
+                                       node 1757 (1365-1961, n=24)
+                                       cpu/GiB 0.578 (0.559-0.581, n=3)
+                                       peers in calls 4.78 (4.66-4.87, n=24)
+                                       with quiets 4.84 (4.73-4.94, n=24), in quiets 0.0260 (0.0260-0.0270, n=24), over 10.0 (10.00-10.0, n=24) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 3266 (2489-3356) MiB/s, hop 50.9 (48.0-51.5) us, message 31.9 (31.9-43.1) us; unsent limit 438383 (334005-450386) B
+  get-1m     pes=8 h=- zone=1048576    job 11468 (11257-11945, n=3)
+                                       node 1356 (1330-2060, n=24)
+                                       cpu/GiB 0.560 (0.546-0.563, n=3)
+                                       peers in calls 2.36 (2.29-5.41, n=24)
+                                       with quiets 3.86 (3.72-5.72, n=24), in quiets 0.299 (0.100-0.307, n=24), over 9.99 (9.98-10.0, n=24) s
+                                       each node's least peer over its most, the least of all: 0.997
+                                       link 2639 (2490-3153) MiB/s, hop 49.7 (49.1-50.0) us, message 35.2 (27.9-40.5) us; unsent limit 354251 (334220-423243) B
+  get-1m     pes=8 h=- zone=4194304    job 9359 (8975-9382, n=3)
+                                       node 1099 (1052-1673, n=24)
+                                       cpu/GiB 0.510 (0.505-0.511, n=3)
+                                       peers in calls 1.17 (1.15-3.76, n=24)
+                                       with quiets 3.49 (3.19-5.15, n=24), in quiets 0.396 (0.375-0.398, n=24), over 9.98 (9.98-9.99, n=24) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 2835 (2294-3766) MiB/s, hop 49.6 (43.9-50.0) us, message 40.8 (37.0-49.5) us; unsent limit 380524 (307946-505474) B
+  get-1m     pes=8 h=- zone=16777216   job 8786 (8693-9282, n=3)
+                                       node 1031 (1019-1567, n=24)
+                                       cpu/GiB 0.521 (0.519-0.523, n=3)
+                                       peers in calls 1.02 (1.02-2.95, n=24)
+                                       with quiets 3.48 (3.21-4.65, n=24), in quiets 0.405 (0.400-0.411, n=24), over 9.98 (9.97-10.00, n=24) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 1920 (1482-2066) MiB/s, hop 45.8 (44.9-51.5) us, message 41.9 (27.4-51.0) us; unsent limit 257631 (198868-277254) B
+
+get-pieces: medians of the rounds' medians, microseconds; a get's and a nonblocking get's time over a put's
+  zone 262144
+    link 2397 (2187-2664) MiB/s, hop 49.6 (38.8-52.1) us, message 0 us; unsent limit 321665 (293581-357509) B
+         16384 B  put      114  get      103 (0.90x)  nbi      101 (0.89x)  n=3
+         65536 B  put      134  get      135 (1.01x)  nbi      134 (1.00x)  n=3
+        262144 B  put      198  get      240 (1.21x)  nbi      249 (1.25x)  n=3
+       1048576 B  put      478  get      755 (1.58x)  nbi      779 (1.63x)  n=3
+       4194304 B  put     1594  get     2908 (1.82x)  nbi     2908 (1.82x)  n=3
+      16777216 B  put     6002  get    11690 (1.95x)  nbi    11678 (1.95x)  n=3
+      67108864 B  put    23654  get    45552 (1.93x)  nbi    44504 (1.88x)  n=3
+  zone 1048576
+    link 2017 (1984-3861) MiB/s, hop 49.3 (45.6-138) us, message 0 us; unsent limit 270712 (266250-518177) B
+         16384 B  put      138  get      102 (0.74x)  nbi      103 (0.75x)  n=3
+         65536 B  put      150  get      143 (0.95x)  nbi      134 (0.89x)  n=3
+        262144 B  put      209  get      183 (0.88x)  nbi      183 (0.88x)  n=3
+       1048576 B  put      481  get      465 (0.97x)  nbi      465 (0.97x)  n=3
+       4194304 B  put     1587  get     1573 (0.99x)  nbi     1590 (1.00x)  n=3
+      16777216 B  put     6001  get     6030 (1.00x)  nbi     5993 (1.00x)  n=3
+      67108864 B  put    23649  get    23738 (1.00x)  nbi    23744 (1.00x)  n=3
+  zone 4194304
+    link 2902 (2622-3140) MiB/s, hop 47.3 (47.2-52.7) us, message 0 us; unsent limit 389551 (351972-421379) B
+         16384 B  put      129  get      102 (0.79x)  nbi      101 (0.78x)  n=3
+         65536 B  put      136  get      143 (1.05x)  nbi      136 (1.00x)  n=3
+        262144 B  put      210  get      185 (0.88x)  nbi      178 (0.85x)  n=3
+       1048576 B  put      486  get      468 (0.96x)  nbi      476 (0.98x)  n=3
+       4194304 B  put     1581  get     1575 (1.00x)  nbi     1577 (1.00x)  n=3
+      16777216 B  put     6007  get     5994 (1.00x)  nbi     5990 (1.00x)  n=3
+      67108864 B  put    23652  get    23655 (1.00x)  nbi    23649 (1.00x)  n=3
+  zone 16777216
+    link 3446 (1799-5105) MiB/s, hop 44.9 (44.2-46.3) us, message 0 us; unsent limit 462573 (241506-685231) B
+         16384 B  put      124  get      105 (0.85x)  nbi      102 (0.82x)  n=3
+         65536 B  put      138  get      146 (1.06x)  nbi      133 (0.96x)  n=3
+        262144 B  put      210  get      177 (0.84x)  nbi      174 (0.83x)  n=3
+       1048576 B  put      482  get      454 (0.94x)  nbi      454 (0.94x)  n=3
+       4194304 B  put     1576  get     1584 (1.00x)  nbi     1594 (1.01x)  n=3
+      16777216 B  put     5999  get     6006 (1.00x)  nbi     5998 (1.00x)  n=3
+      67108864 B  put    23646  get    23669 (1.00x)  nbi    23652 (1.00x)  n=3

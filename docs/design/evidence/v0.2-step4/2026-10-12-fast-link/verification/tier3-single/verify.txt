@@ -1,0 +1,7 @@
+# slurm-node-07, 16 CPUs, started 2026-10-12T01:31:13Z
+== tier3 01:31:13
+100% tests passed, 0 tests failed out of 114
+== the single-node build 01:35:34
+warnings: 0
+100% tests passed, 0 tests failed out of 405
+DONE 01:36:01

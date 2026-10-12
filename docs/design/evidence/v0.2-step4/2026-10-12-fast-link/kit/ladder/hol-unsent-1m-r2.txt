@@ -1,0 +1,17 @@
+# 02:14:40 nodes=2 pes_per_node=2 SHMEM_DEBUG=1 OSOE_WIRE_UNSENT_BYTES=1048576
+# ~/osoe/build/release/kit/hol 10
+salloc: Granted job allocation 111
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.111.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 122665 ns, a message cost of 0 ns, 1495083762 bytes a second (361 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.111.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 122665 ns, a message cost of 0 ns, 1495083762 bytes a second (5680 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.111.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 122665 ns, a message cost of 0 ns, 1495083762 bytes a second (10553 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.111.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 122665 ns, a message cost of 0 ns, 1495083762 bytes a second (10741 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 1048576 (OSOE_WIRE_UNSENT_BYTES)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 1048576 (OSOE_WIRE_UNSENT_BYTES)
+hol phase=alone fetch_adds=23425 median_us=85 p90_us=92 p99_us=154 max_us=471 stream_mib_per_s=0
+hol phase=stream fetch_adds=12772 median_us=789 p90_us=907 p99_us=1019 max_us=1926 stream_mib_per_s=2705
+salloc: Relinquishing job allocation 111
+salloc: Job allocation 111 has been revoked.
+# exit 0

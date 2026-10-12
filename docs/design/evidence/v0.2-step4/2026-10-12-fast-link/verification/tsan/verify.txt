@@ -1,0 +1,26 @@
+# slurm-node-06, 16 CPUs, started 2026-10-12T01:31:12Z
+== build tsan 01:31:12
+warnings: 0
+== tsan OSOE_PROGRESS_HELPERS=0 01:31:17
+100% tests passed, 0 tests failed out of 612
+0 report files, 0 reports, 0 passed in 0 tests
+THREAD SANITIZER GATE PASSED
+== tsan OSOE_PROGRESS_HELPERS=2 01:32:52
+100% tests passed, 0 tests failed out of 612
+72 report files, 78 reports, 78 passed in 24 tests
+  passed 9: in a program's heap
+  passed 5: in the internal region, at its grant-words: osoe_am_parse against osoe_am_parse
+  passed 4: in the internal region, at its grant-words: osoe_am_parse against osoe_internode_generic_number_taken
+  passed 1: in the internal region, at its lane-word: osoe_am_parse against osoe_am_parse
+  passed 59: in the internal region, at its past-the-team-words: osoe_am_parse against osoe_internode_generic_number_taken
+THREAD SANITIZER GATE PASSED
+== tsan OSOE_PROGRESS_HELPERS=3 01:34:25
+100% tests passed, 0 tests failed out of 612
+85 report files, 97 reports, 97 passed in 25 tests
+  passed 19: in a program's heap
+  passed 8: in the internal region, at its grant-words: osoe_am_parse against osoe_am_parse
+  passed 4: in the internal region, at its grant-words: osoe_am_parse against osoe_internode_generic_number_taken
+  passed 1: in the internal region, at its lane-word: osoe_am_parse against osoe_am_parse
+  passed 65: in the internal region, at its past-the-team-words: osoe_am_parse against osoe_internode_generic_number_taken
+THREAD SANITIZER GATE PASSED
+DONE 01:36:00

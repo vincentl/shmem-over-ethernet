@@ -1,0 +1,1062 @@
+# 01:49:13 16 connections each way between slurm-node-02 and slurm-node-01
+# exit toward the first node 0
+# exit toward the second node 124
+connection=15 small short_sends=19 (client)
+connection=15 small stream_mib_per_s=42.4 mebibytes=1
+connection=15 uring round_trip_ns min=45771 median=129859 p99=985213 rounds=2000
+connection=15 blocking round_trip_ns min=50268 median=116731 p99=996567 rounds=2000
+connection=15 uring stream_mib_per_s=590.6 mebibytes=1024
+connection=15 blocking stream_mib_per_s=285.7 mebibytes=1024
+connection=15 uring round_trip_ns min=59965 median=130208 p99=731047 rounds=2000
+connection=15 blocking round_trip_ns min=56396 median=129206 p99=665849 rounds=2000
+connection=15 uring stream_mib_per_s=270.9 mebibytes=1024
+connection=15 blocking stream_mib_per_s=167.8 mebibytes=1024
+connection=15 uring round_trip_ns min=56344 median=150673 p99=1073402 rounds=2000
+connection=15 blocking round_trip_ns min=47277 median=143884 p99=1017897 rounds=2000
+connection=15 uring stream_mib_per_s=147.0 mebibytes=1024
+connection=15 blocking stream_mib_per_s=318.3 mebibytes=1024
+connection=15 uring round_trip_ns min=65960 median=144820 p99=989688 rounds=2000
+connection=15 blocking round_trip_ns min=57817 median=139057 p99=972128 rounds=2000
+connection=15 uring stream_mib_per_s=312.3 mebibytes=1024
+connection=15 blocking stream_mib_per_s=314.4 mebibytes=1024
+connection=15 uring round_trip_ns min=60627 median=591540 p99=1205302 rounds=2000
+connection=15 blocking round_trip_ns min=70071 median=598793 p99=1187545 rounds=2000
+connection=15 uring stream_mib_per_s=153.2 mebibytes=1024
+connection=15 blocking stream_mib_per_s=120.7 mebibytes=1024
+connection=15 uring round_trip_ns min=67144 median=170114 p99=1370958 rounds=2000
+connection=15 blocking round_trip_ns min=50593 median=158789 p99=1393103 rounds=2000
+connection=15 uring stream_mib_per_s=363.3 mebibytes=1024
+connection=15 blocking stream_mib_per_s=225.1 mebibytes=1024
+connection=15 uring round_trip_ns min=58895 median=137413 p99=1027742 rounds=2000
+connection=15 blocking round_trip_ns min=51693 median=139565 p99=1045991 rounds=2000
+connection=15 uring stream_mib_per_s=314.4 mebibytes=1024
+connection=15 blocking stream_mib_per_s=343.3 mebibytes=1024
+connection=15 memory copy_mib_per_s=8472.0 copy8_seq_cst_fence_ns=8.01
+connection=15 ratio one_way_latency_over_copy8=8109 copy_bandwidth_over_stream=14.35
+connection=15 ratio uring_over_blocking fastest_round_trip=1.139 median_round_trip=1.041 stream=1.269 (median of 7 pairs)
+connection=15 exit 0 after 2 attempts
+connection=3 small short_sends=18 (client)
+connection=3 small stream_mib_per_s=59.7 mebibytes=1
+connection=3 uring round_trip_ns min=47933 median=138796 p99=1253116 rounds=2000
+connection=3 blocking round_trip_ns min=44467 median=143257 p99=1227988 rounds=2000
+connection=3 uring stream_mib_per_s=553.1 mebibytes=1024
+connection=3 blocking stream_mib_per_s=319.5 mebibytes=1024
+connection=3 uring round_trip_ns min=75375 median=482975 p99=1174873 rounds=2000
+connection=3 blocking round_trip_ns min=51881 median=461548 p99=1148893 rounds=2000
+connection=3 uring stream_mib_per_s=207.6 mebibytes=1024
+connection=3 blocking stream_mib_per_s=89.2 mebibytes=1024
+connection=3 uring round_trip_ns min=59450 median=583161 p99=1597557 rounds=2000
+connection=3 blocking round_trip_ns min=55202 median=557966 p99=1679042 rounds=2000
+connection=3 uring stream_mib_per_s=219.1 mebibytes=1024
+connection=3 blocking stream_mib_per_s=297.6 mebibytes=1024
+connection=3 uring round_trip_ns min=46142 median=544051 p99=1097855 rounds=2000
+connection=3 blocking round_trip_ns min=45116 median=534015 p99=1103275 rounds=2000
+connection=3 uring stream_mib_per_s=372.1 mebibytes=1024
+connection=3 blocking stream_mib_per_s=211.5 mebibytes=1024
+connection=3 uring round_trip_ns min=56699 median=501001 p99=1231908 rounds=2000
+connection=3 blocking round_trip_ns min=58430 median=501899 p99=1232053 rounds=2000
+connection=3 uring stream_mib_per_s=353.5 mebibytes=1024
+connection=3 blocking stream_mib_per_s=400.8 mebibytes=1024
+connection=3 uring round_trip_ns min=54468 median=445769 p99=1287531 rounds=2000
+connection=3 blocking round_trip_ns min=72842 median=454910 p99=1279366 rounds=2000
+connection=3 uring stream_mib_per_s=280.9 mebibytes=1024
+connection=3 blocking stream_mib_per_s=333.3 mebibytes=1024
+connection=3 uring round_trip_ns min=62831 median=634283 p99=1377232 rounds=2000
+connection=3 blocking round_trip_ns min=60691 median=619230 p99=1371702 rounds=2000
+connection=3 uring stream_mib_per_s=367.4 mebibytes=1024
+connection=3 blocking stream_mib_per_s=146.7 mebibytes=1024
+connection=3 memory copy_mib_per_s=11322.8 copy8_seq_cst_fence_ns=7.14
+connection=3 ratio one_way_latency_over_copy8=9714 copy_bandwidth_over_stream=20.47
+connection=3 ratio uring_over_blocking fastest_round_trip=1.035 median_round_trip=1.019 stream=1.731 (median of 7 pairs)
+connection=3 exit 0 after 2 attempts
+connection=6 small short_sends=16 (client)
+connection=6 small stream_mib_per_s=75.1 mebibytes=1
+connection=6 uring round_trip_ns min=40809 median=101391 p99=1007073 rounds=2000
+connection=6 blocking round_trip_ns min=45621 median=110922 p99=1000903 rounds=2000
+connection=6 uring stream_mib_per_s=997.1 mebibytes=1024
+connection=6 blocking stream_mib_per_s=325.2 mebibytes=1024
+connection=6 uring round_trip_ns min=62401 median=541596 p99=1315903 rounds=2000
+connection=6 blocking round_trip_ns min=63580 median=547763 p99=1346483 rounds=2000
+connection=6 uring stream_mib_per_s=108.4 mebibytes=1024
+connection=6 blocking stream_mib_per_s=175.7 mebibytes=1024
+connection=6 uring round_trip_ns min=47539 median=187426 p99=1212417 rounds=2000
+connection=6 blocking round_trip_ns min=46759 median=183293 p99=1232382 rounds=2000
+connection=6 uring stream_mib_per_s=405.3 mebibytes=1024
+connection=6 blocking stream_mib_per_s=346.4 mebibytes=1024
+connection=6 uring round_trip_ns min=59654 median=173348 p99=1289089 rounds=2000
+connection=6 blocking round_trip_ns min=61906 median=172049 p99=1272705 rounds=2000
+connection=6 uring stream_mib_per_s=270.8 mebibytes=1024
+connection=6 blocking stream_mib_per_s=257.5 mebibytes=1024
+connection=6 uring round_trip_ns min=58673 median=155138 p99=1084373 rounds=2000
+connection=6 blocking round_trip_ns min=55894 median=144598 p99=1076816 rounds=2000
+connection=6 uring stream_mib_per_s=447.5 mebibytes=1024
+connection=6 blocking stream_mib_per_s=144.1 mebibytes=1024
+connection=6 uring round_trip_ns min=59283 median=178969 p99=1205613 rounds=2000
+connection=6 blocking round_trip_ns min=62956 median=178868 p99=1188132 rounds=2000
+connection=6 uring stream_mib_per_s=451.2 mebibytes=1024
+connection=6 blocking stream_mib_per_s=306.7 mebibytes=1024
+connection=6 uring round_trip_ns min=70397 median=866691 p99=1594139 rounds=2000
+connection=6 blocking round_trip_ns min=62571 median=870103 p99=1575793 rounds=2000
+connection=6 uring stream_mib_per_s=301.8 mebibytes=1024
+connection=6 blocking stream_mib_per_s=99.3 mebibytes=1024
+connection=6 memory copy_mib_per_s=12851.9 copy8_seq_cst_fence_ns=6.42
+connection=6 ratio one_way_latency_over_copy8=7890 copy_bandwidth_over_stream=12.89
+connection=6 ratio uring_over_blocking fastest_round_trip=0.981 median_round_trip=1.001 stream=1.471 (median of 7 pairs)
+connection=6 exit 0 after 2 attempts
+connection=5 small short_sends=18 (client)
+connection=5 small stream_mib_per_s=93.6 mebibytes=1
+connection=5 uring round_trip_ns min=45734 median=846840 p99=1541541 rounds=2000
+connection=5 blocking round_trip_ns min=38236 median=840262 p99=1516173 rounds=2000
+connection=5 uring stream_mib_per_s=123.0 mebibytes=1024
+connection=5 blocking stream_mib_per_s=237.8 mebibytes=1024
+connection=5 uring round_trip_ns min=44597 median=134032 p99=1363276 rounds=2000
+connection=5 blocking round_trip_ns min=51632 median=142314 p99=1266282 rounds=2000
+connection=5 uring stream_mib_per_s=176.7 mebibytes=1024
+connection=5 blocking stream_mib_per_s=258.5 mebibytes=1024
+connection=5 uring round_trip_ns min=57286 median=167090 p99=1186755 rounds=2000
+connection=5 blocking round_trip_ns min=59687 median=165967 p99=1194125 rounds=2000
+connection=5 uring stream_mib_per_s=232.2 mebibytes=1024
+connection=5 blocking stream_mib_per_s=229.5 mebibytes=1024
+connection=5 uring round_trip_ns min=74360 median=594424 p99=1290305 rounds=2000
+connection=5 blocking round_trip_ns min=64796 median=585651 p99=1281886 rounds=2000
+connection=5 uring stream_mib_per_s=398.4 mebibytes=1024
+connection=5 blocking stream_mib_per_s=562.0 mebibytes=1024
+connection=5 uring round_trip_ns min=59540 median=643902 p99=1286505 rounds=2000
+connection=5 blocking round_trip_ns min=72266 median=652134 p99=1274395 rounds=2000
+connection=5 uring stream_mib_per_s=115.5 mebibytes=1024
+connection=5 blocking stream_mib_per_s=124.3 mebibytes=1024
+connection=5 uring round_trip_ns min=60379 median=142058 p99=918646 rounds=2000
+connection=5 blocking round_trip_ns min=56124 median=134999 p99=896221 rounds=2000
+connection=5 uring stream_mib_per_s=391.1 mebibytes=1024
+connection=5 blocking stream_mib_per_s=326.8 mebibytes=1024
+connection=5 uring round_trip_ns min=61227 median=143178 p99=1036191 rounds=2000
+connection=5 blocking round_trip_ns min=47260 median=131280 p99=1029895 rounds=2000
+connection=5 uring stream_mib_per_s=419.8 mebibytes=1024
+connection=5 blocking stream_mib_per_s=619.0 mebibytes=1024
+connection=5 memory copy_mib_per_s=12207.4 copy8_seq_cst_fence_ns=6.64
+connection=5 ratio one_way_latency_over_copy8=10087 copy_bandwidth_over_stream=29.08
+connection=5 ratio uring_over_blocking fastest_round_trip=1.076 median_round_trip=1.008 stream=0.709 (median of 7 pairs)
+connection=5 exit 0 after 2 attempts
+connection=10 small short_sends=19 (client)
+connection=10 small stream_mib_per_s=163.3 mebibytes=1
+connection=10 uring round_trip_ns min=54202 median=793576 p99=1353443 rounds=2000
+connection=10 blocking round_trip_ns min=66732 median=789511 p99=1279363 rounds=2000
+connection=10 uring stream_mib_per_s=159.8 mebibytes=1024
+connection=10 blocking stream_mib_per_s=273.0 mebibytes=1024
+connection=10 uring round_trip_ns min=72445 median=689323 p99=1745255 rounds=2000
+connection=10 blocking round_trip_ns min=64299 median=672930 p99=1712734 rounds=2000
+connection=10 uring stream_mib_per_s=195.8 mebibytes=1024
+connection=10 blocking stream_mib_per_s=432.1 mebibytes=1024
+connection=10 uring round_trip_ns min=52255 median=135836 p99=1058529 rounds=2000
+connection=10 blocking round_trip_ns min=53828 median=129997 p99=1032980 rounds=2000
+connection=10 uring stream_mib_per_s=192.7 mebibytes=1024
+connection=10 blocking stream_mib_per_s=241.1 mebibytes=1024
+connection=10 uring round_trip_ns min=59954 median=152354 p99=1129009 rounds=2000
+connection=10 blocking round_trip_ns min=60550 median=147873 p99=1097086 rounds=2000
+connection=10 uring stream_mib_per_s=290.7 mebibytes=1024
+connection=10 blocking stream_mib_per_s=351.5 mebibytes=1024
+connection=10 uring round_trip_ns min=55401 median=571115 p99=1188804 rounds=2000
+connection=10 blocking round_trip_ns min=56765 median=562160 p99=1219432 rounds=2000
+connection=10 uring stream_mib_per_s=109.9 mebibytes=1024
+connection=10 blocking stream_mib_per_s=224.2 mebibytes=1024
+connection=10 uring round_trip_ns min=62273 median=795447 p99=1571401 rounds=2000
+connection=10 blocking round_trip_ns min=59839 median=790306 p99=1511469 rounds=2000
+connection=10 uring stream_mib_per_s=398.8 mebibytes=1024
+connection=10 blocking stream_mib_per_s=203.7 mebibytes=1024
+connection=10 uring round_trip_ns min=67115 median=521043 p99=1270651 rounds=2000
+connection=10 blocking round_trip_ns min=57612 median=524949 p99=1247169 rounds=2000
+connection=10 uring stream_mib_per_s=301.8 mebibytes=1024
+connection=10 blocking stream_mib_per_s=441.0 mebibytes=1024
+connection=10 memory copy_mib_per_s=12550.6 copy8_seq_cst_fence_ns=6.85
+connection=10 ratio one_way_latency_over_copy8=9909 copy_bandwidth_over_stream=31.47
+connection=10 ratio uring_over_blocking fastest_round_trip=0.990 median_round_trip=1.016 stream=0.684 (median of 7 pairs)
+connection=10 exit 0 after 2 attempts
+connection=14 small short_sends=33 (client)
+connection=14 small stream_mib_per_s=22.7 mebibytes=1
+connection=14 uring round_trip_ns min=67909 median=895558 p99=1786511 rounds=2000
+connection=14 blocking round_trip_ns min=66646 median=890511 p99=1765841 rounds=2000
+connection=14 uring stream_mib_per_s=229.5 mebibytes=1024
+connection=14 blocking stream_mib_per_s=288.5 mebibytes=1024
+connection=14 uring round_trip_ns min=65496 median=608954 p99=1395082 rounds=2000
+connection=14 blocking round_trip_ns min=64250 median=619138 p99=1399460 rounds=2000
+connection=14 uring stream_mib_per_s=594.3 mebibytes=1024
+connection=14 blocking stream_mib_per_s=283.9 mebibytes=1024
+connection=14 uring round_trip_ns min=61558 median=165153 p99=1233715 rounds=2000
+connection=14 blocking round_trip_ns min=67133 median=165427 p99=1225272 rounds=2000
+connection=14 uring stream_mib_per_s=457.0 mebibytes=1024
+connection=14 blocking stream_mib_per_s=139.2 mebibytes=1024
+connection=14 uring round_trip_ns min=68675 median=160159 p99=1347408 rounds=2000
+connection=14 blocking round_trip_ns min=59819 median=150726 p99=1288695 rounds=2000
+connection=14 uring stream_mib_per_s=304.3 mebibytes=1024
+connection=14 blocking stream_mib_per_s=134.2 mebibytes=1024
+connection=14 uring round_trip_ns min=66758 median=528745 p99=1179018 rounds=2000
+connection=14 blocking round_trip_ns min=59235 median=515002 p99=1177280 rounds=2000
+connection=14 uring stream_mib_per_s=457.6 mebibytes=1024
+connection=14 blocking stream_mib_per_s=324.5 mebibytes=1024
+connection=14 uring round_trip_ns min=56558 median=551070 p99=1144604 rounds=2000
+connection=14 blocking round_trip_ns min=67931 median=557576 p99=1177938 rounds=2000
+connection=14 uring stream_mib_per_s=150.1 mebibytes=1024
+connection=14 blocking stream_mib_per_s=126.8 mebibytes=1024
+connection=14 uring round_trip_ns min=65173 median=624157 p99=1350332 rounds=2000
+connection=14 blocking round_trip_ns min=64076 median=615686 p99=1313741 rounds=2000
+connection=14 uring stream_mib_per_s=396.7 mebibytes=1024
+connection=14 blocking stream_mib_per_s=314.5 mebibytes=1024
+connection=14 memory copy_mib_per_s=9941.0 copy8_seq_cst_fence_ns=8.33
+connection=14 ratio one_way_latency_over_copy8=9608 copy_bandwidth_over_stream=16.73
+connection=14 ratio uring_over_blocking fastest_round_trip=1.019 median_round_trip=1.006 stream=1.410 (median of 7 pairs)
+connection=14 exit 0 after 2 attempts
+connection=13 small short_sends=16 (client)
+connection=13 small stream_mib_per_s=376.2 mebibytes=1
+connection=13 uring round_trip_ns min=49067 median=790370 p99=1361275 rounds=2000
+connection=13 blocking round_trip_ns min=51813 median=790351 p99=1370395 rounds=2000
+connection=13 uring stream_mib_per_s=216.3 mebibytes=1024
+connection=13 blocking stream_mib_per_s=179.6 mebibytes=1024
+connection=13 uring round_trip_ns min=57993 median=181649 p99=1220940 rounds=2000
+connection=13 blocking round_trip_ns min=53689 median=180010 p99=1195343 rounds=2000
+connection=13 uring stream_mib_per_s=86.4 mebibytes=1024
+connection=13 blocking stream_mib_per_s=405.5 mebibytes=1024
+connection=13 uring round_trip_ns min=60472 median=168689 p99=1308634 rounds=2000
+connection=13 blocking round_trip_ns min=69862 median=170396 p99=1031772 rounds=2000
+connection=13 uring stream_mib_per_s=598.1 mebibytes=1024
+connection=13 blocking stream_mib_per_s=194.8 mebibytes=1024
+connection=13 uring round_trip_ns min=56500 median=170916 p99=1261624 rounds=2000
+connection=13 blocking round_trip_ns min=58818 median=175183 p99=1287157 rounds=2000
+connection=13 uring stream_mib_per_s=213.2 mebibytes=1024
+connection=13 blocking stream_mib_per_s=115.5 mebibytes=1024
+connection=13 uring round_trip_ns min=67828 median=370194 p99=1351607 rounds=2000
+connection=13 blocking round_trip_ns min=55772 median=196140 p99=1362530 rounds=2000
+connection=13 uring stream_mib_per_s=292.9 mebibytes=1024
+connection=13 blocking stream_mib_per_s=143.5 mebibytes=1024
+connection=13 uring round_trip_ns min=73265 median=460955 p99=1251393 rounds=2000
+connection=13 blocking round_trip_ns min=60497 median=447834 p99=1240449 rounds=2000
+connection=13 uring stream_mib_per_s=317.1 mebibytes=1024
+connection=13 blocking stream_mib_per_s=466.1 mebibytes=1024
+connection=13 uring round_trip_ns min=68165 median=406488 p99=1078217 rounds=2000
+connection=13 blocking round_trip_ns min=65765 median=392118 p99=1129482 rounds=2000
+connection=13 uring stream_mib_per_s=370.3 mebibytes=1024
+connection=13 blocking stream_mib_per_s=574.9 mebibytes=1024
+connection=13 memory copy_mib_per_s=14268.3 copy8_seq_cst_fence_ns=6.43
+connection=13 ratio one_way_latency_over_copy8=13119 copy_bandwidth_over_stream=23.86
+connection=13 ratio uring_over_blocking fastest_round_trip=1.036 median_round_trip=1.009 stream=1.204 (median of 7 pairs)
+connection=13 exit 0 after 2 attempts
+connection=9 small short_sends=16 (client)
+connection=9 small stream_mib_per_s=63.2 mebibytes=1
+connection=9 uring round_trip_ns min=67826 median=853176 p99=1546316 rounds=2000
+connection=9 blocking round_trip_ns min=67405 median=850171 p99=3717536 rounds=2000
+connection=9 uring stream_mib_per_s=330.9 mebibytes=1024
+connection=9 blocking stream_mib_per_s=254.4 mebibytes=1024
+connection=9 uring round_trip_ns min=60411 median=140559 p99=716979 rounds=2000
+connection=9 blocking round_trip_ns min=52991 median=132673 p99=784711 rounds=2000
+connection=9 uring stream_mib_per_s=532.2 mebibytes=1024
+connection=9 blocking stream_mib_per_s=386.9 mebibytes=1024
+connection=9 uring round_trip_ns min=67505 median=474505 p99=1390172 rounds=2000
+connection=9 blocking round_trip_ns min=56899 median=462083 p99=1392122 rounds=2000
+connection=9 uring stream_mib_per_s=510.3 mebibytes=1024
+connection=9 blocking stream_mib_per_s=105.6 mebibytes=1024
+connection=9 uring round_trip_ns min=57875 median=580203 p99=1533836 rounds=2000
+connection=9 blocking round_trip_ns min=67249 median=589852 p99=1551805 rounds=2000
+connection=9 uring stream_mib_per_s=93.0 mebibytes=1024
+connection=9 blocking stream_mib_per_s=395.8 mebibytes=1024
+connection=9 uring round_trip_ns min=53732 median=147392 p99=1097883 rounds=2000
+connection=9 blocking round_trip_ns min=61356 median=152556 p99=1086789 rounds=2000
+connection=9 uring stream_mib_per_s=210.4 mebibytes=1024
+connection=9 blocking stream_mib_per_s=221.2 mebibytes=1024
+connection=9 uring round_trip_ns min=71637 median=750556 p99=1677279 rounds=2000
+connection=9 blocking round_trip_ns min=61761 median=732732 p99=1666571 rounds=2000
+connection=9 uring stream_mib_per_s=196.5 mebibytes=1024
+connection=9 blocking stream_mib_per_s=169.1 mebibytes=1024
+connection=9 uring round_trip_ns min=59572 median=151092 p99=1039367 rounds=2000
+connection=9 blocking round_trip_ns min=56198 median=152748 p99=1072563 rounds=2000
+connection=9 uring stream_mib_per_s=271.3 mebibytes=1024
+connection=9 blocking stream_mib_per_s=582.3 mebibytes=1024
+connection=9 memory copy_mib_per_s=13560.8 copy8_seq_cst_fence_ns=6.46
+connection=9 ratio one_way_latency_over_copy8=10877 copy_bandwidth_over_stream=25.48
+connection=9 ratio uring_over_blocking fastest_round_trip=1.060 median_round_trip=1.004 stream=1.162 (median of 7 pairs)
+connection=9 exit 0 after 2 attempts
+connection=12 small short_sends=21 (client)
+connection=12 small stream_mib_per_s=47.9 mebibytes=1
+connection=12 uring round_trip_ns min=61122 median=848996 p99=1579389 rounds=2000
+connection=12 blocking round_trip_ns min=63167 median=851273 p99=1595700 rounds=2000
+connection=12 uring stream_mib_per_s=210.3 mebibytes=1024
+connection=12 blocking stream_mib_per_s=177.1 mebibytes=1024
+connection=12 uring round_trip_ns min=63576 median=579632 p99=1490587 rounds=2000
+connection=12 blocking round_trip_ns min=69467 median=577452 p99=1421909 rounds=2000
+connection=12 uring stream_mib_per_s=88.7 mebibytes=1024
+connection=12 blocking stream_mib_per_s=311.6 mebibytes=1024
+connection=12 uring round_trip_ns min=71525 median=588773 p99=1308185 rounds=2000
+connection=12 blocking round_trip_ns min=50553 median=588762 p99=1332081 rounds=2000
+connection=12 uring stream_mib_per_s=313.4 mebibytes=1024
+connection=12 blocking stream_mib_per_s=335.8 mebibytes=1024
+connection=12 uring round_trip_ns min=64122 median=162241 p99=1042199 rounds=2000
+connection=12 blocking round_trip_ns min=58748 median=162880 p99=994156 rounds=2000
+connection=12 uring stream_mib_per_s=216.9 mebibytes=1024
+connection=12 blocking stream_mib_per_s=280.0 mebibytes=1024
+connection=12 uring round_trip_ns min=50194 median=517564 p99=1183650 rounds=2000
+connection=12 blocking round_trip_ns min=70238 median=505098 p99=1148095 rounds=2000
+connection=12 uring stream_mib_per_s=136.2 mebibytes=1024
+connection=12 blocking stream_mib_per_s=255.4 mebibytes=1024
+connection=12 uring round_trip_ns min=59748 median=477443 p99=1233826 rounds=2000
+connection=12 blocking round_trip_ns min=62581 median=480669 p99=1221885 rounds=2000
+connection=12 uring stream_mib_per_s=341.5 mebibytes=1024
+connection=12 blocking stream_mib_per_s=159.1 mebibytes=1024
+connection=12 uring round_trip_ns min=38146 median=121539 p99=813802 rounds=2000
+connection=12 blocking round_trip_ns min=56155 median=122180 p99=769216 rounds=2000
+connection=12 uring stream_mib_per_s=559.0 mebibytes=1024
+connection=12 blocking stream_mib_per_s=753.3 mebibytes=1024
+connection=12 memory copy_mib_per_s=14186.5 copy8_seq_cst_fence_ns=6.36
+connection=12 ratio one_way_latency_over_copy8=9561 copy_bandwidth_over_stream=25.38
+connection=12 ratio uring_over_blocking fastest_round_trip=0.955 median_round_trip=0.997 stream=0.775 (median of 7 pairs)
+connection=12 exit 0 after 2 attempts
+connection=1 small short_sends=19 (client)
+connection=1 small stream_mib_per_s=54.5 mebibytes=1
+connection=1 uring round_trip_ns min=72861 median=893131 p99=1800396 rounds=2000
+connection=1 blocking round_trip_ns min=67923 median=902467 p99=1794190 rounds=2000
+connection=1 uring stream_mib_per_s=114.2 mebibytes=1024
+connection=1 blocking stream_mib_per_s=393.8 mebibytes=1024
+connection=1 uring round_trip_ns min=71168 median=159502 p99=1975821 rounds=2000
+connection=1 blocking round_trip_ns min=63518 median=154126 p99=1064740 rounds=2000
+connection=1 uring stream_mib_per_s=383.9 mebibytes=1024
+connection=1 blocking stream_mib_per_s=392.5 mebibytes=1024
+connection=1 uring round_trip_ns min=55513 median=179217 p99=1115759 rounds=2000
+connection=1 blocking round_trip_ns min=59971 median=187042 p99=1112746 rounds=2000
+connection=1 uring stream_mib_per_s=193.5 mebibytes=1024
+connection=1 blocking stream_mib_per_s=226.3 mebibytes=1024
+connection=1 uring round_trip_ns min=63417 median=609816 p99=1199800 rounds=2000
+connection=1 blocking round_trip_ns min=50986 median=608534 p99=1173802 rounds=2000
+connection=1 uring stream_mib_per_s=251.1 mebibytes=1024
+connection=1 blocking stream_mib_per_s=175.0 mebibytes=1024
+connection=1 uring round_trip_ns min=54620 median=154386 p99=1074904 rounds=2000
+connection=1 blocking round_trip_ns min=49071 median=140862 p99=1076797 rounds=2000
+connection=1 uring stream_mib_per_s=205.1 mebibytes=1024
+connection=1 blocking stream_mib_per_s=260.6 mebibytes=1024
+connection=1 uring round_trip_ns min=61599 median=448168 p99=1332977 rounds=2000
+connection=1 blocking round_trip_ns min=60601 median=436134 p99=1368839 rounds=2000
+connection=1 uring stream_mib_per_s=357.6 mebibytes=1024
+connection=1 blocking stream_mib_per_s=277.0 mebibytes=1024
+connection=1 uring round_trip_ns min=45201 median=146780 p99=1185691 rounds=2000
+connection=1 blocking round_trip_ns min=44548 median=142077 p99=1190753 rounds=2000
+connection=1 uring stream_mib_per_s=269.2 mebibytes=1024
+connection=1 blocking stream_mib_per_s=104.3 mebibytes=1024
+connection=1 memory copy_mib_per_s=13693.3 copy8_seq_cst_fence_ns=6.45
+connection=1 ratio one_way_latency_over_copy8=11376 copy_bandwidth_over_stream=35.67
+connection=1 ratio uring_over_blocking fastest_round_trip=1.073 median_round_trip=1.028 stream=0.978 (median of 7 pairs)
+connection=1 exit 0 after 2 attempts
+connection=8 small short_sends=18 (client)
+connection=8 small stream_mib_per_s=58.6 mebibytes=1
+connection=8 uring round_trip_ns min=41892 median=88493 p99=929396 rounds=2000
+connection=8 blocking round_trip_ns min=40761 median=96915 p99=942981 rounds=2000
+connection=8 uring stream_mib_per_s=1313.6 mebibytes=1024
+connection=8 blocking stream_mib_per_s=224.8 mebibytes=1024
+connection=8 uring round_trip_ns min=66612 median=447512 p99=1198759 rounds=2000
+connection=8 blocking round_trip_ns min=69587 median=449308 p99=1161986 rounds=2000
+connection=8 uring stream_mib_per_s=272.0 mebibytes=1024
+connection=8 blocking stream_mib_per_s=307.9 mebibytes=1024
+connection=8 uring round_trip_ns min=68413 median=380553 p99=1257609 rounds=2000
+connection=8 blocking round_trip_ns min=53103 median=398230 p99=1875852 rounds=2000
+connection=8 uring stream_mib_per_s=915.5 mebibytes=1024
+connection=8 blocking stream_mib_per_s=274.1 mebibytes=1024
+connection=8 uring round_trip_ns min=57685 median=144589 p99=943511 rounds=2000
+connection=8 blocking round_trip_ns min=68503 median=153291 p99=937777 rounds=2000
+connection=8 uring stream_mib_per_s=163.7 mebibytes=1024
+connection=8 blocking stream_mib_per_s=325.0 mebibytes=1024
+connection=8 uring round_trip_ns min=61716 median=175130 p99=1175266 rounds=2000
+connection=8 blocking round_trip_ns min=66056 median=166555 p99=1151801 rounds=2000
+connection=8 uring stream_mib_per_s=95.0 mebibytes=1024
+connection=8 blocking stream_mib_per_s=413.0 mebibytes=1024
+connection=8 uring round_trip_ns min=64927 median=604560 p99=1175385 rounds=2000
+connection=8 blocking round_trip_ns min=48215 median=601556 p99=1175473 rounds=2000
+connection=8 uring stream_mib_per_s=217.5 mebibytes=1024
+connection=8 blocking stream_mib_per_s=133.8 mebibytes=1024
+connection=8 uring round_trip_ns min=65001 median=694222 p99=1452070 rounds=2000
+connection=8 blocking round_trip_ns min=62535 median=684049 p99=1394327 rounds=2000
+connection=8 uring stream_mib_per_s=155.2 mebibytes=1024
+connection=8 blocking stream_mib_per_s=121.3 mebibytes=1024
+connection=8 memory copy_mib_per_s=10662.6 copy8_seq_cst_fence_ns=7.78
+connection=8 ratio one_way_latency_over_copy8=5684 copy_bandwidth_over_stream=8.12
+connection=8 ratio uring_over_blocking fastest_round_trip=1.028 median_round_trip=0.996 stream=1.280 (median of 7 pairs)
+connection=8 exit 0 after 2 attempts
+connection=2 small short_sends=18 (client)
+connection=2 small stream_mib_per_s=43.0 mebibytes=1
+connection=2 uring round_trip_ns min=66727 median=864978 p99=1561112 rounds=2000
+connection=2 blocking round_trip_ns min=66115 median=873232 p99=1550654 rounds=2000
+connection=2 uring stream_mib_per_s=97.1 mebibytes=1024
+connection=2 blocking stream_mib_per_s=179.9 mebibytes=1024
+connection=2 uring round_trip_ns min=64407 median=159043 p99=1182584 rounds=2000
+connection=2 blocking round_trip_ns min=52242 median=156459 p99=1187411 rounds=2000
+connection=2 uring stream_mib_per_s=397.3 mebibytes=1024
+connection=2 blocking stream_mib_per_s=137.9 mebibytes=1024
+connection=2 uring round_trip_ns min=52407 median=161261 p99=1291231 rounds=2000
+connection=2 blocking round_trip_ns min=57619 median=161783 p99=1279079 rounds=2000
+connection=2 uring stream_mib_per_s=91.0 mebibytes=1024
+connection=2 blocking stream_mib_per_s=115.3 mebibytes=1024
+connection=2 uring round_trip_ns min=65847 median=579344 p99=1454039 rounds=2000
+connection=2 blocking round_trip_ns min=57435 median=580798 p99=1411207 rounds=2000
+connection=2 uring stream_mib_per_s=315.8 mebibytes=1024
+connection=2 blocking stream_mib_per_s=324.0 mebibytes=1024
+connection=2 uring round_trip_ns min=56256 median=450806 p99=1283344 rounds=2000
+connection=2 blocking round_trip_ns min=54094 median=435362 p99=1250036 rounds=2000
+connection=2 uring stream_mib_per_s=98.4 mebibytes=1024
+connection=2 blocking stream_mib_per_s=294.4 mebibytes=1024
+connection=2 uring round_trip_ns min=51451 median=99488 p99=431597 rounds=2000
+connection=2 blocking round_trip_ns min=50657 median=98183 p99=406510 rounds=2000
+connection=2 uring stream_mib_per_s=1174.9 mebibytes=1024
+connection=2 blocking stream_mib_per_s=1355.9 mebibytes=1024
+connection=2 uring round_trip_ns min=49060 median=76319 p99=96726 rounds=2000
+connection=2 blocking round_trip_ns min=45889 median=64479 p99=80323 rounds=2000
+connection=2 uring stream_mib_per_s=766.3 mebibytes=1024
+connection=2 blocking stream_mib_per_s=530.1 mebibytes=1024
+connection=2 memory copy_mib_per_s=13862.4 copy8_seq_cst_fence_ns=6.57
+connection=2 ratio one_way_latency_over_copy8=5809 copy_bandwidth_over_stream=11.80
+connection=2 ratio uring_over_blocking fastest_round_trip=1.040 median_round_trip=1.013 stream=0.867 (median of 7 pairs)
+connection=2 exit 0 after 2 attempts
+connection=11 small short_sends=18 (client)
+connection=11 small stream_mib_per_s=148.8 mebibytes=1
+connection=11 uring round_trip_ns min=75789 median=902989 p99=2406268 rounds=2000
+connection=11 blocking round_trip_ns min=81529 median=890894 p99=1824225 rounds=2000
+connection=11 uring stream_mib_per_s=271.0 mebibytes=1024
+connection=11 blocking stream_mib_per_s=280.8 mebibytes=1024
+connection=11 uring round_trip_ns min=65740 median=167271 p99=1155123 rounds=2000
+connection=11 blocking round_trip_ns min=58082 median=155900 p99=1135506 rounds=2000
+connection=11 uring stream_mib_per_s=96.3 mebibytes=1024
+connection=11 blocking stream_mib_per_s=188.3 mebibytes=1024
+connection=11 uring round_trip_ns min=68348 median=531799 p99=1393656 rounds=2000
+connection=11 blocking round_trip_ns min=63816 median=525394 p99=1378336 rounds=2000
+connection=11 uring stream_mib_per_s=219.4 mebibytes=1024
+connection=11 blocking stream_mib_per_s=251.5 mebibytes=1024
+connection=11 uring round_trip_ns min=68175 median=545472 p99=1191910 rounds=2000
+connection=11 blocking round_trip_ns min=59409 median=541484 p99=1181555 rounds=2000
+connection=11 uring stream_mib_per_s=165.2 mebibytes=1024
+connection=11 blocking stream_mib_per_s=379.3 mebibytes=1024
+connection=11 uring round_trip_ns min=77439 median=694560 p99=1298573 rounds=2000
+connection=11 blocking round_trip_ns min=73759 median=675879 p99=1252297 rounds=2000
+connection=11 uring stream_mib_per_s=143.1 mebibytes=1024
+connection=11 blocking stream_mib_per_s=130.0 mebibytes=1024
+connection=11 uring round_trip_ns min=62164 median=526924 p99=1250689 rounds=2000
+connection=11 blocking round_trip_ns min=56157 median=515884 p99=1267203 rounds=2000
+connection=11 uring stream_mib_per_s=401.9 mebibytes=1024
+connection=11 blocking stream_mib_per_s=151.5 mebibytes=1024
+connection=11 uring round_trip_ns min=50350 median=77480 p99=116520 rounds=2000
+connection=11 blocking round_trip_ns min=55967 median=94118 p99=152757 rounds=2000
+connection=11 uring stream_mib_per_s=660.0 mebibytes=1024
+connection=11 blocking stream_mib_per_s=594.7 mebibytes=1024
+connection=11 memory copy_mib_per_s=14227.6 copy8_seq_cst_fence_ns=6.31
+connection=11 ratio one_way_latency_over_copy8=6142 copy_bandwidth_over_stream=21.56
+connection=11 ratio uring_over_blocking fastest_round_trip=1.071 median_round_trip=1.014 stream=0.965 (median of 7 pairs)
+connection=11 exit 0 after 2 attempts
+connection=0 small short_sends=19 (client)
+connection=0 small stream_mib_per_s=52.0 mebibytes=1
+connection=0 uring round_trip_ns min=87567 median=895827 p99=1719628 rounds=2000
+connection=0 blocking round_trip_ns min=74936 median=894907 p99=1752712 rounds=2000
+connection=0 uring stream_mib_per_s=295.9 mebibytes=1024
+connection=0 blocking stream_mib_per_s=280.1 mebibytes=1024
+connection=0 uring round_trip_ns min=68387 median=478316 p99=1530965 rounds=2000
+connection=0 blocking round_trip_ns min=60348 median=461206 p99=1479147 rounds=2000
+connection=0 uring stream_mib_per_s=201.3 mebibytes=1024
+connection=0 blocking stream_mib_per_s=145.2 mebibytes=1024
+connection=0 uring round_trip_ns min=64794 median=164808 p99=1260066 rounds=2000
+connection=0 blocking round_trip_ns min=62941 median=162466 p99=1321259 rounds=2000
+connection=0 uring stream_mib_per_s=130.2 mebibytes=1024
+connection=0 blocking stream_mib_per_s=133.1 mebibytes=1024
+connection=0 uring round_trip_ns min=60049 median=173586 p99=1131669 rounds=2000
+connection=0 blocking round_trip_ns min=55361 median=183165 p99=1123130 rounds=2000
+connection=0 uring stream_mib_per_s=110.3 mebibytes=1024
+connection=0 blocking stream_mib_per_s=288.9 mebibytes=1024
+connection=0 uring round_trip_ns min=63670 median=191761 p99=1313876 rounds=2000
+connection=0 blocking round_trip_ns min=68142 median=181960 p99=1315833 rounds=2000
+connection=0 uring stream_mib_per_s=278.4 mebibytes=1024
+connection=0 blocking stream_mib_per_s=380.7 mebibytes=1024
+connection=0 uring round_trip_ns min=63720 median=179686 p99=1136580 rounds=2000
+connection=0 blocking round_trip_ns min=64097 median=178704 p99=1167741 rounds=2000
+connection=0 uring stream_mib_per_s=89.3 mebibytes=1024
+connection=0 blocking stream_mib_per_s=320.1 mebibytes=1024
+connection=0 uring round_trip_ns min=46394 median=67987 p99=98838 rounds=2000
+connection=0 blocking round_trip_ns min=45936 median=70719 p99=108518 rounds=2000
+connection=0 uring stream_mib_per_s=616.7 mebibytes=1024
+connection=0 blocking stream_mib_per_s=679.9 mebibytes=1024
+connection=0 memory copy_mib_per_s=14296.1 copy8_seq_cst_fence_ns=6.32
+connection=0 ratio one_way_latency_over_copy8=5379 copy_bandwidth_over_stream=23.18
+connection=0 ratio uring_over_blocking fastest_round_trip=1.029 median_round_trip=1.005 stream=0.907 (median of 7 pairs)
+connection=0 exit 0 after 2 attempts
+connection=4 small short_sends=18 (client)
+connection=4 small stream_mib_per_s=233.0 mebibytes=1
+connection=4 uring round_trip_ns min=44317 median=147923 p99=1219561 rounds=2000
+connection=4 blocking round_trip_ns min=37758 median=134816 p99=1172323 rounds=2000
+connection=4 uring stream_mib_per_s=371.1 mebibytes=1024
+connection=4 blocking stream_mib_per_s=95.1 mebibytes=1024
+connection=4 uring round_trip_ns min=66736 median=221968 p99=1472358 rounds=2000
+connection=4 blocking round_trip_ns min=55624 median=334016 p99=1545447 rounds=2000
+connection=4 uring stream_mib_per_s=240.1 mebibytes=1024
+connection=4 blocking stream_mib_per_s=110.1 mebibytes=1024
+connection=4 uring round_trip_ns min=75326 median=653294 p99=1425824 rounds=2000
+connection=4 blocking round_trip_ns min=68729 median=642059 p99=2179994 rounds=2000
+connection=4 uring stream_mib_per_s=91.7 mebibytes=1024
+connection=4 blocking stream_mib_per_s=389.2 mebibytes=1024
+connection=4 uring round_trip_ns min=52338 median=132518 p99=1023640 rounds=2000
+connection=4 blocking round_trip_ns min=49827 median=128823 p99=1029000 rounds=2000
+connection=4 uring stream_mib_per_s=478.1 mebibytes=1024
+connection=4 blocking stream_mib_per_s=211.0 mebibytes=1024
+connection=4 uring round_trip_ns min=68052 median=390507 p99=1269757 rounds=2000
+connection=4 blocking round_trip_ns min=63956 median=370684 p99=1243399 rounds=2000
+connection=4 uring stream_mib_per_s=114.6 mebibytes=1024
+connection=4 blocking stream_mib_per_s=224.8 mebibytes=1024
+connection=4 uring round_trip_ns min=65079 median=383077 p99=1155032 rounds=2000
+connection=4 blocking round_trip_ns min=57353 median=177060 p99=1141313 rounds=2000
+connection=4 uring stream_mib_per_s=290.2 mebibytes=1024
+connection=4 blocking stream_mib_per_s=201.3 mebibytes=1024
+connection=4 uring round_trip_ns min=44108 median=225794 p99=508744 rounds=2000
+connection=4 blocking round_trip_ns min=48648 median=221024 p99=385088 rounds=2000
+connection=4 uring stream_mib_per_s=577.3 mebibytes=1024
+connection=4 blocking stream_mib_per_s=833.9 mebibytes=1024
+connection=4 memory copy_mib_per_s=14412.5 copy8_seq_cst_fence_ns=6.30
+connection=4 ratio one_way_latency_over_copy8=10523 copy_bandwidth_over_stream=24.96
+connection=4 ratio uring_over_blocking fastest_round_trip=1.096 median_round_trip=1.029 stream=1.442 (median of 7 pairs)
+connection=4 exit 0 after 2 attempts
+connection=7 small short_sends=16 (client)
+connection=7 small stream_mib_per_s=47.7 mebibytes=1
+connection=7 uring round_trip_ns min=61331 median=871518 p99=1548117 rounds=2000
+connection=7 blocking round_trip_ns min=71469 median=874285 p99=1571364 rounds=2000
+connection=7 uring stream_mib_per_s=113.4 mebibytes=1024
+connection=7 blocking stream_mib_per_s=299.6 mebibytes=1024
+connection=7 uring round_trip_ns min=69256 median=550634 p99=1638143 rounds=2000
+connection=7 blocking round_trip_ns min=64944 median=548622 p99=1571284 rounds=2000
+connection=7 uring stream_mib_per_s=145.1 mebibytes=1024
+connection=7 blocking stream_mib_per_s=139.2 mebibytes=1024
+connection=7 uring round_trip_ns min=58877 median=461645 p99=1265909 rounds=2000
+connection=7 blocking round_trip_ns min=69625 median=466628 p99=1294759 rounds=2000
+connection=7 uring stream_mib_per_s=278.7 mebibytes=1024
+connection=7 blocking stream_mib_per_s=300.3 mebibytes=1024
+connection=7 uring round_trip_ns min=51527 median=416571 p99=1239598 rounds=2000
+connection=7 blocking round_trip_ns min=63381 median=426621 p99=1231041 rounds=2000
+connection=7 uring stream_mib_per_s=116.8 mebibytes=1024
+connection=7 blocking stream_mib_per_s=295.1 mebibytes=1024
+connection=7 uring round_trip_ns min=58794 median=135774 p99=963164 rounds=2000
+connection=7 blocking round_trip_ns min=50574 median=130399 p99=933853 rounds=2000
+connection=7 uring stream_mib_per_s=114.6 mebibytes=1024
+connection=7 blocking stream_mib_per_s=170.0 mebibytes=1024
+connection=7 uring round_trip_ns min=41800 median=130573 p99=1014139 rounds=2000
+connection=7 blocking round_trip_ns min=69602 median=148412 p99=1017147 rounds=2000
+connection=7 uring stream_mib_per_s=138.3 mebibytes=1024
+connection=7 blocking stream_mib_per_s=1021.7 mebibytes=1024
+connection=7 uring round_trip_ns min=42178 median=79523 p99=330663 rounds=2000
+connection=7 blocking round_trip_ns min=48230 median=79965 p99=322896 rounds=2000
+connection=7 uring stream_mib_per_s=575.3 mebibytes=1024
+connection=7 blocking stream_mib_per_s=940.1 mebibytes=1024
+connection=7 memory copy_mib_per_s=14220.0 copy8_seq_cst_fence_ns=6.29
+connection=7 ratio one_way_latency_over_copy8=6320 copy_bandwidth_over_stream=24.72
+connection=7 ratio uring_over_blocking fastest_round_trip=0.858 median_round_trip=0.994 stream=0.612 (median of 7 pairs)
+connection=7 exit 0 after 2 attempts
+connection=26 small short_sends=16 (client)
+connection=26 small stream_mib_per_s=172.4 mebibytes=1
+connection=26 uring round_trip_ns min=40430 median=74017 p99=129100 rounds=2000
+connection=26 blocking round_trip_ns min=35103 median=62712 p99=97896 rounds=2000
+connection=26 uring stream_mib_per_s=219.4 mebibytes=1024
+connection=26 blocking stream_mib_per_s=352.3 mebibytes=1024
+connection=26 uring round_trip_ns min=49569 median=176977 p99=1099383 rounds=2000
+connection=26 blocking round_trip_ns min=58761 median=165622 p99=1100101 rounds=2000
+connection=26 uring stream_mib_per_s=424.8 mebibytes=1024
+connection=26 blocking stream_mib_per_s=601.9 mebibytes=1024
+connection=26 uring round_trip_ns min=65804 median=192765 p99=1463499 rounds=2000
+connection=26 blocking round_trip_ns min=60792 median=190464 p99=1509053 rounds=2000
+connection=26 uring stream_mib_per_s=227.9 mebibytes=1024
+connection=26 blocking stream_mib_per_s=377.3 mebibytes=1024
+connection=26 uring round_trip_ns min=58887 median=174355 p99=1165817 rounds=2000
+connection=26 blocking round_trip_ns min=57924 median=172371 p99=1154312 rounds=2000
+connection=26 uring stream_mib_per_s=315.8 mebibytes=1024
+connection=26 blocking stream_mib_per_s=174.4 mebibytes=1024
+connection=26 uring round_trip_ns min=68765 median=427529 p99=1291711 rounds=2000
+connection=26 blocking round_trip_ns min=62296 median=450559 p99=1283913 rounds=2000
+connection=26 uring stream_mib_per_s=142.0 mebibytes=1024
+connection=26 blocking stream_mib_per_s=237.2 mebibytes=1024
+connection=26 uring round_trip_ns min=62045 median=472561 p99=1099256 rounds=2000
+connection=26 blocking round_trip_ns min=50947 median=465553 p99=1116024 rounds=2000
+connection=26 uring stream_mib_per_s=346.8 mebibytes=1024
+connection=26 blocking stream_mib_per_s=376.9 mebibytes=1024
+connection=26 uring round_trip_ns min=62053 median=181745 p99=1279278 rounds=2000
+connection=26 blocking round_trip_ns min=64816 median=173995 p99=1343875 rounds=2000
+connection=26 uring stream_mib_per_s=363.4 mebibytes=1024
+connection=26 blocking stream_mib_per_s=220.1 mebibytes=1024
+connection=26 memory copy_mib_per_s=11029.6 copy8_seq_cst_fence_ns=6.71
+connection=26 ratio one_way_latency_over_copy8=5513 copy_bandwidth_over_stream=25.96
+connection=26 ratio uring_over_blocking fastest_round_trip=1.082 median_round_trip=1.015 stream=0.706 (median of 7 pairs)
+connection=26 exit 0 after 1 attempts
+connection=25 small short_sends=16 (client)
+connection=25 small stream_mib_per_s=225.7 mebibytes=1
+connection=25 uring round_trip_ns min=34696 median=64790 p99=124531 rounds=2000
+connection=25 blocking round_trip_ns min=37527 median=70716 p99=108180 rounds=2000
+connection=25 uring stream_mib_per_s=195.9 mebibytes=1024
+connection=25 blocking stream_mib_per_s=246.9 mebibytes=1024
+connection=25 uring round_trip_ns min=63882 median=168569 p99=1343066 rounds=2000
+connection=25 blocking round_trip_ns min=60807 median=155491 p99=1738622 rounds=2000
+connection=25 uring stream_mib_per_s=613.7 mebibytes=1024
+connection=25 blocking stream_mib_per_s=165.4 mebibytes=1024
+connection=25 uring round_trip_ns min=52999 median=488876 p99=1288079 rounds=2000
+connection=25 blocking round_trip_ns min=55999 median=487860 p99=1255096 rounds=2000
+connection=25 uring stream_mib_per_s=359.7 mebibytes=1024
+connection=25 blocking stream_mib_per_s=207.5 mebibytes=1024
+connection=25 uring round_trip_ns min=66590 median=512800 p99=1220475 rounds=2000
+connection=25 blocking round_trip_ns min=64437 median=502234 p99=1195306 rounds=2000
+connection=25 uring stream_mib_per_s=145.7 mebibytes=1024
+connection=25 blocking stream_mib_per_s=442.2 mebibytes=1024
+connection=25 uring round_trip_ns min=65407 median=130370 p99=716364 rounds=2000
+connection=25 blocking round_trip_ns min=51965 median=132044 p99=721571 rounds=2000
+connection=25 uring stream_mib_per_s=341.9 mebibytes=1024
+connection=25 blocking stream_mib_per_s=229.9 mebibytes=1024
+connection=25 uring round_trip_ns min=59049 median=479730 p99=1100183 rounds=2000
+connection=25 blocking round_trip_ns min=61986 median=472911 p99=1093040 rounds=2000
+connection=25 uring stream_mib_per_s=309.1 mebibytes=1024
+connection=25 blocking stream_mib_per_s=346.2 mebibytes=1024
+connection=25 uring round_trip_ns min=65607 median=647403 p99=1490763 rounds=2000
+connection=25 blocking round_trip_ns min=68143 median=645015 p99=1481835 rounds=2000
+connection=25 uring stream_mib_per_s=207.8 mebibytes=1024
+connection=25 blocking stream_mib_per_s=298.9 mebibytes=1024
+connection=25 memory copy_mib_per_s=11406.2 copy8_seq_cst_fence_ns=6.29
+connection=25 ratio one_way_latency_over_copy8=5149 copy_bandwidth_over_stream=18.59
+connection=25 ratio uring_over_blocking fastest_round_trip=0.963 median_round_trip=1.004 stream=0.893 (median of 7 pairs)
+connection=25 exit 0 after 1 attempts
+connection=31 small short_sends=28 (client)
+connection=31 small stream_mib_per_s=95.0 mebibytes=1
+connection=31 uring round_trip_ns min=43763 median=75185 p99=143857 rounds=2000
+connection=31 blocking round_trip_ns min=42467 median=75306 p99=151724 rounds=2000
+connection=31 uring stream_mib_per_s=208.9 mebibytes=1024
+connection=31 blocking stream_mib_per_s=131.5 mebibytes=1024
+connection=31 uring round_trip_ns min=61326 median=536320 p99=3129259 rounds=2000
+connection=31 blocking round_trip_ns min=74073 median=535642 p99=1434404 rounds=2000
+connection=31 uring stream_mib_per_s=228.5 mebibytes=1024
+connection=31 blocking stream_mib_per_s=323.5 mebibytes=1024
+connection=31 uring round_trip_ns min=58999 median=439772 p99=1134168 rounds=2000
+connection=31 blocking round_trip_ns min=65446 median=446720 p99=1155653 rounds=2000
+connection=31 uring stream_mib_per_s=258.2 mebibytes=1024
+connection=31 blocking stream_mib_per_s=160.8 mebibytes=1024
+connection=31 uring round_trip_ns min=57844 median=191999 p99=1187120 rounds=2000
+connection=31 blocking round_trip_ns min=50770 median=177225 p99=1197588 rounds=2000
+connection=31 uring stream_mib_per_s=600.9 mebibytes=1024
+connection=31 blocking stream_mib_per_s=129.6 mebibytes=1024
+connection=31 uring round_trip_ns min=58246 median=496835 p99=1169226 rounds=2000
+connection=31 blocking round_trip_ns min=64131 median=485802 p99=1123946 rounds=2000
+connection=31 uring stream_mib_per_s=297.3 mebibytes=1024
+connection=31 blocking stream_mib_per_s=325.2 mebibytes=1024
+connection=31 uring round_trip_ns min=64236 median=198952 p99=1621565 rounds=2000
+connection=31 blocking round_trip_ns min=49253 median=165269 p99=1605284 rounds=2000
+connection=31 uring stream_mib_per_s=342.3 mebibytes=1024
+connection=31 blocking stream_mib_per_s=256.8 mebibytes=1024
+connection=31 uring round_trip_ns min=54521 median=150189 p99=1126985 rounds=2000
+connection=31 blocking round_trip_ns min=54916 median=146800 p99=1035386 rounds=2000
+connection=31 uring stream_mib_per_s=351.3 mebibytes=1024
+connection=31 blocking stream_mib_per_s=289.6 mebibytes=1024
+connection=31 memory copy_mib_per_s=12450.7 copy8_seq_cst_fence_ns=6.32
+connection=31 ratio one_way_latency_over_copy8=5944 copy_bandwidth_over_stream=20.72
+connection=31 ratio uring_over_blocking fastest_round_trip=0.993 median_round_trip=1.023 stream=1.333 (median of 7 pairs)
+connection=31 exit 0 after 1 attempts
+connection=17 small short_sends=16 (client)
+connection=17 small stream_mib_per_s=206.9 mebibytes=1
+connection=17 uring round_trip_ns min=39384 median=72255 p99=111765 rounds=2000
+connection=17 blocking round_trip_ns min=39366 median=70400 p99=134201 rounds=2000
+connection=17 uring stream_mib_per_s=118.1 mebibytes=1024
+connection=17 blocking stream_mib_per_s=336.4 mebibytes=1024
+connection=17 uring round_trip_ns min=67712 median=147534 p99=1080246 rounds=2000
+connection=17 blocking round_trip_ns min=57846 median=144181 p99=1105850 rounds=2000
+connection=17 uring stream_mib_per_s=333.9 mebibytes=1024
+connection=17 blocking stream_mib_per_s=233.2 mebibytes=1024
+connection=17 uring round_trip_ns min=57247 median=136798 p99=1165345 rounds=2000
+connection=17 blocking round_trip_ns min=57621 median=144239 p99=1186189 rounds=2000
+connection=17 uring stream_mib_per_s=382.6 mebibytes=1024
+connection=17 blocking stream_mib_per_s=280.0 mebibytes=1024
+connection=17 uring round_trip_ns min=73199 median=544210 p99=1207114 rounds=2000
+connection=17 blocking round_trip_ns min=53397 median=535174 p99=1193545 rounds=2000
+connection=17 uring stream_mib_per_s=299.0 mebibytes=1024
+connection=17 blocking stream_mib_per_s=149.9 mebibytes=1024
+connection=17 uring round_trip_ns min=66805 median=447072 p99=1050546 rounds=2000
+connection=17 blocking round_trip_ns min=62160 median=444718 p99=1034586 rounds=2000
+connection=17 uring stream_mib_per_s=353.8 mebibytes=1024
+connection=17 blocking stream_mib_per_s=306.1 mebibytes=1024
+connection=17 uring round_trip_ns min=70652 median=796525 p99=1302619 rounds=2000
+connection=17 blocking round_trip_ns min=63919 median=815917 p99=1292835 rounds=2000
+connection=17 uring stream_mib_per_s=293.2 mebibytes=1024
+connection=17 blocking stream_mib_per_s=372.6 mebibytes=1024
+connection=17 uring round_trip_ns min=63873 median=672449 p99=1615427 rounds=2000
+connection=17 blocking round_trip_ns min=64725 median=669286 p99=1574564 rounds=2000
+connection=17 uring stream_mib_per_s=141.9 mebibytes=1024
+connection=17 blocking stream_mib_per_s=270.7 mebibytes=1024
+connection=17 memory copy_mib_per_s=11453.8 copy8_seq_cst_fence_ns=6.39
+connection=17 ratio one_way_latency_over_copy8=5655 copy_bandwidth_over_stream=29.94
+connection=17 ratio uring_over_blocking fastest_round_trip=1.075 median_round_trip=1.005 stream=1.156 (median of 7 pairs)
+connection=17 exit 0 after 1 attempts
+connection=19 small short_sends=16 (client)
+connection=19 small stream_mib_per_s=217.2 mebibytes=1
+connection=19 uring round_trip_ns min=34334 median=62539 p99=101348 rounds=2000
+connection=19 blocking round_trip_ns min=41099 median=70915 p99=103535 rounds=2000
+connection=19 uring stream_mib_per_s=140.9 mebibytes=1024
+connection=19 blocking stream_mib_per_s=257.4 mebibytes=1024
+connection=19 uring round_trip_ns min=62686 median=166465 p99=1311389 rounds=2000
+connection=19 blocking round_trip_ns min=59718 median=154672 p99=1319668 rounds=2000
+connection=19 uring stream_mib_per_s=388.8 mebibytes=1024
+connection=19 blocking stream_mib_per_s=89.2 mebibytes=1024
+connection=19 uring round_trip_ns min=65799 median=553402 p99=2566941 rounds=2000
+connection=19 blocking round_trip_ns min=68708 median=548123 p99=1388052 rounds=2000
+connection=19 uring stream_mib_per_s=397.8 mebibytes=1024
+connection=19 blocking stream_mib_per_s=238.1 mebibytes=1024
+connection=19 uring round_trip_ns min=48032 median=607324 p99=1138967 rounds=2000
+connection=19 blocking round_trip_ns min=54137 median=596170 p99=1133256 rounds=2000
+connection=19 uring stream_mib_per_s=411.8 mebibytes=1024
+connection=19 blocking stream_mib_per_s=449.2 mebibytes=1024
+connection=19 uring round_trip_ns min=59457 median=456600 p99=1195791 rounds=2000
+connection=19 blocking round_trip_ns min=44572 median=506003 p99=2099067 rounds=2000
+connection=19 uring stream_mib_per_s=292.6 mebibytes=1024
+connection=19 blocking stream_mib_per_s=156.2 mebibytes=1024
+connection=19 uring round_trip_ns min=61362 median=610037 p99=1199127 rounds=2000
+connection=19 blocking round_trip_ns min=63155 median=607570 p99=1217408 rounds=2000
+connection=19 uring stream_mib_per_s=294.7 mebibytes=1024
+connection=19 blocking stream_mib_per_s=259.6 mebibytes=1024
+connection=19 uring round_trip_ns min=62064 median=173245 p99=1255628 rounds=2000
+connection=19 blocking round_trip_ns min=60093 median=164207 p99=1248637 rounds=2000
+connection=19 uring stream_mib_per_s=295.9 mebibytes=1024
+connection=19 blocking stream_mib_per_s=270.4 mebibytes=1024
+connection=19 memory copy_mib_per_s=11433.4 copy8_seq_cst_fence_ns=6.57
+connection=19 ratio one_way_latency_over_copy8=4761 copy_bandwidth_over_stream=27.76
+connection=19 ratio uring_over_blocking fastest_round_trip=0.972 median_round_trip=1.010 stream=1.135 (median of 7 pairs)
+connection=19 exit 0 after 1 attempts
+connection=24 small short_sends=21 (client)
+connection=24 small stream_mib_per_s=153.7 mebibytes=1
+connection=24 uring round_trip_ns min=37020 median=70994 p99=101494 rounds=2000
+connection=24 blocking round_trip_ns min=33621 median=55604 p99=82478 rounds=2000
+connection=24 uring stream_mib_per_s=220.3 mebibytes=1024
+connection=24 blocking stream_mib_per_s=234.9 mebibytes=1024
+connection=24 uring round_trip_ns min=65899 median=649354 p99=5246573 rounds=2000
+connection=24 blocking round_trip_ns min=59726 median=648086 p99=1299776 rounds=2000
+connection=24 uring stream_mib_per_s=228.1 mebibytes=1024
+connection=24 blocking stream_mib_per_s=399.8 mebibytes=1024
+connection=24 uring round_trip_ns min=68586 median=152987 p99=1171412 rounds=2000
+connection=24 blocking round_trip_ns min=52318 median=136523 p99=1162525 rounds=2000
+connection=24 uring stream_mib_per_s=343.7 mebibytes=1024
+connection=24 blocking stream_mib_per_s=218.1 mebibytes=1024
+connection=24 uring round_trip_ns min=64713 median=161215 p99=1134984 rounds=2000
+connection=24 blocking round_trip_ns min=44198 median=147877 p99=1145254 rounds=2000
+connection=24 uring stream_mib_per_s=225.8 mebibytes=1024
+connection=24 blocking stream_mib_per_s=149.9 mebibytes=1024
+connection=24 uring round_trip_ns min=59719 median=485949 p99=1158590 rounds=2000
+connection=24 blocking round_trip_ns min=56623 median=497024 p99=1182922 rounds=2000
+connection=24 uring stream_mib_per_s=152.0 mebibytes=1024
+connection=24 blocking stream_mib_per_s=160.9 mebibytes=1024
+connection=24 uring round_trip_ns min=49416 median=159597 p99=1096235 rounds=2000
+connection=24 blocking round_trip_ns min=58947 median=166870 p99=1118774 rounds=2000
+connection=24 uring stream_mib_per_s=236.9 mebibytes=1024
+connection=24 blocking stream_mib_per_s=247.1 mebibytes=1024
+connection=24 uring round_trip_ns min=67481 median=521098 p99=1258334 rounds=2000
+connection=24 blocking round_trip_ns min=47886 median=503160 p99=1212381 rounds=2000
+connection=24 uring stream_mib_per_s=238.2 mebibytes=1024
+connection=24 blocking stream_mib_per_s=441.6 mebibytes=1024
+connection=24 memory copy_mib_per_s=12396.3 copy8_seq_cst_fence_ns=6.18
+connection=24 ratio one_way_latency_over_copy8=5744 copy_bandwidth_over_stream=36.06
+connection=24 ratio uring_over_blocking fastest_round_trip=1.103 median_round_trip=1.036 stream=0.945 (median of 7 pairs)
+connection=24 exit 0 after 1 attempts
+connection=29 small short_sends=16 (client)
+connection=29 small stream_mib_per_s=183.5 mebibytes=1
+connection=29 uring round_trip_ns min=37081 median=71748 p99=124249 rounds=2000
+connection=29 blocking round_trip_ns min=34540 median=61245 p99=93879 rounds=2000
+connection=29 uring stream_mib_per_s=118.3 mebibytes=1024
+connection=29 blocking stream_mib_per_s=152.3 mebibytes=1024
+connection=29 uring round_trip_ns min=61326 median=199534 p99=1932846 rounds=2000
+connection=29 blocking round_trip_ns min=61837 median=186887 p99=2115246 rounds=2000
+connection=29 uring stream_mib_per_s=379.5 mebibytes=1024
+connection=29 blocking stream_mib_per_s=340.3 mebibytes=1024
+connection=29 uring round_trip_ns min=45913 median=361474 p99=1147517 rounds=2000
+connection=29 blocking round_trip_ns min=49375 median=219701 p99=1158974 rounds=2000
+connection=29 uring stream_mib_per_s=179.3 mebibytes=1024
+connection=29 blocking stream_mib_per_s=336.6 mebibytes=1024
+connection=29 uring round_trip_ns min=71571 median=573842 p99=1307412 rounds=2000
+connection=29 blocking round_trip_ns min=72337 median=574490 p99=1296978 rounds=2000
+connection=29 uring stream_mib_per_s=147.8 mebibytes=1024
+connection=29 blocking stream_mib_per_s=285.1 mebibytes=1024
+connection=29 uring round_trip_ns min=41177 median=130440 p99=651953 rounds=2000
+connection=29 blocking round_trip_ns min=62287 median=124803 p99=669664 rounds=2000
+connection=29 uring stream_mib_per_s=261.6 mebibytes=1024
+connection=29 blocking stream_mib_per_s=151.1 mebibytes=1024
+connection=29 uring round_trip_ns min=65930 median=702431 p99=1631542 rounds=2000
+connection=29 blocking round_trip_ns min=57273 median=691188 p99=1584510 rounds=2000
+connection=29 uring stream_mib_per_s=219.0 mebibytes=1024
+connection=29 blocking stream_mib_per_s=343.8 mebibytes=1024
+connection=29 uring round_trip_ns min=70156 median=548925 p99=1332671 rounds=2000
+connection=29 blocking round_trip_ns min=49558 median=541923 p99=1304194 rounds=2000
+connection=29 uring stream_mib_per_s=374.3 mebibytes=1024
+connection=29 blocking stream_mib_per_s=435.1 mebibytes=1024
+connection=29 memory copy_mib_per_s=10806.3 copy8_seq_cst_fence_ns=6.89
+connection=29 ratio one_way_latency_over_copy8=5209 copy_bandwidth_over_stream=28.48
+connection=29 ratio uring_over_blocking fastest_round_trip=0.992 median_round_trip=1.045 stream=0.777 (median of 7 pairs)
+connection=29 exit 0 after 1 attempts
+connection=18 small short_sends=16 (client)
+connection=18 small stream_mib_per_s=199.4 mebibytes=1
+connection=18 uring round_trip_ns min=39078 median=65682 p99=1116744 rounds=2000
+connection=18 blocking round_trip_ns min=41872 median=74909 p99=1108606 rounds=2000
+connection=18 uring stream_mib_per_s=141.7 mebibytes=1024
+connection=18 blocking stream_mib_per_s=257.9 mebibytes=1024
+connection=18 uring round_trip_ns min=65724 median=491355 p99=1223551 rounds=2000
+connection=18 blocking round_trip_ns min=59311 median=461536 p99=1210521 rounds=2000
+connection=18 uring stream_mib_per_s=320.1 mebibytes=1024
+connection=18 blocking stream_mib_per_s=385.5 mebibytes=1024
+connection=18 uring round_trip_ns min=64379 median=492553 p99=1158665 rounds=2000
+connection=18 blocking round_trip_ns min=60373 median=492114 p99=1138619 rounds=2000
+connection=18 uring stream_mib_per_s=162.4 mebibytes=1024
+connection=18 blocking stream_mib_per_s=362.8 mebibytes=1024
+connection=18 uring round_trip_ns min=64254 median=576145 p99=2093920 rounds=2000
+connection=18 blocking round_trip_ns min=69648 median=572515 p99=2060267 rounds=2000
+connection=18 uring stream_mib_per_s=134.6 mebibytes=1024
+connection=18 blocking stream_mib_per_s=403.8 mebibytes=1024
+connection=18 uring round_trip_ns min=55603 median=327519 p99=1082651 rounds=2000
+connection=18 blocking round_trip_ns min=50280 median=319772 p99=1067603 rounds=2000
+connection=18 uring stream_mib_per_s=219.4 mebibytes=1024
+connection=18 blocking stream_mib_per_s=156.7 mebibytes=1024
+connection=18 uring round_trip_ns min=59723 median=384467 p99=1138192 rounds=2000
+connection=18 blocking round_trip_ns min=61248 median=392280 p99=1146502 rounds=2000
+connection=18 uring stream_mib_per_s=248.0 mebibytes=1024
+connection=18 blocking stream_mib_per_s=262.0 mebibytes=1024
+connection=18 uring round_trip_ns min=61287 median=577909 p99=1233993 rounds=2000
+connection=18 blocking round_trip_ns min=58025 median=572771 p99=1241796 rounds=2000
+connection=18 uring stream_mib_per_s=286.6 mebibytes=1024
+connection=18 blocking stream_mib_per_s=273.3 mebibytes=1024
+connection=18 memory copy_mib_per_s=13084.8 copy8_seq_cst_fence_ns=6.37
+connection=18 ratio one_way_latency_over_copy8=5153 copy_bandwidth_over_stream=40.88
+connection=18 ratio uring_over_blocking fastest_round_trip=1.056 median_round_trip=1.006 stream=0.830 (median of 7 pairs)
+connection=18 exit 0 after 1 attempts
+connection=22 small short_sends=16 (client)
+connection=22 small stream_mib_per_s=172.8 mebibytes=1
+connection=22 uring round_trip_ns min=39782 median=73745 p99=130784 rounds=2000
+connection=22 blocking round_trip_ns min=37352 median=72102 p99=140596 rounds=2000
+connection=22 uring stream_mib_per_s=202.5 mebibytes=1024
+connection=22 blocking stream_mib_per_s=158.0 mebibytes=1024
+connection=22 uring round_trip_ns min=62456 median=515534 p99=1185299 rounds=2000
+connection=22 blocking round_trip_ns min=72148 median=524170 p99=1218946 rounds=2000
+connection=22 uring stream_mib_per_s=94.3 mebibytes=1024
+connection=22 blocking stream_mib_per_s=311.2 mebibytes=1024
+connection=22 uring round_trip_ns min=70112 median=601025 p99=1221381 rounds=2000
+connection=22 blocking round_trip_ns min=70754 median=584541 p99=1210841 rounds=2000
+connection=22 uring stream_mib_per_s=306.1 mebibytes=1024
+connection=22 blocking stream_mib_per_s=440.7 mebibytes=1024
+connection=22 uring round_trip_ns min=51510 median=635979 p99=1240084 rounds=2000
+connection=22 blocking round_trip_ns min=55314 median=640075 p99=1213979 rounds=2000
+connection=22 uring stream_mib_per_s=125.9 mebibytes=1024
+connection=22 blocking stream_mib_per_s=240.9 mebibytes=1024
+connection=22 uring round_trip_ns min=57224 median=133494 p99=816584 rounds=2000
+connection=22 blocking round_trip_ns min=62525 median=141204 p99=815495 rounds=2000
+connection=22 uring stream_mib_per_s=313.8 mebibytes=1024
+connection=22 blocking stream_mib_per_s=558.3 mebibytes=1024
+connection=22 uring round_trip_ns min=45007 median=149474 p99=1328378 rounds=2000
+connection=22 blocking round_trip_ns min=51916 median=152993 p99=1301185 rounds=2000
+connection=22 uring stream_mib_per_s=224.1 mebibytes=1024
+connection=22 blocking stream_mib_per_s=287.5 mebibytes=1024
+connection=22 uring round_trip_ns min=66340 median=167454 p99=1140758 rounds=2000
+connection=22 blocking round_trip_ns min=58571 median=148187 p99=1174876 rounds=2000
+connection=22 uring stream_mib_per_s=292.9 mebibytes=1024
+connection=22 blocking stream_mib_per_s=257.0 mebibytes=1024
+connection=22 memory copy_mib_per_s=12849.6 copy8_seq_cst_fence_ns=6.62
+connection=22 ratio one_way_latency_over_copy8=5570 copy_bandwidth_over_stream=40.95
+connection=22 ratio uring_over_blocking fastest_round_trip=0.931 median_round_trip=0.994 stream=0.695 (median of 7 pairs)
+connection=22 exit 0 after 1 attempts
+connection=21 small short_sends=18 (client)
+connection=21 small stream_mib_per_s=122.9 mebibytes=1
+connection=21 uring round_trip_ns min=38046 median=66959 p99=118832 rounds=2000
+connection=21 blocking round_trip_ns min=37862 median=73239 p99=120126 rounds=2000
+connection=21 uring stream_mib_per_s=211.8 mebibytes=1024
+connection=21 blocking stream_mib_per_s=130.7 mebibytes=1024
+connection=21 uring round_trip_ns min=52729 median=152749 p99=1316660 rounds=2000
+connection=21 blocking round_trip_ns min=62066 median=153738 p99=1316053 rounds=2000
+connection=21 uring stream_mib_per_s=212.3 mebibytes=1024
+connection=21 blocking stream_mib_per_s=310.6 mebibytes=1024
+connection=21 uring round_trip_ns min=64259 median=360756 p99=1192957 rounds=2000
+connection=21 blocking round_trip_ns min=57184 median=394010 p99=1177303 rounds=2000
+connection=21 uring stream_mib_per_s=235.0 mebibytes=1024
+connection=21 blocking stream_mib_per_s=149.2 mebibytes=1024
+connection=21 uring round_trip_ns min=55995 median=568032 p99=1161415 rounds=2000
+connection=21 blocking round_trip_ns min=56061 median=570336 p99=1144226 rounds=2000
+connection=21 uring stream_mib_per_s=647.9 mebibytes=1024
+connection=21 blocking stream_mib_per_s=436.9 mebibytes=1024
+connection=21 uring round_trip_ns min=65394 median=524458 p99=1220708 rounds=2000
+connection=21 blocking round_trip_ns min=51309 median=503739 p99=1180461 rounds=2000
+connection=21 uring stream_mib_per_s=221.6 mebibytes=1024
+connection=21 blocking stream_mib_per_s=119.5 mebibytes=1024
+connection=21 uring round_trip_ns min=61977 median=156497 p99=1094654 rounds=2000
+connection=21 blocking round_trip_ns min=57009 median=152274 p99=1109237 rounds=2000
+connection=21 uring stream_mib_per_s=243.3 mebibytes=1024
+connection=21 blocking stream_mib_per_s=158.6 mebibytes=1024
+connection=21 uring round_trip_ns min=66720 median=566552 p99=1322707 rounds=2000
+connection=21 blocking round_trip_ns min=60610 median=575283 p99=1333277 rounds=2000
+connection=21 uring stream_mib_per_s=217.2 mebibytes=1024
+connection=21 blocking stream_mib_per_s=873.4 mebibytes=1024
+connection=21 memory copy_mib_per_s=10917.7 copy8_seq_cst_fence_ns=6.52
+connection=21 ratio one_way_latency_over_copy8=5135 copy_bandwidth_over_stream=16.85
+connection=21 ratio uring_over_blocking fastest_round_trip=1.087 median_round_trip=0.994 stream=1.534 (median of 7 pairs)
+connection=21 exit 0 after 1 attempts
+connection=28 small short_sends=16 (client)
+connection=28 small stream_mib_per_s=197.4 mebibytes=1
+connection=28 uring round_trip_ns min=42316 median=80756 p99=151911 rounds=2000
+connection=28 blocking round_trip_ns min=35003 median=65895 p99=110385 rounds=2000
+connection=28 uring stream_mib_per_s=209.5 mebibytes=1024
+connection=28 blocking stream_mib_per_s=176.9 mebibytes=1024
+connection=28 uring round_trip_ns min=65631 median=173166 p99=1277045 rounds=2000
+connection=28 blocking round_trip_ns min=60191 median=170933 p99=1271623 rounds=2000
+connection=28 uring stream_mib_per_s=187.9 mebibytes=1024
+connection=28 blocking stream_mib_per_s=343.9 mebibytes=1024
+connection=28 uring round_trip_ns min=62921 median=156630 p99=1235409 rounds=2000
+connection=28 blocking round_trip_ns min=58837 median=154927 p99=1233531 rounds=2000
+connection=28 uring stream_mib_per_s=145.6 mebibytes=1024
+connection=28 blocking stream_mib_per_s=166.1 mebibytes=1024
+connection=28 uring round_trip_ns min=56874 median=153644 p99=1177436 rounds=2000
+connection=28 blocking round_trip_ns min=57139 median=152129 p99=1123132 rounds=2000
+connection=28 uring stream_mib_per_s=143.7 mebibytes=1024
+connection=28 blocking stream_mib_per_s=313.4 mebibytes=1024
+connection=28 uring round_trip_ns min=53778 median=317470 p99=1180390 rounds=2000
+connection=28 blocking round_trip_ns min=62299 median=332331 p99=1173715 rounds=2000
+connection=28 uring stream_mib_per_s=182.5 mebibytes=1024
+connection=28 blocking stream_mib_per_s=423.7 mebibytes=1024
+connection=28 uring round_trip_ns min=62497 median=583444 p99=1585625 rounds=2000
+connection=28 blocking round_trip_ns min=63157 median=590801 p99=1602534 rounds=2000
+connection=28 uring stream_mib_per_s=223.1 mebibytes=1024
+connection=28 blocking stream_mib_per_s=320.6 mebibytes=1024
+connection=28 uring round_trip_ns min=54624 median=133498 p99=705846 rounds=2000
+connection=28 blocking round_trip_ns min=47885 median=132552 p99=728255 rounds=2000
+connection=28 uring stream_mib_per_s=291.1 mebibytes=1024
+connection=28 blocking stream_mib_per_s=194.1 mebibytes=1024
+connection=28 memory copy_mib_per_s=12347.1 copy8_seq_cst_fence_ns=6.34
+connection=28 ratio one_way_latency_over_copy8=6365 copy_bandwidth_over_stream=42.42
+connection=28 ratio uring_over_blocking fastest_round_trip=1.069 median_round_trip=1.010 stream=0.696 (median of 7 pairs)
+connection=28 exit 0 after 1 attempts
+connection=30 small short_sends=16 (client)
+connection=30 small stream_mib_per_s=212.1 mebibytes=1
+connection=30 uring round_trip_ns min=40747 median=74236 p99=133328 rounds=2000
+connection=30 blocking round_trip_ns min=34812 median=68958 p99=131431 rounds=2000
+connection=30 uring stream_mib_per_s=208.5 mebibytes=1024
+connection=30 blocking stream_mib_per_s=155.8 mebibytes=1024
+connection=30 uring round_trip_ns min=62943 median=135609 p99=1012952 rounds=2000
+connection=30 blocking round_trip_ns min=65377 median=135943 p99=964195 rounds=2000
+connection=30 uring stream_mib_per_s=426.0 mebibytes=1024
+connection=30 blocking stream_mib_per_s=211.8 mebibytes=1024
+connection=30 uring round_trip_ns min=50817 median=182299 p99=1141798 rounds=2000
+connection=30 blocking round_trip_ns min=69795 median=195745 p99=1129098 rounds=2000
+connection=30 uring stream_mib_per_s=353.0 mebibytes=1024
+connection=30 blocking stream_mib_per_s=314.9 mebibytes=1024
+connection=30 uring round_trip_ns min=56464 median=195136 p99=1208023 rounds=2000
+connection=30 blocking round_trip_ns min=50704 median=184948 p99=1228713 rounds=2000
+connection=30 uring stream_mib_per_s=168.8 mebibytes=1024
+connection=30 blocking stream_mib_per_s=677.6 mebibytes=1024
+connection=30 uring round_trip_ns min=74078 median=640940 p99=1245366 rounds=2000
+connection=30 blocking round_trip_ns min=62120 median=642783 p99=1263369 rounds=2000
+connection=30 uring stream_mib_per_s=127.6 mebibytes=1024
+connection=30 blocking stream_mib_per_s=122.2 mebibytes=1024
+connection=30 uring round_trip_ns min=58053 median=594814 p99=1229523 rounds=2000
+connection=30 blocking round_trip_ns min=51321 median=582325 p99=1240837 rounds=2000
+connection=30 uring stream_mib_per_s=107.9 mebibytes=1024
+connection=30 blocking stream_mib_per_s=331.0 mebibytes=1024
+connection=30 uring round_trip_ns min=69660 median=154503 p99=1081857 rounds=2000
+connection=30 blocking round_trip_ns min=50114 median=148766 p99=1056608 rounds=2000
+connection=30 uring stream_mib_per_s=277.6 mebibytes=1024
+connection=30 blocking stream_mib_per_s=765.0 mebibytes=1024
+connection=30 memory copy_mib_per_s=9909.8 copy8_seq_cst_fence_ns=7.35
+connection=30 ratio one_way_latency_over_copy8=5049 copy_bandwidth_over_stream=23.26
+connection=30 ratio uring_over_blocking fastest_round_trip=1.131 median_round_trip=1.021 stream=1.045 (median of 7 pairs)
+connection=30 exit 0 after 1 attempts
+connection=23 small short_sends=18 (client)
+connection=23 small stream_mib_per_s=208.8 mebibytes=1
+connection=23 uring round_trip_ns min=40135 median=74716 p99=142898 rounds=2000
+connection=23 blocking round_trip_ns min=34673 median=72768 p99=135120 rounds=2000
+connection=23 uring stream_mib_per_s=211.8 mebibytes=1024
+connection=23 blocking stream_mib_per_s=397.2 mebibytes=1024
+connection=23 uring round_trip_ns min=52253 median=571424 p99=1244827 rounds=2000
+connection=23 blocking round_trip_ns min=65885 median=577946 p99=1256179 rounds=2000
+connection=23 uring stream_mib_per_s=470.5 mebibytes=1024
+connection=23 blocking stream_mib_per_s=223.4 mebibytes=1024
+connection=23 uring round_trip_ns min=60115 median=140228 p99=1806803 rounds=2000
+connection=23 blocking round_trip_ns min=56945 median=132145 p99=1039795 rounds=2000
+connection=23 uring stream_mib_per_s=99.9 mebibytes=1024
+connection=23 blocking stream_mib_per_s=149.6 mebibytes=1024
+connection=23 uring round_trip_ns min=60250 median=182725 p99=1136611 rounds=2000
+connection=23 blocking round_trip_ns min=60738 median=182652 p99=1114299 rounds=2000
+connection=23 uring stream_mib_per_s=146.0 mebibytes=1024
+connection=23 blocking stream_mib_per_s=306.4 mebibytes=1024
+connection=23 uring round_trip_ns min=64310 median=398461 p99=1034876 rounds=2000
+connection=23 blocking round_trip_ns min=57592 median=395243 p99=1025361 rounds=2000
+connection=23 uring stream_mib_per_s=305.5 mebibytes=1024
+connection=23 blocking stream_mib_per_s=218.1 mebibytes=1024
+connection=23 uring round_trip_ns min=53432 median=157630 p99=1089668 rounds=2000
+connection=23 blocking round_trip_ns min=46251 median=156561 p99=1029191 rounds=2000
+connection=23 uring stream_mib_per_s=242.0 mebibytes=1024
+connection=23 blocking stream_mib_per_s=158.4 mebibytes=1024
+connection=23 uring round_trip_ns min=76548 median=583247 p99=1349798 rounds=2000
+connection=23 blocking round_trip_ns min=58517 median=578744 p99=1357848 rounds=2000
+connection=23 uring stream_mib_per_s=178.1 mebibytes=1024
+connection=23 blocking stream_mib_per_s=871.1 mebibytes=1024
+connection=23 memory copy_mib_per_s=12453.4 copy8_seq_cst_fence_ns=6.30
+connection=23 ratio one_way_latency_over_copy8=5933 copy_bandwidth_over_stream=26.47
+connection=23 ratio uring_over_blocking fastest_round_trip=1.117 median_round_trip=1.008 stream=0.668 (median of 7 pairs)
+connection=23 exit 0 after 1 attempts
+connection=16 small short_sends=16 (client)
+connection=16 small stream_mib_per_s=200.8 mebibytes=1
+connection=16 uring round_trip_ns min=37457 median=70081 p99=109304 rounds=2000
+connection=16 blocking round_trip_ns min=33506 median=62238 p99=95033 rounds=2000
+connection=16 uring stream_mib_per_s=209.1 mebibytes=1024
+connection=16 blocking stream_mib_per_s=156.1 mebibytes=1024
+connection=16 uring round_trip_ns min=64450 median=510364 p99=3252484 rounds=2000
+connection=16 blocking round_trip_ns min=68429 median=505953 p99=1333185 rounds=2000
+connection=16 uring stream_mib_per_s=90.1 mebibytes=1024
+connection=16 blocking stream_mib_per_s=253.0 mebibytes=1024
+connection=16 uring round_trip_ns min=62321 median=159992 p99=1134108 rounds=2000
+connection=16 blocking round_trip_ns min=45773 median=150562 p99=1107429 rounds=2000
+connection=16 uring stream_mib_per_s=292.4 mebibytes=1024
+connection=16 blocking stream_mib_per_s=485.1 mebibytes=1024
+connection=16 uring round_trip_ns min=43551 median=163800 p99=1162155 rounds=2000
+connection=16 blocking round_trip_ns min=53836 median=168880 p99=1137211 rounds=2000
+connection=16 uring stream_mib_per_s=188.1 mebibytes=1024
+connection=16 blocking stream_mib_per_s=149.7 mebibytes=1024
+connection=16 uring round_trip_ns min=63458 median=424785 p99=1195738 rounds=2000
+connection=16 blocking round_trip_ns min=56397 median=411364 p99=1185346 rounds=2000
+connection=16 uring stream_mib_per_s=171.1 mebibytes=1024
+connection=16 blocking stream_mib_per_s=107.8 mebibytes=1024
+connection=16 uring round_trip_ns min=61726 median=142840 p99=2761548 rounds=2000
+connection=16 blocking round_trip_ns min=64427 median=143150 p99=1258006 rounds=2000
+connection=16 uring stream_mib_per_s=227.4 mebibytes=1024
+connection=16 blocking stream_mib_per_s=475.3 mebibytes=1024
+connection=16 uring round_trip_ns min=45696 median=126724 p99=1038348 rounds=2000
+connection=16 blocking round_trip_ns min=59817 median=137768 p99=1061363 rounds=2000
+connection=16 uring stream_mib_per_s=1107.6 mebibytes=1024
+connection=16 blocking stream_mib_per_s=1147.0 mebibytes=1024
+connection=16 memory copy_mib_per_s=13240.8 copy8_seq_cst_fence_ns=6.33
+connection=16 ratio one_way_latency_over_copy8=5532 copy_bandwidth_over_stream=11.95
+connection=16 ratio uring_over_blocking fastest_round_trip=0.958 median_round_trip=1.009 stream=0.966 (median of 7 pairs)
+connection=16 exit 0 after 1 attempts
+connection=20 small short_sends=16 (client)
+connection=20 small stream_mib_per_s=186.8 mebibytes=1
+connection=20 uring round_trip_ns min=33397 median=62908 p99=137122 rounds=2000
+connection=20 blocking round_trip_ns min=35602 median=67348 p99=152994 rounds=2000
+connection=20 uring stream_mib_per_s=215.2 mebibytes=1024
+connection=20 blocking stream_mib_per_s=130.7 mebibytes=1024
+connection=20 uring round_trip_ns min=68244 median=178425 p99=1275772 rounds=2000
+connection=20 blocking round_trip_ns min=56369 median=169697 p99=2452688 rounds=2000
+connection=20 uring stream_mib_per_s=87.9 mebibytes=1024
+connection=20 blocking stream_mib_per_s=256.9 mebibytes=1024
+connection=20 uring round_trip_ns min=53155 median=161732 p99=1203021 rounds=2000
+connection=20 blocking round_trip_ns min=59428 median=166859 p99=1221981 rounds=2000
+connection=20 uring stream_mib_per_s=341.1 mebibytes=1024
+connection=20 blocking stream_mib_per_s=139.0 mebibytes=1024
+connection=20 uring round_trip_ns min=48973 median=130502 p99=707846 rounds=2000
+connection=20 blocking round_trip_ns min=57766 median=131693 p99=706581 rounds=2000
+connection=20 uring stream_mib_per_s=159.9 mebibytes=1024
+connection=20 blocking stream_mib_per_s=162.5 mebibytes=1024
+connection=20 uring round_trip_ns min=55621 median=599868 p99=1209030 rounds=2000
+connection=20 blocking round_trip_ns min=62782 median=593389 p99=1212408 rounds=2000
+connection=20 uring stream_mib_per_s=233.6 mebibytes=1024
+connection=20 blocking stream_mib_per_s=274.4 mebibytes=1024
+connection=20 uring round_trip_ns min=66080 median=529058 p99=1197446 rounds=2000
+connection=20 blocking round_trip_ns min=71246 median=532690 p99=1154856 rounds=2000
+connection=20 uring stream_mib_per_s=336.8 mebibytes=1024
+connection=20 blocking stream_mib_per_s=175.9 mebibytes=1024
+connection=20 uring round_trip_ns min=47987 median=112363 p99=512181 rounds=2000
+connection=20 blocking round_trip_ns min=52648 median=106926 p99=485965 rounds=2000
+connection=20 uring stream_mib_per_s=1006.1 mebibytes=1024
+connection=20 blocking stream_mib_per_s=2116.2 mebibytes=1024
+connection=20 memory copy_mib_per_s=13545.5 copy8_seq_cst_fence_ns=6.17
+connection=20 ratio one_way_latency_over_copy8=5099 copy_bandwidth_over_stream=13.46
+connection=20 ratio uring_over_blocking fastest_round_trip=0.911 median_round_trip=0.993 stream=0.984 (median of 7 pairs)
+connection=20 exit 0 after 1 attempts
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-01: error: *** STEP 26.0 ON slurm-node-01 CANCELLED AT 2026-10-12T01:54:13 ***
+srun: error: slurm-node-01: task 0: Killed

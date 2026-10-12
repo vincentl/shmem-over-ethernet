@@ -1,0 +1,22 @@
+Internal ctest changing into directory: ~/verify-tree-models-5-6/build/release
+Test project ~/verify-tree-models-5-6/build/release
+    Start 741: model.get_completion.equality
+1/6 Test #741: model.get_completion.equality ....   Passed    0.04 sec
+    Start 744: model.arrival
+2/6 Test #744: model.arrival ....................   Passed    0.05 sec
+    Start 755: model.close
+3/6 Test #755: model.close ......................   Passed  144.52 sec
+    Start 759: model.pipeline
+4/6 Test #759: model.pipeline ...................   Passed   35.70 sec
+    Start 761: model.scan
+5/6 Test #761: model.scan .......................   Passed    3.22 sec
+    Start 764: model.team_block
+6/6 Test #764: model.team_block .................   Passed    4.36 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Label Time Summary:
+model    = 187.88 sec*proc (6 tests)
+tier1    = 187.88 sec*proc (6 tests)
+
+Total Test time (real) = 187.90 sec

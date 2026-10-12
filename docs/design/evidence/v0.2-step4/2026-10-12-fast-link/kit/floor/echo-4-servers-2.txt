@@ -1,0 +1,11 @@
+srun: job 17 queued and waiting for resources
+srun: job 17 has been allocated resources
+small enobufs=251 rearms=251
+small enobufs=249 rearms=249
+small enobufs=249 rearms=249
+small enobufs=248 rearms=248
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-02: error: *** STEP 17.0 ON slurm-node-02 CANCELLED AT 2026-10-12T01:44:12 ***
+srun: error: slurm-node-02: task 0: Killed

@@ -1,0 +1,21 @@
+Internal ctest changing into directory: ~/verify-tree-models-a/build/release
+Test project ~/verify-tree-models-a/build/release
+      Start 746: model.reservation
+ 1/20 Test #746: model.reservation ................   Passed  1113.25 sec
+      Start 747: model.blocked_record
+ 2/20 Test #747: model.blocked_record .............   Passed    0.03 sec
+      Start 748: model.range_watch
+ 3/20 Test #748: model.range_watch ................   Passed    0.25 sec
+      Start 749: model.chained_wake
+ 4/20 Test #749: model.chained_wake ...............   Passed    0.32 sec
+      Start 752: model.wait_word
+ 5/20 Test #752: model.wait_word ..................   Passed    0.81 sec
+      Start 753: model.credit_wait
+ 6/20 Test #753: model.credit_wait ................   Passed    3.62 sec
+      Start 754: model.tree_barrier
+ 7/20 Test #754: model.tree_barrier ...............   Passed  358.65 sec
+      Start 756: model.abort
+ 8/20 Test #756: model.abort ......................   Passed  715.85 sec
+      Start 758: model.lock
+ 9/20 Test #758: model.lock .......................   Passed    0.35 sec
+      Start 760: model.allgather

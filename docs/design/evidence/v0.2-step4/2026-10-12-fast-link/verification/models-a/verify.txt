@@ -1,0 +1,5 @@
+# slurm-node-08, 16 CPUs, started 2026-10-12T01:31:15Z
+== build release 01:31:15
+warnings: 0
+== models: 20 of 40 01:31:25
+STOPPED 02:08:47 on the word of the author: 7 of 20 done here; abort_model, killed mid-run, and 12 others not run on the cluster (pure Python, all 40 green in the VM in round nine)

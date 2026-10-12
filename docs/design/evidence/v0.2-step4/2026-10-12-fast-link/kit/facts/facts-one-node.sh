@@ -1,0 +1,30 @@
+first=slurm-node-01
+nodes="slurm-node-01 slurm-node-02 slurm-node-03 slurm-node-04 slurm-node-05 slurm-node-06 slurm-node-07 slurm-node-08 "
+say() { sed "s/^/$(hostname) $1: /"; }
+uname -a | say kernel
+lscpu | say cpu
+free -b | say memory
+df -B1 /dev/shm | say dev-shm
+getconf PAGESIZE | say page-size
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>&1 | say governor
+numactl --hardware 2>&1 | say numa
+address=$(getent ahostsv4 "$first" | awk 'NR == 1 { print $1 }')
+interface=$(ip route get "$address" 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }' | head -1)
+if [ -z "$interface" ] || [ "$interface" = lo ]; then
+    interface=$(ip -o -4 route show default | awk '{ print $5 }' | head -1)
+fi
+echo "$interface" | say interface
+ip -d link show "$interface" | say link
+cat "/sys/class/net/$interface/speed" 2>&1 | say speed
+for option in -i -k -c -l -g; do /usr/sbin/ethtool $option "$interface" 2>&1 | say "ethtool$option"; done
+for key in net.core.netdev_max_backlog net.core.rmem_max net.core.wmem_max net.ipv4.tcp_rmem \
+           net.ipv4.tcp_wmem net.ipv4.tcp_congestion_control net.ipv4.tcp_notsent_lowat \
+           net.ipv4.tcp_mtu_probing net.ipv4.tcp_slow_start_after_idle net.core.somaxconn \
+           net.core.default_qdisc kernel.io_uring_disabled; do
+    echo "$key = $(cat "/proc/sys/${key//.//}" 2>&1)" | say sysctl
+done
+echo "memlock $(ulimit -l), open files $(ulimit -n), stack $(ulimit -s)" | say limits
+loginctl show-user "$(id -un)" -p Linger 2>&1 | say linger
+grep -h '^ *RemoveIPC' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>&1 | say logind
+dpkg-query -W liburing2 liburing-dev 2>&1 | say packages
+for n in $nodes; do echo "$n $(getent ahostsv4 "$n" | awk 'NR == 1 { print $1 }')"; done | say resolves

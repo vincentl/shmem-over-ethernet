@@ -1,0 +1,21 @@
+small enobufs=236 rearms=236
+small enobufs=233 rearms=233
+small enobufs=238 rearms=238
+small enobufs=236 rearms=236
+small enobufs=235 rearms=235
+small enobufs=236 rearms=236
+small enobufs=234 rearms=234
+small enobufs=235 rearms=235
+small enobufs=236 rearms=236
+small enobufs=237 rearms=237
+small enobufs=242 rearms=242
+small enobufs=244 rearms=244
+small enobufs=240 rearms=240
+small enobufs=247 rearms=247
+small enobufs=243 rearms=243
+small enobufs=238 rearms=238
+srun: forcing job termination
+srun: got SIGCONT
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd-slurm-node-02: error: *** STEP 25.0 ON slurm-node-02 CANCELLED AT 2026-10-12T01:54:13 ***
+srun: error: slurm-node-02: task 0: Killed

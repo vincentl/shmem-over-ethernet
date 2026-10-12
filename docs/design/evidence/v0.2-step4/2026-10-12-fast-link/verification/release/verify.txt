@@ -1,0 +1,12 @@
+# slurm-node-04, 16 CPUs, started 2026-10-12T01:31:09Z
+== build release 01:31:09
+warnings: 0
+== static checks 01:31:19
+100% tests passed, 0 tests failed out of 13
+== release OSOE_PROGRESS_HELPERS=0 01:31:53
+100% tests passed, 0 tests failed out of 871
+== release OSOE_PROGRESS_HELPERS=2 01:33:23
+100% tests passed, 0 tests failed out of 871
+== release OSOE_PROGRESS_HELPERS=3 01:34:50
+100% tests passed, 0 tests failed out of 871
+DONE 01:36:18
