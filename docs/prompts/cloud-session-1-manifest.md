@@ -76,8 +76,9 @@ PROBE PASSED (0 failures)
 - **Tier 1**, `ctest --test-dir build/release -L tier1 -j4 --timeout 120`: 139
   tests. At the 30-minute bound **136 had finished: 135 passed, 1 skipped, none
   failed**; three models were still running and were stopped there -
-  `model.reservation`, `model.deadlock_owners` and `model.shape_timing` - and ran
-  later in T32's model suite (below). The 101 tests that are not models took 103
+  `model.reservation`, `model.deadlock_owners` and `model.shape_timing` - and
+  passed later, in T32's model suite at `-j1` (below): 2,167 s, 1,400 s and 87 s
+  alone. The 101 tests that are not models took 103
   s of test time, `shmem.strict-c11` 80 of it; the models, four at a time on four
   cores, took the rest: `model.abort` 1,461 s, `model.abort_exit` 1,298 s,
   `model.tree_barrier` 771 s, `model.close` 288 s, `model.posted_bitmap` 183 s,
@@ -434,13 +435,16 @@ compare it.* Still so at `82c5263`: every breakage's case said `False`, and
   verdict; `trapped: wire reader never advances` caught TRAPPED, `named: ring
   writer does not wait` caught BOUND; `report` right in its three cases);
   the static checks, 13 of 13; then the whole model suite one at a time,
-  `ctest --test-dir build/release -L model -j1 -V`, on these files: running
-  when this was committed - its first 15 tests passed, `model.reservation` in
-  2,167 s of its 2,400 s timeout, `model.abort` in 1,407 s, none with an
-  UNEXPECTED line - its whole count in the next commit's entry, as is
-  `get_completion_model.py` whole, which no preset registers; the other five of
-  §4.11's models and `rabenseifner_model.py` ran whole under the subagents,
-  exit 0 each.
+  `ctest --test-dir build/release -L model -j1 -V`, on the committed files:
+  **39 of 39 passed**, in 9,274 s (2 h 35 min) - the longest `model.reservation`
+  2,167 s of its 2,400 s timeout, `model.abort` 1,407, `model.deadlock_owners`
+  1,400, `model.abort_exit` 1,273, `model.circulant` 761, `model.tree_barrier`
+  740 - and no result line UNEXPECTED (the word appears twice, in
+  `selftest.py`'s checks of `report`, which must answer it). This was running
+  when T32 was committed (`d86c959`); its count is the next commit's.
+  `get_completion_model.py`, whose design cases no preset registers, whole:
+  running at this commit, its result in the next; the other five of §4.11's models and
+  `rabenseifner_model.py` ran whole under the subagents, exit 0 each.
 - **Left**: `allgather_model.py`, the lead's - its breakages still say `False`,
   which `report` takes as before (`expect_ok`), so the model suite passes it
   unchanged; converting it is the same edit as the others'.
