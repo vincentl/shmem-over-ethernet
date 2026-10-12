@@ -1,0 +1,224 @@
+srun: job 1721 queued and waiting for resources
+srun: job 1721 has been allocated resources
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=1500m memory=1g seed=1 report=5 exercises=sort
+exercise sort mode=accumulate exchange=fetch-add ptr=yes keys=1048576 cycle=113 capacity=133304320 local_sort=msd-in-place private=9.1m seconds=600 memory=1017.1m
+sort t=0.3 round=1 keys=16777216 keys_per_s=54308626 mib_per_s=414.3 generate_s=0.009 bin_s=0.014 exchange_s=0.288 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=0.309 failures=0
+library nodes=4 bytes_sent=100753616 gets_nonblocking=0 landing_full=0 reserve_stalls=877 wakes_sent=227 barrier_ns=528725109
+sort t=2.9 round=9 keys=150994944 keys_per_s=52148743 mib_per_s=397.9 generate_s=0.046 bin_s=0.082 exchange_s=2.453 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=2.574 failures=0
+library nodes=4 bytes_sent=805853192 gets_nonblocking=0 landing_full=0 reserve_stalls=6522 wakes_sent=1756 barrier_ns=5674786610
+sort t=8.0 round=24 keys=402653184 keys_per_s=49677069 mib_per_s=379.0 generate_s=0.093 bin_s=0.156 exchange_s=4.837 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.066 failures=0
+library nodes=4 bytes_sent=1511159120 gets_nonblocking=0 landing_full=0 reserve_stalls=12415 wakes_sent=3214 barrier_ns=10969603975
+sort t=12.6 round=38 keys=637534208 keys_per_s=50486444 mib_per_s=385.2 generate_s=0.079 bin_s=0.143 exchange_s=4.441 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.652 failures=0
+library nodes=4 bytes_sent=1410459848 gets_nonblocking=0 landing_full=0 reserve_stalls=11453 wakes_sent=2969 barrier_ns=9029265521
+sort t=17.5 round=53 keys=889192448 keys_per_s=50914339 mib_per_s=388.4 generate_s=0.084 bin_s=0.154 exchange_s=4.717 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.943 failures=0
+library nodes=4 bytes_sent=1511217384 gets_nonblocking=0 landing_full=0 reserve_stalls=12267 wakes_sent=3196 barrier_ns=10364022686
+sort t=22.5 round=68 keys=1140850688 keys_per_s=50540999 mib_per_s=385.6 generate_s=0.088 bin_s=0.154 exchange_s=4.752 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.979 failures=0
+library nodes=4 bytes_sent=1511126008 gets_nonblocking=0 landing_full=0 reserve_stalls=12191 wakes_sent=3172 barrier_ns=11724387849
+sort t=27.2 round=83 keys=1392508928 keys_per_s=54005654 mib_per_s=412.0 generate_s=0.086 bin_s=0.154 exchange_s=4.433 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.660 failures=0
+library nodes=4 bytes_sent=1511079584 gets_nonblocking=0 landing_full=0 reserve_stalls=12268 wakes_sent=3027 barrier_ns=8662382148
+sort t=32.1 round=99 keys=1660944384 keys_per_s=54344054 mib_per_s=414.6 generate_s=0.092 bin_s=0.164 exchange_s=4.698 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.940 failures=0
+library nodes=4 bytes_sent=1611926064 gets_nonblocking=0 landing_full=0 reserve_stalls=12980 wakes_sent=3278 barrier_ns=9161383743
+sort t=46.9 round=115 keys=1929379840 keys_per_s=18224095 mib_per_s=139.0 imbalance=1.000 generate_s=0.094 bin_s=0.164 exchange_s=4.960 sort_s=8.683 check_s=1.002 sync_s=0.000 step_s=14.730 failures=0
+library nodes=4 bytes_sent=1611883016 gets_nonblocking=0 landing_full=0 reserve_stalls=13179 wakes_sent=3298 barrier_ns=10044766438
+sort t=48.4 round=120 keys=2013265920 keys_per_s=54134756 mib_per_s=413.0 generate_s=0.030 bin_s=0.052 exchange_s=1.475 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.550 failures=0
+library nodes=4 bytes_sent=503676432 gets_nonblocking=0 landing_full=0 reserve_stalls=4109 wakes_sent=1081 barrier_ns=2785057826
+sort t=53.8 round=136 keys=2281701376 keys_per_s=49929191 mib_per_s=380.9 generate_s=0.092 bin_s=0.163 exchange_s=5.132 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.376 failures=0
+library nodes=4 bytes_sent=1611851176 gets_nonblocking=0 landing_full=0 reserve_stalls=13229 wakes_sent=3491 barrier_ns=11962363434
+sort t=58.5 round=150 keys=2516582400 keys_per_s=50372118 mib_per_s=384.3 generate_s=0.085 bin_s=0.146 exchange_s=4.451 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.663 failures=0
+library nodes=4 bytes_sent=1410410752 gets_nonblocking=0 landing_full=0 reserve_stalls=11988 wakes_sent=3176 barrier_ns=9473585428
+sort t=63.1 round=165 keys=2768240640 keys_per_s=54377371 mib_per_s=414.9 generate_s=0.087 bin_s=0.152 exchange_s=4.402 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.628 failures=0
+library nodes=4 bytes_sent=1511154864 gets_nonblocking=0 landing_full=0 reserve_stalls=12345 wakes_sent=3107 barrier_ns=8145966747
+sort t=68.2 round=181 keys=3036676096 keys_per_s=52381872 mib_per_s=399.6 generate_s=0.091 bin_s=0.165 exchange_s=4.886 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.125 failures=0
+library nodes=4 bytes_sent=1611844544 gets_nonblocking=0 landing_full=0 reserve_stalls=13252 wakes_sent=3327 barrier_ns=10624871303
+sort t=73.0 round=196 keys=3288334336 keys_per_s=52936461 mib_per_s=403.9 generate_s=0.085 bin_s=0.153 exchange_s=4.525 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.754 failures=0
+library nodes=4 bytes_sent=1511121504 gets_nonblocking=0 landing_full=0 reserve_stalls=12409 wakes_sent=3112 barrier_ns=9379720147
+sort t=77.6 round=211 keys=3539992576 keys_per_s=53699441 mib_per_s=409.7 generate_s=0.084 bin_s=0.154 exchange_s=4.460 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.686 failures=0
+library nodes=4 bytes_sent=1511221000 gets_nonblocking=0 landing_full=0 reserve_stalls=12346 wakes_sent=3045 barrier_ns=7907007600
+sort t=92.3 round=227 keys=3808428032 keys_per_s=18284879 mib_per_s=139.5 imbalance=1.000 generate_s=0.092 bin_s=0.165 exchange_s=4.964 sort_s=8.698 check_s=0.984 sync_s=0.000 step_s=14.681 failures=0
+library nodes=4 bytes_sent=1611883280 gets_nonblocking=0 landing_full=0 reserve_stalls=13397 wakes_sent=3249 barrier_ns=10934996384
+sort t=94.0 round=232 keys=3892314112 keys_per_s=50235450 mib_per_s=383.3 generate_s=0.028 bin_s=0.052 exchange_s=1.594 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.670 failures=0
+library nodes=4 bytes_sent=503645488 gets_nonblocking=0 landing_full=0 reserve_stalls=4039 wakes_sent=1054 barrier_ns=3924615531
+sort t=98.6 round=246 keys=4127195136 keys_per_s=50660685 mib_per_s=386.5 generate_s=0.082 bin_s=0.144 exchange_s=4.425 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.636 failures=0
+library nodes=4 bytes_sent=1410496712 gets_nonblocking=0 landing_full=0 reserve_stalls=11494 wakes_sent=3052 barrier_ns=10471209326
+sort t=103.5 round=261 keys=4378853376 keys_per_s=52145339 mib_per_s=397.8 generate_s=0.090 bin_s=0.156 exchange_s=4.602 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.826 failures=0
+library nodes=4 bytes_sent=1511147272 gets_nonblocking=0 landing_full=0 reserve_stalls=12365 wakes_sent=3300 barrier_ns=9698055980
+sort t=108.3 round=276 keys=4630511616 keys_per_s=52155342 mib_per_s=397.9 generate_s=0.088 bin_s=0.154 exchange_s=4.598 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.825 failures=0
+library nodes=4 bytes_sent=1511162848 gets_nonblocking=0 landing_full=0 reserve_stalls=12395 wakes_sent=3191 barrier_ns=9794766032
+sort t=113.1 round=291 keys=4882169856 keys_per_s=52376032 mib_per_s=399.6 generate_s=0.086 bin_s=0.153 exchange_s=4.578 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.805 failures=0
+library nodes=4 bytes_sent=1511168808 gets_nonblocking=0 landing_full=0 reserve_stalls=12257 wakes_sent=3174 barrier_ns=9460781315
+sort t=118.3 round=306 keys=5133828096 keys_per_s=48297187 mib_per_s=368.5 generate_s=0.087 bin_s=0.153 exchange_s=4.982 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.211 failures=0
+library nodes=4 bytes_sent=1511094808 gets_nonblocking=0 landing_full=0 reserve_stalls=12717 wakes_sent=3299 barrier_ns=12794603290
+sort t=123.1 round=320 keys=5368709120 keys_per_s=48887474 mib_per_s=373.0 generate_s=0.079 bin_s=0.143 exchange_s=4.592 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.805 failures=0
+library nodes=4 bytes_sent=1410417280 gets_nonblocking=0 landing_full=0 reserve_stalls=11474 wakes_sent=3187 barrier_ns=12231313940
+sort t=127.5 round=334 keys=5603590144 keys_per_s=53511654 mib_per_s=408.3 generate_s=0.082 bin_s=0.144 exchange_s=4.176 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.389 failures=0
+library nodes=4 bytes_sent=1410358320 gets_nonblocking=0 landing_full=0 reserve_stalls=11449 wakes_sent=3033 barrier_ns=8394475056
+sort t=142.0 round=349 keys=5855248384 keys_per_s=17320332 mib_per_s=132.1 imbalance=1.000 generate_s=0.086 bin_s=0.154 exchange_s=4.830 sort_s=8.677 check_s=1.015 sync_s=0.000 step_s=14.530 failures=0
+library nodes=4 bytes_sent=1511199008 gets_nonblocking=0 landing_full=0 reserve_stalls=12541 wakes_sent=3253 barrier_ns=10590472220
+sort t=143.8 round=354 keys=5939134464 keys_per_s=47355459 mib_per_s=361.3 generate_s=0.030 bin_s=0.052 exchange_s=1.697 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.771 failures=0
+library nodes=4 bytes_sent=503679360 gets_nonblocking=0 landing_full=0 reserve_stalls=4219 wakes_sent=1130 barrier_ns=4848331455
+sort t=148.6 round=368 keys=6174015488 keys_per_s=49220243 mib_per_s=375.5 generate_s=0.084 bin_s=0.143 exchange_s=4.560 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.772 failures=0
+library nodes=4 bytes_sent=1410469920 gets_nonblocking=0 landing_full=0 reserve_stalls=11564 wakes_sent=3044 barrier_ns=11861942605
+sort t=153.3 round=382 keys=6408896512 keys_per_s=49344657 mib_per_s=376.5 generate_s=0.080 bin_s=0.145 exchange_s=4.548 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.760 failures=0
+library nodes=4 bytes_sent=1410442304 gets_nonblocking=0 landing_full=0 reserve_stalls=11589 wakes_sent=3078 barrier_ns=11051119263
+sort t=157.7 round=396 keys=6643777536 keys_per_s=54349656 mib_per_s=414.7 generate_s=0.080 bin_s=0.144 exchange_s=4.110 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.322 failures=0
+library nodes=4 bytes_sent=1410295600 gets_nonblocking=0 landing_full=0 reserve_stalls=11588 wakes_sent=2995 barrier_ns=7293667044
+sort t=163.0 round=412 keys=6912212992 keys_per_s=50608447 mib_per_s=386.1 generate_s=0.092 bin_s=0.165 exchange_s=5.063 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.304 failures=0
+library nodes=4 bytes_sent=1611916640 gets_nonblocking=0 landing_full=0 reserve_stalls=13260 wakes_sent=3469 barrier_ns=10749926291
+sort t=167.6 round=427 keys=7163871232 keys_per_s=54768663 mib_per_s=417.9 generate_s=0.088 bin_s=0.155 exchange_s=4.369 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.595 failures=0
+library nodes=4 bytes_sent=1511247400 gets_nonblocking=0 landing_full=0 reserve_stalls=12374 wakes_sent=2984 barrier_ns=7829501628
+sort t=172.6 round=443 keys=7432306688 keys_per_s=53740468 mib_per_s=410.0 generate_s=0.093 bin_s=0.163 exchange_s=4.753 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.995 failures=0
+library nodes=4 bytes_sent=1611923184 gets_nonblocking=0 landing_full=0 reserve_stalls=13210 wakes_sent=3331 barrier_ns=9390077139
+sort t=187.8 round=459 keys=7700742144 keys_per_s=17586803 mib_per_s=134.2 imbalance=1.000 generate_s=0.090 bin_s=0.164 exchange_s=5.572 sort_s=8.714 check_s=0.994 sync_s=0.000 step_s=15.263 failures=0
+library nodes=4 bytes_sent=1611871328 gets_nonblocking=0 landing_full=0 reserve_stalls=13267 wakes_sent=3656 barrier_ns=15467250841
+sort t=189.4 round=464 keys=7784628224 keys_per_s=51943690 mib_per_s=396.3 generate_s=0.028 bin_s=0.052 exchange_s=1.539 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.615 failures=0
+library nodes=4 bytes_sent=503678864 gets_nonblocking=0 landing_full=0 reserve_stalls=4219 wakes_sent=1100 barrier_ns=3221613625
+sort t=194.6 round=479 keys=8036286464 keys_per_s=49213050 mib_per_s=375.5 generate_s=0.090 bin_s=0.163 exchange_s=4.888 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.114 failures=0
+library nodes=4 bytes_sent=1511117432 gets_nonblocking=0 landing_full=0 reserve_stalls=12547 wakes_sent=3317 barrier_ns=10936509223
+sort t=199.2 round=493 keys=8271167488 keys_per_s=50331455 mib_per_s=384.0 generate_s=0.080 bin_s=0.145 exchange_s=4.452 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.667 failures=0
+library nodes=4 bytes_sent=1410329344 gets_nonblocking=0 landing_full=0 reserve_stalls=11673 wakes_sent=3074 barrier_ns=8679244125
+sort t=203.7 round=507 keys=8506048512 keys_per_s=52060753 mib_per_s=397.2 generate_s=0.085 bin_s=0.142 exchange_s=4.300 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.512 failures=0
+library nodes=4 bytes_sent=1410319184 gets_nonblocking=0 landing_full=0 reserve_stalls=11579 wakes_sent=3125 barrier_ns=8711492715
+sort t=208.7 round=522 keys=8757706752 keys_per_s=50288806 mib_per_s=383.7 generate_s=0.087 bin_s=0.154 exchange_s=4.778 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.004 failures=0
+library nodes=4 bytes_sent=1511109768 gets_nonblocking=0 landing_full=0 reserve_stalls=12110 wakes_sent=3058 barrier_ns=12487505671
+sort t=213.4 round=536 keys=8992587776 keys_per_s=50829530 mib_per_s=387.8 generate_s=0.081 bin_s=0.143 exchange_s=4.413 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.621 failures=0
+library nodes=4 bytes_sent=1410433560 gets_nonblocking=0 landing_full=0 reserve_stalls=11615 wakes_sent=3212 barrier_ns=8705507736
+sort t=218.4 round=551 keys=9244246016 keys_per_s=49520315 mib_per_s=377.8 generate_s=0.091 bin_s=0.154 exchange_s=4.858 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.082 failures=0
+library nodes=4 bytes_sent=1511114944 gets_nonblocking=0 landing_full=0 reserve_stalls=12615 wakes_sent=3369 barrier_ns=11217159548
+sort t=232.7 round=565 keys=9479127040 keys_per_s=16431929 mib_per_s=125.4 imbalance=1.000 generate_s=0.083 bin_s=0.146 exchange_s=4.650 sort_s=8.670 check_s=0.997 sync_s=0.000 step_s=14.294 failures=0
+library nodes=4 bytes_sent=1410386208 gets_nonblocking=0 landing_full=0 reserve_stalls=11610 wakes_sent=2987 barrier_ns=11592653323
+sort t=234.0 round=569 keys=9546235904 keys_per_s=54486820 mib_per_s=415.7 generate_s=0.022 bin_s=0.041 exchange_s=1.173 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.232 failures=0
+library nodes=4 bytes_sent=402993832 gets_nonblocking=0 landing_full=0 reserve_stalls=3485 wakes_sent=867 barrier_ns=1595645194
+sort t=239.2 round=585 keys=9814671360 keys_per_s=50896147 mib_per_s=388.3 generate_s=0.089 bin_s=0.166 exchange_s=5.032 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.274 failures=0
+library nodes=4 bytes_sent=1611819112 gets_nonblocking=0 landing_full=0 reserve_stalls=13314 wakes_sent=3522 barrier_ns=10727784672
+sort t=243.7 round=600 keys=10066329600 keys_per_s=56342509 mib_per_s=429.9 generate_s=0.089 bin_s=0.154 exchange_s=4.238 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.467 failures=0
+library nodes=4 bytes_sent=1511107376 gets_nonblocking=0 landing_full=0 reserve_stalls=12387 wakes_sent=3017 barrier_ns=7516009850
+sort t=248.7 round=616 keys=10334765056 keys_per_s=53341086 mib_per_s=407.0 generate_s=0.093 bin_s=0.166 exchange_s=4.788 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.032 failures=0
+library nodes=4 bytes_sent=1611998920 gets_nonblocking=0 landing_full=0 reserve_stalls=13192 wakes_sent=3305 barrier_ns=10594915470
+sort t=253.4 round=631 keys=10586423296 keys_per_s=53633475 mib_per_s=409.2 generate_s=0.089 bin_s=0.155 exchange_s=4.467 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.692 failures=0
+library nodes=4 bytes_sent=1511114056 gets_nonblocking=0 landing_full=0 reserve_stalls=12285 wakes_sent=3142 barrier_ns=9196310715
+sort t=258.3 round=646 keys=10838081536 keys_per_s=51522410 mib_per_s=393.1 generate_s=0.087 bin_s=0.154 exchange_s=4.657 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.884 failures=0
+library nodes=4 bytes_sent=1511128312 gets_nonblocking=0 landing_full=0 reserve_stalls=12518 wakes_sent=3257 barrier_ns=9837076246
+sort t=263.1 round=661 keys=11089739776 keys_per_s=52745971 mib_per_s=402.4 generate_s=0.090 bin_s=0.153 exchange_s=4.544 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.771 failures=0
+library nodes=4 bytes_sent=1511122256 gets_nonblocking=0 landing_full=0 reserve_stalls=12450 wakes_sent=3234 barrier_ns=9106904684
+sort t=267.9 round=676 keys=11341398016 keys_per_s=52002061 mib_per_s=396.7 generate_s=0.086 bin_s=0.154 exchange_s=4.611 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.839 failures=0
+library nodes=4 bytes_sent=1511184064 gets_nonblocking=0 landing_full=0 reserve_stalls=12473 wakes_sent=3158 barrier_ns=8679301274
+sort t=282.6 round=691 keys=11593056256 keys_per_s=17138608 mib_per_s=130.8 imbalance=1.000 generate_s=0.084 bin_s=0.154 exchange_s=4.998 sort_s=8.657 check_s=0.982 sync_s=0.000 step_s=14.684 failures=0
+library nodes=4 bytes_sent=1511127480 gets_nonblocking=0 landing_full=0 reserve_stalls=12485 wakes_sent=3381 barrier_ns=12196309985
+sort t=284.2 round=696 keys=11676942336 keys_per_s=51641329 mib_per_s=394.0 generate_s=0.031 bin_s=0.052 exchange_s=1.548 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.624 failures=0
+library nodes=4 bytes_sent=503723520 gets_nonblocking=0 landing_full=0 reserve_stalls=4174 wakes_sent=1108 barrier_ns=2849088807
+sort t=288.9 round=711 keys=11928600576 keys_per_s=54541867 mib_per_s=416.1 generate_s=0.087 bin_s=0.153 exchange_s=4.386 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.614 failures=0
+library nodes=4 bytes_sent=1511033888 gets_nonblocking=0 landing_full=0 reserve_stalls=12638 wakes_sent=3128 barrier_ns=7766448203
+sort t=294.2 round=727 keys=12197036032 keys_per_s=50453531 mib_per_s=384.9 generate_s=0.091 bin_s=0.165 exchange_s=5.078 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.320 failures=0
+library nodes=4 bytes_sent=1611871752 gets_nonblocking=0 landing_full=0 reserve_stalls=13110 wakes_sent=3230 barrier_ns=13940266712
+sort t=299.1 round=742 keys=12448694272 keys_per_s=51546031 mib_per_s=393.3 generate_s=0.084 bin_s=0.154 exchange_s=4.655 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.882 failures=0
+library nodes=4 bytes_sent=1511194216 gets_nonblocking=0 landing_full=0 reserve_stalls=12568 wakes_sent=3331 barrier_ns=9516476364
+sort t=303.7 round=757 keys=12700352512 keys_per_s=54035830 mib_per_s=412.3 generate_s=0.088 bin_s=0.154 exchange_s=4.434 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.657 failures=0
+library nodes=4 bytes_sent=1511192256 gets_nonblocking=0 landing_full=0 reserve_stalls=12323 wakes_sent=3144 barrier_ns=9167313428
+sort t=308.5 round=773 keys=12968787968 keys_per_s=56471092 mib_per_s=430.8 generate_s=0.091 bin_s=0.165 exchange_s=4.510 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.754 failures=0
+library nodes=4 bytes_sent=1611850576 gets_nonblocking=0 landing_full=0 reserve_stalls=12971 wakes_sent=3144 barrier_ns=8255505815
+sort t=313.5 round=789 keys=13237223424 keys_per_s=53047967 mib_per_s=404.7 generate_s=0.091 bin_s=0.164 exchange_s=4.817 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.060 failures=0
+library nodes=4 bytes_sent=1611940584 gets_nonblocking=0 landing_full=0 reserve_stalls=13320 wakes_sent=3263 barrier_ns=9993058207
+sort t=328.0 round=804 keys=13488881664 keys_per_s=17399878 mib_per_s=132.8 imbalance=1.000 generate_s=0.084 bin_s=0.155 exchange_s=4.770 sort_s=8.683 check_s=0.969 sync_s=0.000 step_s=14.463 failures=0
+library nodes=4 bytes_sent=1511189040 gets_nonblocking=0 landing_full=0 reserve_stalls=12434 wakes_sent=2903 barrier_ns=12104421269
+sort t=329.6 round=809 keys=13572767744 keys_per_s=51565468 mib_per_s=393.4 generate_s=0.028 bin_s=0.052 exchange_s=1.551 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.627 failures=0
+library nodes=4 bytes_sent=503734688 gets_nonblocking=0 landing_full=0 reserve_stalls=4153 wakes_sent=998 barrier_ns=4289823229
+sort t=334.4 round=824 keys=13824425984 keys_per_s=52272093 mib_per_s=398.8 generate_s=0.085 bin_s=0.155 exchange_s=4.589 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.814 failures=0
+library nodes=4 bytes_sent=1511148008 gets_nonblocking=0 landing_full=0 reserve_stalls=12158 wakes_sent=3105 barrier_ns=10130245058
+sort t=339.5 round=839 keys=14076084224 keys_per_s=49649438 mib_per_s=378.8 generate_s=0.088 bin_s=0.153 exchange_s=4.839 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.069 failures=0
+library nodes=4 bytes_sent=1511163528 gets_nonblocking=0 landing_full=0 reserve_stalls=12542 wakes_sent=3195 barrier_ns=12582191538
+sort t=344.2 round=853 keys=14310965248 keys_per_s=50544326 mib_per_s=385.6 generate_s=0.080 bin_s=0.145 exchange_s=4.433 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.647 failures=0
+library nodes=4 bytes_sent=1410421440 gets_nonblocking=0 landing_full=0 reserve_stalls=11914 wakes_sent=3195 barrier_ns=8623408416
+sort t=349.2 round=868 keys=14562623488 keys_per_s=50376742 mib_per_s=384.3 generate_s=0.088 bin_s=0.152 exchange_s=4.768 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.996 failures=0
+library nodes=4 bytes_sent=1511194016 gets_nonblocking=0 landing_full=0 reserve_stalls=12335 wakes_sent=3346 barrier_ns=10808471671
+sort t=354.5 round=883 keys=14814281728 keys_per_s=47515052 mib_per_s=362.5 generate_s=0.085 bin_s=0.153 exchange_s=5.071 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.296 failures=0
+library nodes=4 bytes_sent=1511063504 gets_nonblocking=0 landing_full=0 reserve_stalls=12244 wakes_sent=3389 barrier_ns=13288616245
+sort t=359.1 round=897 keys=15049162752 keys_per_s=50238492 mib_per_s=383.3 generate_s=0.083 bin_s=0.144 exchange_s=4.463 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.675 failures=0
+library nodes=4 bytes_sent=1410298816 gets_nonblocking=0 landing_full=0 reserve_stalls=11683 wakes_sent=2993 barrier_ns=9920633077
+sort t=373.2 round=911 keys=15284043776 keys_per_s=16658214 mib_per_s=127.1 imbalance=1.000 generate_s=0.083 bin_s=0.144 exchange_s=4.427 sort_s=8.686 check_s=0.962 sync_s=0.000 step_s=14.100 failures=0
+library nodes=4 bytes_sent=1410378936 gets_nonblocking=0 landing_full=0 reserve_stalls=11744 wakes_sent=2957 barrier_ns=8841914896
+sort t=374.5 round=915 keys=15351152640 keys_per_s=54639028 mib_per_s=416.9 generate_s=0.023 bin_s=0.043 exchange_s=1.167 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.228 failures=0
+library nodes=4 bytes_sent=402983328 gets_nonblocking=0 landing_full=0 reserve_stalls=3256 wakes_sent=899 barrier_ns=2012262806
+sort t=379.8 round=931 keys=15619588096 keys_per_s=50141285 mib_per_s=382.5 generate_s=0.093 bin_s=0.164 exchange_s=5.109 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.354 failures=0
+library nodes=4 bytes_sent=1611853944 gets_nonblocking=0 landing_full=0 reserve_stalls=13506 wakes_sent=3532 barrier_ns=12765911436
+sort t=384.0 round=945 keys=15854469120 keys_per_s=56221381 mib_per_s=428.9 generate_s=0.079 bin_s=0.145 exchange_s=3.965 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.178 failures=0
+library nodes=4 bytes_sent=1410353776 gets_nonblocking=0 landing_full=0 reserve_stalls=11493 wakes_sent=2749 barrier_ns=7599299959
+sort t=389.3 round=961 keys=16122904576 keys_per_s=50188611 mib_per_s=382.9 generate_s=0.091 bin_s=0.164 exchange_s=5.105 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.349 failures=0
+library nodes=4 bytes_sent=1611883352 gets_nonblocking=0 landing_full=0 reserve_stalls=13240 wakes_sent=3421 barrier_ns=12550237153
+sort t=394.1 round=975 keys=16357785600 keys_per_s=49710978 mib_per_s=379.3 generate_s=0.080 bin_s=0.143 exchange_s=4.514 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.725 failures=0
+library nodes=4 bytes_sent=1410403832 gets_nonblocking=0 landing_full=0 reserve_stalls=11681 wakes_sent=3078 barrier_ns=11385690573
+sort t=398.5 round=989 keys=16592666624 keys_per_s=53198522 mib_per_s=405.9 generate_s=0.082 bin_s=0.144 exchange_s=4.203 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.415 failures=0
+library nodes=4 bytes_sent=1410352104 gets_nonblocking=0 landing_full=0 reserve_stalls=11440 wakes_sent=2852 barrier_ns=9687382212
+sort t=403.2 round=1004 keys=16844324864 keys_per_s=53641076 mib_per_s=409.2 generate_s=0.087 bin_s=0.153 exchange_s=4.466 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.692 failures=0
+library nodes=4 bytes_sent=1511084608 gets_nonblocking=0 landing_full=0 reserve_stalls=12370 wakes_sent=3098 barrier_ns=9489853632
+sort t=417.5 round=1019 keys=17095983104 keys_per_s=17621960 mib_per_s=134.4 imbalance=1.000 generate_s=0.085 bin_s=0.154 exchange_s=4.595 sort_s=8.694 check_s=0.978 sync_s=0.000 step_s=14.281 failures=0
+library nodes=4 bytes_sent=1511202368 gets_nonblocking=0 landing_full=0 reserve_stalls=12384 wakes_sent=3187 barrier_ns=8989843555
+sort t=419.0 round=1024 keys=17179869184 keys_per_s=55756132 mib_per_s=425.4 generate_s=0.032 bin_s=0.055 exchange_s=1.430 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.505 failures=0
+library nodes=4 bytes_sent=503693200 gets_nonblocking=0 landing_full=0 reserve_stalls=4157 wakes_sent=1040 barrier_ns=2685696000
+sort t=424.2 round=1040 keys=17448304640 keys_per_s=51456135 mib_per_s=392.6 generate_s=0.093 bin_s=0.166 exchange_s=4.973 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.217 failures=0
+library nodes=4 bytes_sent=1611819320 gets_nonblocking=0 landing_full=0 reserve_stalls=13227 wakes_sent=3366 barrier_ns=11283119318
+sort t=429.0 round=1055 keys=17699962880 keys_per_s=51940518 mib_per_s=396.3 generate_s=0.087 bin_s=0.156 exchange_s=4.617 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.845 failures=0
+library nodes=4 bytes_sent=1511136128 gets_nonblocking=0 landing_full=0 reserve_stalls=12301 wakes_sent=3393 barrier_ns=8333249638
+sort t=433.7 round=1070 keys=17951621120 keys_per_s=53551276 mib_per_s=408.6 generate_s=0.087 bin_s=0.154 exchange_s=4.474 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.699 failures=0
+library nodes=4 bytes_sent=1511162208 gets_nonblocking=0 landing_full=0 reserve_stalls=12539 wakes_sent=3213 barrier_ns=7832031377
+sort t=438.7 round=1085 keys=18203279360 keys_per_s=50446911 mib_per_s=384.9 generate_s=0.087 bin_s=0.155 exchange_s=4.763 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.989 failures=0
+library nodes=4 bytes_sent=1511168592 gets_nonblocking=0 landing_full=0 reserve_stalls=12608 wakes_sent=3301 barrier_ns=9819228663
+sort t=443.9 round=1100 keys=18454937600 keys_per_s=48978234 mib_per_s=373.7 generate_s=0.088 bin_s=0.155 exchange_s=4.913 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.138 failures=0
+library nodes=4 bytes_sent=1511189544 gets_nonblocking=0 landing_full=0 reserve_stalls=12446 wakes_sent=3212 barrier_ns=11650425057
+sort t=448.4 round=1114 keys=18689818624 keys_per_s=51356738 mib_per_s=391.8 generate_s=0.081 bin_s=0.146 exchange_s=4.367 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.574 failures=0
+library nodes=4 bytes_sent=1410296696 gets_nonblocking=0 landing_full=0 reserve_stalls=11585 wakes_sent=3020 barrier_ns=9190966390
+sort t=453.3 round=1129 keys=18941476864 keys_per_s=51182888 mib_per_s=390.5 generate_s=0.087 bin_s=0.153 exchange_s=4.689 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.917 failures=0
+library nodes=4 bytes_sent=1511091080 gets_nonblocking=0 landing_full=0 reserve_stalls=12433 wakes_sent=3288 barrier_ns=9225302006
+sort t=467.8 round=1144 keys=19193135104 keys_per_s=17400677 mib_per_s=132.8 imbalance=1.000 generate_s=0.085 bin_s=0.155 exchange_s=4.753 sort_s=8.679 check_s=0.961 sync_s=0.000 step_s=14.463 failures=0
+library nodes=4 bytes_sent=1511099936 gets_nonblocking=0 landing_full=0 reserve_stalls=12375 wakes_sent=3240 barrier_ns=9828181620
+sort t=469.4 round=1149 keys=19277021184 keys_per_s=52220066 mib_per_s=398.4 generate_s=0.030 bin_s=0.052 exchange_s=1.531 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.606 failures=0
+library nodes=4 bytes_sent=503721104 gets_nonblocking=0 landing_full=0 reserve_stalls=4143 wakes_sent=1161 barrier_ns=3092921585
+sort t=474.5 round=1164 keys=19528679424 keys_per_s=49254346 mib_per_s=375.8 generate_s=0.096 bin_s=0.153 exchange_s=4.881 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.109 failures=0
+library nodes=4 bytes_sent=1511106472 gets_nonblocking=0 landing_full=0 reserve_stalls=12867 wakes_sent=3256 barrier_ns=11841159018
+sort t=479.0 round=1178 keys=19763560448 keys_per_s=53029559 mib_per_s=404.6 generate_s=0.080 bin_s=0.145 exchange_s=4.215 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.429 failures=0
+library nodes=4 bytes_sent=1410338864 gets_nonblocking=0 landing_full=0 reserve_stalls=11573 wakes_sent=2998 barrier_ns=8174319166
+sort t=483.9 round=1193 keys=20015218688 keys_per_s=50502057 mib_per_s=385.3 generate_s=0.089 bin_s=0.154 exchange_s=4.754 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.983 failures=0
+library nodes=4 bytes_sent=1511194680 gets_nonblocking=0 landing_full=0 reserve_stalls=12322 wakes_sent=3170 barrier_ns=11557999265
+sort t=488.8 round=1208 keys=20266876928 keys_per_s=52202300 mib_per_s=398.3 generate_s=0.089 bin_s=0.154 exchange_s=4.593 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.821 failures=0
+library nodes=4 bytes_sent=1511195288 gets_nonblocking=0 landing_full=0 reserve_stalls=12214 wakes_sent=3185 barrier_ns=10590142814
+sort t=493.8 round=1223 keys=20518535168 keys_per_s=49848718 mib_per_s=380.3 generate_s=0.090 bin_s=0.156 exchange_s=4.821 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.048 failures=0
+library nodes=4 bytes_sent=1511128192 gets_nonblocking=0 landing_full=0 reserve_stalls=12580 wakes_sent=3343 barrier_ns=10397059405
+sort t=498.1 round=1237 keys=20753416192 keys_per_s=54217909 mib_per_s=413.6 generate_s=0.080 bin_s=0.144 exchange_s=4.118 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.332 failures=0
+library nodes=4 bytes_sent=1410436472 gets_nonblocking=0 landing_full=0 reserve_stalls=11514 wakes_sent=2872 barrier_ns=7389354990
+sort t=513.3 round=1253 keys=21021851648 keys_per_s=17699698 mib_per_s=135.0 imbalance=1.000 generate_s=0.092 bin_s=0.165 exchange_s=5.469 sort_s=8.676 check_s=0.981 sync_s=0.000 step_s=15.166 failures=0
+library nodes=4 bytes_sent=1611900504 gets_nonblocking=0 landing_full=0 reserve_stalls=13396 wakes_sent=3608 barrier_ns=13713680730
+sort t=515.1 round=1258 keys=21105737728 keys_per_s=48095616 mib_per_s=366.9 generate_s=0.028 bin_s=0.052 exchange_s=1.669 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.744 failures=0
+library nodes=4 bytes_sent=503727328 gets_nonblocking=0 landing_full=0 reserve_stalls=4072 wakes_sent=1109 barrier_ns=4684959300
+sort t=519.5 round=1272 keys=21340618752 keys_per_s=53165990 mib_per_s=405.6 generate_s=0.080 bin_s=0.143 exchange_s=4.206 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.418 failures=0
+library nodes=4 bytes_sent=1410342768 gets_nonblocking=0 landing_full=0 reserve_stalls=11814 wakes_sent=2998 barrier_ns=7817746383
+sort t=524.3 round=1287 keys=21592276992 keys_per_s=52677470 mib_per_s=401.9 generate_s=0.086 bin_s=0.155 exchange_s=4.551 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.777 failures=0
+library nodes=4 bytes_sent=1511114504 gets_nonblocking=0 landing_full=0 reserve_stalls=12736 wakes_sent=3202 barrier_ns=7893134000
+sort t=529.1 round=1302 keys=21843935232 keys_per_s=52281648 mib_per_s=398.9 generate_s=0.086 bin_s=0.155 exchange_s=4.586 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.814 failures=0
+library nodes=4 bytes_sent=1511101648 gets_nonblocking=0 landing_full=0 reserve_stalls=12302 wakes_sent=3028 barrier_ns=12244630013
+sort t=533.8 round=1317 keys=22095593472 keys_per_s=53645162 mib_per_s=409.3 generate_s=0.085 bin_s=0.154 exchange_s=4.465 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.691 failures=0
+library nodes=4 bytes_sent=1511130800 gets_nonblocking=0 landing_full=0 reserve_stalls=12083 wakes_sent=3171 barrier_ns=9151557086
+sort t=538.6 round=1332 keys=22347251712 keys_per_s=52389401 mib_per_s=399.7 generate_s=0.090 bin_s=0.154 exchange_s=4.574 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.804 failures=0
+library nodes=4 bytes_sent=1510989832 gets_nonblocking=0 landing_full=0 reserve_stalls=12504 wakes_sent=3183 barrier_ns=8645820554
+sort t=543.8 round=1347 keys=22598909952 keys_per_s=47805282 mib_per_s=364.7 generate_s=0.086 bin_s=0.154 exchange_s=5.032 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.264 failures=0
+library nodes=4 bytes_sent=1511177240 gets_nonblocking=0 landing_full=0 reserve_stalls=12561 wakes_sent=3206 barrier_ns=12568776054
+sort t=557.9 round=1361 keys=22833790976 keys_per_s=16677289 mib_per_s=127.2 imbalance=1.000 generate_s=0.080 bin_s=0.145 exchange_s=4.447 sort_s=8.694 check_s=0.982 sync_s=0.000 step_s=14.084 failures=0
+library nodes=4 bytes_sent=1410319592 gets_nonblocking=0 landing_full=0 reserve_stalls=11587 wakes_sent=2960 barrier_ns=8311447973
+sort t=559.2 round=1365 keys=22900899840 keys_per_s=53106855 mib_per_s=405.2 generate_s=0.023 bin_s=0.041 exchange_s=1.204 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=1.264 failures=0
+library nodes=4 bytes_sent=402973496 gets_nonblocking=0 landing_full=0 reserve_stalls=3231 wakes_sent=839 barrier_ns=2353952252
+sort t=564.1 round=1380 keys=23152558080 keys_per_s=51117900 mib_per_s=390.0 generate_s=0.088 bin_s=0.154 exchange_s=4.697 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.923 failures=0
+library nodes=4 bytes_sent=1511171728 gets_nonblocking=0 landing_full=0 reserve_stalls=12423 wakes_sent=3244 barrier_ns=10721868673
+sort t=569.2 round=1395 keys=23404216320 keys_per_s=49772208 mib_per_s=379.7 generate_s=0.092 bin_s=0.155 exchange_s=4.832 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.056 failures=0
+library nodes=4 bytes_sent=1511090216 gets_nonblocking=0 landing_full=0 reserve_stalls=12484 wakes_sent=3216 barrier_ns=11837449276
+sort t=573.5 round=1409 keys=23639097344 keys_per_s=54597432 mib_per_s=416.5 generate_s=0.082 bin_s=0.145 exchange_s=4.090 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.302 failures=0
+library nodes=4 bytes_sent=1410370904 gets_nonblocking=0 landing_full=0 reserve_stalls=11785 wakes_sent=2858 barrier_ns=7839850284
+sort t=579.0 round=1425 keys=23907532800 keys_per_s=48295846 mib_per_s=368.5 generate_s=0.092 bin_s=0.165 exchange_s=5.316 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=5.558 failures=0
+library nodes=4 bytes_sent=1611900808 gets_nonblocking=0 landing_full=0 reserve_stalls=13677 wakes_sent=3526 barrier_ns=12356499899
+sort t=583.5 round=1439 keys=24142413824 keys_per_s=52907232 mib_per_s=403.7 generate_s=0.081 bin_s=0.145 exchange_s=4.229 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.439 failures=0
+library nodes=4 bytes_sent=1410342768 gets_nonblocking=0 landing_full=0 reserve_stalls=11609 wakes_sent=2951 barrier_ns=9068952388
+sort t=588.3 round=1454 keys=24394072064 keys_per_s=51532314 mib_per_s=393.2 generate_s=0.085 bin_s=0.155 exchange_s=4.657 sort_s=0.000 check_s=0.000 sync_s=0.000 step_s=4.884 failures=0
+library nodes=4 bytes_sent=1511097160 gets_nonblocking=0 landing_full=0 reserve_stalls=12224 wakes_sent=3222 barrier_ns=9797051394
+sort t=602.8 round=1469 keys=24645730304 keys_per_s=17374057 mib_per_s=132.6 imbalance=1.000 generate_s=0.086 bin_s=0.155 exchange_s=4.804 sort_s=8.684 check_s=0.982 sync_s=0.000 step_s=14.485 failures=0
+library nodes=4 bytes_sent=1511138624 gets_nonblocking=0 landing_full=0 reserve_stalls=12509 wakes_sent=3202 barrier_ns=10464126033
+sort t=603.2 round=1470 keys=24662507520 keys_per_s=40659882 mib_per_s=310.2 imbalance=1.002 generate_s=0.006 bin_s=0.010 exchange_s=0.339 sort_s=0.052 check_s=0.009 sync_s=0.000 step_s=0.413 failures=0
+library nodes=4 bytes_sent=100747352 gets_nonblocking=0 landing_full=0 reserve_stalls=831 wakes_sent=230 barrier_ns=1078272190
+summary sort rounds=1470 keys=24662507520 seconds=603.2 keys_per_s=40888947 mib_per_s=312.0 imbalance=1.000 failures=0
+osoe-pacer failures=0 seconds=603.3

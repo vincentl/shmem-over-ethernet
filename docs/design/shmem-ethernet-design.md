@@ -2667,8 +2667,8 @@ outcome C11 forbids, and with what.
 
 | Shape | C11's requirement | Order | Where |
 |---|---|---|---|
-| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the wire's `produced` (whose wake word is bumped after it by a locked add) and `consumed`; the agent's `running` (phase 1 step 4); `called`, a caller of `shmem_global_exit` recorded before its declaration's CAS, which the agent's acquire of the word then carries; `waiting_in`, the routine a wait publishes for its agent (the watchdog's retirement). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
-| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job, connection-area and wire headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4), whose store also follows the lead's removal of the node's heap and control-segment names (§6.2) |
+| Single-writer publication (message passing): data, then a flag; the reader loads the flag, then the data | A release store that an acquire load reads makes everything before the store happen-before everything after the load | **`release`** store, **`acquire`** load | counters, `blocked`, `armed_token`, a buffer's `filled` and `seq`; the agent's `running` (phase 1 step 4); `called`, a caller of `shmem_global_exit` recorded before its declaration's CAS, which the agent's acquire of the word then carries; `waiting_in`, the routine a wait publishes for its agent (the watchdog's retirement). *`acked` and the buffers' `head` were here until phase 1 step 3 slice 2, when waiters began to register on them (next row)* |
+| A futex word that is its own predicate | Only the header written before it, which is a release; the kernel orders the compare (futex(2)) | **`release`** | `ready` in the node, job and connection-area headers; the agent's `ready`; `failed`; a landing slot's `ready`; the node's `lead_agent_running` (phase 1 step 4), whose store also follows the lead's removal of the node's heap and control-segment names (§6.2) |
 | Two-sided (store buffering): each side stores its own word, then loads the other's | Both-miss is forbidden only among `seq_cst` operations, which alone are in the single total order *S*; an `acquire` load is not in *S* | **`seq_cst`** on **both stores and both loads** (an RMW counts as the store) | §4.9's watch: `osoe_transport_watch`/`unwatch` and the rmw write; `osoe_transport_load` and `notify`'s load of the watch. The wait words (`base/wait-word.h`, `wait_word_model.py`, slice 2 of step 3): a waiter's registration and its check of the value — `acked`, or a reservation's loads of the buffers' `head` — against the agent's store of the value — `acked`, or open's hand-over of `head` — and its load of the count. |
 | CAS, `fetch_add` and the other RMWs | Any order is atomic; `seq_cst` puts them in *S*, which the two-sided rule needs of the RMW that is its store | **`seq_cst`** | everywhere; among them the abort word, installed whole by one CAS, and `ending`, the claim on ending a process (phase 1 step 4) |
 | A queue in one word, then a wake word: a waiter's ticket and a giver's serve are RMWs on the same word; the giver then bumps a futex word; the waiter loads that word, then checks its ticket (slice 2 of step 3) | Not store buffering: two RMWs on one word are ordered by its modification order, so a give always sees every ticket taken before it. The waiter's check needs only to follow the giver's serve when it has seen the giver's bump — a release RMW read by an `acquire` load; a bump it has not seen is the futex compare's to catch | RMWs **`seq_cst`** (the row above); the waiter's loads of the wake word and of the state **`acquire`** | `osoe_credit_take`, `_give`, `_served` (`credit_wait_model.py`) |
@@ -2684,7 +2684,7 @@ And what changed when the tree was held to that table:
 | Quiet's point a `seq_cst` store to a thread-local word | **No, it guaranteed nothing**: C11 relates that store to no other location. On aarch64 (`stlr`) loads after quiet missed another thread's store ~3.6 M times in 6 M rounds, as often as with nothing there | `seq_cst` fence | `dmb ish`; `mfence` for `xchg` on x86-64 |
 | Fence's point the same store | **Too weak in C11, and a full fence was too strong**: fence needs W→W only | release fence | none on x86-64; `dmb ish` on aarch64 |
 | Futex words that are their own predicate at `seq_cst` (slice 2), and the landing slot's `ready` | **No**: the kernel orders the compare; C11 governs only the header before it | `release` | an `xchg` fewer per word on x86-64 |
-| The wire's `produced` and `consumed` at `seq_cst` | **No**: message passing into a separate wake word, not two-sided. `wire_model.py` now runs every case under SC and x86-TSO with both as release stores: the design holds, each broken variant is still caught | `release` | an `xchg` fewer per send and per receive on x86-64 |
+| The wire's `produced` and `consumed` at `seq_cst` (the shared-memory wire's, gone with it when phase 1 step 3 slice 1 put a socket in its place) | **No**: message passing into a separate wake word, not two-sided. `wire_model.py` now runs every case under SC and x86-TSO with both as release stores: the design holds, each broken variant is still caught | `release` | an `xchg` fewer per send and per receive on x86-64 |
 
 The measurements are evidence that the gaps are real on a shipping target, not
 the argument; the argument is the C11 column. §4.6 has the fence and quiet
@@ -3280,7 +3280,7 @@ Per-thread records (a watch, a blocking-get completion slot) are allocated per
 calling thread even though `SERIALIZED` needs only one per PE. That way `MULTIPLE`
 adds concurrency to them rather than multiplying them.
 
-**Get completion — two cumulative counters per PE, no per-operation state:**
+**Get completion — two cumulative counters per context (per PE until layout 21), no per-operation state:**
 
 ```c
 uint64_t bytes_issued;   /* PE adds expected bytes on issue      */
@@ -3325,13 +3325,13 @@ bytes in the arena, then adds the reply's length to `bytes_landed` - seq_cst,
 since it is the value half of the two-sided wait on the wake word beside it
 (base/wait-word.h: a wake only while the PE waits) - and **returns the credit
 as the reply lands**, where a blocking operation's caller returns it after
-reading its slot: the PE copies nonblocking replies out only at its next wait,
+reading its slot: the PE copies nonblocking replies out only at a wait on their context,
 and holding their credits until then would keep its node-mates' gets queued
 behind replies long delivered. That is the return point the credit's own
 comment has named since the credits were built (reply.h), and the credit
 model's take and give are the same operations whoever gives. Every wait -
 quiet, pe_quiet whatever PEs it names, and a barrier's opening quiet - waits
-for `bytes_landed == bytes_issued` and copies each reply to its `dst`, and so
+for its context's `bytes_landed == bytes_issued` and copies each reply to its `dst`, and so
 does finalize's barrier; an iget ends with a wait for its gets alone
 (`osoe_transport_wait_gets`), since a whole wait would also complete, and pay
 the acknowledgement of, the writes to that PE's node, which an iget does not
@@ -3985,12 +3985,12 @@ question nobody needed. Recorded before a benchmark applies pressure for them.
 | Operation | Guarantee | Intranode backend | AM backend |
 |---|---|---|---|
 | put | Returns at local completion. Applied later; complete and visible once a covering wait returns. No ordering between puts to one PE except across a fence (spec §9.6.1.1). Notify best effort | `memcpy` into the target's mapping, applied before return, then notify | Reserve and copy into the node-pair buffer (§3.5); the dirty set records the node |
-| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at the PE's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get of one piece, or of each piece in turn past the 4,096th context block: its reply lands in the landing slot and the calling thread copies it out (§3.12); of more, and a nonblocking get: its pieces land in the landing arena, each copied out by whichever of the PE's threads claims it first - the wait for that context's gets, or any thread's issue that finds the zone full (§4.6, §4.11's *As built, slice 2*) |
+| get | Blocking. Complete per operation: `dst` holds the bytes on return. With `OSOE_TRANSPORT_NONBLOCKING`, complete at its context's next wait instead. Never fenced | `memcpy` out of the target's mapping, nonblocking or not | Request; a blocking get of one piece, or of each piece in turn past the 4,096th context block: its reply lands in the landing slot and the calling thread copies it out (§3.12); of more, and a nonblocking get: its pieces land in the landing arena, each copied out by whichever of the PE's threads claims it first - the wait for that context's gets, or any thread's issue that finds the zone full (§4.6, §4.11's *As built, slice 2*) |
 | rmw | One 4- or 8-byte word. Exactly once. Exclusive against same-width rmw on the word within one atomicity domain, and against waiters and tests (spec §3.2). Fetching: complete on return. Non-fetching: as a put. Notify exact | One C11 atomic on the shared mapping (§3.16 orders), then notify | Handler-time CPU atomic at the target; a fetched value is a value descriptor (§3.8) |
 | fence | Writes issued on the context before the call are placed at each target before later ones (spec §9.12.1). Unless the context is `NOSTORE`, the calling thread's stores become visible. Does not wait, and need not send anything | Serializing store only; every write is already placed | Serializing store, then ask each dirty peer not yet acknowledged to acknowledge through its highest segment, and flush (§3.4, §4.6) |
-| wait | Every write on the context — to listed PEs, or to all — and every nonblocking get the PE has issued is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes, after the nonblocking gets |
-| wait for gets | Every nonblocking get the PE has issued is complete; writes are left for the next wait. An iget's end | Nothing: none is ever in flight | The gets half of the wait (§4.6, as built) |
-| load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `acquire` load of the word | The same: every writer is a CPU atomic on the shared mapping |
+| wait | Every write on the context — to listed PEs, or to all — and every nonblocking get issued on the context is complete and visible, and unless the context is `NOSTORE` so are the calling thread's stores (spec §9.12.2, §9.12.3). May over-wait | Serializing store only; nothing is ever outstanding | The §4.6 `shmem_quiet`, restricted to the listed PEs' nodes, after the nonblocking gets |
+| wait for gets | Every nonblocking get issued on the context is complete; writes are left for the next wait. An iget's end | Nothing: none is ever in flight | The gets half of the wait (§4.6, as built) |
+| load | A coherent load of a word of the caller's own region, 2, 4 or 8 bytes. Exclusive against rmw on it (spec §3.2). For `shmem_test*`, the `wait_until` predicate, and `shmem_signal_fetch` | One `seq_cst` load of the word (§3.16's two-sided row) | The same: every writer is a CPU atomic on the shared mapping |
 | notify | Wakes a PE's waiters whose watched range a write overlaps (§4.9). Exact for rmw, best effort for puts; wakes may be spurious | §4.9 watch slot | The same function, called by the progress thread after it applies a write |
 
 **Ordering is the weak contract, with a per-operation fence flag.** The boundary
@@ -7331,7 +7331,7 @@ gets, each runs its blocking counterpart's fetching rmw and stores `*fetch`
 before it returns, which the spec permits: the value is promised by the next
 quiet, a deadline rather than a floor. Across nodes each call is therefore a
 round trip where a batch could overlap. The upgrade is the rmw taking
-`OSOE_TRANSPORT_NONBLOCKING` with a result destination the PE's next wait
+`OSOE_TRANSPORT_NONBLOCKING` with a result destination its context's next wait
 copies out, as the gets' does (§4.6), revisiting §4.6's one outstanding
 fetching AMO; nothing in the corpus calls them but the SOS test suite.
 
@@ -8034,8 +8034,9 @@ git. Four properties are deliberate:
 step. Tests carry ctest labels: `env` for `tools/probe`, and tier labels
 (`tier1`, …, §8.2) as the suites arrive, so `ctest --preset debug -L tier1` runs
 what CI can run anywhere. The model checker's tests (`tools/modelcheck`, which
-needs Python 3) carry `model` beside `tier1`. They take about half an hour (29
-minutes in the development VM on 2026-10-03) and run in
+needs Python 3) carry `model` beside `tier1`. They take about an hour (40 tests
+in 62 minutes in the development VM on 2026-10-11, the longest
+`model.reservation` at 14) and run in
 the release build only, so the `release` test preset leaves that label out and
 the `models` preset runs it alone: `ctest --preset models`, or `cmake --workflow
 --preset models` from a clean tree. The project's own verification is the four

@@ -141,7 +141,11 @@ until the tree to be tagged has them; the author tags.
   `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on.
 - [ ] **The x86-64 item at two and three helpers too** (portability P3, under
   "After the release"), and the README's sentence on what "the tagged tree"
-  did on x86-64 made 0.2's (readiness Q5-4).
+  did on x86-64 made 0.2's (readiness Q5-4). Until an x86-64 kernel runs a
+  timing test of the helpers' wakes, what stands for x86's order on them is
+  `lead_wake_model.py`, the owners' wake, and `helper_request_model.py`, the
+  helpers' requests, which run under x86-TSO with breakages that must fail
+  (portability P3's third fix, raised again by the ninth review's P9-5).
 - [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
 - [ ] **The README's commands on the Pi cluster, and its quick start on Raspberry

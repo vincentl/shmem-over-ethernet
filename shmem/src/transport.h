@@ -24,7 +24,7 @@
  * Backends. Each call is dispatched on the single locality function (§8.1):
  *   - intranode: the target's heap is mapped in this process (§4.1); every
  *     operation is a memory operation in the calling thread;
- *   - AM: everything else (§3; not in phase 1 step 1).
+ *   - AM: everything else (§3).
  * Backends are bound at build time: no table of function pointers, and a
  * backend's fast path may become static inline behind these names (§4.10).
  *
@@ -403,10 +403,11 @@ void osoe_transport_put(struct osoe_transport_context *context, int pe, enum oso
  *
  * Blocking, and complete per operation: dst holds the bytes when the call
  * returns, whether dst is private or symmetric memory - unless
- * OSOE_TRANSPORT_NONBLOCKING is set, when they are there after the PE's next
- * osoe_transport_wait. The bytes may be sampled at any moment between the call
- * and its completion; a get racing a write to the same bytes is undefined
- * (§4.6 deferred sampling). Gets are never fenced (spec §9.12.1).
+ * OSOE_TRANSPORT_NONBLOCKING is set, when they are there after the next
+ * osoe_transport_wait on the same context. The bytes may be sampled at any
+ * moment between the call and its completion; a get racing a write to the
+ * same bytes is undefined (§4.6 deferred sampling). Gets are never fenced
+ * (spec §9.12.1).
  *
  * Intranode: memcpy out of the target's heap mapping, nonblocking or not.
  * AM: a blocking get of one piece - or of each piece in turn, from a thread
@@ -486,9 +487,10 @@ uint64_t osoe_transport_rmw(struct osoe_transport_context *context, int pe, enum
  * §3.2), so the value is one some rmw left there, never a torn mix. A backend
  * whose NIC applies rmw out of the CPU's sight synchronizes here.
  *
- * Intranode and AM: one acquire load. Every writer is a CPU atomic on the
- * shared mapping (§4.1), and a load of a word no larger than a pointer is a
- * single instruction on every target.
+ * Intranode and AM: one seq_cst load - the waiter's half of a two-sided
+ * protocol (§3.16), where acquire loses wakes (transport-am.c). Every writer
+ * is a CPU atomic on the shared mapping (§4.1), and a load of a word no larger
+ * than a pointer is a single instruction on every target.
  */
 uint64_t osoe_transport_load(enum osoe_region region, uint64_t offset, unsigned width);
 
@@ -555,7 +557,7 @@ void osoe_transport_fence(struct osoe_transport_context *context);
 
 /*
  * Wait: return once every write issued on context - to the listed PEs, or to
- * every PE if pes is NULL - and every nonblocking get this PE has issued is
+ * every PE if pes is NULL - and every nonblocking get issued on context is
  * complete, and visible to
  * every PE; and, on contexts without SHMEM_CTX_NOSTORE, the calling thread's
  * earlier memory stores are visible to other cores (spec §9.12.2, §9.12.3). With pes non-NULL and npes 0, returns

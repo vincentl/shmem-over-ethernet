@@ -29,7 +29,7 @@ void osoe_rma_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *
 void osoe_rma_get(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
                   size_t nelems, size_t width, int pe, unsigned flags);
 
-/* Complete this PE's nonblocking gets and nothing else (§4.6): what an iget
+/* Complete ctx's nonblocking gets and nothing else (§4.6): what an iget
  * ends with, naming `routine` wherever it waits. */
 void osoe_rma_complete_gets(const char *routine, shmem_ctx_t ctx);
 

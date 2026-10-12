@@ -228,7 +228,11 @@ tier 3, the single-node build and `osoe-pacer`'s runs, across nodes at 23 Gbit/s
 kernel can run - the full build with a shim standing in for the futex2 calls the
 emulator refuses, the single-node build with none, since the emulator passes the
 classic futex through - and an aarch64 build made to order memory as x86-64 does
-passed the whole suite.
+passed the whole suite. The kernels it has run on are Linux 6.12 - Debian 13's,
+in the development virtual machines and, as `6.12.111+deb13-cloud-amd64`, on the
+Google Cloud nodes - and 6.18, the Pi cluster's; the single-node build has run
+on Rocky Linux 9.8's 5.14 besides. No run has been on the 6.7 floor itself,
+which is reasoned from the facilities the full build relies on, not run.
 
 Debian 13 (Trixie) and Raspberry Pi OS Trixie provide all of these from their
 own repositories - `sudo apt install build-essential cmake pkg-config
@@ -613,8 +617,9 @@ where to find what among the documents.
 | `dev/` | `lima/`, the definitions of the Debian 13 virtual machine osoe is developed in on a Mac ([Developing on macOS](#developing-on-macos)) and of the Rocky Linux 9 one the single-node build is tested in |
 | `docs/README.md` | where to find what in `docs/` |
 | `docs/pi-cluster.md`, `docs/pi-cluster-results.md` | the runbook for the four-node Raspberry Pi 5 cluster, and what its sessions measured |
-| `docs/fast-link.md`, `docs/fast-link/` | the runbook for the measurements that wait for a link above a gigabit - v0.2 step 4's last part - with its scripts and probes, not yet run on such a link |
+| `docs/fast-link.md`, `docs/fast-link-results.md`, `docs/fast-link/` | the runbook for the measurements on a link above a gigabit - v0.2 step 4's last part - and what its sessions measured, with its scripts and probes; the first session, on eight x86-64 nodes, was on 2026-10-12 |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
+| `docs/release-notes/` | a note for each release: what it is and what changed, what was checked before its tag, and what it leaves for later |
 | `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
@@ -1506,7 +1511,8 @@ is compared between nodes as well, where the node that sees a difference ends
 naming the variable and both nodes, the nodes already connected to it end with
 it, and a node not yet connected says what it waits for until the launcher ends
 it ("How a job starts"); one marked *checked among a node's PEs* is compared
-only there. `SHMEM_INFO` prints most of this list from the library itself. In
+only there, and one marked *checked between nodes* only between them.
+`SHMEM_INFO` prints most of this list from the library itself. In
 the single-node build the settings only a job of more than one node uses - the
 connections', the wire's, keepalive's, the helpers', the collectives' shape and
 the link's - are still checked as values, as the full build checks them in a job
@@ -1553,7 +1559,7 @@ both are set the `SHMEM_` one controls.
 | `OSOE_KEEPALIVE` | `60,10,6`, or `0` where every node has a loopback address | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - `osoe-launch`'s logical nodes - has neither: with no link between its nodes to cut, and a kernel that closes a dead node's connections itself and answers for a stopped one, a probe can find nothing there, and an overloaded machine's receive backlog drops them. Nodes with addresses of their own keep both, tier 3's namespaces on one machine among them. `SHMEM_DEBUG` says which a node chose. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
-| `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. |
+| `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. A value that is not 32 hexadecimal digits is refused by name, but an empty one is taken as unset, without a word: a wrapper whose secret came out empty starts the job unsecured. *Checked* between nodes: where one node has a secret and another has none, or a different one, the node that sees it ends naming the variable and both nodes; a node's PEs are not compared, and only its lead's is used. |
 | `OSOE_HEAP_BASE` | chosen | The address every PE maps its heap at, a multiple of the page size, in place of the library's own candidates: a node whose lead finds it taken refuses to start. The node's first PE's value is the node's. |
 | `OSOE_SHM_CAPACITY_CHECK` | `1` | `0`: a node whose heaps would not fit `/dev/shm`'s free space is warned, not refused. |
 | `OSOE_KEEP_CONTROL_SEGMENT` | `0` | `1`: the control segment keeps its name in `/dev/shm` until finalize, so a crash leaves it for `osoe-stat` to read; `osoe-stat --gc` removes such segments once their PEs are gone, as it does a [failed start's leftovers](#names-a-failed-start-leaves). |

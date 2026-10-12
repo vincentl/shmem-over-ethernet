@@ -13,8 +13,10 @@ you want; each names the `README.md` of the directories that go with it.
 | `README.md` | what osoe is; building, installing and running a program, under `srun` or on one machine; every limit and every environment variable |
 | `docs/pi-cluster.md` | the runbook for the four Raspberry Pi 5 nodes osoe was measured on, under Slurm: checking the nodes, building, the smoke tests, the library against its floor, `osoe-bench`, how jobs end, and programs from the reading corpus |
 | `docs/pi-cluster-results.md` | what the sessions on that cluster measured and found, newest last |
-| `docs/fast-link.md`, `docs/fast-link/` | the runbook for v0.2 step 4's Part 4, written before its machines exist: five to eight x86-64 nodes on a link above a gigabit, set up under Slurm, and the measurements that decide the progress helpers' default, the zero-copy send's, the ladder's settings and the landing zone's size; beside it the kit's scripts and probes, which run on one machine's logical nodes too (`dry-run.sh`) |
+| `docs/fast-link.md`, `docs/fast-link/` | the runbook for v0.2 step 4's Part 4, written before its machines existed and first run on 2026-10-12: five to eight x86-64 nodes on a link above a gigabit, set up under Slurm, and the measurements that decide the progress helpers' default, the zero-copy send's, the ladder's settings and the landing zone's size; beside it the kit's scripts and probes, which run on one machine's logical nodes too (`dry-run.sh`) |
+| `docs/fast-link-results.md` | what the kit measured on that link, session by session, newest last |
 | `docs/release-checklist.md` | what a release needs - the release point, what every tag needs, and what the reviews rated for after it - ticked where it is done |
+| `docs/release-notes/` | a note for each release: what it is and what changed, what was checked before its tag, and what it leaves for later |
 | `docs/reference/README.md` | where to get the OpenSHMEM 1.6 specification, which is not in the repository |
 
 ## How it works
@@ -22,7 +24,7 @@ you want; each names the `README.md` of the directories that go with it.
 | Where | What |
 |---|---|
 | `docs/design/shmem-ethernet-design.md` | the design notes: every protocol and data structure, and why it is as it is, in ten sections from the goals (§1) to the open questions (§10); §9 lists the invariants the code is held to. Comments in the code cite its sections, as `§4.10`; a reference of the form `§9.x.y` is to the OpenSHMEM specification |
-| `docs/design/README.md` | the rest of `docs/design/`: four proposals (`osoe-pacer-proposal.md`, `team-resources-proposal.md`, `progress-helpers-proposal.md`, `mesh-schedule-proposal.md`), a note and a proposal on a possible successor API (`successor-api-stage-setting.md`, `core-api-proposal.md`), the virtual traces of the reference workloads of design §8.6, and the raw outputs the notes cite |
+| `docs/design/README.md` | the rest of `docs/design/`: five proposals (`osoe-pacer-proposal.md`, `team-resources-proposal.md`, `progress-helpers-proposal.md`, `mesh-schedule-proposal.md`, `blocking-get-proposal.md`), a note and a proposal on a possible successor API (`successor-api-stage-setting.md`, `core-api-proposal.md`), the virtual traces of the reference workloads of design §8.6, and the raw outputs the notes cite |
 | `tools/modelcheck/README.md` | the model checker for osoe's lock-free and futex protocols, and how to write a model |
 | `base/README.md`, `shmem/README.md`, `tools/README.md` | the code: how each directory relates to the rest, and where to start reading |
 
@@ -39,7 +41,7 @@ was directed, written and reviewed; this part is where each level of it is kept.
 | `CLAUDE.md` | the working agreements a session works under: when to delegate to subagents, how names are spelled, how a rename is audited, how review files are named |
 | `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds, of two reads of v0.2 step 4's first part and of round eight's scale S4 on the Pi; its `README.md` is the guide |
 
-**The evidence.** About 2,400 files sit under `docs/design/evidence/` and
+**The evidence.** About 2,900 files sit under `docs/design/evidence/` and
 `docs/reviews/evidence/` - `git ls-files | grep -c '/evidence/'` counts them:
 model runs, litmus tests, probe programs, logs, patches, and the raw output of
 each session on the Pi cluster, which
@@ -59,7 +61,12 @@ were made in. `osoe` is defined in `dev/lima/`, and the earliest briefs call it
 1). `osoe-load` and `osoe-x86` were made for the round-three review and are not
 defined here. `osoe-x86` runs an aarch64 kernel like the others,
 with Rosetta registered for x86-64 programs: a run "in `osoe-x86`" is an aarch64
-run unless it says x86-64. A fourth, `osoe-16k`, was a throwaway for the second
+run unless it says x86-64. An x86-64 run of the full build there goes through a
+shim, loaded with `LD_PRELOAD`, that turns the futex2 calls Rosetta refuses into
+the classic futex; the shim is copied into the VM's own file system, since read
+from the host's mount the full suite stalled after 244 of its tests, Rosetta's
+translation daemon at 400% CPU (v0.2 step 1's portability review, Q9).
+A fourth, `osoe-16k`, was a throwaway for the second
 round's check of a kernel with 16 KiB pages, and
 `docs/reviews/evidence/phase1-step2-slice1/portability/page-size-16k-vm.yaml`
 defines it. Paths under `build/scratch/` name the scratch tree of the session

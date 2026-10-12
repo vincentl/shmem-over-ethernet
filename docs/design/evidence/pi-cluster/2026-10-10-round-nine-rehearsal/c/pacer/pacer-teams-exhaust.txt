@@ -1,0 +1,8 @@
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=teams
+exercise teams mode=exhaust seconds=60 memory=0
+osoe: PE 0: shmem_team_split_strided: no team number is free on every PE of the new team - between them they hold every one a program may use, though each may hold fewer: OSOE_MAX_TEAMS is 256, the teams one PE may be in at once, 3 of them predefined, and a larger one leaves more to choose from (design §5.7); the split takes none and returns nonzero on every PE of its parent team
+teams exhausted after 253 splits of the whole team, then the split returned nonzero on every PE; the teams destroyed, one more split of the whole team succeeded on every PE, and was destroyed
+teams t=0.0 round=1 collectives=0 collectives_per_s=0 grid_s=0.000 strided_s=0.000 check_s=0.000 renew_s=0.000 step_s=0.000 failures=0
+library nodes=4 bytes_sent=308208 gets_nonblocking=0 landing_full=0 reserve_stalls=0 wakes_sent=914 barrier_ns=34787121
+summary teams rounds=1 collectives=0 seconds=0.0 collectives_per_s=0 failures=0
+osoe-pacer failures=0 seconds=0.2

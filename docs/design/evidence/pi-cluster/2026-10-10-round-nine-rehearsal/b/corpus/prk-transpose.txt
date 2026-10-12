@@ -1,0 +1,10 @@
+Parallel Research Kernels version 2.17
+SHMEM matrix transpose: B = A^T
+Number of ranks      = 16
+Matrix order         = 2048
+Number of iterations = 10
+Synchronization      = flags
+Tile size            = 32
+Solution validates
+Rate (MB/s): 974.886819 Avg time (s): 0.068838
+Summed errors:              0.000000000000000 

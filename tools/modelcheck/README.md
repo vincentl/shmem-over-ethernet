@@ -35,8 +35,9 @@ were run. Develop new models here.
 
 **Where they run.** Every model is a ctest in the release preset only: a model
 is Python and gives the same verdict whichever preset built the library. They
-carry the label `model` beside `tier1`, and take about half an hour (29
-minutes in the development VM, 2026-10-03), so the
+carry the label `model` beside `tier1`, and take about an hour (40 tests in
+62 minutes in the development VM, 2026-10-11, the longest `model.reservation`
+at 14), so the
 `release` test preset leaves that label out and the `models` preset runs it
 alone (`ctest --preset models`). Without Python 3 none is registered. The
 six of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
