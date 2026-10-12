@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 167 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 169 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
@@ -68,7 +68,7 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
 
 ## The order of the work
 
-1. **Now, in the VMs, while the cluster is made** - the 127 items that need no
+1. **Now, in the VMs, while the cluster is made** - the 128 items that need no
    cluster, in slices of related items, each slice a branch:
    - **the kit for the cluster's machine** - done on 2026-10-11, set for
      `c2-standard-8` and back to `c4-standard-16` - before the first session;
@@ -169,8 +169,8 @@ a scan, each modelled and tested, and the crossover among the three measured
 What was put to the author, the lead's recommendation first:
 
 - **A1, the cluster** - answered in part on 2026-10-11 (eight `c4-standard-16`,
-  an MTU of 8896, a head node reached through IAP): each session's window and
-  the budget remain.
+  an MTU of 8896, a head node reached through IAP) and on 2026-10-12 (the next session the next
+  day, about two hours): the later sessions' windows and the budget remain.
 - **A7, the scope.** `task-v0.2.md` put out of v0.2 RoCE and Soft-RoCE, the mesh
   schedule and `process_vm_readv` for statics. *Recommended:* RoCE and Soft-RoCE
   stay out - a backend is new work, not an open item, and `c4-standard-16` has no
@@ -194,13 +194,16 @@ What was put to the author, the lead's recommendation first:
 - **A13, Träff's at 257 to 512 nodes**, which 254 logical nodes cannot reach.
   *Recommended:* accepted through a lower ceiling's tests.
 - **A14, round three's R6 and R7.** *Recommended:* R6 closed by `docs/README.md`
-  as it stands; R7's seam note made with X7.
+  as it stands; R7's seam note made with X7. *The author, 2026-10-12:* a fresh
+  read first.
 - **A2 to A6** come after Part 4's sessions, each from its section's results, as
-  the runbook says.
+  the runbook says. A5 was answered on 2026-10-12 from the first session's §8 -
+  the landing zone from a per-node budget (P32, H28) - and A6 waits for §10's
+  senders (H11).
 
 ## What it costs
 
-The inventory's sizes are 95 small, 64 medium and 8 large, before each slice's
+The inventory's sizes are 96 small, 65 medium and 8 large, before each slice's
 verification - about three hours of a VM - and read. With subagents for the
 mechanical slices, the work in the VMs is some eight to twelve working sessions;
 Part 4 is four cluster sessions of four hours and their analysis; the Pi's items
