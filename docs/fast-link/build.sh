@@ -34,7 +34,9 @@ if [ "$KIT_LAUNCHER" = osoe-launch ]; then
     build_here | tee -a "$LOG"
     exit "${PIPESTATUS[0]}"
 fi
-for n in $(tail -n +2 "$NODES_FILE"); do
+# Every node of the list but this machine: the first node has the tree already,
+# and a head node off the list is none of them.
+for n in $(grep -vxF "$(hostname -s)" "$NODES_FILE"); do
     ssh "$n" mkdir -p "$REPOSITORY" && \
         rsync -a --delete --exclude=/.git --exclude=/build "$REPOSITORY"/ "$n:$REPOSITORY"/ \
         || { echo "copying the tree to $n failed" | tee -a "$LOG"; exit 1; }

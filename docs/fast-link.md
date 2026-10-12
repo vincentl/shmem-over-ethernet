@@ -136,7 +136,7 @@ crashed in the development VM, a machine without a GPU, printing no node line;
 with the plugin removed alone it still did (round nine's review, R2):
 
 ```sh
-for n in $(tail -n +2 NODES); do ssh -o StrictHostKeyChecking=accept-new $n \
+for n in $(grep -vxF "$(hostname -s)" NODES); do ssh -o StrictHostKeyChecking=accept-new $n \
     "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
      build-essential cmake pkg-config liburing-dev rsync ethtool iperf3 &&
      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
