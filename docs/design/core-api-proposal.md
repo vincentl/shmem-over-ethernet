@@ -11,19 +11,21 @@ reasons from what hardware does, the source is that survey: osoe is a software
 transport over Ethernet, built to be a working 1.6 and not from how Slingshot
 or InfiniBand implement SHMEM, and it is cited here as one transport's
 experience, labelled as such (the author's caution, 2026-10-07). Nothing here
-binds osoe. The author will answer §10's questions, and the proposal will be revised
+binds osoe. The author will answer §11's questions, and the proposal will be revised
 from his answers. The placeholder prefix `oc_` is the earlier documents' and is
 not a name.*
 
 **How to read it.** §1 is the author's direction, stated so that the rest can be
-checked against it. §2 is the proposal on one page. §3 is what the reading
-corpus says about how programs synchronize, the evidence the choices lean on.
-§4 takes each item of §2 in turn: what it is, why, what else was considered and
-why it was not chosen, or was left open as a question. §5 writes a software
-pipeline on the API. §6 is threads, §7 OpenSHMEM 1.6 as a library on top, §8
-the checklist for an API meant to be used with an AI assistant, §9 what is
-deliberately absent. §10 is the questions and push-backs for the author,
-numbered, each with a recommendation.
+checked against it. §2 is the proposal on one page: three layers, the rule that
+admits a call to each, and the core's table. §3 is what the reading corpus and
+MppUtil say about how programs synchronize, the evidence the choices lean on.
+§4 takes each item of the core in turn: what it is, why, what else was
+considered and why it was not chosen, or was left open as a question. §5 writes
+a software pipeline on the API. §6 is the thread model, §7 the OpenSHMEM 2.0
+standard library built on the core, §8 OpenSHMEM 1.6 as a library on the two,
+§9 the checklist for an API meant to be used with an AI assistant, §10 what is
+deliberately absent. §11 is the questions and push-backs for the author,
+numbered, each with a recommendation; §12 is what follows the answers.
 
 ## 1. The author's direction
 
@@ -61,23 +63,66 @@ From the author on 2026-09-20 (`successor-api-stage-setting.md` §1) and
     implementable, since the corpus's problems were bound by SHMEM's history
     and the specification's own model has been the recurring trouble.
     (2026-10-07)
+14. **Three layers, each with a rule of admission**: a coherent PGAS core
+    aligned with the hardware, which vendors implement; an OpenSHMEM 2.0
+    standard library of the functions complete programs need, built on the
+    core, with nothing admitted for ergonomics alone; and OpenSHMEM 1.6 built
+    on the two. (2026-10-07)
 
 ## 2. The proposal on one page
 
-In the shape of the talk's backup slide:
+Three layers, and the rule that admits a call to each:
 
-| | Calls | What it answers |
-|---|---|---|
-| **Job** | `open` `close` `abort` `query` | the world team is the job: ranks, nodes, and which calls are native here |
-| **Teams** | `split` `node_mates` `rank` `size` `translate` `release` | *who*, as an arithmetic rule; and *the realm*, the scope in which this PE's operations are ordered and completed. A team may split into a sub-team of itself, and is one thread's at a time |
-| **Memory** | `region_create` `region_release` `allocate` `free` `reference_to` `reference_offset` `direct` | symmetric regions over a team, declared by purpose; references, not addresses, on the wire; node-mates' pointers |
-| **Data** | `put` `get` `put_signal` | nonblocking, on a team to a member of it; the signal an add or a set; flags `FENCED` and `MORE` |
-| **Atomics** | `fetch_add` `compare_swap` `read` `add` `set` | 64-bit words in atomic regions; the first three fetch and return, `add` and `set` do not |
-| **Waiting** | `await` | my own waitable word, a comparison, a deadline |
-| **Completion** | `quiet` `quiet_to` | everything this PE issued on the team, or on it to one member, is complete and visible; collectives included |
-| **Collectives** | `sync` `broadcast` `reduce` `allgather` | nonblocking, named by (team, sequence), begun once the PE's earlier operations on the team are complete, behind the seam |
+- **The core.** A call is admitted if removing it changes what programs can
+  express (*necessary*) or changes a cost class on real hardware (*native*):
+  one round trip to two, O(1) to O(P), native to emulated. Vendors implement
+  the core and nothing else. Twenty-five calls and one flag.
+- **OpenSHMEM 2.0, the standard library on the core** (§7). A function is
+  admitted if a complete PGAS program needs it, it is built from core calls
+  with no change of cost class, it has one spelling, and its cost is stated as
+  the core calls it makes. Written once, portable, shipped with the
+  specification; a vendor may replace any function with a native one whose
+  contract holds. Nothing is admitted for ergonomics alone. About fifteen
+  functions.
+- **OpenSHMEM 1.6 on the two** (§8). The compatibility library, allowed to be
+  slow where 1.6's semantics are expensive.
 
-Thirty-two calls, and four rules that make them one system:
+### The core
+
+In the shape of the talk's backup slide, with the reason each call is in the
+core beside it:
+
+| | Calls | Why in the core | What it answers |
+|---|---|---|---|
+| **Job** | `open` `close` `abort` | necessary | a job that starts, releases, and ends with its status in band; `open` returns the world team and fills the capabilities |
+| **Teams** | `split` `rank` `size` `translate` `release` | necessary | *who*, as an arithmetic rule with a tag; and *the realm*, the scope in which this PE's operations are ordered and completed; one thread's at a time |
+| | `node_mates` | native | locality, the runtime's knowledge: a team's members on my node, in O(1) |
+| **Memory** | `region_create` `region_release` | necessary | symmetric regions over a team, declared by purpose and placed at one offset on every member; a reference `(region, offset)` is arithmetic on the base `region_create` returns |
+| | `direct` | native | a node-mate's pointer, with an ordering contract |
+| **Data** | `put` `get` | necessary | nonblocking, on a team to a member of it |
+| | `put_signal` | native | the data, then an add to or a set of a waitable word fenced behind it, as the one NIC operation it is |
+| **Order** | the flag `FENCED` | native | placed after my earlier operations on this team to this target: the NIC's fence bit, a quiet otherwise |
+| **Atomics** | `compare_swap` `read` | necessary | the universal atomic, and a coherent read of a word the atomic engine writes |
+| | `fetch_add` `add` | native | the hottest fetching atomic, and the same without a reply |
+| **Waiting** | `await` | necessary | my own waitable word, a comparison, a deadline |
+| **Completion** | `quiet` | necessary | everything this PE issued on the team is complete and visible, collectives included |
+| | `quiet_to` | native | the same for this PE's operations to one member: per-peer completion, which the hardware has |
+| **Arrival** | `sync` | native | arrival, posted now, in effect once my earlier operations on the team are complete, released at `quiet`; a tree of atomics and awaits in software, an engine in hardware |
+| **Collectives** | `broadcast` `reduce` | native | nonblocking, named by (team, sequence), begun once the PE's earlier operations on the team are complete; what in-network engines offload |
+
+Sixteen calls are necessary; nine, and the flag, are native. The reference
+constructors `reference_to` and `reference_offset` are inline arithmetic in the
+core's header, part of the reference type and not calls (§4.7).
+
+### The 2.0 library
+
+`allocate` `free`; `set`; `barrier`; `allgather` `exchange` `exchangev`
+`collect`; the derived atomics, swap, and, or, xor, min, max and the 32-bit
+forms; `lock` `unlock`. §7 gives each its recipe in core calls and its cost.
+
+### The rules
+
+Four rules make the layers one system:
 
 1. **Every call returns a status, and every wait takes a deadline.** `DONE`,
    `NOT_YET`, `PEER_FAILED`. Misuse is a named fatal in every build, never a
@@ -95,11 +140,11 @@ Thirty-two calls, and four rules that make them one system:
    collectives and waits follow: a quiet is the owner's, a collective is one
    call per PE from the owner, a wait is any thread's on its own PE's word (§6).
 
-Fence, quiet and barrier survive as *order within a team* (a flag on an
-operation), *completion of a team* (`quiet`) and *arrival of a team* (`sync`,
-completed by `quiet`): three different questions that hardware answers with
-three different mechanisms, none derivable from the others without a round
-trip. What does not survive is their unscoped form.
+Fence, quiet and barrier survive as the core's *Order*, *Completion* and
+*Arrival* rows: a flag on an operation, the quiet of a team, and a sync
+completed by quiet, three different questions that hardware answers with three
+different mechanisms, none derivable from the others without a round trip. What
+does not survive is their unscoped form.
 
 ## 3. What the corpus says
 
@@ -231,7 +276,8 @@ benchmarks and OSB's micro-benchmarks set apart from the applications.
    memory signals by put-with-signal. An add alone would serve them, since the
    counts are monotone, but it is not their idiom, and a set is a plain write,
    native everywhere. So `put_signal` takes the operation, add or set, as the
-   specification's does (§4.4, Q11), and `set` joins the atomics (§4.5).
+   specification's does (§4.4, Q11), and a standalone `set` is the 2.0
+   library's (§7).
 6. **Subset completion is wanted five ways and met well by none**: per
    partner (bale's exstack2, which quiets three times a buffer; DeepEP; MORI);
    per buffer (mandelbrot); per stage (the pipelined reduce); by rolling
@@ -271,7 +317,7 @@ choices are the proposal's prior art (read 2026-10-07: `src/comm.c`,
    manual says the stack is shared by every thread of the process and that
    changing it while sibling threads call is unsafe. The nesting is the
    proposal's tree of teams, of which a stack is one path; the implicit
-   argument is what §8's first item forbids. A thread-local current team with
+   argument is what §9's first item forbids. A thread-local current team with
    push and pop is a convenience header above the core (§4.2's table).
 3. **Every split is collective over the current communicator** and agrees a
    slot in a symmetric pool of 32 internal records, pSync arrays and one SHMEM
@@ -312,15 +358,16 @@ choices are the proposal's prior art (read 2026-10-07: `src/comm.c`,
 ```c
 typedef int64_t oc_deadline;          /* absolute nanoseconds; OC_BLOCK waits, OC_POLL returns at once */
 
-oc_status oc_open (const struct oc_options *, oc_team *world);
-oc_status oc_query(oc_team, struct oc_capabilities *);
+oc_status oc_open (const struct oc_options *, oc_team *world, struct oc_capabilities *);
 void      oc_close(oc_team world);                                 /* local; nothing collective */
 _Noreturn void oc_abort(oc_team, int status, const char *reason);   /* ends the job, in band */
 ```
 
-**What.** `oc_open` returns the world team: every PE in the job, in the order
-the launcher gave. Rank and size are team queries (`oc_team_rank(world)`); node
-and node count are in the capabilities. `oc_options` carries the job's shape,
+**What.** `oc_open` returns the world team, every PE in the job in the order
+the launcher gave, and fills the capabilities: which calls are native here, the
+budgets of teams, hardware queues, counters and per-thread records, and the
+node map. Rank and size are team queries (`oc_team_rank(world)`). `oc_options`
+carries the job's shape,
 which ranks share a node, so that one host is a cluster by definition and every
 program is testable on a laptop (L13); the thread level; and the diagnostic
 sink. `close` releases resources and is local: the barrier that OpenSHMEM's
@@ -337,8 +384,9 @@ root of all identity.
 
 | Alternative | Why not |
 |---|---|
-| An implicit global job, as OpenSHMEM's `shmem_init` | contracts stop being local: a call site cannot be judged from the handles in scope (§8); two libraries in one process cannot each open a job |
+| An implicit global job, as OpenSHMEM's `shmem_init` | contracts stop being local: a call site cannot be judged from the handles in scope (§9); two libraries in one process cannot each open a job |
 | A separate `oc_job`, the world team derived from it | one more object for no answer the world team does not give; **Q13** |
+| A separate `query` call for the capabilities | they are read once, at start, and never change; `open` fills them and the core is one call smaller |
 | `finalize` as barrier plus teardown | L8: the root leaves first while owing the release, and `atexit` turns a fatal into a hang |
 
 ### 4.2 Teams: a rule for who, and the realm of completion
@@ -602,20 +650,20 @@ oc_status oc_compare_swap(oc_team, int rank, struct oc_reference, uint64_t expec
                           uint64_t *old, oc_deadline);
 oc_status oc_read        (oc_team, int rank, struct oc_reference, uint64_t *value, oc_deadline);
 oc_status oc_add         (oc_team, int rank, struct oc_reference, uint64_t addend, unsigned flags);   /* no reply */
-oc_status oc_set         (oc_team, int rank, struct oc_reference, uint64_t value,  unsigned flags);   /* no reply */
 ```
 
 64-bit words, 8-byte aligned by construction, in regions created `OC_ATOMIC`
 or `OC_WAITABLE`, except `oc_read`, which reads a word of any region. The
 three that fetch block for their round trip and return the value, rule 2, with
-a deadline; `add` and `set` do not fetch and complete at the team's `quiet`.
+a deadline; `add` does not fetch and completes at the team's `quiet`.
 
-**Why these five.** The core-API review's required set was write, read,
-compare-and-swap and add (`core-api.md` §2.4), and this is that set with the
-fetching and non-fetching forms told apart by what programs use. `set` is an
-atomic write of one aligned word, the one "atomic" every fabric has because it
-is a write, and the signal the GPU codes set 66 times for every 4 adds (§3.2,
-item 5); it is `put_signal`'s set half on its own. The stage-setting's §3 table: the intersection of PCIe
+**Why these four.** The core-API review's required set was write, read,
+compare-and-swap and add (`core-api.md` §2.4); this is that set with the
+fetching and non-fetching forms told apart by what programs use, and with the
+write where it belongs: as the set operation of `put_signal`, and as the 2.0
+library's standalone `set` built on it (§7), since where the signaller is a
+word's only writer an aligned write is atomic on every fabric, and that is what
+a signal is. The stage-setting's §3 table: the intersection of PCIe
 AtomicOps, IBTA RoCE and mlx5 is {fetch-and-add, compare-and-swap} on 64 bits,
 always fetching. Add swap and stock IBTA is lost; add 32 bits and it is lost
 again, and a 32-bit atomic cannot be emulated on the containing word without
@@ -624,9 +672,9 @@ operation with the reply discarded, and the hottest atomic in the corpus:
 histograms, GUPS, bale, DeepEP's `amo_nonfetch_add`. `read` is a fetch every
 fabric has in some form. Everything else, swap, and, or, xor, min, max, 32-bit
 and floating-point, is *derived*: a compare-and-swap loop, two round trips or
-more under contention, or a target-CPU handler. It belongs in a library above
-the core with its cost stated in its header; whether that library ships in the
-same header is **Q7**.
+more under contention, or a target-CPU handler. It is the 2.0 library's, each
+routine with its cost in its header and a vendor free to substitute a native
+one (§7, **Q7**).
 
 **Atomicity is the region's.** All atomics to a word go through one engine, the
 NIC's or the CPU's, chosen per region and never both, the RoCE review's lesson
@@ -675,14 +723,13 @@ core (**Q12**).
 #define OC_ATOMIC    (1u << 1)   /* atomics */
 #define OC_WAITABLE  (1u << 2)   /* words an await may wait on */
 
-oc_status oc_region_create (oc_team, size_t bytes, unsigned purpose, oc_region *);   /* collective; returns when made */
+oc_status oc_region_create (oc_team, size_t bytes, unsigned purpose, oc_region *, void **base);   /* collective; agrees placement; returns when made */
 void      oc_region_release(oc_region);
-void     *oc_allocate(oc_region, size_t bytes, size_t alignment);   /* local, deterministic, no barrier */
-void      oc_free(oc_region, void *);
-struct oc_reference { uint32_t region; uint64_t offset; };
-struct oc_reference oc_reference_to(oc_region, const void *local);
-struct oc_reference oc_reference_offset(struct oc_reference, uint64_t bytes);   /* arithmetic */
 void     *oc_direct(oc_team, int rank, struct oc_reference);          /* a pointer, or NULL */
+
+struct oc_reference { uint32_t region; uint64_t offset; };                                   /* what the wire carries */
+static inline struct oc_reference oc_reference_to(oc_region, const void *local);             /* (region, local - base) */
+static inline struct oc_reference oc_reference_offset(struct oc_reference, uint64_t bytes);  /* arithmetic */
 ```
 
 Kept from the strawman (§4.2), the arguments restated. A region is created
@@ -695,21 +742,82 @@ scratch among the team's members alone, which bale's conveyors cannot today
 (§3.1, item 8). The purpose is declared at creation because that is what an
 RDMA backend needs to register atomic-capable and waitable memory apart from
 bulk memory (osoe's `set_range`, UCX's atomic key), stated once rather than
-inferred per allocation. Allocation is local and
-deterministic, symmetric by contract: osoe's allocator has this property, and
-the specification's barrier on every `malloc` is a logarithmic collective for
-nothing; a debug build carries an allocation digest on the next collective and
-names the first divergent call. `oc_direct` gives a node-mate's pointer with
+inferred per allocation. The region is the primitive, and the only one:
+`region_create` returns its local base, a program carves it as it likes, and
+the two reference constructors are arithmetic on that base, part of the type
+and not calls. The allocator over a region, local, deterministic and
+barrier-free where the specification's `malloc` is a logarithmic collective for
+nothing, is the 2.0 library's (§7). `oc_direct` gives a node-mate's pointer with
 osoe's contract: non-`NULL` means that stores through it are ordered against the
 library's own writes, not merely "is local". No symmetric statics: L15 prices
 the compatibility promise (7 of the specification's 53 examples run without
-them), and the library of §7 pays it with a linker script, not the core.
+them), and the library of §8 pays it with a linker script, not the core.
+
+**What a region is to the implementation.** Not a new mapping and not a new
+NIC registration. `open` reserves one pool per purpose on each PE, sized by an
+option, and registers each once; a region is a range of the pool of its
+purpose, with an id in a small per-PE table, and nothing per region reaches
+the NIC. The pools are three because waitable and atomic memory need
+registration attributes that bulk memory must not carry: on CXI a counter
+bound to a memory region disables optimized RMA for everything in it.
+
+**Placement is symmetric within the team.** A region sits at the same offset
+of the pool on every member, so that an initiator turns `(region, offset)`
+into a target address with one add and no table. Placed per member instead,
+every PE would need every member's base for every region, O(regions ×
+members), the key-times-chunk-times-peer table the core-API review found in
+NVSHMEM's addressing (NV §2). Symmetric placement has a cost of its own: the
+members must find a range free on all of them at once, and a PE in several
+teams has its pool carved by each in an order the others never see, so a hole
+free on one member is taken on another, which is MppUtil's "your app is
+fragmenting the communicators" (§3.3) in memory's form. The design below keeps
+that agreement to one per team.
+
+**Two ends of the pool.** Regions of the world team grow from the bottom by an
+identical sequence of calls on every PE, symmetric by construction with no
+agreement, as today's heap is. The common case, a program that makes at most
+one team, which is every application in the corpus, never meets the rest. Team
+arenas grow from the top.
+
+**A team's arena, agreed once.** A team that owns symmetric data gets an arena
+at its first `region_create`, which is collective anyway and is where the team
+first meets: an AND reduction over the team of each member's bitmap of free
+chunks, the lowest common run taken, sized by the request and rounded up to
+whole chunks. Every later region of the team is carved from the arena locally,
+in call order, and so lands at the same offset on every member with no
+message; a region that does not fit triggers one more agreement, correct
+always and rare in practice. Arenas are whole chunks of a buddy structure, so
+released ones coalesce. An arena is released whole with its team; a live
+region at the team's release is a named fatal, and a sub-team's arena is
+released before its parent's. A realm needs no memory: the pipeline's pair
+teams carry completion and the per-thread sub-teams carry issue, and neither
+creates a region, so arenas exist only for the few, long-lived teams that own
+data.
+
+**The creation-time discipline.** Create a team's regions at its creation,
+before any sub-team of it exists and before the PE returns to its other teams.
+Followed, it makes the top end of the pool a tree that mirrors the tree of
+teams and fragments little. It cannot be what makes placement correct, since
+the agreement is needed wherever PEs belong to different numbers of teams, a
+middle stage's PE creating twice the pair teams a first stage's does; and it
+cannot be mandatory, since programs allocate on the world in a later phase and
+libraries allocate on entry. So it is recommended, and a debug build names a
+region created out of its turn (**Q21**).
+
+**Declared.** The pool sizes, the chunk size and the arenas a PE may hold are
+capabilities; no common range for an arena is a named fatal that says which
+member had none.
 
 | Alternative | Why not, or where open |
 |---|---|
 | One heap with hints per allocation (`malloc_with_hints`) | hints have no users; purpose at region creation is what registration needs |
+| Placement per member, with the members' bases at every initiator | O(regions × members) of state, the table that sank NVSHMEM's addressing (`core-api.md` NV §2) |
+| An agreement at every region creation | one per team suffices once its arena exists; later regions are local |
+| A sparse reservation far larger than physical memory, pages backed on touch | clean for the kernel and wrong for the fabric: a NIC without on-demand paging pins the whole reservation, optimized memory regions are a budget (about two thousand on CXI, a twelve-bit index on Ultra Ethernet), and the reservation times PEs per node must fit the node-mates' mappings; withdrawn |
+| The creation-time discipline as a rule | forbids a later phase's allocation on the world and a library's on entry; recommended and checked instead; **Q21** |
+| `allocate` and `free` in the core | an allocator is built on the region with no change of cost class, so the admission rule puts it in the 2.0 library |
 | Regions always job-wide, whatever team creates them | every PE of the job would take part in a team-local library's set-up, and bale shows the need for a team's own scratch (§3.1, item 8); **Q10** |
-| Symmetric statics | L15; a toolchain matter, kept by the library of §7 |
+| Symmetric statics | L15; a toolchain matter, kept by the library of §8 |
 | `shmem_ptr` on any memory | the ordering contract is what makes a pointer usable; a pointer with no contract is a race |
 
 ### 4.8 Collectives
@@ -719,7 +827,6 @@ oc_status oc_sync     (oc_team);
 oc_status oc_broadcast(oc_team, int root, struct oc_reference buffer, size_t len);
 oc_status oc_reduce   (oc_team, struct oc_reference dst, struct oc_reference src, size_t count,
                        enum oc_type, enum oc_operation);
-oc_status oc_allgather(oc_team, struct oc_reference dst, struct oc_reference src, size_t len);
 ```
 
 All nonblocking. Each is identified by its team and its sequence number in that
@@ -734,24 +841,26 @@ SHARP, multicast or triggered operations can replace it (L4); depth O(log N)
 between nodes and O(log L) within one; O(1) state per team per node; the shape
 chosen per message size (L48: a fan-out of 2 was 1.5 times faster than 4 for a
 megabyte on gigabit Ethernet; Träff's circulant at large sizes, v0.2 step 3).
-`allgather` is an operation of its own, not a reduction reused (L43).
 
-**Why these four.** Arrival, one-to-all, all-to-one-to-all with an operation,
-and all-to-all of equal blocks are the four that in-network collective engines
-offload, and the four osoe spent its effort on. `alltoall` and its
-variable-size form have real demand (bale and its conveyors, ISx, the MoE codes;
-`core-api.md` C10) but are puts and a sync in every implementation surveyed and
-offloaded nowhere; a library above the core writes them in a page on `put` with
-`MORE` and `sync`. Scans have no users; `collect` is an exclusive scan of the
-sizes and an `allgather` of the blocks. Whether exchange belongs in the core
-anyway is **Q8**.
+**Why these three.** Arrival, one-to-all and all-to-one-to-all with an
+operation are what in-network collective engines offload, SHARP's barrier,
+reduce and broadcast, and what Portals' triggered operations build, which is
+the native test. `allgather` was in the core in the first draft because a
+gather reused from the reduction tree was slow (L43), an argument about how to
+build it and not about where it belongs; no in-network engine offloads it, so
+it is the 2.0 library's (§7), a ring or recursive doubling over `put_signal`
+and `await`. So are `exchange` and its variable-size form, which have real
+demand (bale and its conveyors, ISx, the MoE codes; `core-api.md` C10) and are
+puts and a sync in every implementation surveyed, and `collect`, an allgather
+of sizes and then puts. Scans have no users. Whether exchange belongs in the
+core anyway is **Q8**.
 
 | Alternative | Why not, or where open |
 |---|---|
 | Blocking collectives only | L5: a dead end that has to be redone |
 | A handle or mark returned by each collective (the strawman) | the author's direction 6; the team's sequence number identifies it and `quiet` completes it |
-| `alltoall` and `alltoallv` in the core | software everywhere; **Q8** |
-| Scans, `collect`, active sets, `_to_all` | no users, or a library's work; §9 |
+| `allgather`, `alltoall` and `alltoallv` in the core | offloaded nowhere, so built in the 2.0 library at no change of cost class; **Q8** |
+| Scans, active sets, `_to_all` | no users, or the 1.6 library's work (§8, §10) |
 | Collectives above the transport seam (osoe's first decision) | L4: the largest single RoCE loss; what crosses is `arrive(team, epoch)` down and `released(team, epoch)` up |
 
 ### 4.9 Failure, lifecycle and diagnostics
@@ -760,7 +869,7 @@ anyway is **Q8**.
   `PEER_FAILED`, the job is ending and the status says so in band (L32).
   Misuse, a rank outside the team, a reference outside its region, a collective
   out of step, is a named fatal in every build, with a stable identifier, the
-  rank, the routine and the offending value in machine-readable form (L11, §8).
+  rank, the routine and the offending value in machine-readable form (L11, §9).
 - **A peer's death ends the job**, osoe's model: the resource manager owns the
   job. `PEER_FAILED` exists so that the end is reported where the program is
   waiting, not so that the program may continue; a survivable core is **Q9**.
@@ -771,7 +880,7 @@ anyway is **Q8**.
   transport is a header, and a build step holds the code to it (L17).
 - **One host is a cluster, deterministically.** The job's shape is in the
   options (L13), and the reference implementation's scheduler is seedable, so
-  a test is a reproducible test (§8).
+  a test is a reproducible test (§9).
 - **Profiling** is a registered callback table, not weak symbols and a doubled
   ABI.
 
@@ -785,7 +894,7 @@ for frames f+1 to f+K−1. Back-pressure is a credit the receiver adds to the
 sender's word.
 
 ```c
-oc_team world;  oc_open(&options, &world);
+oc_team world;  struct oc_capabilities capabilities;  oc_open(&options, &world, &capabilities);
 int P = oc_team_size(world), me = oc_team_rank(world), m = P / S;
 int s = me / m;
 
@@ -800,13 +909,12 @@ for (int k = 0; k < K; k++) {
     if (s > 0)     oc_team_split(world, me - m, m, 2, k, &up[k]);
 }
 
-/* Symmetric memory: K frame slots, and two waitable words. */
-oc_region bulk, words;
-oc_region_create(world, K * FRAME, OC_BULK, &bulk);
-oc_region_create(world, 2 * sizeof(uint64_t), OC_WAITABLE, &words);
-char     *slot    = oc_allocate(bulk, K * FRAME, 64);
-uint64_t *frames  = oc_allocate(words, 8, 8);     /* frames landed here, counted by my upstream   */
-uint64_t *credits = oc_allocate(words, 8, 8);     /* slots freed at my downstream, counted by it */
+/* Symmetric memory: K frame slots in one region, two waitable words in another. */
+oc_region bulk, words;  char *slot;  uint64_t *word;
+oc_region_create(world, K * FRAME, OC_BULK, &bulk, (void **)&slot);
+oc_region_create(world, 2 * sizeof(uint64_t), OC_WAITABLE, &words, (void **)&word);
+uint64_t *frames  = &word[0];                     /* frames landed here, counted by my upstream   */
+uint64_t *credits = &word[1];                     /* slots freed at my downstream, counted by it */
 struct oc_reference slot_ref    = oc_reference_to(bulk, slot),
                     frames_ref  = oc_reference_to(words, frames),
                     credits_ref = oc_reference_to(words, credits);
@@ -991,7 +1099,7 @@ several threads takes its team as an argument and tags its own sub-teams with
 a constant of its own.
 
 **Two things left to other layers.** The 1.6 library's shareable default
-context has no counterpart here, and §7 and **Q17** say how the library copes.
+context has no counterpart here, and §8 and **Q17** say how the library copes.
 Collectives with threads as participants, a reduce declared as k calls on this
 PE with a local counter gathering the contributions before one inter-PE phase,
 is what GPU block-scoped collectives are and would be the first exception to
@@ -1003,22 +1111,53 @@ thread, a warp or a block, has to be an argument of every operation
 |---|---|
 | Thread levels (OpenSHMEM 1.4, MPI) | under rule 2 every level but "any threads" is a program using one team; the specification never says whether a provided level may fall below the requested one; **Q19** |
 | Teams shareable by threads, a lock-free issue path and a locked quiet (osoe's shared contexts) | the heavy protocol, paid by every program for the few that share; the corpus's threaded codes use an issuer per thread (§3.2, item 2); **Q17** |
-| A mutex around every operation on a shared team (MppUtil's `unsafecomms_lock`) | two locked instructions an operation, and a descheduled holder convoys every thread; acceptable only as the 1.6 library's way with its default context (§7) |
+| A mutex around every operation on a shared team (MppUtil's `unsafecomms_lock`) | two locked instructions an operation, and a descheduled holder convoys every thread; acceptable only as the 1.6 library's way with its default context (§8) |
 | Threads as members, with ranks of their own (MPI endpoints; Loom's warps) | makes threads addressable, which sank the MPI proposal; the symmetric space and the arrival counts are per PE |
 | An implicit current team (MppUtil's stack) | §3.3, item 2; a thread-local convenience above the core |
 | Explicit thread registration with the NIC (Cray's extensions; MppUtil) | the sub-team is the registration, and its hardware queue a declared allocation rather than a vendor call |
 | Collectives with a participant count per PE | the first exception to rule 2; deferred to the device question |
 
-## 7. OpenSHMEM 1.6 as a library on the core
+## 7. OpenSHMEM 2.0: the standard library on the core
+
+The second layer: the functions a complete PGAS program needs, each built from
+core calls with no change of cost class, each with one spelling and its cost
+stated as the core calls it makes. It is written once and shipped with the
+specification, so that a vendor writes the core and nothing else; and a vendor
+may replace any function here with a native one whose contract holds, so that
+an in-network allgather or a NIC's swap is reachable without being in the core.
+The rule that keeps it standard rather than ergonomic: a function enters
+because programs cannot do without it, never because it saves typing.
+
+| Function | Built from | Cost in core calls | Why standard |
+|---|---|---|---|
+| `allocate`, `free` | a deterministic allocator over a region: local, symmetric by contract, no barrier; a debug build carries a digest of allocations on the next collective and names the first divergent call | local | every program carves regions, and one allocator with one contract beats one per program; the specification's `malloc` is a logarithmic collective for nothing |
+| `set` | `put_signal` with no data and the set operation | one call | the standalone set of a waitable word, which Triton's kernels do twenty times (§3.2, item 5) |
+| `barrier` | `sync` then `quiet` | two calls | the most-called collective by far (§3.2, item 1); **Q6** |
+| `allgather` | a ring or recursive doubling over `put_signal` and `await`, then `sync`; never a reduction reused (L43) | O(log P) rounds | ISx, OSU, the 1.6 `fcollect` |
+| `exchange`, `exchangev` | puts with `MORE` to every member, the counts by an `allgather` for the variable form, then `sync` | O(P) puts a PE | bale and its conveyors, ISx, the MoE codes (`core-api.md` C10); **Q8** |
+| `collect` | an `allgather` of sizes, then puts | as `exchangev` | the 1.6 `collect` |
+| swap, and, or, xor, min, max, the 32-bit forms | compare-swap loops, or native where the vendor substitutes (PCIe atomics, mlx5 and UET for swap; Portals, CXI and UET for min and max) | two round trips or more under contention | the atomics programs reach for beyond the intersection; Graph500's min saves four round trips an edge where native; **Q7** |
+| `lock`, `unlock` | a queue lock on `compare_swap` and `await`, a word of a region per lock | three atomics and a wait per contended acquire | every PGAS library ships one and a hand-rolled lock hides bugs; one user in the corpus, the UTS benchmark; **Q20** |
+
+**Excluded, named as ergonomics**: typed generics, an optional header outside
+both layers with its own failure path (L37); blocking and nonblocking twins; a
+thread-local current team in MppUtil's style (§3.3); `split_2d` as a spelled
+call, since two splits or the k-dimensional rule (Q1) cover it; scans, which
+have no users; `pe_quiet` with a list of PEs, which is a loop of `quiet_to`.
+
+The 1.6 library of §8 builds on both layers.
+
+## 8. OpenSHMEM 1.6 as a library on the core
 
 The stance the talk's backup slides assume, C of the stage-setting's §6, the
 core underneath and OpenSHMEM 1.6 implemented on top as the proof that the core
-is enough, is assumed here too (**Q14**). What the library needs, by the
-routine families of the usage survey:
+is enough, is assumed here too (**Q14**); the library builds on the core and
+on the 2.0 library of §7. What it needs, by the routine families of the usage
+survey:
 
 | OpenSHMEM 1.6 | On this API | Cost |
 |---|---|---|
-| typed RMA and atomics, `p` and `g`, the `_nbi` and `ctx_` forms: most of the 4,857 entry points | generated, a line each: `put`, `get`, `read`, `fetch_add`, `compare_swap`, `add` on the value's bits; 32-bit and bitwise atomics as compare-and-swap loops | one core call; the derived atomics several round trips |
+| typed RMA and atomics, `p` and `g`, the `_nbi` and `ctx_` forms: most of the 4,857 entry points | generated, a line each: `put`, `get`, `read`, `fetch_add`, `compare_swap`, `add` on the value's bits; 32-bit and bitwise atomics the 2.0 library's derived ones | one core call; the derived atomics several round trips |
 | the default context | the world team's realm; under the multiple thread level a mutex per operation on it, since the core has no team two threads may use at once (§6, **Q17**) | nothing below the multiple level; a locked path at it |
 | `shmem_ctx_create`; `shmem_team_create_ctx(T)` | a split of the world, or of T, by the identity rule, with a tag the library draws from a per-PE counter, since a context never carries a collective | a counter set |
 | `shmem_quiet`, `shmem_ctx_quiet` | `quiet` of the realm | as the core |
@@ -1028,15 +1167,16 @@ routine families of the usage survey:
 | `shmem_team_sync` | `sync(T); quiet(T)`: realm T carries only T's collectives, since RMA goes on the default context's realm | as the core |
 | `team_split_strided`, `split_2d`, `translate_pe`, `team_my_pe`, `team_n_pes` | `split`, twice for `split_2d`; the collective the specification requires over the parent becomes a `sync` of the parent | a sync a split |
 | `SHMEM_TEAM_SHARED`, `shmem_ptr`, `team_ptr` | `node_mates(world)`; `direct` | as the core |
-| `put_signal`, `signal_add`, `signal_wait_until`, `wait_until`, `test` | `put_signal`, `add`, `await`; the heap created waitable, at the vendor's price | as the core; the price |
-| broadcast, reductions, `fcollect`, `sync` | the core's four, started, then `quiet` | as the core |
-| `alltoall(s)`, `collect`, scans, active sets, `_to_all` | puts, `sync` and `allgather` in the library | software, as today |
-| the `malloc` family, statics, locks, sessions, `global_exit` | an allocator over regions with a `sync` a call; a linker script; a queue lock on `compare_swap` and `await`; `MORE`; `abort` | cold paths |
+| `put_signal`, `signal_add`, `signal_set`, `signal_wait_until`, `wait_until`, `test` | `put_signal`, `add`, the 2.0 `set`, `await`; the heap created waitable, at the vendor's price | as the core; the price |
+| broadcast, reductions, `sync` | the core's three, started, then `quiet` | as the core |
+| `fcollect`, `collect`, `alltoall(s)` | the 2.0 library's `allgather`, `collect`, `exchange` and `exchangev` | software, as today |
+| scans, active sets, `_to_all` | puts, `sync` and the 2.0 collectives, in the library | software, as today |
+| the `malloc` family, statics, locks, sessions, `global_exit` | the 2.0 allocator with a `sync` a call; a linker script; the 2.0 lock; `MORE`; `abort` | cold paths |
 
 Run on it, the SOS test suite and the reading corpus would show whether the
 core is enough; the library is the test.
 
-## 8. For AI-assisted development
+## 9. For AI-assisted development
 
 The stage-setting's §5 hypothesis, as a checklist against the items:
 
@@ -1051,23 +1191,25 @@ The stage-setting's §5 hypothesis, as a checklist against the items:
    collective), its round trips and its complexity in N and L; the capabilities
    say which atomics are native and what a team costs (§4.5, §4.2).
 5. **Semantics small enough to ship as an executable model.** Four rules and
-   thirty-two calls; a reference model of order, completion and arrival,
+   twenty-five core calls; a reference model of order, completion and arrival,
    published with the specification, lets a tool check a program's use of the
    API as osoe's models checked the library (**Q15**).
 6. **Deterministic on one host** (§4.9).
 7. **Blocking has a deadline and a reason** (rule 1).
 
-## 9. Deliberately absent
+## 10. Deliberately absent
 
-Contexts; handles, marks and requests; typed routines; blocking and nonblocking
-variants; a standalone fence; `pe_quiet`; symmetric statics; `shmem_ptr` on
-arbitrary memory; global locks (a queue lock is a page above the core); 32-bit,
-floating-point and bitwise atomics (derived); strided and blocked transfers;
-vector and multi-word waits; `alltoall(s)`, `collect` and scans (above the
-core); active sets and `_to_all`; sessions; implicit finalize; deprecated names;
-reserved environment-variable syntax; undefined behaviour.
+From the core and the 2.0 library alike: contexts; handles, marks and requests;
+typed routines (an optional header outside both layers); blocking and
+nonblocking variants; a standalone fence; `pe_quiet` with a list; symmetric
+statics; `shmem_ptr` on arbitrary memory; strided and blocked transfers; vector
+and multi-word waits; scans; active sets and `_to_all`; sessions; implicit
+finalize; thread levels; an implicit current team; deprecated names; reserved
+environment-variable syntax; undefined behaviour. From the core alone, built in
+the 2.0 library instead: the allocator, the standalone `set`, `barrier`,
+`allgather`, exchange, `collect`, the derived atomics and the lock.
 
-## 10. Questions and push-backs for the author
+## 11. Questions and push-backs for the author
 
 Each with a recommendation, so that "as recommended" is an answer.
 
@@ -1129,20 +1271,21 @@ Each with a recommendation, so that "as recommended" is an answer.
 6. **`barrier` as a spelled inline over `sync` then `quiet`, or only the two
    calls?** The barrier is about nine hundred call sites in the classic
    applications against six for every other synchronization routine together
-   (§3.2, item 1). *Recommendation:* the inline, in the same header,
-   documented as exactly the two: the hottest collective should be one line,
-   and an inline keeps the core at thirty-two.
+   (§3.2, item 1). *Recommendation:* `barrier` in the 2.0 library as exactly
+   the two (§7): the hottest collective should be one line, and the core stays
+   at twenty-five.
 7. **The derived atomics**, swap, and, or, xor, min, max and 32-bit: in the
-   same header with their tier declared, or in a library above? Swap is native
-   on PCIe atomics, mlx5 and Ultra Ethernet and absent from stock IBTA; min and
+   core with their tier declared, or in the 2.0 library? Swap is native on
+   PCIe atomics, mlx5 and Ultra Ethernet and absent from stock IBTA; min and
    max would save Graph500 four round trips an edge where native.
-   *Recommendation:* a second header, shipped with the reference
-   implementation, each routine's cost in its comment; the core's header stays
-   the intersection.
-8. **Exchange** (`alltoall`, `alltoallv`): in the core or above? Real demand
-   (bale, ISx, the MoE codes), offloaded nowhere. *Recommendation:* above, on
-   `put` with `MORE` and `sync`, in the same second header; promote it if an
-   implementation shows an in-network exchange.
+   *Recommendation:* the 2.0 library (§7), each routine's cost in its comment
+   and a vendor free to substitute a native one; the core stays the
+   intersection.
+8. **Exchange** (`alltoall`, `alltoallv`): in the core or in the 2.0 library?
+   Real demand (bale, ISx, the MoE codes), offloaded nowhere. *Recommendation:*
+   the 2.0 library (§7), on `put` with `MORE` and `sync`, with `allgather` and
+   `collect` beside it; a vendor substitutes an in-network one if it ever
+   exists.
 9. **Peer failure.** The core says a dead peer ends the job and `PEER_FAILED`
    reports it where a PE is waiting. A survivable core would need every team to
    tolerate a missing member, which changes every collective.
@@ -1163,13 +1306,13 @@ Each with a recommendation, so that "as recommended" is an answer.
     Triton (§3.2, item 5), and a set is a plain write, native everywhere and
     cheaper than an add. *Recommendation:* both, as the specification and
     NVSHMEM have them, since they are two things: an add counts producers, a
-    set announces a value; and `set` as the fifth atomic (§4.5).
+    set announces a value; and a standalone `set` in the 2.0 library (§7).
 12. **A wait for any of several words.** L45 found the collective engine needs
     it; no application in the corpus does. *Recommendation:* out, until a
     program shows the need; producers add to one word.
 13. **The world team as the job, with no `oc_job` object.** *Recommendation:*
     yes.
-14. **The compatibility stance**: still C, the core plus the 1.6 library (§7)?
+14. **The compatibility stance**: still C, the core plus the 1.6 library (§8)?
     *Recommendation:* yes; the library is the proof that the core is enough,
     and the corpus is its test suite.
 15. **An executable reference model in the specification** (order, completion,
@@ -1185,7 +1328,7 @@ Each with a recommendation, so that "as recommended" is an answer.
     quiet (bale) or by going under the API (DeepEP, GIN), and that a sub-team
     per partner would be P − 1 teams a PE (§3.1, item 4; §4.3). It is a scope,
     not a handle, and O(1) wherever completion is per peer. *Recommendation:*
-    include it, as one call more; without it the proposal has no answer
+    include it, in the core's native tier; without it the proposal has no answer
     for bale's conveyors but the full quiet they pay today.
 
 **On threads**
@@ -1217,11 +1360,28 @@ Each with a recommendation, so that "as recommended" is an answer.
     which the specification leaves open, is a trap an API meant for assisted
     development should not keep.
 
-## 11. What follows the answers
+**On the layers**
+
+20. **The lock in the 2.0 library.** A queue lock on `compare_swap` and `await`
+    is a page, every PGAS library ships one, and a hand-rolled lock hides bugs;
+    the corpus has one user, the UTS benchmark. *Recommendation:* keep it in
+    the 2.0 library and mark the doubt; drop it if the author would rather the
+    library carry nothing without an application user.
+
+**On memory**
+
+21. **The creation-time discipline: a rule or a recommendation?** Creating a
+    team's regions at its creation, before sub-teams and before returning to
+    other teams, keeps the pool's top end a tree and fragmentation low (§4.7).
+    As a rule it forbids a later phase's allocation on the world and a
+    library's allocation on entry. *Recommendation:* a recommendation, checked
+    in debug builds, with the arena agreement carrying correctness either way.
+
+## 12. What follows the answers
 
 The proposal is revised from them: §2's table, the signatures and §5's example
 settle, and the open rows of the alternatives tables close or become decisions.
 Then, in order: the executable model of §2's four rules, small enough to
 publish; the capabilities structure and the header comments' cost declarations;
-and the library's feasibility checked against the corpus, a grep of what every
-program calls against §7's table, before any code.
+and the two libraries' feasibility checked against the corpus, a grep of what
+every program calls against §7's recipes and §8's table, before any code.
