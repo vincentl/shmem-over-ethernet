@@ -1007,7 +1007,9 @@ what.
 
 - **The tag's Pi checks rehearsed on `main` at `3b45472`** (round nine's lead,
   overnight; `docs/reviews/archive/v0.2-before-part4-review.md`, "The Pi
-  rehearsal"): 0.1.0's release-point runbook in its four parts. The build without
+  rehearsal"; its raw outputs in
+  `docs/design/evidence/pi-cluster/2026-10-10-round-nine-rehearsal/`):
+  0.1.0's release-point runbook in its four parts. The build without
   a warning, the probe, tier 1 101 of 101, the smoke on block and cyclic maps,
   the floor, the benchmark, the endings, the corpus as at 0.1.0, every pacer run
   `failures=0`, an hour of `mix` `failures=0` in 3,603 s and an hour of

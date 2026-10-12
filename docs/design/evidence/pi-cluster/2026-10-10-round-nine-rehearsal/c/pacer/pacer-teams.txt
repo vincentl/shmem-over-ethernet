@@ -1,0 +1,253 @@
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=teams
+exercise teams numbers=6 strided=4 grid=4x4 renew_every=3 kinds=15 seconds=600 memory=8.0k
+teams t=0.0 round=1 collectives=43 collectives_per_s=27496 grid_s=0.000 strided_s=0.001 check_s=0.000 renew_s=0.000 step_s=0.002 failures=0
+library nodes=4 bytes_sent=9792 gets_nonblocking=0 landing_full=0 reserve_stalls=2 wakes_sent=27 barrier_ns=141767956
+teams t=0.0 round=9 collectives=369 collectives_per_s=23494 grid_s=0.006 strided_s=0.003 check_s=0.000 renew_s=0.008 step_s=0.014 failures=0
+library nodes=4 bytes_sent=61528 gets_nonblocking=0 landing_full=0 reserve_stalls=8 wakes_sent=113 barrier_ns=96138277
+teams t=0.2 round=73 collectives=3082 collectives_per_s=19758 grid_s=0.058 strided_s=0.024 check_s=0.000 renew_s=0.081 step_s=0.137 failures=0
+library nodes=4 bytes_sent=518744 gets_nonblocking=0 landing_full=0 reserve_stalls=89 wakes_sent=881 barrier_ns=1120500810
+teams t=1.2 round=585 collectives=24897 collectives_per_s=20919 grid_s=0.406 strided_s=0.160 check_s=0.001 renew_s=0.558 step_s=1.043 failures=0
+library nodes=4 bytes_sent=3763832 gets_nonblocking=0 landing_full=0 reserve_stalls=1194 wakes_sent=6196 barrier_ns=8238469739
+teams t=5.9 round=3039 collectives=129063 collectives_per_s=22205 grid_s=1.665 strided_s=0.541 check_s=0.003 renew_s=2.652 step_s=4.691 failures=0
+library nodes=4 bytes_sent=18334544 gets_nonblocking=0 landing_full=0 reserve_stalls=6149 wakes_sent=30135 barrier_ns=38973492000
+teams t=11.0 round=5654 collectives=242442 collectives_per_s=22323 grid_s=1.737 strided_s=0.717 check_s=0.003 renew_s=2.850 step_s=5.079 failures=0
+library nodes=4 bytes_sent=19867064 gets_nonblocking=0 landing_full=0 reserve_stalls=6571 wakes_sent=32923 barrier_ns=41563981489
+teams t=16.0 round=8228 collectives=353733 collectives_per_s=21930 grid_s=1.754 strided_s=0.661 check_s=0.003 renew_s=2.841 step_s=5.075 failures=0
+library nodes=4 bytes_sent=20065784 gets_nonblocking=0 landing_full=0 reserve_stalls=6392 wakes_sent=33512 barrier_ns=41317637060
+teams t=20.9 round=10764 collectives=462540 collectives_per_s=22294 grid_s=1.751 strided_s=0.578 check_s=0.003 renew_s=2.754 step_s=4.880 failures=0
+library nodes=4 bytes_sent=19234392 gets_nonblocking=0 landing_full=0 reserve_stalls=6591 wakes_sent=31499 barrier_ns=40179380571
+teams t=26.1 round=13362 collectives=573885 collectives_per_s=21646 grid_s=1.818 strided_s=0.609 check_s=0.003 renew_s=2.908 step_s=5.144 failures=0
+library nodes=4 bytes_sent=20179792 gets_nonblocking=0 landing_full=0 reserve_stalls=6441 wakes_sent=33956 barrier_ns=42044017228
+teams t=30.8 round=15887 collectives=680470 collectives_per_s=22506 grid_s=1.678 strided_s=0.489 check_s=0.003 renew_s=2.744 step_s=4.736 failures=0
+library nodes=4 bytes_sent=18507400 gets_nonblocking=0 landing_full=0 reserve_stalls=6116 wakes_sent=30001 barrier_ns=39472028974
+teams t=36.0 round=18552 collectives=794415 collectives_per_s=22120 grid_s=1.822 strided_s=0.637 check_s=0.003 renew_s=2.909 step_s=5.151 failures=0
+library nodes=4 bytes_sent=20175712 gets_nonblocking=0 landing_full=0 reserve_stalls=6840 wakes_sent=33321 barrier_ns=42287662071
+teams t=41.0 round=21138 collectives=904581 collectives_per_s=21987 grid_s=1.809 strided_s=0.548 check_s=0.003 renew_s=2.829 step_s=5.010 failures=0
+library nodes=4 bytes_sent=19191536 gets_nonblocking=0 landing_full=0 reserve_stalls=6539 wakes_sent=31658 barrier_ns=41416160561
+teams t=45.9 round=23718 collectives=1014486 collectives_per_s=22260 grid_s=1.709 strided_s=0.607 check_s=0.003 renew_s=2.809 step_s=4.937 failures=0
+library nodes=4 bytes_sent=19288152 gets_nonblocking=0 landing_full=0 reserve_stalls=6270 wakes_sent=31825 barrier_ns=40823034413
+teams t=50.9 round=26330 collectives=1125523 collectives_per_s=22125 grid_s=1.770 strided_s=0.639 check_s=0.003 renew_s=2.838 step_s=5.019 failures=0
+library nodes=4 bytes_sent=19414944 gets_nonblocking=0 landing_full=0 reserve_stalls=6408 wakes_sent=31851 barrier_ns=41488899823
+teams t=55.9 round=28932 collectives=1237404 collectives_per_s=22542 grid_s=1.705 strided_s=0.650 check_s=0.003 renew_s=2.786 step_s=4.963 failures=0
+library nodes=4 bytes_sent=19588368 gets_nonblocking=0 landing_full=0 reserve_stalls=6626 wakes_sent=32390 barrier_ns=40908840266
+teams t=61.0 round=31553 collectives=1349936 collectives_per_s=22065 grid_s=1.770 strided_s=0.576 check_s=0.003 renew_s=2.875 step_s=5.100 failures=0
+library nodes=4 bytes_sent=19939760 gets_nonblocking=0 landing_full=0 reserve_stalls=6488 wakes_sent=32972 barrier_ns=41888518836
+teams t=66.0 round=34122 collectives=1461687 collectives_per_s=22497 grid_s=1.757 strided_s=0.687 check_s=0.003 renew_s=2.793 step_s=4.967 failures=0
+library nodes=4 bytes_sent=19513120 gets_nonblocking=0 landing_full=0 reserve_stalls=6315 wakes_sent=32346 barrier_ns=40602006509
+teams t=71.0 round=36707 collectives=1571463 collectives_per_s=21922 grid_s=1.745 strided_s=0.556 check_s=0.003 renew_s=2.842 step_s=5.008 failures=0
+library nodes=4 bytes_sent=19234424 gets_nonblocking=0 landing_full=0 reserve_stalls=6335 wakes_sent=31790 barrier_ns=41442387248
+teams t=76.0 round=39288 collectives=1680477 collectives_per_s=21663 grid_s=1.842 strided_s=0.595 check_s=0.003 renew_s=2.857 step_s=5.032 failures=0
+library nodes=4 bytes_sent=19391816 gets_nonblocking=0 landing_full=0 reserve_stalls=6276 wakes_sent=32071 barrier_ns=41568682346
+teams t=80.9 round=41852 collectives=1791064 collectives_per_s=22356 grid_s=1.758 strided_s=0.622 check_s=0.003 renew_s=2.803 step_s=4.947 failures=0
+library nodes=4 bytes_sent=19482176 gets_nonblocking=0 landing_full=0 reserve_stalls=6686 wakes_sent=31829 barrier_ns=40473098607
+teams t=85.9 round=44443 collectives=1901585 collectives_per_s=22150 grid_s=1.744 strided_s=0.560 check_s=0.003 renew_s=2.825 step_s=4.990 failures=0
+library nodes=4 bytes_sent=19478752 gets_nonblocking=0 landing_full=0 reserve_stalls=6512 wakes_sent=32391 barrier_ns=41257001483
+teams t=91.0 round=47039 collectives=2013098 collectives_per_s=22056 grid_s=1.798 strided_s=0.651 check_s=0.003 renew_s=2.886 step_s=5.056 failures=0
+library nodes=4 bytes_sent=19641432 gets_nonblocking=0 landing_full=0 reserve_stalls=6639 wakes_sent=32379 barrier_ns=41521331753
+teams t=95.9 round=49606 collectives=2122763 collectives_per_s=22122 grid_s=1.775 strided_s=0.569 check_s=0.003 renew_s=2.813 step_s=4.957 failures=0
+library nodes=4 bytes_sent=19318016 gets_nonblocking=0 landing_full=0 reserve_stalls=6362 wakes_sent=31888 barrier_ns=40820262124
+teams t=100.9 round=52195 collectives=2233807 collectives_per_s=22303 grid_s=1.756 strided_s=0.605 check_s=0.003 renew_s=2.847 step_s=4.979 failures=0
+library nodes=4 bytes_sent=19187848 gets_nonblocking=0 landing_full=0 reserve_stalls=6535 wakes_sent=31852 barrier_ns=41039025225
+teams t=105.8 round=54794 collectives=2343754 collectives_per_s=22398 grid_s=1.730 strided_s=0.519 check_s=0.003 renew_s=2.799 step_s=4.909 failures=0
+library nodes=4 bytes_sent=19056400 gets_nonblocking=0 landing_full=0 reserve_stalls=6594 wakes_sent=30770 barrier_ns=40808142799
+teams t=111.0 round=57441 collectives=2458740 collectives_per_s=22266 grid_s=1.792 strided_s=0.662 check_s=0.003 renew_s=2.900 step_s=5.164 failures=0
+library nodes=4 bytes_sent=20273296 gets_nonblocking=0 landing_full=0 reserve_stalls=6425 wakes_sent=33601 barrier_ns=41996481414
+teams t=116.1 round=60003 collectives=2570256 collectives_per_s=21972 grid_s=1.767 strided_s=0.739 check_s=0.003 renew_s=2.842 step_s=5.075 failures=0
+library nodes=4 bytes_sent=19525632 gets_nonblocking=0 landing_full=0 reserve_stalls=6250 wakes_sent=32942 barrier_ns=41538565329
+teams t=121.2 round=62526 collectives=2677905 collectives_per_s=21147 grid_s=1.936 strided_s=0.540 check_s=0.002 renew_s=2.775 step_s=5.091 failures=0
+library nodes=4 bytes_sent=18857784 gets_nonblocking=0 landing_full=0 reserve_stalls=6176 wakes_sent=31009 barrier_ns=40365183677
+teams t=125.9 round=65004 collectives=2784762 collectives_per_s=22760 grid_s=1.621 strided_s=0.649 check_s=0.002 renew_s=2.673 step_s=4.695 failures=0
+library nodes=4 bytes_sent=18604504 gets_nonblocking=0 landing_full=0 reserve_stalls=6299 wakes_sent=30670 barrier_ns=38777144183
+teams t=130.8 round=67642 collectives=2894669 collectives_per_s=22242 grid_s=1.777 strided_s=0.528 check_s=0.003 renew_s=2.856 step_s=4.941 failures=0
+library nodes=4 bytes_sent=19087352 gets_nonblocking=0 landing_full=0 reserve_stalls=6601 wakes_sent=30928 barrier_ns=41512909327
+teams t=136.0 round=70311 collectives=3008415 collectives_per_s=22018 grid_s=1.795 strided_s=0.632 check_s=0.003 renew_s=2.954 step_s=5.166 failures=0
+library nodes=4 bytes_sent=19932520 gets_nonblocking=0 landing_full=0 reserve_stalls=6724 wakes_sent=33037 barrier_ns=43067455609
+teams t=141.0 round=72894 collectives=3118839 collectives_per_s=21752 grid_s=1.815 strided_s=0.614 check_s=0.003 renew_s=2.882 step_s=5.076 failures=0
+library nodes=4 bytes_sent=19765344 gets_nonblocking=0 landing_full=0 reserve_stalls=6378 wakes_sent=32752 barrier_ns=41612120626
+teams t=146.0 round=75438 collectives=3228975 collectives_per_s=22283 grid_s=1.733 strided_s=0.625 check_s=0.003 renew_s=2.775 step_s=4.943 failures=0
+library nodes=4 bytes_sent=19252712 gets_nonblocking=0 landing_full=0 reserve_stalls=6320 wakes_sent=32306 barrier_ns=40538169074
+teams t=151.1 round=78011 collectives=3338025 collectives_per_s=21323 grid_s=1.716 strided_s=0.564 check_s=0.003 renew_s=3.000 step_s=5.114 failures=0
+library nodes=4 bytes_sent=19217712 gets_nonblocking=0 landing_full=0 reserve_stalls=6593 wakes_sent=31234 barrier_ns=43946604819
+teams t=155.8 round=80526 collectives=3444843 collectives_per_s=22532 grid_s=1.639 strided_s=0.533 check_s=0.003 renew_s=2.721 step_s=4.741 failures=0
+library nodes=4 bytes_sent=18403936 gets_nonblocking=0 landing_full=0 reserve_stalls=6249 wakes_sent=30056 barrier_ns=39448168946
+teams t=160.9 round=83178 collectives=3557118 collectives_per_s=22207 grid_s=1.806 strided_s=0.544 check_s=0.003 renew_s=2.894 step_s=5.056 failures=0
+library nodes=4 bytes_sent=19411696 gets_nonblocking=0 landing_full=0 reserve_stalls=6534 wakes_sent=31732 barrier_ns=42061819554
+teams t=165.9 round=85800 collectives=3668652 collectives_per_s=22387 grid_s=1.718 strided_s=0.554 check_s=0.003 renew_s=2.827 step_s=4.982 failures=0
+library nodes=4 bytes_sent=19535432 gets_nonblocking=0 landing_full=0 reserve_stalls=6544 wakes_sent=32044 barrier_ns=41313964169
+teams t=171.0 round=88431 collectives=3782007 collectives_per_s=22168 grid_s=1.823 strided_s=0.637 check_s=0.003 renew_s=2.876 step_s=5.114 failures=0
+library nodes=4 bytes_sent=19557352 gets_nonblocking=0 landing_full=0 reserve_stalls=6343 wakes_sent=32453 barrier_ns=42015595128
+teams t=175.9 round=91003 collectives=3890705 collectives_per_s=22071 grid_s=1.809 strided_s=0.538 check_s=0.003 renew_s=2.827 step_s=4.925 failures=0
+library nodes=4 bytes_sent=18932584 gets_nonblocking=0 landing_full=0 reserve_stalls=6309 wakes_sent=30932 barrier_ns=40861725600
+teams t=181.0 round=93614 collectives=4002698 collectives_per_s=22122 grid_s=1.746 strided_s=0.652 check_s=0.003 renew_s=2.835 step_s=5.063 failures=0
+library nodes=4 bytes_sent=19832312 gets_nonblocking=0 landing_full=0 reserve_stalls=6508 wakes_sent=33182 barrier_ns=41575870524
+teams t=186.0 round=96192 collectives=4112448 collectives_per_s=22086 grid_s=1.797 strided_s=0.558 check_s=0.003 renew_s=2.828 step_s=4.969 failures=0
+library nodes=4 bytes_sent=19315064 gets_nonblocking=0 landing_full=0 reserve_stalls=6771 wakes_sent=31549 barrier_ns=40998241005
+teams t=191.0 round=98785 collectives=4226778 collectives_per_s=22481 grid_s=1.769 strided_s=0.689 check_s=0.003 renew_s=2.850 step_s=5.086 failures=0
+library nodes=4 bytes_sent=20031136 gets_nonblocking=0 landing_full=0 reserve_stalls=6353 wakes_sent=33734 barrier_ns=41282185899
+teams t=196.0 round=101334 collectives=4335423 collectives_per_s=22044 grid_s=1.734 strided_s=0.553 check_s=0.003 renew_s=2.810 step_s=4.929 failures=0
+library nodes=4 bytes_sent=19506320 gets_nonblocking=0 landing_full=0 reserve_stalls=6350 wakes_sent=32167 barrier_ns=40605696774
+teams t=201.1 round=103919 collectives=4447154 collectives_per_s=21977 grid_s=1.809 strided_s=0.592 check_s=0.003 renew_s=2.847 step_s=5.084 failures=0
+library nodes=4 bytes_sent=19927568 gets_nonblocking=0 landing_full=0 reserve_stalls=6454 wakes_sent=33114 barrier_ns=41457540280
+teams t=205.8 round=106461 collectives=4553559 collectives_per_s=22274 grid_s=1.704 strided_s=0.471 check_s=0.003 renew_s=2.757 step_s=4.777 failures=0
+library nodes=4 bytes_sent=18485304 gets_nonblocking=0 landing_full=0 reserve_stalls=6267 wakes_sent=29809 barrier_ns=39983031126
+teams t=211.0 round=109121 collectives=4667438 collectives_per_s=22208 grid_s=1.826 strided_s=0.597 check_s=0.003 renew_s=2.906 step_s=5.128 failures=0
+library nodes=4 bytes_sent=20041120 gets_nonblocking=0 landing_full=0 reserve_stalls=6653 wakes_sent=32767 barrier_ns=42213053561
+teams t=215.9 round=111714 collectives=4776918 collectives_per_s=22107 grid_s=1.738 strided_s=0.526 check_s=0.002 renew_s=2.800 step_s=4.952 failures=0
+library nodes=4 bytes_sent=19116928 gets_nonblocking=0 landing_full=0 reserve_stalls=6354 wakes_sent=31513 barrier_ns=41241682373
+teams t=221.0 round=114331 collectives=4889933 collectives_per_s=22360 grid_s=1.787 strided_s=0.701 check_s=0.003 renew_s=2.860 step_s=5.054 failures=0
+library nodes=4 bytes_sent=19586208 gets_nonblocking=0 landing_full=0 reserve_stalls=6479 wakes_sent=32542 barrier_ns=41663170951
+teams t=225.9 round=116919 collectives=5000085 collectives_per_s=22294 grid_s=1.747 strided_s=0.601 check_s=0.003 renew_s=2.809 step_s=4.941 failures=0
+library nodes=4 bytes_sent=19373400 gets_nonblocking=0 landing_full=0 reserve_stalls=6543 wakes_sent=31789 barrier_ns=40817154997
+teams t=230.9 round=119537 collectives=5111019 collectives_per_s=22297 grid_s=1.689 strided_s=0.561 check_s=0.002 renew_s=2.842 step_s=4.975 failures=0
+library nodes=4 bytes_sent=19087352 gets_nonblocking=0 landing_full=0 reserve_stalls=6468 wakes_sent=30975 barrier_ns=41357075037
+teams t=235.9 round=122167 collectives=5223872 collectives_per_s=22311 grid_s=1.767 strided_s=0.641 check_s=0.003 renew_s=2.896 step_s=5.058 failures=0
+library nodes=4 bytes_sent=19547552 gets_nonblocking=0 landing_full=0 reserve_stalls=6245 wakes_sent=32668 barrier_ns=41701961928
+teams t=240.9 round=124766 collectives=5333710 collectives_per_s=22070 grid_s=1.766 strided_s=0.552 check_s=0.003 renew_s=2.831 step_s=4.977 failures=0
+library nodes=4 bytes_sent=19294928 gets_nonblocking=0 landing_full=0 reserve_stalls=6580 wakes_sent=31594 barrier_ns=41283729222
+teams t=246.0 round=127377 collectives=5445723 collectives_per_s=22110 grid_s=1.781 strided_s=0.638 check_s=0.003 renew_s=2.842 step_s=5.066 failures=0
+library nodes=4 bytes_sent=19627808 gets_nonblocking=0 landing_full=0 reserve_stalls=6533 wakes_sent=32581 barrier_ns=41627388877
+teams t=250.9 round=129953 collectives=5556171 collectives_per_s=22329 grid_s=1.743 strided_s=0.583 check_s=0.003 renew_s=2.772 step_s=4.946 failures=0
+library nodes=4 bytes_sent=19314064 gets_nonblocking=0 landing_full=0 reserve_stalls=6528 wakes_sent=32013 barrier_ns=40853663034
+teams t=255.9 round=132556 collectives=5668285 collectives_per_s=22401 grid_s=1.772 strided_s=0.640 check_s=0.003 renew_s=2.821 step_s=5.005 failures=0
+library nodes=4 bytes_sent=19719880 gets_nonblocking=0 landing_full=0 reserve_stalls=6379 wakes_sent=32769 barrier_ns=41109677279
+teams t=261.0 round=135156 collectives=5780502 collectives_per_s=22135 grid_s=1.753 strided_s=0.611 check_s=0.003 renew_s=2.853 step_s=5.070 failures=0
+library nodes=4 bytes_sent=19874048 gets_nonblocking=0 landing_full=0 reserve_stalls=6421 wakes_sent=32978 barrier_ns=41478150023
+teams t=266.0 round=137720 collectives=5890372 collectives_per_s=21817 grid_s=1.821 strided_s=0.649 check_s=0.003 renew_s=2.865 step_s=5.036 failures=0
+library nodes=4 bytes_sent=19652888 gets_nonblocking=0 landing_full=0 reserve_stalls=6185 wakes_sent=32670 barrier_ns=41208704909
+teams t=271.0 round=140265 collectives=5998692 collectives_per_s=21979 grid_s=1.730 strided_s=0.553 check_s=0.003 renew_s=2.802 step_s=4.928 failures=0
+library nodes=4 bytes_sent=19069608 gets_nonblocking=0 landing_full=0 reserve_stalls=6132 wakes_sent=31630 barrier_ns=40672811306
+teams t=276.0 round=142847 collectives=6110277 collectives_per_s=22373 grid_s=1.744 strided_s=0.618 check_s=0.003 renew_s=2.803 step_s=4.987 failures=0
+library nodes=4 bytes_sent=19655320 gets_nonblocking=0 landing_full=0 reserve_stalls=6660 wakes_sent=32857 barrier_ns=40850628926
+teams t=280.8 round=145435 collectives=6220565 collectives_per_s=22904 grid_s=1.643 strided_s=0.579 check_s=0.003 renew_s=2.754 step_s=4.815 failures=0
+library nodes=4 bytes_sent=18862480 gets_nonblocking=0 landing_full=0 reserve_stalls=6592 wakes_sent=30664 barrier_ns=40230806702
+teams t=286.0 round=148122 collectives=6335178 collectives_per_s=22142 grid_s=1.879 strided_s=0.619 check_s=0.003 renew_s=2.937 step_s=5.176 failures=0
+library nodes=4 bytes_sent=20193752 gets_nonblocking=0 landing_full=0 reserve_stalls=6801 wakes_sent=33260 barrier_ns=42675712893
+teams t=290.9 round=150717 collectives=6445041 collectives_per_s=22307 grid_s=1.770 strided_s=0.564 check_s=0.003 renew_s=2.787 step_s=4.925 failures=0
+library nodes=4 bytes_sent=19143656 gets_nonblocking=0 landing_full=0 reserve_stalls=6525 wakes_sent=31075 barrier_ns=40876640172
+teams t=296.0 round=153351 collectives=6557805 collectives_per_s=22228 grid_s=1.850 strided_s=0.681 check_s=0.003 renew_s=2.889 step_s=5.073 failures=0
+library nodes=4 bytes_sent=19866072 gets_nonblocking=0 landing_full=0 reserve_stalls=6807 wakes_sent=32692 barrier_ns=41862601883
+teams t=301.1 round=155947 collectives=6669855 collectives_per_s=21936 grid_s=1.816 strided_s=0.705 check_s=0.003 renew_s=2.871 step_s=5.108 failures=0
+library nodes=4 bytes_sent=19799864 gets_nonblocking=0 landing_full=0 reserve_stalls=6673 wakes_sent=33206 barrier_ns=41650400226
+teams t=305.9 round=158488 collectives=6778359 collectives_per_s=22482 grid_s=1.721 strided_s=0.531 check_s=0.003 renew_s=2.742 step_s=4.826 failures=0
+library nodes=4 bytes_sent=18912800 gets_nonblocking=0 landing_full=0 reserve_stalls=6499 wakes_sent=31159 barrier_ns=39954722259
+teams t=311.0 round=161120 collectives=6890326 collectives_per_s=22081 grid_s=1.813 strided_s=0.596 check_s=0.003 renew_s=2.905 step_s=5.071 failures=0
+library nodes=4 bytes_sent=19478920 gets_nonblocking=0 landing_full=0 reserve_stalls=6656 wakes_sent=31940 barrier_ns=41962689565
+teams t=315.9 round=163715 collectives=7001530 collectives_per_s=22490 grid_s=1.771 strided_s=0.557 check_s=0.003 renew_s=2.800 step_s=4.945 failures=0
+library nodes=4 bytes_sent=19297960 gets_nonblocking=0 landing_full=0 reserve_stalls=6627 wakes_sent=31901 barrier_ns=40845719460
+teams t=321.0 round=166339 collectives=7114237 collectives_per_s=22157 grid_s=1.813 strided_s=0.641 check_s=0.003 renew_s=2.853 step_s=5.087 failures=0
+library nodes=4 bytes_sent=19985312 gets_nonblocking=0 landing_full=0 reserve_stalls=6670 wakes_sent=33330 barrier_ns=41692131905
+teams t=325.9 round=168918 collectives=7224600 collectives_per_s=22428 grid_s=1.700 strided_s=0.566 check_s=0.003 renew_s=2.790 step_s=4.921 failures=0
+library nodes=4 bytes_sent=19116696 gets_nonblocking=0 landing_full=0 reserve_stalls=6329 wakes_sent=31639 barrier_ns=40643212753
+teams t=330.9 round=171538 collectives=7337568 collectives_per_s=22554 grid_s=1.797 strided_s=0.681 check_s=0.003 renew_s=2.822 step_s=5.009 failures=0
+library nodes=4 bytes_sent=19448080 gets_nonblocking=0 landing_full=0 reserve_stalls=6460 wakes_sent=32452 barrier_ns=41289614960
+teams t=336.0 round=174153 collectives=7449663 collectives_per_s=22282 grid_s=1.761 strided_s=0.588 check_s=0.003 renew_s=2.884 step_s=5.031 failures=0
+library nodes=4 bytes_sent=19681624 gets_nonblocking=0 landing_full=0 reserve_stalls=6332 wakes_sent=32636 barrier_ns=41562296531
+teams t=341.0 round=176752 collectives=7560896 collectives_per_s=22246 grid_s=1.737 strided_s=0.643 check_s=0.003 renew_s=2.823 step_s=5.000 failures=0
+library nodes=4 bytes_sent=19433208 gets_nonblocking=0 landing_full=0 reserve_stalls=6556 wakes_sent=32273 barrier_ns=41186880014
+teams t=345.8 round=179350 collectives=7669829 collectives_per_s=22330 grid_s=1.746 strided_s=0.525 check_s=0.003 renew_s=2.780 step_s=4.878 failures=0
+library nodes=4 bytes_sent=18737088 gets_nonblocking=0 landing_full=0 reserve_stalls=6425 wakes_sent=30191 barrier_ns=40652389974
+teams t=350.9 round=182012 collectives=7783134 collectives_per_s=22316 grid_s=1.764 strided_s=0.553 check_s=0.003 renew_s=2.904 step_s=5.077 failures=0
+library nodes=4 bytes_sent=20042680 gets_nonblocking=0 landing_full=0 reserve_stalls=6807 wakes_sent=32899 barrier_ns=42007259979
+teams t=356.0 round=184633 collectives=7894337 collectives_per_s=22060 grid_s=1.798 strided_s=0.580 check_s=0.003 renew_s=2.880 step_s=5.041 failures=0
+library nodes=4 bytes_sent=19623736 gets_nonblocking=0 landing_full=0 reserve_stalls=6538 wakes_sent=32327 barrier_ns=41662064573
+teams t=360.9 round=187232 collectives=8005335 collectives_per_s=22263 grid_s=1.730 strided_s=0.616 check_s=0.003 renew_s=2.805 step_s=4.986 failures=0
+library nodes=4 bytes_sent=19544584 gets_nonblocking=0 landing_full=0 reserve_stalls=6548 wakes_sent=32367 barrier_ns=41209750318
+teams t=365.9 round=189838 collectives=8115907 collectives_per_s=22224 grid_s=1.802 strided_s=0.547 check_s=0.003 renew_s=2.819 step_s=4.975 failures=0
+library nodes=4 bytes_sent=19451296 gets_nonblocking=0 landing_full=0 reserve_stalls=6817 wakes_sent=31791 barrier_ns=41145169400
+teams t=370.9 round=192456 collectives=8227035 collectives_per_s=22312 grid_s=1.773 strided_s=0.597 check_s=0.003 renew_s=2.834 step_s=4.981 failures=0
+library nodes=4 bytes_sent=19455928 gets_nonblocking=0 landing_full=0 reserve_stalls=6661 wakes_sent=31719 barrier_ns=41265979641
+teams t=376.0 round=195084 collectives=8339808 collectives_per_s=22141 grid_s=1.802 strided_s=0.574 check_s=0.003 renew_s=2.873 step_s=5.094 failures=0
+library nodes=4 bytes_sent=19968760 gets_nonblocking=0 landing_full=0 reserve_stalls=6700 wakes_sent=32668 barrier_ns=41766046659
+teams t=380.9 round=197663 collectives=8450083 collectives_per_s=22337 grid_s=1.803 strided_s=0.647 check_s=0.003 renew_s=2.785 step_s=4.937 failures=0
+library nodes=4 bytes_sent=19293768 gets_nonblocking=0 landing_full=0 reserve_stalls=6524 wakes_sent=31896 barrier_ns=40824716921
+teams t=385.8 round=200274 collectives=8559111 collectives_per_s=22584 grid_s=1.718 strided_s=0.496 check_s=0.003 renew_s=2.817 step_s=4.828 failures=0
+library nodes=4 bytes_sent=18886328 gets_nonblocking=0 landing_full=0 reserve_stalls=6547 wakes_sent=30472 barrier_ns=40744684362
+teams t=391.0 round=202978 collectives=8674588 collectives_per_s=22233 grid_s=1.844 strided_s=0.593 check_s=0.003 renew_s=2.935 step_s=5.194 failures=0
+library nodes=4 bytes_sent=20479048 gets_nonblocking=0 landing_full=0 reserve_stalls=6675 wakes_sent=33692 barrier_ns=42790341501
+teams t=395.9 round=205581 collectives=8784960 collectives_per_s=22412 grid_s=1.770 strided_s=0.595 check_s=0.003 renew_s=2.800 step_s=4.925 failures=0
+library nodes=4 bytes_sent=19231632 gets_nonblocking=0 landing_full=0 reserve_stalls=6498 wakes_sent=31794 barrier_ns=40921593955
+teams t=401.0 round=208223 collectives=8898845 collectives_per_s=22245 grid_s=1.809 strided_s=0.614 check_s=0.003 renew_s=2.908 step_s=5.120 failures=0
+library nodes=4 bytes_sent=19955616 gets_nonblocking=0 landing_full=0 reserve_stalls=6445 wakes_sent=32954 barrier_ns=42016286406
+teams t=405.9 round=210803 collectives=9007544 collectives_per_s=22294 grid_s=1.714 strided_s=0.583 check_s=0.002 renew_s=2.795 step_s=4.876 failures=0
+library nodes=4 bytes_sent=19024136 gets_nonblocking=0 landing_full=0 reserve_stalls=6380 wakes_sent=30962 barrier_ns=40622257205
+teams t=410.9 round=213448 collectives=9119461 collectives_per_s=22420 grid_s=1.759 strided_s=0.578 check_s=0.003 renew_s=2.870 step_s=4.992 failures=0
+library nodes=4 bytes_sent=19669304 gets_nonblocking=0 landing_full=0 reserve_stalls=6493 wakes_sent=32325 barrier_ns=41552896079
+teams t=415.9 round=216097 collectives=9232411 collectives_per_s=22235 grid_s=1.751 strided_s=0.548 check_s=0.003 renew_s=2.872 step_s=5.080 failures=0
+library nodes=4 bytes_sent=19798056 gets_nonblocking=0 landing_full=0 reserve_stalls=6544 wakes_sent=32485 barrier_ns=42033488446
+teams t=420.9 round=218704 collectives=9343654 collectives_per_s=22315 grid_s=1.746 strided_s=0.548 check_s=0.003 renew_s=2.846 step_s=4.985 failures=0
+library nodes=4 bytes_sent=19558448 gets_nonblocking=0 landing_full=0 reserve_stalls=6406 wakes_sent=32096 barrier_ns=41223706849
+teams t=426.0 round=221318 collectives=9455906 collectives_per_s=22169 grid_s=1.863 strided_s=0.647 check_s=0.003 renew_s=2.859 step_s=5.063 failures=0
+library nodes=4 bytes_sent=19828680 gets_nonblocking=0 landing_full=0 reserve_stalls=6445 wakes_sent=32711 barrier_ns=41348071750
+teams t=430.9 round=223899 collectives=9566511 collectives_per_s=22372 grid_s=1.732 strided_s=0.606 check_s=0.003 renew_s=2.804 step_s=4.944 failures=0
+library nodes=4 bytes_sent=19263440 gets_nonblocking=0 landing_full=0 reserve_stalls=6434 wakes_sent=31690 barrier_ns=40769440782
+teams t=435.8 round=226509 collectives=9676158 collectives_per_s=22385 grid_s=1.723 strided_s=0.503 check_s=0.003 renew_s=2.792 step_s=4.898 failures=0
+library nodes=4 bytes_sent=19077392 gets_nonblocking=0 landing_full=0 reserve_stalls=6575 wakes_sent=30489 barrier_ns=40992945396
+teams t=441.0 round=229173 collectives=9790587 collectives_per_s=22158 grid_s=1.805 strided_s=0.653 check_s=0.003 renew_s=2.919 step_s=5.164 failures=0
+library nodes=4 bytes_sent=20205184 gets_nonblocking=0 landing_full=0 reserve_stalls=6620 wakes_sent=33632 barrier_ns=42417233349
+teams t=445.9 round=231752 collectives=9899341 collectives_per_s=22209 grid_s=1.747 strided_s=0.573 check_s=0.003 renew_s=2.810 step_s=4.897 failures=0
+library nodes=4 bytes_sent=18883640 gets_nonblocking=0 landing_full=0 reserve_stalls=6631 wakes_sent=30567 barrier_ns=40782354366
+teams t=450.9 round=234385 collectives=10012318 collectives_per_s=22517 grid_s=1.722 strided_s=0.597 check_s=0.003 renew_s=2.827 step_s=5.017 failures=0
+library nodes=4 bytes_sent=19588800 gets_nonblocking=0 landing_full=0 reserve_stalls=6598 wakes_sent=32251 barrier_ns=41366323006
+teams t=456.0 round=237008 collectives=10124257 collectives_per_s=21961 grid_s=1.829 strided_s=0.659 check_s=0.003 renew_s=2.896 step_s=5.097 failures=0
+library nodes=4 bytes_sent=19787016 gets_nonblocking=0 landing_full=0 reserve_stalls=6509 wakes_sent=32836 barrier_ns=41860453618
+teams t=461.0 round=239581 collectives=10235554 collectives_per_s=22349 grid_s=1.729 strided_s=0.608 check_s=0.003 renew_s=2.794 step_s=4.980 failures=0
+library nodes=4 bytes_sent=19698800 gets_nonblocking=0 landing_full=0 reserve_stalls=6443 wakes_sent=33063 barrier_ns=40717181580
+teams t=466.1 round=242164 collectives=10347170 collectives_per_s=21872 grid_s=1.861 strided_s=0.696 check_s=0.003 renew_s=2.864 step_s=5.103 failures=0
+library nodes=4 bytes_sent=19815608 gets_nonblocking=0 landing_full=0 reserve_stalls=6406 wakes_sent=33173 barrier_ns=41646725519
+teams t=470.9 round=244694 collectives=10454101 collectives_per_s=22251 grid_s=1.725 strided_s=0.517 check_s=0.003 renew_s=2.742 step_s=4.806 failures=0
+library nodes=4 bytes_sent=18759496 gets_nonblocking=0 landing_full=0 reserve_stalls=6277 wakes_sent=30690 barrier_ns=39974603931
+teams t=475.9 round=247326 collectives=10567284 collectives_per_s=22485 grid_s=1.731 strided_s=0.671 check_s=0.003 renew_s=2.849 step_s=5.034 failures=0
+library nodes=4 bytes_sent=19726488 gets_nonblocking=0 landing_full=0 reserve_stalls=6516 wakes_sent=32842 barrier_ns=41545182511
+teams t=481.0 round=249940 collectives=10678612 collectives_per_s=22100 grid_s=1.823 strided_s=0.650 check_s=0.002 renew_s=2.866 step_s=5.037 failures=0
+library nodes=4 bytes_sent=19606088 gets_nonblocking=0 landing_full=0 reserve_stalls=6548 wakes_sent=32558 barrier_ns=41548674881
+teams t=485.9 round=252534 collectives=10790766 collectives_per_s=22570 grid_s=1.715 strided_s=0.626 check_s=0.003 renew_s=2.814 step_s=4.969 failures=0
+library nodes=4 bytes_sent=19440608 gets_nonblocking=0 landing_full=0 reserve_stalls=6406 wakes_sent=32369 barrier_ns=40801220936
+teams t=490.9 round=255144 collectives=10901682 collectives_per_s=22551 grid_s=1.721 strided_s=0.541 check_s=0.003 renew_s=2.796 step_s=4.918 failures=0
+library nodes=4 bytes_sent=19333456 gets_nonblocking=0 landing_full=0 reserve_stalls=6585 wakes_sent=31162 barrier_ns=40883590224
+teams t=495.9 round=257797 collectives=11014971 collectives_per_s=22492 grid_s=1.749 strided_s=0.593 check_s=0.003 renew_s=2.876 step_s=5.037 failures=0
+library nodes=4 bytes_sent=19752520 gets_nonblocking=0 landing_full=0 reserve_stalls=6726 wakes_sent=32369 barrier_ns=41779181560
+teams t=500.9 round=260430 collectives=11127387 collectives_per_s=22594 grid_s=1.710 strided_s=0.544 check_s=0.003 renew_s=2.815 step_s=4.975 failures=0
+library nodes=4 bytes_sent=19612576 gets_nonblocking=0 landing_full=0 reserve_stalls=6637 wakes_sent=32135 barrier_ns=41244208251
+teams t=506.1 round=263075 collectives=11241248 collectives_per_s=21993 grid_s=1.887 strided_s=0.724 check_s=0.003 renew_s=2.915 step_s=5.177 failures=0
+library nodes=4 bytes_sent=19883832 gets_nonblocking=0 landing_full=0 reserve_stalls=6535 wakes_sent=33310 barrier_ns=42422558337
+teams t=511.0 round=265629 collectives=11350344 collectives_per_s=22059 grid_s=1.742 strided_s=0.636 check_s=0.003 renew_s=2.796 step_s=4.946 failures=0
+library nodes=4 bytes_sent=19299632 gets_nonblocking=0 landing_full=0 reserve_stalls=6251 wakes_sent=31914 barrier_ns=40655289294
+teams t=516.1 round=268211 collectives=11462031 collectives_per_s=21940 grid_s=1.805 strided_s=0.670 check_s=0.003 renew_s=2.853 step_s=5.090 failures=0
+library nodes=4 bytes_sent=19780168 gets_nonblocking=0 landing_full=0 reserve_stalls=6184 wakes_sent=33033 barrier_ns=41522877978
+teams t=520.9 round=270747 collectives=11570421 collectives_per_s=22507 grid_s=1.662 strided_s=0.565 check_s=0.003 renew_s=2.739 step_s=4.816 failures=0
+library nodes=4 bytes_sent=18820424 gets_nonblocking=0 landing_full=0 reserve_stalls=6158 wakes_sent=31158 barrier_ns=39890668193
+teams t=526.0 round=273379 collectives=11683576 collectives_per_s=22142 grid_s=1.784 strided_s=0.694 check_s=0.003 renew_s=2.901 step_s=5.110 failures=0
+library nodes=4 bytes_sent=19917968 gets_nonblocking=0 landing_full=0 reserve_stalls=6310 wakes_sent=32763 barrier_ns=41914826737
+teams t=531.0 round=275954 collectives=11794358 collectives_per_s=22203 grid_s=1.725 strided_s=0.560 check_s=0.003 renew_s=2.824 step_s=4.990 failures=0
+library nodes=4 bytes_sent=19628208 gets_nonblocking=0 landing_full=0 reserve_stalls=6454 wakes_sent=32328 barrier_ns=41022979615
+teams t=536.0 round=278534 collectives=11905078 collectives_per_s=22244 grid_s=1.741 strided_s=0.636 check_s=0.003 renew_s=2.789 step_s=4.977 failures=0
+library nodes=4 bytes_sent=19730136 gets_nonblocking=0 landing_full=0 reserve_stalls=6409 wakes_sent=32973 barrier_ns=40862852451
+teams t=540.9 round=281125 collectives=12014574 collectives_per_s=22380 grid_s=1.690 strided_s=0.570 check_s=0.003 renew_s=2.801 step_s=4.893 failures=0
+library nodes=4 bytes_sent=18869608 gets_nonblocking=0 landing_full=0 reserve_stalls=6571 wakes_sent=30347 barrier_ns=40754518675
+teams t=545.8 round=283772 collectives=12126647 collectives_per_s=22621 grid_s=1.781 strided_s=0.576 check_s=0.003 renew_s=2.863 step_s=4.954 failures=0
+library nodes=4 bytes_sent=19370440 gets_nonblocking=0 landing_full=0 reserve_stalls=6648 wakes_sent=31383 barrier_ns=41340032094
+teams t=551.0 round=286443 collectives=12241161 collectives_per_s=22275 grid_s=1.820 strided_s=0.613 check_s=0.003 renew_s=2.937 step_s=5.141 failures=0
+library nodes=4 bytes_sent=20154504 gets_nonblocking=0 landing_full=0 reserve_stalls=6729 wakes_sent=33427 barrier_ns=42389513542
+teams t=555.9 round=289040 collectives=12351029 collectives_per_s=22194 grid_s=1.770 strided_s=0.528 check_s=0.003 renew_s=2.831 step_s=4.950 failures=0
+library nodes=4 bytes_sent=19336888 gets_nonblocking=0 landing_full=0 reserve_stalls=6397 wakes_sent=31637 barrier_ns=41064783681
+teams t=560.9 round=291663 collectives=12462537 collectives_per_s=22606 grid_s=1.700 strided_s=0.575 check_s=0.003 renew_s=2.821 step_s=4.933 failures=0
+library nodes=4 bytes_sent=19415600 gets_nonblocking=0 landing_full=0 reserve_stalls=6869 wakes_sent=31498 barrier_ns=40984829666
+teams t=565.8 round=294321 collectives=12574365 collectives_per_s=22722 grid_s=1.702 strided_s=0.531 check_s=0.002 renew_s=2.830 step_s=4.922 failures=0
+library nodes=4 bytes_sent=19221672 gets_nonblocking=0 landing_full=0 reserve_stalls=6582 wakes_sent=30962 barrier_ns=41299205275
+teams t=571.1 round=297021 collectives=12691740 collectives_per_s=22077 grid_s=1.879 strided_s=0.702 check_s=0.003 renew_s=2.985 step_s=5.317 failures=0
+library nodes=4 bytes_sent=20716704 gets_nonblocking=0 landing_full=0 reserve_stalls=6743 wakes_sent=34639 barrier_ns=43665391347
+teams t=576.0 round=299560 collectives=12801282 collectives_per_s=22328 grid_s=1.677 strided_s=0.632 check_s=0.003 renew_s=2.758 step_s=4.906 failures=0
+library nodes=4 bytes_sent=19202584 gets_nonblocking=0 landing_full=0 reserve_stalls=6294 wakes_sent=31875 barrier_ns=40208231997
+teams t=580.9 round=302147 collectives=12912668 collectives_per_s=22555 grid_s=1.681 strided_s=0.594 check_s=0.003 renew_s=2.783 step_s=4.938 failures=0
+library nodes=4 bytes_sent=19434768 gets_nonblocking=0 landing_full=0 reserve_stalls=6541 wakes_sent=32017 barrier_ns=40679975677
+teams t=586.0 round=304766 collectives=13025702 collectives_per_s=22401 grid_s=1.786 strided_s=0.615 check_s=0.003 renew_s=2.828 step_s=5.046 failures=0
+library nodes=4 bytes_sent=20006400 gets_nonblocking=0 landing_full=0 reserve_stalls=6719 wakes_sent=32698 barrier_ns=41267439678
+teams t=590.9 round=307361 collectives=13136238 collectives_per_s=22440 grid_s=1.742 strided_s=0.572 check_s=0.003 renew_s=2.795 step_s=4.926 failures=0
+library nodes=4 bytes_sent=19144128 gets_nonblocking=0 landing_full=0 reserve_stalls=6715 wakes_sent=31577 barrier_ns=40891674611
+teams t=595.9 round=309995 collectives=13247691 collectives_per_s=22355 grid_s=1.761 strided_s=0.575 check_s=0.003 renew_s=2.851 step_s=4.986 failures=0
+library nodes=4 bytes_sent=19678832 gets_nonblocking=0 landing_full=0 reserve_stalls=6719 wakes_sent=32175 barrier_ns=41543965575
+teams t=600.0 round=312160 collectives=13339785 collectives_per_s=22496 grid_s=1.456 strided_s=0.513 check_s=0.002 renew_s=2.341 step_s=4.094 failures=0
+library nodes=4 bytes_sent=15978992 gets_nonblocking=0 landing_full=0 reserve_stalls=5542 wakes_sent=25964 barrier_ns=33976225065
+summary teams rounds=312160 collectives=13339785 seconds=599.9 collectives_per_s=22235 failures=0
+summary teams renewals=104053 renew_every=3
+osoe-pacer failures=0 seconds=600.0

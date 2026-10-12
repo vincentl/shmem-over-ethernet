@@ -1,0 +1,28 @@
+start 23:40:16
+npb: A 1 B 1
+prk: 3 of 3 validate
+isx: weak 0 strong 0
+examples: 64 exit 0 of 72; not 0: bcast3: exit 1 bcast4: exit 1 global_exit: exit 99 just-a-shmalloc: exit 1 nullput: exit 1 reduce-max: exit 1 reduce-sum: exit 1 shmem_2dheat: exit 1 
+osu build: 0
+osu put: 0
+osu get: 0
+osu put_bw: 0
+osu get_bw: 0
+osu put_nb: 0
+osu get_nb: 0
+osu put_nb_bw: 0
+osu get_nb_bw: 0
+osu put_overlap: 0
+osu get_overlap: 0
+osu atomics: 0
+osu put_mr: 0
+osu put_mr_nb: 0
+osu get_mr_nb: 0
+osu barrier: 0 0
+osu broadcast: 0 0
+osu collect: 0 0
+osu fcollect: 0 0
+osu reduce: 0 0
+ssca1: /home/pi/osoe/build/release-run/corpus/ssca1-2x2.txt:1 /home/pi/osoe/build/release-run/corpus/ssca1-4x1.txt:1  succeeded 3 3
+sos: 160 exit 0; not: unit/bigget: exit 124 unit/c11_shmem_test_all_any_some: build failed unit/c11_shmem_wait_until_all_any_some: build failed unit/shmemalign: exit 1 unit/shmem_team_b2b_collectives: exit 1 ; unit/bigget -l 100: exit 0
+end 23:58:57

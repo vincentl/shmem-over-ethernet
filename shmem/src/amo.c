@@ -271,9 +271,9 @@ static uint64_t amo_rmw(const char *routine, shmem_ctx_t ctx, const void *dest,
  *
  * The upgrade (design §7.5) is the transport's rmw taking
  * OSOE_TRANSPORT_NONBLOCKING instead, with a result destination copied in at
- * the PE's next wait - the shape osoe's nonblocking gets already have (§4.6, as
- * built), whose one outstanding fetching AMO it would revisit. Not built here:
- * every routine below is the immediate form only.
+ * its context's next wait - the shape osoe's nonblocking gets already have
+ * (§4.6, as built), whose one outstanding fetching AMO it would revisit. Not
+ * built here: every routine below is the immediate form only.
  *
  * Each amo_rmw call below is given the _nbi routine's own name
  * ("shmem_long_atomic_fetch_add_nbi", not "...fetch_add"), so a diagnostic

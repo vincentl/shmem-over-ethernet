@@ -1,0 +1,1285 @@
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=mailbox,atomics,rma,locks,collectives,waits,sort,alltoall labels=hosts
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 seconds=3600 memory=4.8k
+exercise atomics cases=71 contexts=default,private,serialized slots=16 operations=64 claims=16 seconds=3600 memory=704
+exercise rma halo=8..1m cases=198 kinds=29 flags=atomic_add,signal_add,signal_set puts=putmem,putmem_nbi,uint64_put,putmem_signal,putmem_signal_nbi seconds=3600 memory=1.2m
+exercise locks locks=8 acquisitions=4 seconds=3600 memory=336
+exercise collectives typed=319 timed=87 sizes=8..128k teams=world,even seconds=3600 memory=4.1m
+exercise waits types=12 forms=14 comparisons=6 words=4 cases=168 seconds=3600 memory=96
+exercise sort mode=rounds exchange=fetch-add ptr=yes keys=524288 asked=4194304 capacity=593920 local_sort=lsd-scratch private=9.2m seconds=3600 memory=9.1m
+exercise alltoall teams=world,even blocks=8,64,512,4096,65536 variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput seconds=3600 memory=5.1m
+mix1 summary atomics rounds=697 updates=140626 seconds=9.2 updates_per_s=15219 failures=0
+mix0 summary mailbox rounds=12798 messages=204768 seconds=10.1 messages_per_s=20240 mib_per_s=2.6 failures=0
+mix2 summary rma rounds=2273 transfers=18184 seconds=11.6 transfers_per_s=1565 mib_per_s=143.7 failures=0
+mix3 summary locks rounds=2602 acquisitions=41632 seconds=13.8 acquisitions_per_s=3022 failures=0
+mix0 summary atomics rounds=544 updates=110684 seconds=4.9 updates_per_s=22411 failures=0
+mix2 summary locks rounds=1476 acquisitions=23616 seconds=7.2 acquisitions_per_s=3302 failures=0
+mix3 summary collectives rounds=1011 calls=20050 seconds=7.5 calls_per_s=2685 mib_per_s=29.9 failures=0
+mix1 summary rma rounds=2467 transfers=19736 seconds=10.1 transfers_per_s=1962 mib_per_s=180.4 failures=0
+mix2 summary collectives rounds=577 calls=11504 seconds=6.4 calls_per_s=1795 mib_per_s=20.1 failures=0
+mix3 summary waits rounds=4892 words=78272 seconds=7.9 words_per_s=9914 failures=0
+mix0 summary rma rounds=2520 transfers=20160 seconds=11.7 transfers_per_s=1717 mib_per_s=158.0 failures=0
+mix1 summary locks rounds=1744 acquisitions=27904 seconds=12.3 acquisitions_per_s=2261 failures=0
+world library nodes=4 bytes_sent=6063163336 gets_nonblocking=202516 landing_full=0 reserve_stalls=56513 wakes_sent=236579 barrier_ns=209578841255
+world library nodes=4 bytes_sent=403129176 gets_nonblocking=0 landing_full=0 reserve_stalls=2440 wakes_sent=1162 barrier_ns=6734545635
+world library nodes=4 bytes_sent=856617096 gets_nonblocking=0 landing_full=0 reserve_stalls=5082 wakes_sent=2584 barrier_ns=7699727571
+world library nodes=4 bytes_sent=655087816 gets_nonblocking=0 landing_full=0 reserve_stalls=3793 wakes_sent=1923 barrier_ns=5919744230
+world summary sort rounds=39 keys=327155712 seconds=10.1 keys_per_s=32428121 mib_per_s=247.4 imbalance=1.001 failures=0
+mix2 summary waits rounds=12202 words=195232 seconds=9.0 words_per_s=21645 failures=0
+mix1 summary collectives rounds=2060 calls=40700 seconds=12.6 calls_per_s=3226 mib_per_s=35.7 failures=0
+mix3 summary mailbox rounds=29901 messages=478416 seconds=12.9 messages_per_s=36988 mib_per_s=4.8 failures=0
+mix0 summary locks rounds=3517 acquisitions=56272 seconds=13.5 acquisitions_per_s=4170 failures=0
+mix0 summary collectives rounds=819 calls=16342 seconds=5.4 calls_per_s=3044 mib_per_s=34.6 failures=0
+mix2 summary mailbox rounds=14008 messages=224128 seconds=6.3 messages_per_s=35624 mib_per_s=4.6 failures=0
+mix3 summary atomics rounds=1054 updates=212649 seconds=7.5 updates_per_s=28528 failures=0
+mix1 summary waits rounds=25339 words=405424 seconds=14.5 words_per_s=27921 failures=0
+mix0 summary waits rounds=6323 words=101168 seconds=9.6 words_per_s=10520 failures=0
+mix2 summary atomics rounds=720 updates=146197 seconds=10.3 updates_per_s=14214 failures=0
+mix3 summary rma rounds=1793 transfers=14344 seconds=10.5 transfers_per_s=1363 mib_per_s=125.4 failures=0
+mix1 summary mailbox rounds=26490 messages=423840 seconds=13.4 messages_per_s=31689 mib_per_s=4.1 failures=0
+world library nodes=4 bytes_sent=2259200440 gets_nonblocking=48768 landing_full=0 reserve_stalls=116781 wakes_sent=349077 barrier_ns=302456931552
+world library nodes=4 bytes_sent=252663712 gets_nonblocking=1200 landing_full=162 reserve_stalls=9970 wakes_sent=1015 barrier_ns=3280872102
+world library nodes=4 bytes_sent=1892433848 gets_nonblocking=5760 landing_full=660 reserve_stalls=44078 wakes_sent=5702 barrier_ns=19530426265
+world library nodes=4 bytes_sent=930243904 gets_nonblocking=2400 landing_full=333 reserve_stalls=22706 wakes_sent=2567 barrier_ns=9340873444
+world summary alltoall rounds=66 exchanges=1056 seconds=10.3 exchanges_per_s=102 failures=0
+mix3 summary locks rounds=836 acquisitions=13376 seconds=5.4 acquisitions_per_s=2470 failures=0
+mix1 summary atomics rounds=660 updates=134445 seconds=8.2 updates_per_s=16416 failures=0
+mix2 summary rma rounds=1600 transfers=12800 seconds=8.3 transfers_per_s=1539 mib_per_s=141.9 failures=0
+mix0 summary mailbox rounds=15432 messages=246912 seconds=10.0 messages_per_s=24610 mib_per_s=3.2 failures=0
+mix2 summary locks rounds=1321 acquisitions=21136 seconds=6.3 acquisitions_per_s=3333 failures=0
+mix0 summary atomics rounds=826 updates=167902 seconds=7.2 updates_per_s=23215 failures=0
+mix3 summary collectives rounds=1766 calls=34674 seconds=12.9 calls_per_s=2687 mib_per_s=29.7 failures=0
+mix1 summary rma rounds=3317 transfers=26536 seconds=13.8 transfers_per_s=1930 mib_per_s=177.7 failures=0
+mix3 summary waits rounds=3222 words=51552 seconds=5.3 words_per_s=9713 failures=0
+mix2 summary collectives rounds=1007 calls=19852 seconds=11.0 calls_per_s=1798 mib_per_s=19.3 failures=0
+mix0 summary rma rounds=2463 transfers=19704 seconds=11.6 transfers_per_s=1696 mib_per_s=155.8 failures=0
+mix1 summary locks rounds=1812 acquisitions=28992 seconds=12.5 acquisitions_per_s=2318 failures=0
+world library nodes=4 bytes_sent=6315274888 gets_nonblocking=199348 landing_full=0 reserve_stalls=53027 wakes_sent=222498 barrier_ns=227792970348
+world library nodes=4 bytes_sent=403093016 gets_nonblocking=0 landing_full=0 reserve_stalls=2372 wakes_sent=1156 barrier_ns=3106615777
+world library nodes=4 bytes_sent=1007641864 gets_nonblocking=0 landing_full=0 reserve_stalls=5925 wakes_sent=2977 barrier_ns=8436652481
+world library nodes=4 bytes_sent=604664496 gets_nonblocking=0 landing_full=0 reserve_stalls=3593 wakes_sent=1810 barrier_ns=5632204109
+world summary sort rounds=41 keys=343932928 seconds=10.2 keys_per_s=33702264 mib_per_s=257.1 imbalance=1.000 failures=0
+mix1 summary collectives rounds=966 calls=19014 seconds=6.1 calls_per_s=3124 mib_per_s=34.5 failures=0
+mix0 summary locks rounds=2632 acquisitions=42112 seconds=9.9 acquisitions_per_s=4271 failures=0
+mix3 summary mailbox rounds=25739 messages=411824 seconds=10.4 messages_per_s=39729 mib_per_s=5.2 failures=0
+mix2 summary waits rounds=18248 words=291968 seconds=11.8 words_per_s=24709 failures=0
+mix2 summary mailbox rounds=16421 messages=262736 seconds=8.5 messages_per_s=30904 mib_per_s=4.0 failures=0
+mix1 summary waits rounds=11060 words=176960 seconds=9.4 words_per_s=18757 failures=0
+mix0 summary collectives rounds=1838 calls=36122 seconds=11.4 calls_per_s=3178 mib_per_s=35.0 failures=0
+mix3 summary atomics rounds=1597 updates=325320 seconds=12.7 updates_per_s=25561 failures=0
+mix0 summary waits rounds=5305 words=84880 seconds=7.5 words_per_s=11337 failures=0
+mix3 summary rma rounds=1398 transfers=11184 seconds=7.8 transfers_per_s=1425 mib_per_s=130.9 failures=0
+mix2 summary atomics rounds=718 updates=145801 seconds=8.5 updates_per_s=17179 failures=0
+mix1 summary mailbox rounds=12521 messages=200336 seconds=8.2 messages_per_s=24444 mib_per_s=3.2 failures=0
+world library nodes=4 bytes_sent=1850718512 gets_nonblocking=38832 landing_full=0 reserve_stalls=116779 wakes_sent=269178 barrier_ns=202847550555
+world library nodes=4 bytes_sent=252575936 gets_nonblocking=1200 landing_full=168 reserve_stalls=6303 wakes_sent=908 barrier_ns=2819474272
+world library nodes=4 bytes_sent=2349385040 gets_nonblocking=6720 landing_full=827 reserve_stalls=45797 wakes_sent=6746 barrier_ns=23775582863
+world library nodes=4 bytes_sent=472998664 gets_nonblocking=1440 landing_full=168 reserve_stalls=10123 wakes_sent=1379 barrier_ns=7402779500
+world summary alltoall rounds=65 exchanges=1040 seconds=10.3 exchanges_per_s=101 failures=0
+mix3 summary locks rounds=1157 acquisitions=18512 seconds=7.6 acquisitions_per_s=2446 failures=0
+mix0 summary mailbox rounds=11435 messages=182960 seconds=8.7 messages_per_s=20984 mib_per_s=2.7 failures=0
+mix1 summary atomics rounds=1039 updates=210148 seconds=11.7 updates_per_s=18038 failures=0
+mix2 summary rma rounds=2424 transfers=19392 seconds=11.7 transfers_per_s=1652 mib_per_s=151.9 failures=0
+mix1 summary rma rounds=1977 transfers=15816 seconds=8.1 transfers_per_s=1959 mib_per_s=180.0 failures=0
+mix2 summary locks rounds=1725 acquisitions=27600 seconds=8.2 acquisitions_per_s=3369 failures=0
+mix3 summary collectives rounds=1844 calls=36356 seconds=11.4 calls_per_s=3191 mib_per_s=34.9 failures=0
+mix0 summary atomics rounds=1783 updates=360528 seconds=12.6 updates_per_s=28523 failures=0
+mix0 summary rma rounds=1033 transfers=8264 seconds=5.0 transfers_per_s=1651 mib_per_s=152.2 failures=0
+mix3 summary waits rounds=3686 words=58976 seconds=5.3 words_per_s=11164 failures=0
+mix1 summary locks rounds=2332 acquisitions=37312 seconds=9.9 acquisitions_per_s=3768 failures=0
+mix2 summary collectives rounds=1748 calls=34492 seconds=10.8 calls_per_s=3184 mib_per_s=35.4 failures=0
+world library nodes=4 bytes_sent=4950690400 gets_nonblocking=148564 landing_full=0 reserve_stalls=54506 wakes_sent=259544 barrier_ns=206008469326
+world library nodes=4 bytes_sent=403059096 gets_nonblocking=0 landing_full=0 reserve_stalls=2339 wakes_sent=1167 barrier_ns=2693729623
+world library nodes=4 bytes_sent=1058151448 gets_nonblocking=0 landing_full=0 reserve_stalls=6169 wakes_sent=3110 barrier_ns=9380371966
+world library nodes=4 bytes_sent=503838800 gets_nonblocking=0 landing_full=0 reserve_stalls=2809 wakes_sent=1438 barrier_ns=4049824621
+world summary sort rounds=40 keys=335544320 seconds=9.8 keys_per_s=34092198 mib_per_s=260.1 imbalance=1.000 failures=0
+mix0 summary locks rounds=1750 acquisitions=28000 seconds=6.9 acquisitions_per_s=4055 failures=0
+mix3 summary mailbox rounds=16071 messages=257136 seconds=7.0 messages_per_s=36500 mib_per_s=4.7 failures=0
+mix2 summary waits rounds=10922 words=174752 seconds=7.7 words_per_s=22641 failures=0
+mix1 summary collectives rounds=1784 calls=35226 seconds=10.2 calls_per_s=3466 mib_per_s=38.0 failures=0
+mix2 summary mailbox rounds=18518 messages=296288 seconds=9.6 messages_per_s=30937 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=1455 updates=292680 seconds=12.7 updates_per_s=23030 failures=0
+mix0 summary collectives rounds=2074 calls=40936 seconds=13.0 calls_per_s=3148 mib_per_s=35.0 failures=0
+mix1 summary waits rounds=15320 words=245120 seconds=13.0 words_per_s=18788 failures=0
+mix1 summary mailbox rounds=6132 messages=98112 seconds=5.0 messages_per_s=19609 mib_per_s=2.5 failures=0
+mix3 summary rma rounds=1702 transfers=13616 seconds=11.3 transfers_per_s=1204 mib_per_s=111.1 failures=0
+mix2 summary atomics rounds=682 updates=136209 seconds=11.6 updates_per_s=11710 failures=0
+mix0 summary waits rounds=7529 words=120464 seconds=13.1 words_per_s=9175 failures=0
+world library nodes=4 bytes_sent=2164441232 gets_nonblocking=48260 landing_full=0 reserve_stalls=106730 wakes_sent=224616 barrier_ns=244251705960
+world library nodes=4 bytes_sent=252589160 gets_nonblocking=960 landing_full=0 reserve_stalls=6964 wakes_sent=957 barrier_ns=2905771969
+world library nodes=4 bytes_sent=2349353000 gets_nonblocking=6720 landing_full=826 reserve_stalls=49717 wakes_sent=6892 barrier_ns=27186885137
+world library nodes=4 bytes_sent=236966280 gets_nonblocking=1200 landing_full=165 reserve_stalls=4535 wakes_sent=777 barrier_ns=2551653097
+world summary alltoall rounds=62 exchanges=992 seconds=9.6 exchanges_per_s=103 failures=0
+mix0 summary mailbox rounds=6592 messages=105472 seconds=5.2 messages_per_s=20468 mib_per_s=2.7 failures=0
+mix1 summary atomics rounds=537 updates=109641 seconds=6.2 updates_per_s=17710 failures=0
+mix3 summary locks rounds=1264 acquisitions=20224 seconds=7.4 acquisitions_per_s=2736 failures=0
+mix2 summary rma rounds=2260 transfers=18080 seconds=10.3 transfers_per_s=1749 mib_per_s=161.1 failures=0
+mix1 summary rma rounds=1305 transfers=10440 seconds=5.4 transfers_per_s=1941 mib_per_s=179.1 failures=0
+mix2 summary locks rounds=2861 acquisitions=45776 seconds=10.3 acquisitions_per_s=4426 failures=0
+mix3 summary collectives rounds=2476 calls=48804 seconds=13.3 calls_per_s=3662 mib_per_s=40.9 failures=0
+mix0 summary atomics rounds=2305 updates=464783 seconds=14.2 updates_per_s=32658 failures=0
+mix1 summary locks rounds=1141 acquisitions=18256 seconds=8.9 acquisitions_per_s=2053 failures=0
+mix2 summary collectives rounds=864 calls=16956 seconds=9.4 calls_per_s=1809 mib_per_s=19.8 failures=0
+mix3 summary waits rounds=8048 words=128768 seconds=12.7 words_per_s=10168 failures=0
+mix0 summary rma rounds=3193 transfers=25544 seconds=14.9 transfers_per_s=1720 mib_per_s=158.3 failures=0
+world library nodes=4 bytes_sent=5938678656 gets_nonblocking=187684 landing_full=0 reserve_stalls=53595 wakes_sent=245504 barrier_ns=266047346958
+world library nodes=4 bytes_sent=403083368 gets_nonblocking=0 landing_full=0 reserve_stalls=2392 wakes_sent=1201 barrier_ns=5182103477
+world library nodes=4 bytes_sent=906905320 gets_nonblocking=0 landing_full=0 reserve_stalls=5510 wakes_sent=2737 barrier_ns=10371596051
+world library nodes=4 bytes_sent=503881528 gets_nonblocking=0 landing_full=0 reserve_stalls=3031 wakes_sent=1500 barrier_ns=5026568529
+world summary sort rounds=37 keys=310378496 seconds=10.0 keys_per_s=31180581 mib_per_s=237.9 imbalance=1.000 failures=0
+mix0 summary locks rounds=2111 acquisitions=33776 seconds=8.3 acquisitions_per_s=4077 failures=0
+mix1 summary collectives rounds=1415 calls=27776 seconds=8.7 calls_per_s=3175 mib_per_s=35.9 failures=0
+mix3 summary mailbox rounds=24195 messages=387120 seconds=9.7 messages_per_s=39968 mib_per_s=5.2 failures=0
+mix2 summary waits rounds=16057 words=256912 seconds=10.5 words_per_s=24420 failures=0
+mix1 summary waits rounds=6094 words=97504 seconds=5.2 words_per_s=18819 failures=0
+mix0 summary collectives rounds=1178 calls=22992 seconds=7.3 calls_per_s=3150 mib_per_s=34.3 failures=0
+mix3 summary atomics rounds=961 updates=196113 seconds=7.8 updates_per_s=25169 failures=0
+mix2 summary mailbox rounds=19663 messages=314608 seconds=8.5 messages_per_s=37097 mib_per_s=4.8 failures=0
+mix3 summary rma rounds=1036 transfers=8288 seconds=6.1 transfers_per_s=1366 mib_per_s=125.7 failures=0
+mix2 summary atomics rounds=461 updates=95275 seconds=6.6 updates_per_s=14488 failures=0
+mix0 summary waits rounds=6556 words=104896 seconds=9.2 words_per_s=11380 failures=0
+mix1 summary mailbox rounds=15266 messages=244256 seconds=9.8 messages_per_s=24916 mib_per_s=3.2 failures=0
+world library nodes=4 bytes_sent=1529322336 gets_nonblocking=26572 landing_full=0 reserve_stalls=97175 wakes_sent=279119 barrier_ns=178815516714
+world library nodes=4 bytes_sent=252560856 gets_nonblocking=960 landing_full=0 reserve_stalls=5866 wakes_sent=887 barrier_ns=2745257877
+world library nodes=4 bytes_sent=2349445824 gets_nonblocking=6960 landing_full=828 reserve_stalls=49836 wakes_sent=6818 barrier_ns=24018132690
+world library nodes=4 bytes_sent=472978480 gets_nonblocking=1200 landing_full=164 reserve_stalls=9017 wakes_sent=1396 barrier_ns=6341129266
+world summary alltoall rounds=65 exchanges=1040 seconds=10.3 exchanges_per_s=101 failures=0
+mix2 summary rma rounds=1042 transfers=8336 seconds=5.5 transfers_per_s=1514 mib_per_s=139.5 failures=0
+mix1 summary atomics rounds=746 updates=149584 seconds=8.2 updates_per_s=18156 failures=0
+mix0 summary mailbox rounds=14179 messages=226864 seconds=8.9 messages_per_s=25400 mib_per_s=3.3 failures=0
+mix3 summary locks rounds=3172 acquisitions=50752 seconds=13.3 acquisitions_per_s=3806 failures=0
+mix3 summary collectives rounds=1473 calls=29006 seconds=10.7 calls_per_s=2717 mib_per_s=30.2 failures=0
+mix0 summary atomics rounds=1211 updates=245154 seconds=10.7 updates_per_s=22937 failures=0
+mix2 summary locks rounds=2249 acquisitions=35984 seconds=10.8 acquisitions_per_s=3341 failures=0
+mix1 summary rma rounds=2994 transfers=23952 seconds=12.3 transfers_per_s=1954 mib_per_s=179.7 failures=0
+mix2 summary collectives rounds=676 calls=13124 seconds=7.5 calls_per_s=1746 mib_per_s=20.1 failures=0
+mix0 summary rma rounds=1879 transfers=15032 seconds=9.1 transfers_per_s=1658 mib_per_s=152.9 failures=0
+mix3 summary waits rounds=6138 words=98208 seconds=9.3 words_per_s=10591 failures=0
+mix1 summary locks rounds=1396 acquisitions=22336 seconds=9.7 acquisitions_per_s=2311 failures=0
+world library nodes=4 bytes_sent=5137362800 gets_nonblocking=160748 landing_full=0 reserve_stalls=56995 wakes_sent=251243 barrier_ns=189744928512
+world library nodes=4 bytes_sent=403043976 gets_nonblocking=0 landing_full=0 reserve_stalls=2349 wakes_sent=1101 barrier_ns=3104468258
+world library nodes=4 bytes_sent=1007710800 gets_nonblocking=0 landing_full=0 reserve_stalls=5928 wakes_sent=3120 barrier_ns=13691496714
+world library nodes=4 bytes_sent=403066952 gets_nonblocking=0 landing_full=0 reserve_stalls=2326 wakes_sent=1151 barrier_ns=3599182389
+world summary sort rounds=37 keys=310378496 seconds=9.7 keys_per_s=32100484 mib_per_s=244.9 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=15102 messages=241632 seconds=6.8 messages_per_s=35724 mib_per_s=4.6 failures=0
+mix1 summary collectives rounds=2291 calls=45038 seconds=14.0 calls_per_s=3223 mib_per_s=35.5 failures=0
+mix0 summary locks rounds=3712 acquisitions=59392 seconds=14.2 acquisitions_per_s=4173 failures=0
+mix2 summary waits rounds=20750 words=332000 seconds=14.7 words_per_s=22624 failures=0
+mix3 summary atomics rounds=724 updates=145562 seconds=6.3 updates_per_s=22994 failures=0
+mix0 summary collectives rounds=1264 calls=25026 seconds=8.1 calls_per_s=3098 mib_per_s=34.7 failures=0
+mix2 summary mailbox rounds=17365 messages=277840 seconds=8.4 messages_per_s=33026 mib_per_s=4.3 failures=0
+mix1 summary waits rounds=23074 words=369184 seconds=14.5 words_per_s=25414 failures=0
+mix2 summary atomics rounds=537 updates=106361 seconds=8.2 updates_per_s=12949 failures=0
+mix1 summary mailbox rounds=9500 messages=152000 seconds=8.2 messages_per_s=18448 mib_per_s=2.4 failures=0
+mix0 summary waits rounds=7992 words=127872 seconds=14.0 words_per_s=9141 failures=0
+mix3 summary rma rounds=1992 transfers=15936 seconds=14.0 transfers_per_s=1134 mib_per_s=104.2 failures=0
+world library nodes=4 bytes_sent=2371430248 gets_nonblocking=55000 landing_full=0 reserve_stalls=98933 wakes_sent=221325 barrier_ns=334242559504
+world library nodes=4 bytes_sent=252596048 gets_nonblocking=1200 landing_full=161 reserve_stalls=7283 wakes_sent=947 barrier_ns=2893225708
+world library nodes=4 bytes_sent=2128800784 gets_nonblocking=6240 landing_full=660 reserve_stalls=40045 wakes_sent=6331 barrier_ns=21267812212
+world library nodes=4 bytes_sent=695733736 gets_nonblocking=2160 landing_full=330 reserve_stalls=13091 wakes_sent=1988 barrier_ns=6872573135
+world summary alltoall rounds=68 exchanges=1088 seconds=10.1 exchanges_per_s=107 failures=0
+mix3 summary locks rounds=921 acquisitions=14736 seconds=6.2 acquisitions_per_s=2378 failures=0
+mix0 summary mailbox rounds=8834 messages=141344 seconds=6.8 messages_per_s=20670 mib_per_s=2.7 failures=0
+mix2 summary rma rounds=2462 transfers=19696 seconds=11.4 transfers_per_s=1732 mib_per_s=159.6 failures=0
+mix1 summary atomics rounds=1715 updates=347367 seconds=14.4 updates_per_s=24136 failures=0
+mix0 summary atomics rounds=698 updates=142261 seconds=6.3 updates_per_s=22746 failures=0
+mix2 summary locks rounds=2405 acquisitions=38480 seconds=11.5 acquisitions_per_s=3342 failures=0
+mix1 summary rma rounds=3002 transfers=24016 seconds=12.3 transfers_per_s=1955 mib_per_s=180.0 failures=0
+mix3 summary collectives rounds=1949 calls=38282 seconds=13.5 calls_per_s=2840 mib_per_s=31.2 failures=0
+mix2 summary collectives rounds=531 calls=10540 seconds=5.9 calls_per_s=1794 mib_per_s=19.4 failures=0
+mix0 summary rma rounds=1292 transfers=10336 seconds=6.2 transfers_per_s=1660 mib_per_s=152.4 failures=0
+mix3 summary waits rounds=6426 words=102816 seconds=7.3 words_per_s=14020 failures=0
+mix1 summary locks rounds=3453 acquisitions=55248 seconds=13.6 acquisitions_per_s=4058 failures=0
+world library nodes=4 bytes_sent=5818069032 gets_nonblocking=183616 landing_full=0 reserve_stalls=57841 wakes_sent=333380 barrier_ns=291433349448
+world library nodes=4 bytes_sent=403072496 gets_nonblocking=0 landing_full=0 reserve_stalls=2386 wakes_sent=1162 barrier_ns=2588376328
+world library nodes=4 bytes_sent=1007685784 gets_nonblocking=0 landing_full=0 reserve_stalls=5842 wakes_sent=3121 barrier_ns=8181091936
+world library nodes=4 bytes_sent=554240488 gets_nonblocking=0 landing_full=0 reserve_stalls=3222 wakes_sent=1626 barrier_ns=6869854524
+world summary sort rounds=40 keys=335544320 seconds=10.1 keys_per_s=33103445 mib_per_s=252.6 imbalance=1.001 failures=0
+mix0 summary locks rounds=1838 acquisitions=29408 seconds=7.2 acquisitions_per_s=4059 failures=0
+mix1 summary collectives rounds=1746 calls=34314 seconds=9.9 calls_per_s=3461 mib_per_s=38.2 failures=0
+mix2 summary waits rounds=16002 words=256032 seconds=10.3 words_per_s=24963 failures=0
+mix3 summary mailbox rounds=34141 messages=546256 seconds=11.9 messages_per_s=45957 mib_per_s=6.0 failures=0
+mix3 summary atomics rounds=1307 updates=264074 seconds=11.4 updates_per_s=23246 failures=0
+mix1 summary waits rounds=15372 words=245952 seconds=12.9 words_per_s=18993 failures=0
+mix2 summary mailbox rounds=26052 messages=416832 seconds=13.2 messages_per_s=31527 mib_per_s=4.1 failures=0
+mix0 summary collectives rounds=2399 calls=47070 seconds=14.8 calls_per_s=3178 mib_per_s=34.8 failures=0
+mix3 summary rma rounds=1172 transfers=9376 seconds=6.8 transfers_per_s=1383 mib_per_s=127.7 failures=0
+mix2 summary atomics rounds=692 updates=141648 seconds=9.1 updates_per_s=15621 failures=0
+mix1 summary mailbox rounds=13132 messages=210112 seconds=9.5 messages_per_s=22056 mib_per_s=2.9 failures=0
+mix0 summary waits rounds=11912 words=190592 seconds=19.3 words_per_s=9869 failures=0
+world library nodes=4 bytes_sent=1945122920 gets_nonblocking=33304 landing_full=0 reserve_stalls=133024 wakes_sent=345107 barrier_ns=340687510640
+world library nodes=4 bytes_sent=252569592 gets_nonblocking=1200 landing_full=166 reserve_stalls=6052 wakes_sent=900 barrier_ns=2950573176
+world library nodes=4 bytes_sent=2349368496 gets_nonblocking=6720 landing_full=828 reserve_stalls=50551 wakes_sent=6830 barrier_ns=23168907071
+world library nodes=4 bytes_sent=236951728 gets_nonblocking=720 landing_full=0 reserve_stalls=3890 wakes_sent=822 barrier_ns=2534792805
+world summary alltoall rounds=62 exchanges=992 seconds=9.6 exchanges_per_s=104 failures=0
+mix2 summary rma rounds=1131 transfers=9048 seconds=6.0 transfers_per_s=1517 mib_per_s=139.2 failures=0
+mix1 summary atomics rounds=493 updates=99047 seconds=6.2 updates_per_s=16053 failures=0
+mix0 summary mailbox rounds=10024 messages=160384 seconds=6.9 messages_per_s=23084 mib_per_s=3.0 failures=0
+mix3 summary locks rounds=2116 acquisitions=33856 seconds=9.7 acquisitions_per_s=3495 failures=0
+mix2 summary locks rounds=2198 acquisitions=35168 seconds=10.6 acquisitions_per_s=3324 failures=0
+mix1 summary rma rounds=2843 transfers=22744 seconds=11.6 transfers_per_s=1953 mib_per_s=179.8 failures=0
+mix0 summary atomics rounds=1588 updates=321844 seconds=13.0 updates_per_s=24675 failures=0
+mix3 summary collectives rounds=2200 calls=43420 seconds=14.4 calls_per_s=3018 mib_per_s=32.9 failures=0
+mix3 summary waits rounds=5345 words=85520 seconds=8.6 words_per_s=9919 failures=0
+mix2 summary collectives rounds=794 calls=15736 seconds=8.7 calls_per_s=1803 mib_per_s=19.6 failures=0
+mix0 summary rma rounds=2114 transfers=16912 seconds=10.1 transfers_per_s=1669 mib_per_s=153.7 failures=0
+mix1 summary locks rounds=1462 acquisitions=23392 seconds=10.5 acquisitions_per_s=2221 failures=0
+world library nodes=4 bytes_sent=5352441864 gets_nonblocking=169428 landing_full=0 reserve_stalls=52920 wakes_sent=235011 barrier_ns=185257852860
+world library nodes=4 bytes_sent=403073176 gets_nonblocking=0 landing_full=0 reserve_stalls=2395 wakes_sent=1161 barrier_ns=2920952723
+world library nodes=4 bytes_sent=1007787192 gets_nonblocking=0 landing_full=0 reserve_stalls=5979 wakes_sent=2904 barrier_ns=7627656472
+world library nodes=4 bytes_sent=554229688 gets_nonblocking=0 landing_full=0 reserve_stalls=3245 wakes_sent=1596 barrier_ns=4669255268
+world summary sort rounds=40 keys=335544320 seconds=9.9 keys_per_s=33861351 mib_per_s=258.3 imbalance=1.000 failures=0
+mix2 summary waits rounds=13010 words=208160 seconds=9.6 words_per_s=21574 failures=0
+mix3 summary mailbox rounds=29193 messages=467088 seconds=12.7 messages_per_s=36822 mib_per_s=4.8 failures=0
+mix1 summary collectives rounds=2139 calls=42252 seconds=13.1 calls_per_s=3217 mib_per_s=35.8 failures=0
+mix0 summary locks rounds=3712 acquisitions=59392 seconds=14.1 acquisitions_per_s=4203 failures=0
+mix1 summary waits rounds=7312 words=116992 seconds=6.2 words_per_s=18775 failures=0
+mix0 summary collectives rounds=1306 calls=25724 seconds=8.2 calls_per_s=3135 mib_per_s=34.6 failures=0
+mix2 summary mailbox rounds=38369 messages=613904 seconds=13.5 messages_per_s=45570 mib_per_s=5.9 failures=0
+mix3 summary atomics rounds=2490 updates=504599 seconds=15.1 updates_per_s=33396 failures=0
+mix2 summary atomics rounds=359 updates=72724 seconds=5.3 updates_per_s=13769 failures=0
+mix1 summary mailbox rounds=9692 messages=155072 seconds=8.2 messages_per_s=18882 mib_per_s=2.5 failures=0
+mix0 summary waits rounds=7461 words=119376 seconds=12.6 words_per_s=9458 failures=0
+mix3 summary rma rounds=2051 transfers=16408 seconds=13.4 transfers_per_s=1225 mib_per_s=112.7 failures=0
+world library nodes=4 bytes_sent=2572632800 gets_nonblocking=57368 landing_full=0 reserve_stalls=133038 wakes_sent=397740 barrier_ns=282432603146
+world library nodes=4 bytes_sent=252597912 gets_nonblocking=1200 landing_full=166 reserve_stalls=7741 wakes_sent=940 barrier_ns=5218241136
+world library nodes=4 bytes_sent=1876325760 gets_nonblocking=5280 landing_full=660 reserve_stalls=42885 wakes_sent=5507 barrier_ns=22385575696
+world library nodes=4 bytes_sent=489227792 gets_nonblocking=1920 landing_full=167 reserve_stalls=10938 wakes_sent=1709 barrier_ns=5345306407
+world summary alltoall rounds=59 exchanges=944 seconds=9.1 exchanges_per_s=103 failures=0
+mix2 summary rma rounds=975 transfers=7800 seconds=5.1 transfers_per_s=1523 mib_per_s=140.2 failures=0
+mix0 summary mailbox rounds=7380 messages=118080 seconds=5.5 messages_per_s=21663 mib_per_s=2.8 failures=0
+mix1 summary atomics rounds=612 updates=124922 seconds=6.3 updates_per_s=19852 failures=0
+mix3 summary locks rounds=3433 acquisitions=54928 seconds=12.7 acquisitions_per_s=4310 failures=0
+mix3 summary collectives rounds=797 calls=15802 seconds=5.9 calls_per_s=2669 mib_per_s=31.3 failures=0
+mix1 summary rma rounds=1768 transfers=14144 seconds=7.2 transfers_per_s=1958 mib_per_s=180.4 failures=0
+mix0 summary atomics rounds=902 updates=181515 seconds=7.6 updates_per_s=23831 failures=0
+mix2 summary locks rounds=4000 acquisitions=64000 seconds=14.4 acquisitions_per_s=4452 failures=0
+mix0 summary rma rounds=1035 transfers=8280 seconds=5.0 transfers_per_s=1649 mib_per_s=151.9 failures=0
+mix1 summary locks rounds=1085 acquisitions=17360 seconds=6.3 acquisitions_per_s=2768 failures=0
+mix3 summary waits rounds=6047 words=96752 seconds=6.5 words_per_s=14969 failures=0
+mix2 summary collectives rounds=1048 calls=20672 seconds=7.8 calls_per_s=2658 mib_per_s=29.4 failures=0
+world library nodes=4 bytes_sent=3416429296 gets_nonblocking=105000 landing_full=0 reserve_stalls=40922 wakes_sent=306545 barrier_ns=259223966612
+world library nodes=4 bytes_sent=403086960 gets_nonblocking=0 landing_full=0 reserve_stalls=2281 wakes_sent=1098 barrier_ns=3505977630
+world library nodes=4 bytes_sent=1007681208 gets_nonblocking=0 landing_full=0 reserve_stalls=5891 wakes_sent=3034 barrier_ns=10000674192
+world library nodes=4 bytes_sent=503894520 gets_nonblocking=0 landing_full=0 reserve_stalls=2879 wakes_sent=1415 barrier_ns=4129333423
+world summary sort rounds=39 keys=327155712 seconds=9.8 keys_per_s=33378582 mib_per_s=254.7 imbalance=1.000 failures=0
+mix2 summary waits rounds=9015 words=144240 seconds=6.8 words_per_s=21122 failures=0
+mix3 summary mailbox rounds=15137 messages=242192 seconds=6.9 messages_per_s=35217 mib_per_s=4.6 failures=0
+mix0 summary locks rounds=2031 acquisitions=32496 seconds=7.9 acquisitions_per_s=4088 failures=0
+mix1 summary collectives rounds=2118 calls=41632 seconds=12.0 calls_per_s=3456 mib_per_s=38.1 failures=0
+mix2 summary mailbox rounds=9822 messages=157152 seconds=5.2 messages_per_s=30483 mib_per_s=4.0 failures=0
+mix0 summary collectives rounds=1345 calls=26606 seconds=8.3 calls_per_s=3192 mib_per_s=35.9 failures=0
+mix1 summary waits rounds=16399 words=262384 seconds=11.2 words_per_s=23406 failures=0
+mix3 summary atomics rounds=1743 updates=352945 seconds=12.0 updates_per_s=29353 failures=0
+mix1 summary mailbox rounds=7851 messages=125616 seconds=6.2 messages_per_s=20205 mib_per_s=2.6 failures=0
+mix0 summary waits rounds=5034 words=80544 seconds=7.3 words_per_s=11030 failures=0
+mix2 summary atomics rounds=1177 updates=238891 seconds=12.7 updates_per_s=18777 failures=0
+mix3 summary rma rounds=2826 transfers=22608 seconds=13.7 transfers_per_s=1646 mib_per_s=151.2 failures=0
+world library nodes=4 bytes_sent=2963779480 gets_nonblocking=77096 landing_full=0 reserve_stalls=98237 wakes_sent=269260 barrier_ns=285410248055
+world library nodes=4 bytes_sent=252591208 gets_nonblocking=960 landing_full=0 reserve_stalls=6955 wakes_sent=893 barrier_ns=3075086188
+world library nodes=4 bytes_sent=2115090872 gets_nonblocking=6480 landing_full=825 reserve_stalls=48534 wakes_sent=6285 barrier_ns=21560594078
+world library nodes=4 bytes_sent=707503120 gets_nonblocking=1920 landing_full=168 reserve_stalls=14193 wakes_sent=2098 barrier_ns=7144370702
+world summary alltoall rounds=66 exchanges=1056 seconds=10.2 exchanges_per_s=103 failures=0
+mix0 summary mailbox rounds=12133 messages=194128 seconds=9.4 messages_per_s=20644 mib_per_s=2.7 failures=0
+mix3 summary locks rounds=1820 acquisitions=29120 seconds=11.2 acquisitions_per_s=2605 failures=0
+mix1 summary atomics rounds=1080 updates=218835 seconds=12.3 updates_per_s=17823 failures=0
+mix2 summary rma rounds=2754 transfers=22032 seconds=13.3 transfers_per_s=1657 mib_per_s=152.7 failures=0
+mix3 summary collectives rounds=1130 calls=22260 seconds=8.2 calls_per_s=2715 mib_per_s=30.0 failures=0
+mix0 summary atomics rounds=1042 updates=211421 seconds=9.1 updates_per_s=23199 failures=0
+mix1 summary rma rounds=2849 transfers=22792 seconds=11.5 transfers_per_s=1981 mib_per_s=182.4 failures=0
+mix2 summary locks rounds=2882 acquisitions=46112 seconds=12.8 acquisitions_per_s=3609 failures=0
+mix1 summary locks rounds=785 acquisitions=12560 seconds=6.1 acquisitions_per_s=2047 failures=0
+mix3 summary waits rounds=7262 words=116192 seconds=11.8 words_per_s=9849 failures=0
+mix2 summary collectives rounds=1084 calls=21256 seconds=12.1 calls_per_s=1761 mib_per_s=20.0 failures=0
+mix0 summary rma rounds=3010 transfers=24080 seconds=14.1 transfers_per_s=1714 mib_per_s=157.8 failures=0
+world library nodes=4 bytes_sent=7227748456 gets_nonblocking=233420 landing_full=0 reserve_stalls=68023 wakes_sent=244436 barrier_ns=225563621040
+world library nodes=4 bytes_sent=403050112 gets_nonblocking=0 landing_full=0 reserve_stalls=2389 wakes_sent=1124 barrier_ns=2847838714
+world library nodes=4 bytes_sent=1007725408 gets_nonblocking=0 landing_full=0 reserve_stalls=5737 wakes_sent=2819 barrier_ns=8294893847
+world library nodes=4 bytes_sent=604608760 gets_nonblocking=0 landing_full=0 reserve_stalls=3495 wakes_sent=1748 barrier_ns=5112226878
+world summary sort rounds=41 keys=343932928 seconds=10.1 keys_per_s=34108069 mib_per_s=260.2 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=13129 messages=210064 seconds=5.9 messages_per_s=35849 mib_per_s=4.6 failures=0
+mix1 summary collectives rounds=961 calls=18878 seconds=6.0 calls_per_s=3144 mib_per_s=34.7 failures=0
+mix2 summary waits rounds=11649 words=186384 seconds=8.2 words_per_s=22859 failures=0
+mix0 summary locks rounds=2638 acquisitions=42208 seconds=9.8 acquisitions_per_s=4288 failures=0
+mix2 summary mailbox rounds=13245 messages=211920 seconds=6.8 messages_per_s=30987 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=1123 updates=227724 seconds=9.6 updates_per_s=23659 failures=0
+mix0 summary collectives rounds=1645 calls=32464 seconds=10.2 calls_per_s=3172 mib_per_s=35.2 failures=0
+mix1 summary waits rounds=21073 words=337168 seconds=14.6 words_per_s=23160 failures=0
+mix3 summary rma rounds=905 transfers=7240 seconds=5.3 transfers_per_s=1376 mib_per_s=127.3 failures=0
+mix1 summary mailbox rounds=6078 messages=97248 seconds=5.0 messages_per_s=19604 mib_per_s=2.5 failures=0
+mix2 summary atomics rounds=538 updates=106830 seconds=8.9 updates_per_s=11960 failures=0
+mix0 summary waits rounds=7064 words=113024 seconds=12.7 words_per_s=8924 failures=0
+world library nodes=4 bytes_sent=1340774384 gets_nonblocking=22876 landing_full=0 reserve_stalls=82908 wakes_sent=187014 barrier_ns=302566041136
+world library nodes=4 bytes_sent=252626248 gets_nonblocking=960 landing_full=0 reserve_stalls=9127 wakes_sent=933 barrier_ns=3283215496
+world library nodes=4 bytes_sent=2112792360 gets_nonblocking=6240 landing_full=826 reserve_stalls=45014 wakes_sent=6151 barrier_ns=20728267565
+world library nodes=4 bytes_sent=473545584 gets_nonblocking=1680 landing_full=166 reserve_stalls=11336 wakes_sent=1454 barrier_ns=5021466060
+world summary alltoall rounds=62 exchanges=992 seconds=9.5 exchanges_per_s=105 failures=0
+mix2 summary rma rounds=1781 transfers=14248 seconds=9.5 transfers_per_s=1495 mib_per_s=137.4 failures=0
+mix3 summary locks rounds=1627 acquisitions=26032 seconds=10.4 acquisitions_per_s=2513 failures=0
+mix1 summary atomics rounds=927 updates=187175 seconds=11.2 updates_per_s=16766 failures=0
+mix0 summary mailbox rounds=16852 messages=269632 seconds=11.7 messages_per_s=23126 mib_per_s=3.0 failures=0
+mix2 summary locks rounds=1329 acquisitions=21264 seconds=6.4 acquisitions_per_s=3322 failures=0
+mix0 summary atomics rounds=735 updates=147998 seconds=6.6 updates_per_s=22595 failures=0
+mix3 summary collectives rounds=1077 calls=21064 seconds=7.7 calls_per_s=2725 mib_per_s=29.4 failures=0
+mix1 summary rma rounds=3341 transfers=26728 seconds=14.2 transfers_per_s=1888 mib_per_s=173.7 failures=0
+mix0 summary rma rounds=1377 transfers=11016 seconds=6.7 transfers_per_s=1649 mib_per_s=152.1 failures=0
+mix2 summary collectives rounds=808 calls=15792 seconds=7.6 calls_per_s=2078 mib_per_s=22.9 failures=0
+mix3 summary waits rounds=12120 words=193920 seconds=10.2 words_per_s=19003 failures=0
+mix1 summary locks rounds=3350 acquisitions=53600 seconds=13.5 acquisitions_per_s=3964 failures=0
+world library nodes=4 bytes_sent=5550359176 gets_nonblocking=180540 landing_full=0 reserve_stalls=64612 wakes_sent=254398 barrier_ns=260000299844
+world library nodes=4 bytes_sent=403065416 gets_nonblocking=0 landing_full=0 reserve_stalls=2282 wakes_sent=1174 barrier_ns=2407462852
+world library nodes=4 bytes_sent=1058209464 gets_nonblocking=0 landing_full=0 reserve_stalls=6141 wakes_sent=3157 barrier_ns=11530967754
+world library nodes=4 bytes_sent=453475440 gets_nonblocking=0 landing_full=0 reserve_stalls=2641 wakes_sent=1307 barrier_ns=3625171122
+world summary sort rounds=39 keys=327155712 seconds=9.9 keys_per_s=32957975 mib_per_s=251.4 imbalance=1.001 failures=0
+mix2 summary waits rounds=10837 words=173392 seconds=8.0 words_per_s=21580 failures=0
+mix1 summary collectives rounds=1618 calls=31972 seconds=10.1 calls_per_s=3157 mib_per_s=35.2 failures=0
+mix3 summary mailbox rounds=23759 messages=380144 seconds=10.4 messages_per_s=36398 mib_per_s=4.7 failures=0
+mix0 summary locks rounds=2785 acquisitions=44560 seconds=10.8 acquisitions_per_s=4129 failures=0
+mix0 summary collectives rounds=860 calls=16940 seconds=5.4 calls_per_s=3166 mib_per_s=33.4 failures=0
+mix2 summary mailbox rounds=12827 messages=205232 seconds=5.9 messages_per_s=34785 mib_per_s=4.5 failures=0
+mix1 summary waits rounds=17440 words=279040 seconds=10.1 words_per_s=27509 failures=0
+mix3 summary atomics rounds=1764 updates=357195 seconds=10.7 updates_per_s=33460 failures=0
+mix3 summary rma rounds=855 transfers=6840 seconds=5.0 transfers_per_s=1362 mib_per_s=125.2 failures=0
+mix0 summary waits rounds=7233 words=115728 seconds=9.1 words_per_s=12716 failures=0
+mix2 summary atomics rounds=745 updates=152855 seconds=9.1 updates_per_s=16713 failures=0
+mix1 summary mailbox rounds=28231 messages=451696 seconds=12.4 messages_per_s=36503 mib_per_s=4.7 failures=0
+world library nodes=4 bytes_sent=1439993656 gets_nonblocking=25680 landing_full=0 reserve_stalls=109271 wakes_sent=364378 barrier_ns=227774948412
+world library nodes=4 bytes_sent=252621232 gets_nonblocking=960 landing_full=0 reserve_stalls=8339 wakes_sent=917 barrier_ns=2967149247
+world library nodes=4 bytes_sent=2115045024 gets_nonblocking=6480 landing_full=826 reserve_stalls=45241 wakes_sent=6144 barrier_ns=24462508451
+world library nodes=4 bytes_sent=707347352 gets_nonblocking=1680 landing_full=168 reserve_stalls=11832 wakes_sent=1924 barrier_ns=6817631452
+world summary alltoall rounds=65 exchanges=1040 seconds=10.4 exchanges_per_s=100 failures=0
+mix0 summary mailbox rounds=6672 messages=106752 seconds=5.4 messages_per_s=19845 mib_per_s=2.6 failures=0
+mix1 summary atomics rounds=605 updates=124074 seconds=7.0 updates_per_s=17831 failures=0
+mix2 summary rma rounds=1421 transfers=11368 seconds=7.0 transfers_per_s=1615 mib_per_s=148.6 failures=0
+mix3 summary locks rounds=1891 acquisitions=30256 seconds=9.1 acquisitions_per_s=3331 failures=0
+mix1 summary rma rounds=2335 transfers=18680 seconds=9.6 transfers_per_s=1951 mib_per_s=179.8 failures=0
+mix2 summary locks rounds=2305 acquisitions=36880 seconds=10.4 acquisitions_per_s=3532 failures=0
+mix3 summary collectives rounds=1890 calls=37260 seconds=12.2 calls_per_s=3052 mib_per_s=34.1 failures=0
+mix0 summary atomics rounds=1602 updates=325594 seconds=12.3 updates_per_s=26473 failures=0
+mix1 summary locks rounds=769 acquisitions=12304 seconds=5.9 acquisitions_per_s=2084 failures=0
+mix3 summary waits rounds=3943 words=63088 seconds=6.4 words_per_s=9914 failures=0
+mix0 summary rma rounds=2475 transfers=19800 seconds=11.6 transfers_per_s=1713 mib_per_s=157.5 failures=0
+mix2 summary collectives rounds=1271 calls=25148 seconds=12.4 calls_per_s=2027 mib_per_s=22.6 failures=0
+world library nodes=4 bytes_sent=5478353080 gets_nonblocking=168996 landing_full=0 reserve_stalls=50639 wakes_sent=223813 barrier_ns=198013993936
+world library nodes=4 bytes_sent=403135496 gets_nonblocking=0 landing_full=0 reserve_stalls=2390 wakes_sent=1111 barrier_ns=2898596499
+world library nodes=4 bytes_sent=1007761784 gets_nonblocking=0 landing_full=0 reserve_stalls=5907 wakes_sent=3021 barrier_ns=8927500709
+world library nodes=4 bytes_sent=554238888 gets_nonblocking=0 landing_full=0 reserve_stalls=3288 wakes_sent=1660 barrier_ns=5279273358
+world summary sort rounds=40 keys=335544320 seconds=10.1 keys_per_s=33272252 mib_per_s=253.8 imbalance=1.000 failures=0
+mix0 summary locks rounds=1686 acquisitions=26976 seconds=6.5 acquisitions_per_s=4129 failures=0
+mix1 summary collectives rounds=1508 calls=29642 seconds=8.6 calls_per_s=3436 mib_per_s=37.8 failures=0
+mix3 summary mailbox rounds=27617 messages=441872 seconds=9.9 messages_per_s=44608 mib_per_s=5.8 failures=0
+mix2 summary waits rounds=25691 words=411056 seconds=14.4 words_per_s=28486 failures=0
+mix0 summary collectives rounds=1069 calls=20962 seconds=6.9 calls_per_s=3017 mib_per_s=34.3 failures=0
+mix2 summary mailbox rounds=20593 messages=329488 seconds=8.7 messages_per_s=37979 mib_per_s=4.9 failures=0
+mix1 summary waits rounds=14111 words=225776 seconds=9.6 words_per_s=23584 failures=0
+mix3 summary atomics rounds=1954 updates=394580 seconds=12.5 updates_per_s=31558 failures=0
+mix3 summary rma rounds=844 transfers=6752 seconds=5.2 transfers_per_s=1310 mib_per_s=120.1 failures=0
+mix0 summary waits rounds=5940 words=95040 seconds=7.8 words_per_s=12235 failures=0
+mix2 summary atomics rounds=601 updates=119988 seconds=7.8 updates_per_s=15405 failures=0
+mix1 summary mailbox rounds=33625 messages=538000 seconds=13.0 messages_per_s=41529 mib_per_s=5.4 failures=0
+world library nodes=4 bytes_sent=1532724536 gets_nonblocking=21924 landing_full=0 reserve_stalls=116899 wakes_sent=470126 barrier_ns=322100719320
+world library nodes=4 bytes_sent=252576224 gets_nonblocking=1200 landing_full=163 reserve_stalls=6187 wakes_sent=910 barrier_ns=2886576716
+world library nodes=4 bytes_sent=2349301328 gets_nonblocking=6720 landing_full=827 reserve_stalls=48897 wakes_sent=6911 barrier_ns=26232570850
+world library nodes=4 bytes_sent=236985440 gets_nonblocking=720 landing_full=0 reserve_stalls=5569 wakes_sent=808 barrier_ns=2565961120
+world summary alltoall rounds=62 exchanges=992 seconds=9.6 exchanges_per_s=104 failures=0
+mix0 summary mailbox rounds=6583 messages=105328 seconds=5.1 messages_per_s=20555 mib_per_s=2.7 failures=0
+mix2 summary rma rounds=1063 transfers=8504 seconds=5.5 transfers_per_s=1537 mib_per_s=141.6 failures=0
+mix3 summary locks rounds=1072 acquisitions=17152 seconds=6.1 acquisitions_per_s=2830 failures=0
+mix1 summary atomics rounds=1836 updates=371118 seconds=12.4 updates_per_s=29984 failures=0
+mix3 summary collectives rounds=908 calls=17772 seconds=6.6 calls_per_s=2705 mib_per_s=29.4 failures=0
+mix2 summary locks rounds=2075 acquisitions=33200 seconds=9.8 acquisitions_per_s=3399 failures=0
+mix1 summary rma rounds=2672 transfers=21376 seconds=10.8 transfers_per_s=1981 mib_per_s=182.5 failures=0
+mix0 summary atomics rounds=1565 updates=316382 seconds=12.3 updates_per_s=25654 failures=0
+mix2 summary collectives rounds=487 calls=9634 seconds=5.2 calls_per_s=1843 mib_per_s=19.0 failures=0
+mix1 summary locks rounds=760 acquisitions=12160 seconds=5.8 acquisitions_per_s=2109 failures=0
+mix3 summary waits rounds=4736 words=75776 seconds=7.3 words_per_s=10337 failures=0
+mix0 summary rma rounds=3168 transfers=25344 seconds=14.3 transfers_per_s=1771 mib_per_s=163.2 failures=0
+world library nodes=4 bytes_sent=5768820168 gets_nonblocking=186092 landing_full=0 reserve_stalls=52436 wakes_sent=262613 barrier_ns=296206293612
+world library nodes=4 bytes_sent=403130408 gets_nonblocking=0 landing_full=0 reserve_stalls=2379 wakes_sent=1176 barrier_ns=2436629179
+world library nodes=4 bytes_sent=1058121576 gets_nonblocking=0 landing_full=0 reserve_stalls=6223 wakes_sent=3211 barrier_ns=10821628839
+world library nodes=4 bytes_sent=453489760 gets_nonblocking=0 landing_full=0 reserve_stalls=2653 wakes_sent=1334 barrier_ns=5105055732
+world summary sort rounds=39 keys=327155712 seconds=10.1 keys_per_s=32500128 mib_per_s=248.0 imbalance=1.000 failures=0
+mix1 summary collectives rounds=1219 calls=23992 seconds=7.7 calls_per_s=3135 mib_per_s=34.7 failures=0
+mix2 summary waits rounds=12706 words=203296 seconds=9.3 words_per_s=21907 failures=0
+mix3 summary mailbox rounds=22952 messages=367232 seconds=9.9 messages_per_s=36968 mib_per_s=4.8 failures=0
+mix0 summary locks rounds=3271 acquisitions=52336 seconds=12.4 acquisitions_per_s=4211 failures=0
+mix3 summary atomics rounds=630 updates=127980 seconds=5.6 updates_per_s=23011 failures=0
+mix0 summary collectives rounds=922 calls=18148 seconds=5.8 calls_per_s=3118 mib_per_s=33.3 failures=0
+mix1 summary waits rounds=8347 words=133552 seconds=6.5 words_per_s=20642 failures=0
+mix2 summary mailbox rounds=38026 messages=608416 seconds=12.1 messages_per_s=50476 mib_per_s=6.5 failures=0
+mix2 summary atomics rounds=438 updates=89238 seconds=6.4 updates_per_s=13941 failures=0
+mix3 summary rma rounds=1178 transfers=9424 seconds=7.0 transfers_per_s=1344 mib_per_s=124.2 failures=0
+mix0 summary waits rounds=5002 words=80032 seconds=7.4 words_per_s=10843 failures=0
+mix1 summary mailbox rounds=16892 messages=270272 seconds=9.1 messages_per_s=29708 mib_per_s=3.9 failures=0
+world library nodes=4 bytes_sent=1660394936 gets_nonblocking=33888 landing_full=0 reserve_stalls=91561 wakes_sent=437554 barrier_ns=242294611246
+world library nodes=4 bytes_sent=252602624 gets_nonblocking=1200 landing_full=167 reserve_stalls=7557 wakes_sent=941 barrier_ns=5518634640
+world library nodes=4 bytes_sent=1876310272 gets_nonblocking=5280 landing_full=658 reserve_stalls=42267 wakes_sent=5485 barrier_ns=18920094913
+world library nodes=4 bytes_sent=709700128 gets_nonblocking=2160 landing_full=167 reserve_stalls=12912 wakes_sent=2159 barrier_ns=7119872715
+world summary alltoall rounds=61 exchanges=976 seconds=9.6 exchanges_per_s=102 failures=0
+mix0 summary mailbox rounds=7202 messages=115232 seconds=5.5 messages_per_s=20824 mib_per_s=2.7 failures=0
+mix1 summary atomics rounds=514 updates=103956 seconds=6.3 updates_per_s=16552 failures=0
+mix2 summary rma rounds=1689 transfers=13512 seconds=8.0 transfers_per_s=1687 mib_per_s=155.2 failures=0
+mix3 summary locks rounds=3516 acquisitions=56256 seconds=14.2 acquisitions_per_s=3958 failures=0
+mix2 summary locks rounds=1347 acquisitions=21552 seconds=6.5 acquisitions_per_s=3325 failures=0
+mix0 summary atomics rounds=1315 updates=265728 seconds=11.7 updates_per_s=22702 failures=0
+mix3 summary collectives rounds=1884 calls=37166 seconds=13.7 calls_per_s=2722 mib_per_s=30.2 failures=0
+mix1 summary rma rounds=3535 transfers=28280 seconds=14.5 transfers_per_s=1949 mib_per_s=179.4 failures=0
+mix3 summary waits rounds=4709 words=75344 seconds=7.6 words_per_s=9873 failures=0
+mix0 summary rma rounds=1988 transfers=15904 seconds=9.6 transfers_per_s=1661 mib_per_s=152.9 failures=0
+mix2 summary collectives rounds=891 calls=17518 seconds=9.7 calls_per_s=1801 mib_per_s=21.0 failures=0
+mix1 summary locks rounds=1305 acquisitions=20880 seconds=9.8 acquisitions_per_s=2138 failures=0
+world library nodes=4 bytes_sent=6195547008 gets_nonblocking=199024 landing_full=0 reserve_stalls=53751 wakes_sent=265930 barrier_ns=245753213067
+world library nodes=4 bytes_sent=403114280 gets_nonblocking=0 landing_full=0 reserve_stalls=2347 wakes_sent=1156 barrier_ns=3855100089
+world library nodes=4 bytes_sent=957394192 gets_nonblocking=0 landing_full=0 reserve_stalls=5632 wakes_sent=2795 barrier_ns=8934677912
+world library nodes=4 bytes_sent=604668592 gets_nonblocking=0 landing_full=0 reserve_stalls=3637 wakes_sent=1877 barrier_ns=5814173825
+world summary sort rounds=40 keys=335544320 seconds=10.2 keys_per_s=33021000 mib_per_s=251.9 imbalance=1.000 failures=0
+mix2 summary waits rounds=8265 words=132240 seconds=6.2 words_per_s=21427 failures=0
+mix3 summary mailbox rounds=17101 messages=273616 seconds=7.5 messages_per_s=36644 mib_per_s=4.8 failures=0
+mix0 summary locks rounds=2097 acquisitions=33552 seconds=8.1 acquisitions_per_s=4163 failures=0
+mix1 summary collectives rounds=2215 calls=43794 seconds=12.6 calls_per_s=3480 mib_per_s=38.6 failures=0
+mix3 summary atomics rounds=630 updates=127010 seconds=5.5 updates_per_s=23171 failures=0
+mix0 summary collectives rounds=1482 calls=29208 seconds=9.3 calls_per_s=3136 mib_per_s=34.6 failures=0
+mix1 summary waits rounds=13254 words=212064 seconds=10.3 words_per_s=20667 failures=0
+mix2 summary mailbox rounds=35141 messages=562256 seconds=13.1 messages_per_s=42800 mib_per_s=5.6 failures=0
+mix2 summary atomics rounds=590 updates=120544 seconds=8.3 updates_per_s=14485 failures=0
+mix3 summary rma rounds=1736 transfers=13888 seconds=10.0 transfers_per_s=1385 mib_per_s=127.5 failures=0
+mix1 summary mailbox rounds=13669 messages=218704 seconds=10.9 messages_per_s=20097 mib_per_s=2.6 failures=0
+mix0 summary waits rounds=9759 words=156144 seconds=15.3 words_per_s=10173 failures=0
+world library nodes=4 bytes_sent=2259883096 gets_nonblocking=47512 landing_full=0 reserve_stalls=98809 wakes_sent=342621 barrier_ns=314482584336
+world library nodes=4 bytes_sent=252575104 gets_nonblocking=960 landing_full=0 reserve_stalls=6327 wakes_sent=890 barrier_ns=3014023020
+world library nodes=4 bytes_sent=2128922160 gets_nonblocking=6720 landing_full=828 reserve_stalls=47046 wakes_sent=6357 barrier_ns=21583966139
+world library nodes=4 bytes_sent=693939968 gets_nonblocking=1680 landing_full=165 reserve_stalls=13879 wakes_sent=1912 barrier_ns=6892884545
+world summary alltoall rounds=67 exchanges=1072 seconds=10.2 exchanges_per_s=106 failures=0
+mix2 summary rma rounds=1032 transfers=8256 seconds=5.5 transfers_per_s=1500 mib_per_s=138.4 failures=0
+mix3 summary locks rounds=812 acquisitions=12992 seconds=5.5 acquisitions_per_s=2366 failures=0
+mix0 summary mailbox rounds=8798 messages=140768 seconds=6.4 messages_per_s=21891 mib_per_s=2.8 failures=0
+mix1 summary atomics rounds=2123 updates=430489 seconds=14.5 updates_per_s=29671 failures=0
+mix1 summary rma rounds=1671 transfers=13368 seconds=6.8 transfers_per_s=1954 mib_per_s=179.4 failures=0
+mix0 summary atomics rounds=1681 updates=340738 seconds=11.6 updates_per_s=29482 failures=0
+mix2 summary locks rounds=3549 acquisitions=56784 seconds=12.9 acquisitions_per_s=4388 failures=0
+mix3 summary collectives rounds=2759 calls=54380 seconds=15.2 calls_per_s=3587 mib_per_s=39.1 failures=0
+mix2 summary collectives rounds=583 calls=11458 seconds=6.2 calls_per_s=1850 mib_per_s=19.0 failures=0
+mix0 summary rma rounds=1486 transfers=11888 seconds=7.1 transfers_per_s=1664 mib_per_s=153.0 failures=0
+mix3 summary waits rounds=13345 words=213520 seconds=10.9 words_per_s=19546 failures=0
+mix1 summary locks rounds=3514 acquisitions=56224 seconds=14.1 acquisitions_per_s=3993 failures=0
+world library nodes=4 bytes_sent=3992061080 gets_nonblocking=115512 landing_full=0 reserve_stalls=55645 wakes_sent=375650 barrier_ns=330312574039
+world library nodes=4 bytes_sent=403063832 gets_nonblocking=0 landing_full=0 reserve_stalls=2357 wakes_sent=1137 barrier_ns=3007321168
+world library nodes=4 bytes_sent=1007732104 gets_nonblocking=0 landing_full=0 reserve_stalls=5764 wakes_sent=3067 barrier_ns=9774226530
+world library nodes=4 bytes_sent=503865592 gets_nonblocking=0 landing_full=0 reserve_stalls=3005 wakes_sent=1463 barrier_ns=4386676708
+world summary sort rounds=39 keys=327155712 seconds=9.9 keys_per_s=33195036 mib_per_s=253.3 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=11986 messages=191776 seconds=5.3 messages_per_s=36086 mib_per_s=4.7 failures=0
+mix1 summary collectives rounds=1250 calls=24480 seconds=7.6 calls_per_s=3227 mib_per_s=35.3 failures=0
+mix2 summary waits rounds=14082 words=225312 seconds=9.8 words_per_s=22932 failures=0
+mix0 summary locks rounds=2583 acquisitions=41328 seconds=9.8 acquisitions_per_s=4202 failures=0
+mix2 summary mailbox rounds=11096 messages=177536 seconds=5.7 messages_per_s=31192 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=891 updates=180671 seconds=7.6 updates_per_s=23723 failures=0
+mix1 summary waits rounds=9361 words=149776 seconds=7.9 words_per_s=18925 failures=0
+mix0 summary collectives rounds=2123 calls=41776 seconds=12.6 calls_per_s=3313 mib_per_s=37.2 failures=0
+mix3 summary rma rounds=1288 transfers=10304 seconds=7.4 transfers_per_s=1395 mib_per_s=128.5 failures=0
+mix0 summary waits rounds=6813 words=109008 seconds=9.0 words_per_s=12091 failures=0
+mix2 summary atomics rounds=1202 updates=243025 seconds=11.3 updates_per_s=21555 failures=0
+mix1 summary mailbox rounds=30290 messages=484640 seconds=13.1 messages_per_s=36992 mib_per_s=4.8 failures=0
+world library nodes=4 bytes_sent=1834551864 gets_nonblocking=33496 landing_full=0 reserve_stalls=96158 wakes_sent=316232 barrier_ns=262996573167
+world library nodes=4 bytes_sent=252571200 gets_nonblocking=1200 landing_full=163 reserve_stalls=6372 wakes_sent=925 barrier_ns=3039236665
+world library nodes=4 bytes_sent=2128901712 gets_nonblocking=6240 landing_full=665 reserve_stalls=45156 wakes_sent=6465 barrier_ns=21459394837
+world library nodes=4 bytes_sent=695734384 gets_nonblocking=2160 landing_full=328 reserve_stalls=12238 wakes_sent=2051 barrier_ns=7314704502
+world summary alltoall rounds=68 exchanges=1088 seconds=10.1 exchanges_per_s=107 failures=0
+mix0 summary mailbox rounds=9819 messages=157104 seconds=7.6 messages_per_s=20619 mib_per_s=2.7 failures=0
+mix1 summary atomics rounds=734 updates=147842 seconds=8.9 updates_per_s=16670 failures=0
+mix3 summary locks rounds=1600 acquisitions=25600 seconds=9.7 acquisitions_per_s=2639 failures=0
+mix2 summary rma rounds=2261 transfers=18088 seconds=10.9 transfers_per_s=1665 mib_per_s=153.3 failures=0
+mix0 summary atomics rounds=899 updates=182562 seconds=7.9 updates_per_s=23167 failures=0
+mix1 summary rma rounds=2231 transfers=17848 seconds=9.1 transfers_per_s=1958 mib_per_s=180.4 failures=0
+mix2 summary locks rounds=3642 acquisitions=58272 seconds=14.2 acquisitions_per_s=4114 failures=0
+mix3 summary collectives rounds=2520 calls=49590 seconds=14.8 calls_per_s=3352 mib_per_s=37.1 failures=0
+mix0 summary rma rounds=2148 transfers=17184 seconds=10.4 transfers_per_s=1650 mib_per_s=151.9 failures=0
+mix1 summary locks rounds=1420 acquisitions=22720 seconds=10.6 acquisitions_per_s=2137 failures=0
+mix3 summary waits rounds=7930 words=126880 seconds=11.2 words_per_s=11371 failures=0
+mix2 summary collectives rounds=1300 calls=25550 seconds=12.1 calls_per_s=2115 mib_per_s=23.5 failures=0
+world library nodes=4 bytes_sent=5905961416 gets_nonblocking=182136 landing_full=0 reserve_stalls=60567 wakes_sent=267866 barrier_ns=205931097709
+world library nodes=4 bytes_sent=403065360 gets_nonblocking=0 landing_full=0 reserve_stalls=2365 wakes_sent=1193 barrier_ns=2533235290
+world library nodes=4 bytes_sent=1058174120 gets_nonblocking=0 landing_full=0 reserve_stalls=6260 wakes_sent=3287 barrier_ns=11023807301
+world library nodes=4 bytes_sent=453510184 gets_nonblocking=0 landing_full=0 reserve_stalls=2610 wakes_sent=1350 barrier_ns=5198406884
+world summary sort rounds=39 keys=327155712 seconds=10.1 keys_per_s=32542382 mib_per_s=248.3 imbalance=1.000 failures=0
+mix2 summary waits rounds=6770 words=108320 seconds=5.1 words_per_s=21310 failures=0
+mix1 summary collectives rounds=1203 calls=23698 seconds=7.5 calls_per_s=3157 mib_per_s=35.3 failures=0
+mix3 summary mailbox rounds=17334 messages=277344 seconds=7.6 messages_per_s=36549 mib_per_s=4.7 failures=0
+mix0 summary locks rounds=3904 acquisitions=62464 seconds=14.6 acquisitions_per_s=4266 failures=0
+mix0 summary collectives rounds=1076 calls=21054 seconds=6.9 calls_per_s=3044 mib_per_s=33.4 failures=0
+mix2 summary mailbox rounds=13096 messages=209536 seconds=6.7 messages_per_s=31045 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=835 updates=168081 seconds=7.2 updates_per_s=23507 failures=0
+mix1 summary waits rounds=24190 words=387040 seconds=14.7 words_per_s=26296 failures=0
+mix1 summary mailbox rounds=5541 messages=88656 seconds=4.7 messages_per_s=18822 mib_per_s=2.4 failures=0
+mix0 summary waits rounds=4816 words=77056 seconds=7.9 words_per_s=9812 failures=0
+mix2 summary atomics rounds=504 updates=102424 seconds=8.1 updates_per_s=12664 failures=0
+mix3 summary rma rounds=2080 transfers=16640 seconds=11.8 transfers_per_s=1408 mib_per_s=129.5 failures=0
+world library nodes=4 bytes_sent=2218604568 gets_nonblocking=58516 landing_full=0 reserve_stalls=84514 wakes_sent=220306 barrier_ns=361652714843
+world library nodes=4 bytes_sent=252583136 gets_nonblocking=1200 landing_full=166 reserve_stalls=6656 wakes_sent=876 barrier_ns=3116294556
+world library nodes=4 bytes_sent=2128956712 gets_nonblocking=6240 landing_full=658 reserve_stalls=47667 wakes_sent=6543 barrier_ns=24678753716
+world library nodes=4 bytes_sent=459228800 gets_nonblocking=1440 landing_full=164 reserve_stalls=9618 wakes_sent=1376 barrier_ns=4558249447
+world summary alltoall rounds=63 exchanges=1008 seconds=9.9 exchanges_per_s=102 failures=0
+mix1 summary atomics rounds=512 updates=102113 seconds=6.4 updates_per_s=15960 failures=0
+mix3 summary locks rounds=1460 acquisitions=23360 seconds=9.4 acquisitions_per_s=2487 failures=0
+mix0 summary mailbox rounds=12541 messages=200656 seconds=9.3 messages_per_s=21603 mib_per_s=2.8 failures=0
+mix2 summary rma rounds=2362 transfers=18896 seconds=11.6 transfers_per_s=1634 mib_per_s=150.2 failures=0
+mix3 summary collectives rounds=1455 calls=28496 seconds=10.6 calls_per_s=2676 mib_per_s=30.2 failures=0
+mix1 summary rma rounds=2642 transfers=21136 seconds=10.8 transfers_per_s=1956 mib_per_s=180.0 failures=0
+mix0 summary atomics rounds=1660 updates=335326 seconds=12.9 updates_per_s=26008 failures=0
+mix2 summary locks rounds=3032 acquisitions=48512 seconds=12.9 acquisitions_per_s=3756 failures=0
+mix0 summary rma rounds=1057 transfers=8456 seconds=5.1 transfers_per_s=1644 mib_per_s=151.3 failures=0
+mix1 summary locks rounds=3522 acquisitions=56352 seconds=13.1 acquisitions_per_s=4317 failures=0
+mix3 summary waits rounds=20401 words=326416 seconds=13.6 words_per_s=24087 failures=0
+mix2 summary collectives rounds=2476 calls=48804 seconds=14.3 calls_per_s=3402 mib_per_s=38.0 failures=0
+world library nodes=4 bytes_sent=5529266152 gets_nonblocking=165136 landing_full=0 reserve_stalls=67756 wakes_sent=282578 barrier_ns=212224371054
+world library nodes=4 bytes_sent=403103888 gets_nonblocking=0 landing_full=0 reserve_stalls=2456 wakes_sent=1184 barrier_ns=5227769358
+world library nodes=4 bytes_sent=906919664 gets_nonblocking=0 landing_full=0 reserve_stalls=5126 wakes_sent=2639 barrier_ns=8371506064
+world library nodes=4 bytes_sent=604675184 gets_nonblocking=0 landing_full=0 reserve_stalls=3428 wakes_sent=1829 barrier_ns=7441026365
+world summary sort rounds=39 keys=327155712 seconds=10.0 keys_per_s=32599716 mib_per_s=248.7 imbalance=1.000 failures=0
+mix1 summary collectives rounds=951 calls=18748 seconds=5.9 calls_per_s=3162 mib_per_s=35.2 failures=0
+mix3 summary mailbox rounds=17397 messages=278352 seconds=7.4 messages_per_s=37528 mib_per_s=4.9 failures=0
+mix0 summary locks rounds=2835 acquisitions=45360 seconds=10.6 acquisitions_per_s=4299 failures=0
+mix2 summary waits rounds=16356 words=261696 seconds=11.0 words_per_s=23840 failures=0
+mix1 summary waits rounds=8518 words=136288 seconds=7.2 words_per_s=18896 failures=0
+mix3 summary atomics rounds=933 updates=189067 seconds=8.0 updates_per_s=23494 failures=0
+mix0 summary collectives rounds=1281 calls=25350 seconds=8.1 calls_per_s=3140 mib_per_s=34.7 failures=0
+mix2 summary mailbox rounds=21998 messages=351968 seconds=9.4 messages_per_s=37309 mib_per_s=4.8 failures=0
+mix1 summary mailbox rounds=6411 messages=102576 seconds=5.3 messages_per_s=19275 mib_per_s=2.5 failures=0
+mix0 summary waits rounds=4383 words=70128 seconds=6.6 words_per_s=10680 failures=0
+mix3 summary rma rounds=1953 transfers=15624 seconds=9.9 transfers_per_s=1582 mib_per_s=145.7 failures=0
+mix2 summary atomics rounds=1175 updates=235398 seconds=11.5 updates_per_s=20515 failures=0
+world library nodes=4 bytes_sent=2159431168 gets_nonblocking=53664 landing_full=0 reserve_stalls=97191 wakes_sent=273068 barrier_ns=213877271309
+world library nodes=4 bytes_sent=252552840 gets_nonblocking=960 landing_full=0 reserve_stalls=5667 wakes_sent=893 barrier_ns=3284823083
+world library nodes=4 bytes_sent=2112928488 gets_nonblocking=6240 landing_full=829 reserve_stalls=46386 wakes_sent=6283 barrier_ns=21482025525
+world library nodes=4 bytes_sent=475224576 gets_nonblocking=1680 landing_full=166 reserve_stalls=9829 wakes_sent=1490 barrier_ns=5025267700
+world summary alltoall rounds=63 exchanges=1008 seconds=9.5 exchanges_per_s=106 failures=0
+mix2 summary rma rounds=1631 transfers=13048 seconds=8.7 transfers_per_s=1505 mib_per_s=138.6 failures=0
+mix1 summary atomics rounds=1264 updates=257286 seconds=13.8 updates_per_s=18666 failures=0
+mix3 summary locks rounds=2692 acquisitions=43072 seconds=14.8 acquisitions_per_s=2911 failures=0
+mix0 summary mailbox rounds=23277 messages=372432 seconds=14.7 messages_per_s=25264 mib_per_s=3.3 failures=0
+mix0 summary atomics rounds=816 updates=165171 seconds=7.1 updates_per_s=23280 failures=0
+mix2 summary locks rounds=1540 acquisitions=24640 seconds=7.4 acquisitions_per_s=3310 failures=0
+mix1 summary rma rounds=1833 transfers=14664 seconds=7.5 transfers_per_s=1958 mib_per_s=180.2 failures=0
+mix3 summary collectives rounds=1902 calls=37558 seconds=11.8 calls_per_s=3189 mib_per_s=35.3 failures=0
+mix2 summary collectives rounds=591 calls=11748 seconds=6.6 calls_per_s=1774 mib_per_s=20.0 failures=0
+mix0 summary rma rounds=2297 transfers=18376 seconds=11.0 transfers_per_s=1677 mib_per_s=154.3 failures=0
+mix3 summary waits rounds=8461 words=135376 seconds=11.6 words_per_s=11678 failures=0
+mix1 summary locks rounds=1808 acquisitions=28928 seconds=11.9 acquisitions_per_s=2422 failures=0
+world library nodes=4 bytes_sent=5101991224 gets_nonblocking=160148 landing_full=0 reserve_stalls=67950 wakes_sent=249619 barrier_ns=208220101183
+world library nodes=4 bytes_sent=403095896 gets_nonblocking=0 landing_full=0 reserve_stalls=2324 wakes_sent=1143 barrier_ns=3328579454
+world library nodes=4 bytes_sent=1007809800 gets_nonblocking=0 landing_full=0 reserve_stalls=6066 wakes_sent=3146 barrier_ns=8531832633
+world library nodes=4 bytes_sent=554223432 gets_nonblocking=0 landing_full=0 reserve_stalls=3298 wakes_sent=1734 barrier_ns=6055656218
+world summary sort rounds=40 keys=335544320 seconds=10.2 keys_per_s=32890569 mib_per_s=250.9 imbalance=1.000 failures=0
+mix0 summary locks rounds=1926 acquisitions=30816 seconds=7.5 acquisitions_per_s=4104 failures=0
+mix1 summary collectives rounds=2094 calls=41206 seconds=11.6 calls_per_s=3541 mib_per_s=39.1 failures=0
+mix3 summary mailbox rounds=36232 messages=579712 seconds=12.8 messages_per_s=45187 mib_per_s=5.9 failures=0
+mix2 summary waits rounds=21941 words=351056 seconds=13.1 words_per_s=26716 failures=0
+mix3 summary atomics rounds=698 updates=141291 seconds=6.1 updates_per_s=23142 failures=0
+mix1 summary waits rounds=11553 words=184848 seconds=9.8 words_per_s=18906 failures=0
+mix0 summary collectives rounds=1880 calls=37130 seconds=11.7 calls_per_s=3187 mib_per_s=35.1 failures=0
+mix2 summary mailbox rounds=24122 messages=385952 seconds=11.7 messages_per_s=33002 mib_per_s=4.3 failures=0
+mix0 summary waits rounds=3187 words=50992 seconds=4.8 words_per_s=10605 failures=0
+mix2 summary atomics rounds=505 updates=103255 seconds=6.3 updates_per_s=16429 failures=0
+mix1 summary mailbox rounds=17821 messages=285136 seconds=10.0 messages_per_s=28463 mib_per_s=3.7 failures=0
+mix3 summary rma rounds=3171 transfers=25368 seconds=14.5 transfers_per_s=1751 mib_per_s=161.2 failures=0
+world library nodes=4 bytes_sent=3470120096 gets_nonblocking=87816 landing_full=0 reserve_stalls=118662 wakes_sent=394184 barrier_ns=277423308917
+world library nodes=4 bytes_sent=252586968 gets_nonblocking=1200 landing_full=165 reserve_stalls=6812 wakes_sent=927 barrier_ns=3010083421
+world library nodes=4 bytes_sent=2128840280 gets_nonblocking=6240 landing_full=664 reserve_stalls=41714 wakes_sent=6296 barrier_ns=25575141005
+world library nodes=4 bytes_sent=693564408 gets_nonblocking=1920 landing_full=329 reserve_stalls=15845 wakes_sent=1854 barrier_ns=6799089482
+world summary alltoall rounds=65 exchanges=1040 seconds=10.4 exchanges_per_s=100 failures=0
+mix0 summary mailbox rounds=7060 messages=112960 seconds=5.6 messages_per_s=20349 mib_per_s=2.6 failures=0
+mix3 summary locks rounds=1728 acquisitions=27648 seconds=9.5 acquisitions_per_s=2921 failures=0
+mix2 summary rma rounds=2895 transfers=23160 seconds=12.9 transfers_per_s=1802 mib_per_s=166.1 failures=0
+mix1 summary atomics rounds=1428 updates=288395 seconds=13.3 updates_per_s=21741 failures=0
+mix3 summary collectives rounds=1049 calls=20620 seconds=7.7 calls_per_s=2691 mib_per_s=29.8 failures=0
+mix1 summary rma rounds=2550 transfers=20400 seconds=10.3 transfers_per_s=1979 mib_per_s=182.5 failures=0
+mix0 summary atomics rounds=1194 updates=241117 seconds=10.4 updates_per_s=23250 failures=0
+mix2 summary locks rounds=3029 acquisitions=48464 seconds=12.7 acquisitions_per_s=3814 failures=0
+mix0 summary rma rounds=1805 transfers=14440 seconds=8.8 transfers_per_s=1643 mib_per_s=151.4 failures=0
+mix2 summary collectives rounds=1023 calls=19988 seconds=9.7 calls_per_s=2050 mib_per_s=21.8 failures=0
+mix1 summary locks rounds=1546 acquisitions=24736 seconds=9.9 acquisitions_per_s=2498 failures=0
+mix3 summary waits rounds=18062 words=288992 seconds=14.8 words_per_s=19463 failures=0
+world library nodes=4 bytes_sent=6159397560 gets_nonblocking=196904 landing_full=0 reserve_stalls=62678 wakes_sent=261204 barrier_ns=260832685508
+world library nodes=4 bytes_sent=403094088 gets_nonblocking=0 landing_full=0 reserve_stalls=2303 wakes_sent=1242 barrier_ns=3164900516
+world library nodes=4 bytes_sent=1007796072 gets_nonblocking=0 landing_full=0 reserve_stalls=5808 wakes_sent=3080 barrier_ns=8761616541
+world library nodes=4 bytes_sent=554224120 gets_nonblocking=0 landing_full=0 reserve_stalls=3247 wakes_sent=1794 barrier_ns=5565546707
+world summary sort rounds=40 keys=335544320 seconds=10.2 keys_per_s=33051802 mib_per_s=252.2 imbalance=1.000 failures=0
+mix2 summary waits rounds=9687 words=154992 seconds=7.1 words_per_s=21781 failures=0
+mix1 summary collectives rounds=1282 calls=25308 seconds=7.9 calls_per_s=3208 mib_per_s=34.3 failures=0
+mix3 summary mailbox rounds=25540 messages=408640 seconds=10.7 messages_per_s=38148 mib_per_s=5.0 failures=0
+mix0 summary locks rounds=2973 acquisitions=47568 seconds=11.2 acquisitions_per_s=4255 failures=0
+mix2 summary mailbox rounds=11556 messages=184896 seconds=5.9 messages_per_s=31202 mib_per_s=4.1 failures=0
+mix3 summary atomics rounds=739 updates=150586 seconds=6.3 updates_per_s=23781 failures=0
+mix0 summary collectives rounds=1444 calls=28236 seconds=8.9 calls_per_s=3188 mib_per_s=35.5 failures=0
+mix1 summary waits rounds=11918 words=190688 seconds=9.6 words_per_s=19965 failures=0
+mix1 summary mailbox rounds=5782 messages=92512 seconds=4.8 messages_per_s=19269 mib_per_s=2.5 failures=0
+mix2 summary atomics rounds=492 updates=98604 seconds=7.9 updates_per_s=12545 failures=0
+mix3 summary rma rounds=1529 transfers=12232 seconds=10.3 transfers_per_s=1183 mib_per_s=108.7 failures=0
+mix0 summary waits rounds=5986 words=95776 seconds=10.4 words_per_s=9253 failures=0
+world library nodes=4 bytes_sent=1850798296 gets_nonblocking=39928 landing_full=0 reserve_stalls=87217 wakes_sent=197028 barrier_ns=207398133465
+world library nodes=4 bytes_sent=252601832 gets_nonblocking=960 landing_full=0 reserve_stalls=7776 wakes_sent=994 barrier_ns=3055079402
+world library nodes=4 bytes_sent=2114991960 gets_nonblocking=6480 landing_full=827 reserve_stalls=42496 wakes_sent=6350 barrier_ns=24690898539
+world library nodes=4 bytes_sent=707391168 gets_nonblocking=1680 landing_full=165 reserve_stalls=13626 wakes_sent=1993 barrier_ns=7076396133
+world summary alltoall rounds=65 exchanges=1040 seconds=10.4 exchanges_per_s=100 failures=0
+mix0 summary mailbox rounds=11207 messages=179312 seconds=8.8 messages_per_s=20438 mib_per_s=2.7 failures=0
+mix3 summary locks rounds=1530 acquisitions=24480 seconds=9.8 acquisitions_per_s=2488 failures=0
+mix1 summary atomics rounds=956 updates=194556 seconds=11.0 updates_per_s=17704 failures=0
+mix2 summary rma rounds=2340 transfers=18720 seconds=11.5 transfers_per_s=1624 mib_per_s=149.3 failures=0
+mix1 summary rma rounds=1693 transfers=13544 seconds=6.9 transfers_per_s=1970 mib_per_s=180.9 failures=0
+mix0 summary atomics rounds=1402 updates=283986 seconds=10.1 updates_per_s=28057 failures=0
+mix2 summary locks rounds=2691 acquisitions=43056 seconds=10.5 acquisitions_per_s=4095 failures=0
+mix3 summary collectives rounds=2460 calls=48450 seconds=14.0 calls_per_s=3463 mib_per_s=37.9 failures=0
+mix1 summary locks rounds=750 acquisitions=12000 seconds=5.7 acquisitions_per_s=2107 failures=0
+mix0 summary rma rounds=1339 transfers=10712 seconds=6.5 transfers_per_s=1656 mib_per_s=152.2 failures=0
+mix3 summary waits rounds=12319 words=197104 seconds=10.7 words_per_s=18431 failures=0
+mix2 summary collectives rounds=1896 calls=37274 seconds=12.7 calls_per_s=2943 mib_per_s=32.9 failures=0
+world library nodes=4 bytes_sent=5001441344 gets_nonblocking=147772 landing_full=0 reserve_stalls=56291 wakes_sent=233491 barrier_ns=246380025973
+world library nodes=4 bytes_sent=403106768 gets_nonblocking=0 landing_full=0 reserve_stalls=2499 wakes_sent=1203 barrier_ns=3281587006
+world library nodes=4 bytes_sent=957295184 gets_nonblocking=0 landing_full=0 reserve_stalls=5585 wakes_sent=2916 barrier_ns=11787617813
+world library nodes=4 bytes_sent=503878104 gets_nonblocking=0 landing_full=0 reserve_stalls=2756 wakes_sent=1403 barrier_ns=4043488653
+world summary sort rounds=38 keys=318767104 seconds=9.8 keys_per_s=32443415 mib_per_s=247.5 imbalance=1.000 failures=0
+mix1 summary collectives rounds=1222 calls=24098 seconds=7.6 calls_per_s=3170 mib_per_s=35.7 failures=0
+mix0 summary locks rounds=2400 acquisitions=38400 seconds=9.1 acquisitions_per_s=4235 failures=0
+mix2 summary waits rounds=14655 words=234480 seconds=9.9 words_per_s=23694 failures=0
+mix3 summary mailbox rounds=27073 messages=433168 seconds=10.4 messages_per_s=41639 mib_per_s=5.4 failures=0
+mix2 summary mailbox rounds=19107 messages=305712 seconds=9.9 messages_per_s=30997 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=1253 updates=251888 seconds=10.9 updates_per_s=23091 failures=0
+mix0 summary collectives rounds=1997 calls=39362 seconds=12.4 calls_per_s=3163 mib_per_s=35.0 failures=0
+mix1 summary waits rounds=17941 words=287056 seconds=14.0 words_per_s=20511 failures=0
+mix3 summary rma rounds=1164 transfers=9312 seconds=6.7 transfers_per_s=1393 mib_per_s=128.2 failures=0
+mix2 summary atomics rounds=588 updates=120665 seconds=7.9 updates_per_s=15282 failures=0
+mix1 summary mailbox rounds=14589 messages=233424 seconds=11.0 messages_per_s=21140 mib_per_s=2.7 failures=0
+mix0 summary waits rounds=11130 words=178080 seconds=17.5 words_per_s=10179 failures=0
+world library nodes=4 bytes_sent=1760058520 gets_nonblocking=32596 landing_full=0 reserve_stalls=121060 wakes_sent=269249 barrier_ns=301399684112
+world library nodes=4 bytes_sent=252599208 gets_nonblocking=1200 landing_full=163 reserve_stalls=7833 wakes_sent=931 barrier_ns=2881794665
+world library nodes=4 bytes_sent=2115081720 gets_nonblocking=6240 landing_full=663 reserve_stalls=47141 wakes_sent=6323 barrier_ns=22043623240
+world library nodes=4 bytes_sent=707513808 gets_nonblocking=1920 landing_full=331 reserve_stalls=14488 wakes_sent=2080 barrier_ns=7509483673
+world summary alltoall rounds=66 exchanges=1056 seconds=10.3 exchanges_per_s=103 failures=0
+mix0 summary mailbox rounds=12126 messages=194016 seconds=9.7 messages_per_s=20086 mib_per_s=2.6 failures=0
+mix1 summary atomics rounds=802 updates=161574 seconds=10.3 updates_per_s=15657 failures=0
+mix2 summary rma rounds=2061 transfers=16488 seconds=10.7 transfers_per_s=1540 mib_per_s=142.1 failures=0
+mix3 summary locks rounds=1658 acquisitions=26528 seconds=10.7 acquisitions_per_s=2471 failures=0
+mix0 summary atomics rounds=1182 updates=239762 seconds=10.4 updates_per_s=23124 failures=0
+mix3 summary collectives rounds=1535 calls=30246 seconds=11.2 calls_per_s=2697 mib_per_s=30.2 failures=0
+mix2 summary locks rounds=2352 acquisitions=37632 seconds=11.3 acquisitions_per_s=3323 failures=0
+mix1 summary rma rounds=3100 transfers=24800 seconds=12.7 transfers_per_s=1957 mib_per_s=180.1 failures=0
+mix1 summary locks rounds=682 acquisitions=10912 seconds=5.3 acquisitions_per_s=2049 failures=0
+mix3 summary waits rounds=4142 words=66272 seconds=6.7 words_per_s=9900 failures=0
+mix2 summary collectives rounds=863 calls=17066 seconds=9.4 calls_per_s=1818 mib_per_s=20.2 failures=0
+mix0 summary rma rounds=2244 transfers=17952 seconds=10.5 transfers_per_s=1712 mib_per_s=157.8 failures=0
+world library nodes=4 bytes_sent=6301965760 gets_nonblocking=199488 landing_full=0 reserve_stalls=62776 wakes_sent=196809 barrier_ns=160915481942
+world library nodes=4 bytes_sent=403094528 gets_nonblocking=0 landing_full=0 reserve_stalls=2328 wakes_sent=1084 barrier_ns=3356110484
+world library nodes=4 bytes_sent=1007769160 gets_nonblocking=0 landing_full=0 reserve_stalls=5915 wakes_sent=3145 barrier_ns=8960812094
+world library nodes=4 bytes_sent=503862936 gets_nonblocking=0 landing_full=0 reserve_stalls=3026 wakes_sent=1640 barrier_ns=4467516545
+world summary sort rounds=39 keys=327155712 seconds=10.0 keys_per_s=32757648 mib_per_s=249.9 imbalance=1.000 failures=0
+mix0 summary locks rounds=1701 acquisitions=27216 seconds=6.7 acquisitions_per_s=4075 failures=0
+mix1 summary collectives rounds=1189 calls=23172 seconds=7.3 calls_per_s=3187 mib_per_s=35.5 failures=0
+mix3 summary mailbox rounds=23387 messages=374192 seconds=8.7 messages_per_s=42779 mib_per_s=5.6 failures=0
+mix2 summary waits rounds=14482 words=231712 seconds=9.1 words_per_s=25373 failures=0
+mix0 summary collectives rounds=1052 calls=20628 seconds=6.7 calls_per_s=3085 mib_per_s=34.0 failures=0
+mix1 summary waits rounds=7950 words=127200 seconds=6.7 words_per_s=18913 failures=0
+mix2 summary mailbox rounds=15905 messages=254480 seconds=7.4 messages_per_s=34591 mib_per_s=4.5 failures=0
+mix3 summary atomics rounds=962 updates=196199 seconds=7.5 updates_per_s=26020 failures=0
+mix3 summary rma rounds=1326 transfers=10608 seconds=7.7 transfers_per_s=1371 mib_per_s=126.4 failures=0
+mix1 summary mailbox rounds=14145 messages=226320 seconds=10.5 messages_per_s=21529 mib_per_s=2.8 failures=0
+mix2 summary atomics rounds=943 updates=190029 seconds=13.0 updates_per_s=14573 failures=0
+mix0 summary waits rounds=10232 words=163712 seconds=14.9 words_per_s=10960 failures=0
+world library nodes=4 bytes_sent=1693239800 gets_nonblocking=37896 landing_full=0 reserve_stalls=107337 wakes_sent=240025 barrier_ns=190259091010
+world library nodes=4 bytes_sent=252594080 gets_nonblocking=1200 landing_full=163 reserve_stalls=7191 wakes_sent=897 barrier_ns=2941376611
+world library nodes=4 bytes_sent=2128944120 gets_nonblocking=6240 landing_full=660 reserve_stalls=46820 wakes_sent=6482 barrier_ns=21305764629
+world library nodes=4 bytes_sent=695765032 gets_nonblocking=2160 landing_full=330 reserve_stalls=14212 wakes_sent=1954 barrier_ns=6972595844
+world summary alltoall rounds=68 exchanges=1088 seconds=10.1 exchanges_per_s=107 failures=0
+mix0 summary mailbox rounds=9718 messages=155488 seconds=7.6 messages_per_s=20433 mib_per_s=2.7 failures=0
+mix2 summary rma rounds=1673 transfers=13384 seconds=8.6 transfers_per_s=1554 mib_per_s=143.1 failures=0
+mix3 summary locks rounds=1534 acquisitions=24544 seconds=9.1 acquisitions_per_s=2706 failures=0
+mix1 summary atomics rounds=1412 updates=286124 seconds=12.0 updates_per_s=23896 failures=0
+mix0 summary atomics rounds=811 updates=162911 seconds=7.2 updates_per_s=22482 failures=0
+mix3 summary collectives rounds=1427 calls=28112 seconds=10.2 calls_per_s=2751 mib_per_s=29.9 failures=0
+mix2 summary locks rounds=2810 acquisitions=44960 seconds=13.4 acquisitions_per_s=3364 failures=0
+mix1 summary rma rounds=3614 transfers=28912 seconds=14.8 transfers_per_s=1954 mib_per_s=180.1 failures=0
+mix3 summary waits rounds=4772 words=76352 seconds=7.7 words_per_s=9945 failures=0
+mix1 summary locks rounds=1180 acquisitions=18880 seconds=9.0 acquisitions_per_s=2093 failures=0
+mix0 summary rma rounds=2938 transfers=23504 seconds=13.8 transfers_per_s=1702 mib_per_s=156.8 failures=0
+mix2 summary collectives rounds=1359 calls=26812 seconds=14.0 calls_per_s=1914 mib_per_s=21.4 failures=0
+world library nodes=4 bytes_sent=6995752384 gets_nonblocking=230904 landing_full=0 reserve_stalls=65745 wakes_sent=276668 barrier_ns=246871222589
+world library nodes=4 bytes_sent=403109408 gets_nonblocking=0 landing_full=0 reserve_stalls=2463 wakes_sent=1118 barrier_ns=2647812558
+world library nodes=4 bytes_sent=1007770936 gets_nonblocking=0 landing_full=0 reserve_stalls=6153 wakes_sent=3171 barrier_ns=11445869130
+world library nodes=4 bytes_sent=403082312 gets_nonblocking=0 landing_full=0 reserve_stalls=2545 wakes_sent=1268 barrier_ns=6414291466
+world summary sort rounds=37 keys=310378496 seconds=10.0 keys_per_s=31001050 mib_per_s=236.5 imbalance=1.000 failures=0
+mix1 summary collectives rounds=1810 calls=35760 seconds=11.1 calls_per_s=3212 mib_per_s=35.5 failures=0
+mix3 summary mailbox rounds=26511 messages=424176 seconds=11.7 messages_per_s=36350 mib_per_s=4.7 failures=0
+mix2 summary waits rounds=16810 words=268960 seconds=12.1 words_per_s=22159 failures=0
+mix0 summary locks rounds=3517 acquisitions=56272 seconds=13.5 acquisitions_per_s=4182 failures=0
+mix0 summary collectives rounds=852 calls=16898 seconds=5.4 calls_per_s=3108 mib_per_s=34.2 failures=0
+mix3 summary atomics rounds=970 updates=195891 seconds=7.0 updates_per_s=27864 failures=0
+mix1 summary waits rounds=14279 words=228464 seconds=8.8 words_per_s=25820 failures=0
+mix2 summary mailbox rounds=36682 messages=586912 seconds=11.7 messages_per_s=50034 mib_per_s=6.5 failures=0
+mix3 summary rma rounds=887 transfers=7096 seconds=5.4 transfers_per_s=1316 mib_per_s=121.4 failures=0
+mix1 summary mailbox rounds=9038 messages=144608 seconds=6.8 messages_per_s=21300 mib_per_s=2.8 failures=0
+mix2 summary atomics rounds=714 updates=144505 seconds=10.5 updates_per_s=13704 failures=0
+mix0 summary waits rounds=8598 words=137568 seconds=13.7 words_per_s=10068 failures=0
+world library nodes=4 bytes_sent=1519882784 gets_nonblocking=22716 landing_full=0 reserve_stalls=118951 wakes_sent=360035 barrier_ns=272059249261
+world library nodes=4 bytes_sent=252594376 gets_nonblocking=1200 landing_full=165 reserve_stalls=7109 wakes_sent=925 barrier_ns=3146378770
+world library nodes=4 bytes_sent=2112923624 gets_nonblocking=6000 landing_full=662 reserve_stalls=45695 wakes_sent=6199 barrier_ns=21312513939
+world library nodes=4 bytes_sent=489100776 gets_nonblocking=1680 landing_full=167 reserve_stalls=10298 wakes_sent=1639 barrier_ns=5095314736
+world summary alltoall rounds=64 exchanges=1024 seconds=9.5 exchanges_per_s=108 failures=0
+mix2 summary rma rounds=1064 transfers=8512 seconds=5.8 transfers_per_s=1461 mib_per_s=134.5 failures=0
+mix3 summary locks rounds=1086 acquisitions=17376 seconds=6.9 acquisitions_per_s=2506 failures=0
+mix1 summary atomics rounds=809 updates=162694 seconds=9.0 updates_per_s=17992 failures=0
+mix0 summary mailbox rounds=23697 messages=379152 seconds=13.3 messages_per_s=28503 mib_per_s=3.7 failures=0
+mix3 summary collectives rounds=757 calls=14834 seconds=5.5 calls_per_s=2686 mib_per_s=30.8 failures=0
+mix1 summary rma rounds=1793 transfers=14344 seconds=7.3 transfers_per_s=1974 mib_per_s=181.7 failures=0
+mix0 summary atomics rounds=1015 updates=206438 seconds=8.0 updates_per_s=25663 failures=0
+mix2 summary locks rounds=2064 acquisitions=33024 seconds=8.7 acquisitions_per_s=3783 failures=0
+mix2 summary collectives rounds=560 calls=10920 seconds=6.1 calls_per_s=1797 mib_per_s=19.4 failures=0
+mix3 summary waits rounds=6008 words=96128 seconds=9.4 words_per_s=10207 failures=0
+mix0 summary rma rounds=1985 transfers=15880 seconds=9.4 transfers_per_s=1684 mib_per_s=154.7 failures=0
+mix1 summary locks rounds=3153 acquisitions=50448 seconds=14.7 acquisitions_per_s=3422 failures=0
+world library nodes=4 bytes_sent=4215239536 gets_nonblocking=131292 landing_full=0 reserve_stalls=46276 wakes_sent=281702 barrier_ns=247849002841
+world library nodes=4 bytes_sent=403097936 gets_nonblocking=0 landing_full=0 reserve_stalls=2309 wakes_sent=1162 barrier_ns=5308576640
+world library nodes=4 bytes_sent=957346576 gets_nonblocking=0 landing_full=0 reserve_stalls=5575 wakes_sent=3024 barrier_ns=9638129692
+world library nodes=4 bytes_sent=554261448 gets_nonblocking=0 landing_full=0 reserve_stalls=3137 wakes_sent=1687 barrier_ns=4934076155
+world summary sort rounds=39 keys=327155712 seconds=10.0 keys_per_s=32645363 mib_per_s=249.1 imbalance=1.001 failures=0
+mix3 summary mailbox rounds=12153 messages=194448 seconds=5.5 messages_per_s=35323 mib_per_s=4.6 failures=0
+mix2 summary waits rounds=14613 words=233808 seconds=10.7 words_per_s=21892 failures=0
+mix0 summary locks rounds=2818 acquisitions=45088 seconds=10.8 acquisitions_per_s=4156 failures=0
+mix1 summary collectives rounds=2352 calls=46308 seconds=13.7 calls_per_s=3375 mib_per_s=37.4 failures=0
+mix0 summary collectives rounds=996 calls=19634 seconds=6.3 calls_per_s=3123 mib_per_s=33.7 failures=0
+mix3 summary atomics rounds=732 updates=148834 seconds=6.4 updates_per_s=23437 failures=0
+mix2 summary mailbox rounds=24878 messages=398048 seconds=9.3 messages_per_s=42890 mib_per_s=5.6 failures=0
+mix1 summary waits rounds=18108 words=289728 seconds=11.0 words_per_s=26221 failures=0
+mix1 summary mailbox rounds=7338 messages=117408 seconds=6.2 messages_per_s=19086 mib_per_s=2.5 failures=0
+mix2 summary atomics rounds=668 updates=134638 seconds=10.9 updates_per_s=12314 failures=0
+mix0 summary waits rounds=7763 words=124208 seconds=13.5 words_per_s=9227 failures=0
+mix3 summary rma rounds=2167 transfers=17336 seconds=14.4 transfers_per_s=1206 mib_per_s=110.9 failures=0
+world library nodes=4 bytes_sent=2464471440 gets_nonblocking=59820 landing_full=0 reserve_stalls=93745 wakes_sent=258958 barrier_ns=297709191343
+world library nodes=4 bytes_sent=252574064 gets_nonblocking=1200 landing_full=164 reserve_stalls=6294 wakes_sent=904 barrier_ns=2937167109
+world library nodes=4 bytes_sent=2349339984 gets_nonblocking=6720 landing_full=824 reserve_stalls=48829 wakes_sent=6865 barrier_ns=23861064573
+world library nodes=4 bytes_sent=238804264 gets_nonblocking=960 landing_full=0 reserve_stalls=5519 wakes_sent=860 barrier_ns=2645395854
+world summary alltoall rounds=63 exchanges=1008 seconds=9.4 exchanges_per_s=107 failures=0
+mix0 summary mailbox rounds=6665 messages=106640 seconds=5.4 messages_per_s=19679 mib_per_s=2.5 failures=0
+mix2 summary rma rounds=1097 transfers=8776 seconds=5.8 transfers_per_s=1516 mib_per_s=138.9 failures=0
+mix3 summary locks rounds=1290 acquisitions=20640 seconds=6.9 acquisitions_per_s=2986 failures=0
+mix1 summary atomics rounds=837 updates=170538 seconds=7.6 updates_per_s=22390 failures=0
+mix3 summary collectives rounds=926 calls=18304 seconds=6.7 calls_per_s=2747 mib_per_s=30.7 failures=0
+mix0 summary atomics rounds=815 updates=164780 seconds=7.2 updates_per_s=22801 failures=0
+mix2 summary locks rounds=2394 acquisitions=38304 seconds=11.3 acquisitions_per_s=3398 failures=0
+mix1 summary rma rounds=3475 transfers=27800 seconds=14.1 transfers_per_s=1970 mib_per_s=181.2 failures=0
+mix3 summary waits rounds=4025 words=64400 seconds=6.4 words_per_s=9986 failures=0
+mix2 summary collectives rounds=932 calls=18428 seconds=9.9 calls_per_s=1856 mib_per_s=20.6 failures=0
+mix0 summary rma rounds=2099 transfers=16792 seconds=10.1 transfers_per_s=1664 mib_per_s=153.3 failures=0
+mix1 summary locks rounds=1889 acquisitions=30224 seconds=11.6 acquisitions_per_s=2601 failures=0
+world library nodes=4 bytes_sent=5623436480 gets_nonblocking=180576 landing_full=0 reserve_stalls=52793 wakes_sent=227881 barrier_ns=199135422297
+world library nodes=4 bytes_sent=403114632 gets_nonblocking=0 landing_full=0 reserve_stalls=2308 wakes_sent=1122 barrier_ns=3741624665
+world library nodes=4 bytes_sent=957395216 gets_nonblocking=0 landing_full=0 reserve_stalls=5654 wakes_sent=2992 barrier_ns=9839613641
+world library nodes=4 bytes_sent=503885136 gets_nonblocking=0 landing_full=0 reserve_stalls=3106 wakes_sent=1511 barrier_ns=7131240205
+world summary sort rounds=38 keys=318767104 seconds=10.0 keys_per_s=31827874 mib_per_s=242.8 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=16670 messages=266720 seconds=7.5 messages_per_s=35679 mib_per_s=4.6 failures=0
+mix2 summary waits rounds=16524 words=264384 seconds=12.1 words_per_s=21914 failures=0
+mix1 summary collectives rounds=2048 calls=40462 seconds=12.6 calls_per_s=3221 mib_per_s=35.9 failures=0
+mix0 summary locks rounds=3502 acquisitions=56032 seconds=13.5 acquisitions_per_s=4157 failures=0
+mix1 summary waits rounds=8070 words=129120 seconds=6.9 words_per_s=18595 failures=0
+mix3 summary atomics rounds=933 updates=187946 seconds=8.2 updates_per_s=23039 failures=0
+mix0 summary collectives rounds=1783 calls=35088 seconds=11.0 calls_per_s=3191 mib_per_s=35.8 failures=0
+mix2 summary mailbox rounds=30658 messages=490528 seconds=12.9 messages_per_s=37969 mib_per_s=4.9 failures=0
+mix1 summary mailbox rounds=9542 messages=152672 seconds=7.7 messages_per_s=19755 mib_per_s=2.6 failures=0
+mix0 summary waits rounds=7613 words=121808 seconds=12.0 words_per_s=10121 failures=0
+mix2 summary atomics rounds=929 updates=188712 seconds=13.5 updates_per_s=14010 failures=0
+mix3 summary rma rounds=2329 transfers=18632 seconds=13.9 transfers_per_s=1339 mib_per_s=123.4 failures=0
+world library nodes=4 bytes_sent=2735401320 gets_nonblocking=63788 landing_full=0 reserve_stalls=108774 wakes_sent=329490 barrier_ns=263721650501
+world library nodes=4 bytes_sent=252560480 gets_nonblocking=960 landing_full=0 reserve_stalls=5490 wakes_sent=927 barrier_ns=2795526026
+world library nodes=4 bytes_sent=2349509968 gets_nonblocking=6960 landing_full=821 reserve_stalls=51572 wakes_sent=6801 barrier_ns=23855336289
+world library nodes=4 bytes_sent=238669352 gets_nonblocking=960 landing_full=164 reserve_stalls=4063 wakes_sent=776 barrier_ns=2578538656
+world summary alltoall rounds=63 exchanges=1008 seconds=9.6 exchanges_per_s=105 failures=0
+mix1 summary atomics rounds=412 updates=83668 seconds=5.4 updates_per_s=15555 failures=0
+mix3 summary locks rounds=1300 acquisitions=20800 seconds=8.5 acquisitions_per_s=2434 failures=0
+mix2 summary rma rounds=2735 transfers=21880 seconds=14.0 transfers_per_s=1559 mib_per_s=143.6 failures=0
+mix0 summary mailbox rounds=20502 messages=328032 seconds=14.3 messages_per_s=22880 mib_per_s=3.0 failures=0
+mix0 summary atomics rounds=594 updates=119478 seconds=5.3 updates_per_s=22680 failures=0
+mix1 summary rma rounds=2734 transfers=21872 seconds=11.1 transfers_per_s=1963 mib_per_s=180.9 failures=0
+mix2 summary locks rounds=3056 acquisitions=48896 seconds=13.3 acquisitions_per_s=3685 failures=0
+mix3 summary collectives rounds=2332 calls=46038 seconds=14.9 calls_per_s=3099 mib_per_s=34.3 failures=0
+mix1 summary locks rounds=757 acquisitions=12112 seconds=5.8 acquisitions_per_s=2084 failures=0
+mix0 summary rma rounds=1433 transfers=11464 seconds=6.9 transfers_per_s=1661 mib_per_s=153.1 failures=0
+mix2 summary collectives rounds=1638 calls=32302 seconds=11.6 calls_per_s=2777 mib_per_s=30.9 failures=0
+mix3 summary waits rounds=19657 words=314512 seconds=14.6 words_per_s=21558 failures=0
+world library nodes=4 bytes_sent=6172539304 gets_nonblocking=190116 landing_full=0 reserve_stalls=54466 wakes_sent=261868 barrier_ns=320307367507
+world library nodes=4 bytes_sent=403061704 gets_nonblocking=0 landing_full=0 reserve_stalls=2250 wakes_sent=1314 barrier_ns=5621210823
+world library nodes=4 bytes_sent=906992400 gets_nonblocking=0 landing_full=0 reserve_stalls=5348 wakes_sent=2725 barrier_ns=9066339723
+world library nodes=4 bytes_sent=554270208 gets_nonblocking=0 landing_full=0 reserve_stalls=3327 wakes_sent=1658 barrier_ns=4667834230
+world summary sort rounds=38 keys=318767104 seconds=9.8 keys_per_s=32432592 mib_per_s=247.4 imbalance=1.000 failures=0
+mix1 summary collectives rounds=826 calls=16104 seconds=5.1 calls_per_s=3136 mib_per_s=34.0 failures=0
+mix2 summary waits rounds=7276 words=116416 seconds=5.4 words_per_s=21556 failures=0
+mix3 summary mailbox rounds=27343 messages=437488 seconds=11.0 messages_per_s=39594 mib_per_s=5.1 failures=0
+mix0 summary locks rounds=3652 acquisitions=58432 seconds=13.5 acquisitions_per_s=4338 failures=0
+mix0 summary collectives rounds=895 calls=17494 seconds=5.7 calls_per_s=3053 mib_per_s=33.7 failures=0
+mix1 summary waits rounds=7994 words=127904 seconds=6.3 words_per_s=20274 failures=0
+mix3 summary atomics rounds=955 updates=192892 seconds=7.1 updates_per_s=27238 failures=0
+mix2 summary mailbox rounds=26011 messages=416176 seconds=9.2 messages_per_s=45206 mib_per_s=5.9 failures=0
+mix0 summary waits rounds=3128 words=50048 seconds=4.5 words_per_s=11044 failures=0
+mix1 summary mailbox rounds=6839 messages=109424 seconds=4.9 messages_per_s=22265 mib_per_s=2.9 failures=0
+mix2 summary atomics rounds=988 updates=199440 seconds=10.0 updates_per_s=19880 failures=0
+mix3 summary rma rounds=2916 transfers=23328 seconds=13.3 transfers_per_s=1748 mib_per_s=160.8 failures=0
+world library nodes=4 bytes_sent=2882164632 gets_nonblocking=81496 landing_full=0 reserve_stalls=94032 wakes_sent=352080 barrier_ns=271399246015
+world library nodes=4 bytes_sent=252559424 gets_nonblocking=1200 landing_full=166 reserve_stalls=5881 wakes_sent=883 barrier_ns=3078194055
+world library nodes=4 bytes_sent=2128928488 gets_nonblocking=6240 landing_full=664 reserve_stalls=46521 wakes_sent=6524 barrier_ns=21818857227
+world library nodes=4 bytes_sent=693933296 gets_nonblocking=2160 landing_full=327 reserve_stalls=13531 wakes_sent=1935 barrier_ns=6980740241
+world summary alltoall rounds=67 exchanges=1072 seconds=10.2 exchanges_per_s=105 failures=0
+mix3 summary locks rounds=1037 acquisitions=16592 seconds=6.9 acquisitions_per_s=2398 failures=0
+mix2 summary rma rounds=1793 transfers=14344 seconds=9.6 transfers_per_s=1502 mib_per_s=138.2 failures=0
+mix0 summary mailbox rounds=12648 messages=202368 seconds=9.7 messages_per_s=20953 mib_per_s=2.7 failures=0
+mix1 summary atomics rounds=831 updates=168022 seconds=10.1 updates_per_s=16672 failures=0
+mix1 summary rma rounds=1651 transfers=13208 seconds=6.8 transfers_per_s=1956 mib_per_s=180.2 failures=0
+mix0 summary atomics rounds=803 updates=164060 seconds=7.0 updates_per_s=23603 failures=0
+mix2 summary locks rounds=2089 acquisitions=33424 seconds=8.8 acquisitions_per_s=3787 failures=0
+mix3 summary collectives rounds=2004 calls=39446 seconds=11.9 calls_per_s=3329 mib_per_s=37.0 failures=0
+mix0 summary rma rounds=1267 transfers=10136 seconds=6.1 transfers_per_s=1650 mib_per_s=151.9 failures=0
+mix3 summary waits rounds=5802 words=92832 seconds=7.1 words_per_s=13037 failures=0
+mix1 summary locks rounds=2135 acquisitions=34160 seconds=10.0 acquisitions_per_s=3423 failures=0
+mix2 summary collectives rounds=1899 calls=37410 seconds=12.3 calls_per_s=3040 mib_per_s=32.8 failures=0
+world library nodes=4 bytes_sent=4406167304 gets_nonblocking=128144 landing_full=0 reserve_stalls=50582 wakes_sent=242475 barrier_ns=213776104640
+world library nodes=4 bytes_sent=403045016 gets_nonblocking=0 landing_full=0 reserve_stalls=2377 wakes_sent=1171 barrier_ns=2560280728
+world library nodes=4 bytes_sent=1007680072 gets_nonblocking=0 landing_full=0 reserve_stalls=5858 wakes_sent=2967 barrier_ns=8657476564
+world library nodes=4 bytes_sent=554245088 gets_nonblocking=0 landing_full=0 reserve_stalls=3200 wakes_sent=1620 barrier_ns=5006767341
+world summary sort rounds=40 keys=335544320 seconds=9.9 keys_per_s=33754875 mib_per_s=257.5 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=10988 messages=175808 seconds=4.9 messages_per_s=35984 mib_per_s=4.7 failures=0
+mix2 summary waits rounds=10134 words=162144 seconds=7.3 words_per_s=22182 failures=0
+mix1 summary collectives rounds=1599 calls=31560 seconds=9.5 calls_per_s=3318 mib_per_s=35.9 failures=0
+mix0 summary locks rounds=3413 acquisitions=54608 seconds=12.9 acquisitions_per_s=4222 failures=0
+mix3 summary atomics rounds=1233 updates=251168 seconds=10.7 updates_per_s=23430 failures=0
+mix2 summary mailbox rounds=20730 messages=331680 seconds=10.7 messages_per_s=30999 mib_per_s=4.0 failures=0
+mix1 summary waits rounds=14201 words=227216 seconds=12.0 words_per_s=18918 failures=0
+mix0 summary collectives rounds=2393 calls=47258 seconds=14.6 calls_per_s=3227 mib_per_s=36.0 failures=0
+mix0 summary waits rounds=7282 words=116512 seconds=10.5 words_per_s=11099 failures=0
+mix2 summary atomics rounds=830 updates=169058 seconds=11.4 updates_per_s=14894 failures=0
+mix1 summary mailbox rounds=16292 messages=260672 seconds=11.8 messages_per_s=22011 mib_per_s=2.9 failures=0
+mix3 summary rma rounds=2814 transfers=22512 seconds=14.5 transfers_per_s=1552 mib_per_s=142.9 failures=0
+world library nodes=4 bytes_sent=3088159864 gets_nonblocking=76948 landing_full=0 reserve_stalls=122283 wakes_sent=276650 barrier_ns=289407705711
+world library nodes=4 bytes_sent=252575280 gets_nonblocking=960 landing_full=0 reserve_stalls=6212 wakes_sent=909 barrier_ns=2993683287
+world library nodes=4 bytes_sent=2349312992 gets_nonblocking=6720 landing_full=820 reserve_stalls=48202 wakes_sent=6827 barrier_ns=23864762609
+world library nodes=4 bytes_sent=252668384 gets_nonblocking=1440 landing_full=166 reserve_stalls=5450 wakes_sent=904 barrier_ns=3018074431
+world summary alltoall rounds=64 exchanges=1024 seconds=9.5 exchanges_per_s=108 failures=0
+mix2 summary rma rounds=1516 transfers=12128 seconds=8.2 transfers_per_s=1476 mib_per_s=136.1 failures=0
+mix0 summary mailbox rounds=10294 messages=164704 seconds=8.1 messages_per_s=20280 mib_per_s=2.6 failures=0
+mix1 summary atomics rounds=751 updates=152217 seconds=8.9 updates_per_s=17096 failures=0
+mix3 summary locks rounds=3339 acquisitions=53424 seconds=14.2 acquisitions_per_s=3763 failures=0
+mix1 summary rma rounds=1527 transfers=12216 seconds=6.3 transfers_per_s=1946 mib_per_s=179.0 failures=0
+mix3 summary collectives rounds=1833 calls=36026 seconds=10.6 calls_per_s=3386 mib_per_s=37.4 failures=0
+mix0 summary atomics rounds=1968 updates=397179 seconds=12.6 updates_per_s=31502 failures=0
+mix2 summary locks rounds=4114 acquisitions=65824 seconds=14.2 acquisitions_per_s=4649 failures=0
+mix3 summary waits rounds=3820 words=61120 seconds=6.1 words_per_s=9987 failures=0
+mix0 summary rma rounds=1527 transfers=12216 seconds=7.4 transfers_per_s=1653 mib_per_s=152.0 failures=0
+mix2 summary collectives rounds=825 calls=16166 seconds=8.0 calls_per_s=2013 mib_per_s=23.0 failures=0
+mix1 summary locks rounds=1827 acquisitions=29232 seconds=9.8 acquisitions_per_s=2972 failures=0
+world library nodes=4 bytes_sent=4185977232 gets_nonblocking=125060 landing_full=0 reserve_stalls=52126 wakes_sent=322323 barrier_ns=233343707692
+world library nodes=4 bytes_sent=403095736 gets_nonblocking=0 landing_full=0 reserve_stalls=2397 wakes_sent=1194 barrier_ns=2115376596
+world library nodes=4 bytes_sent=1058159168 gets_nonblocking=0 landing_full=0 reserve_stalls=6004 wakes_sent=3099 barrier_ns=11014418940
+world library nodes=4 bytes_sent=503874480 gets_nonblocking=0 landing_full=0 reserve_stalls=2938 wakes_sent=1452 barrier_ns=4350952646
+world summary sort rounds=40 keys=335544320 seconds=10.0 keys_per_s=33653962 mib_per_s=256.8 imbalance=1.000 failures=0
+mix0 summary locks rounds=2374 acquisitions=37984 seconds=9.2 acquisitions_per_s=4132 failures=0
+mix1 summary collectives rounds=1891 calls=37050 seconds=11.1 calls_per_s=3339 mib_per_s=37.5 failures=0
+mix2 summary waits rounds=17978 words=287648 seconds=11.7 words_per_s=24510 failures=0
+mix3 summary mailbox rounds=38369 messages=613904 seconds=13.6 messages_per_s=45238 mib_per_s=5.9 failures=0
+mix1 summary waits rounds=6871 words=109936 seconds=5.8 words_per_s=18971 failures=0
+mix2 summary mailbox rounds=16567 messages=265072 seconds=8.3 messages_per_s=31905 mib_per_s=4.1 failures=0
+mix0 summary collectives rounds=2054 calls=40366 seconds=12.2 calls_per_s=3305 mib_per_s=36.0 failures=0
+mix3 summary atomics rounds=1569 updates=316645 seconds=12.8 updates_per_s=24786 failures=0
+mix2 summary atomics rounds=748 updates=151591 seconds=10.6 updates_per_s=14278 failures=0
+mix3 summary rma rounds=2226 transfers=17808 seconds=12.9 transfers_per_s=1385 mib_per_s=127.5 failures=0
+mix1 summary mailbox rounds=15402 messages=246432 seconds=12.6 messages_per_s=19572 mib_per_s=2.5 failures=0
+mix0 summary waits rounds=9265 words=148240 seconds=13.8 words_per_s=10773 failures=0
+world library nodes=4 bytes_sent=2723150272 gets_nonblocking=60228 landing_full=0 reserve_stalls=126442 wakes_sent=362594 barrier_ns=247003588824
+world library nodes=4 bytes_sent=252588160 gets_nonblocking=960 landing_full=0 reserve_stalls=6839 wakes_sent=995 barrier_ns=2829359972
+world library nodes=4 bytes_sent=2349294048 gets_nonblocking=6720 landing_full=826 reserve_stalls=48567 wakes_sent=6822 barrier_ns=23889517289
+world library nodes=4 bytes_sent=252696968 gets_nonblocking=1440 landing_full=167 reserve_stalls=7118 wakes_sent=953 barrier_ns=5288784896
+world summary alltoall rounds=64 exchanges=1024 seconds=9.7 exchanges_per_s=106 failures=0
+mix2 summary rma rounds=1042 transfers=8336 seconds=5.6 transfers_per_s=1484 mib_per_s=136.8 failures=0
+mix0 summary mailbox rounds=12741 messages=203856 seconds=8.7 messages_per_s=23537 mib_per_s=3.0 failures=0
+mix3 summary locks rounds=1728 acquisitions=27648 seconds=9.4 acquisitions_per_s=2948 failures=0
+mix1 summary atomics rounds=1096 updates=221751 seconds=10.3 updates_per_s=21591 failures=0
+mix0 summary atomics rounds=756 updates=153510 seconds=6.7 updates_per_s=22796 failures=0
+mix2 summary locks rounds=1600 acquisitions=25600 seconds=7.7 acquisitions_per_s=3328 failures=0
+mix3 summary collectives rounds=1416 calls=27824 seconds=10.2 calls_per_s=2735 mib_per_s=29.8 failures=0
+mix1 summary rma rounds=3552 transfers=28416 seconds=14.9 transfers_per_s=1903 mib_per_s=175.0 failures=0
+mix2 summary collectives rounds=634 calls=12376 seconds=6.8 calls_per_s=1831 mib_per_s=20.1 failures=0
+mix0 summary rma rounds=2958 transfers=23664 seconds=14.0 transfers_per_s=1691 mib_per_s=155.6 failures=0
+mix3 summary waits rounds=9605 words=153680 seconds=14.2 words_per_s=10803 failures=0
+mix1 summary locks rounds=1978 acquisitions=31648 seconds=14.3 acquisitions_per_s=2216 failures=0
+world library nodes=4 bytes_sent=6364901304 gets_nonblocking=208496 landing_full=0 reserve_stalls=63796 wakes_sent=237564 barrier_ns=244360580363
+world library nodes=4 bytes_sent=403103960 gets_nonblocking=0 landing_full=0 reserve_stalls=2375 wakes_sent=1166 barrier_ns=3080802352
+world library nodes=4 bytes_sent=1007728960 gets_nonblocking=0 landing_full=0 reserve_stalls=5705 wakes_sent=3131 barrier_ns=9703344080
+world library nodes=4 bytes_sent=503783528 gets_nonblocking=0 landing_full=0 reserve_stalls=2991 wakes_sent=1482 barrier_ns=4291888076
+world summary sort rounds=39 keys=327155712 seconds=9.9 keys_per_s=33142321 mib_per_s=252.9 imbalance=1.000 failures=0
+mix2 summary waits rounds=7337 words=117392 seconds=5.5 words_per_s=21517 failures=0
+mix3 summary mailbox rounds=13416 messages=214656 seconds=6.0 messages_per_s=35946 mib_per_s=4.7 failures=0
+mix0 summary locks rounds=1839 acquisitions=29424 seconds=7.1 acquisitions_per_s=4143 failures=0
+mix1 summary collectives rounds=2657 calls=52462 seconds=14.4 calls_per_s=3632 mib_per_s=40.4 failures=0
+mix2 summary mailbox rounds=10348 messages=165568 seconds=5.4 messages_per_s=30784 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=1110 updates=224416 seconds=9.4 updates_per_s=23763 failures=0
+mix1 summary waits rounds=11962 words=191392 seconds=10.1 words_per_s=19001 failures=0
+mix0 summary collectives rounds=1830 calls=36060 seconds=11.0 calls_per_s=3273 mib_per_s=36.1 failures=0
+mix1 summary mailbox rounds=6902 messages=110432 seconds=5.5 messages_per_s=20009 mib_per_s=2.6 failures=0
+mix2 summary atomics rounds=471 updates=94190 seconds=7.2 updates_per_s=13044 failures=0
+mix0 summary waits rounds=5770 words=92320 seconds=9.4 words_per_s=9858 failures=0
+mix3 summary rma rounds=1516 transfers=12128 seconds=9.6 transfers_per_s=1268 mib_per_s=116.8 failures=0
+world library nodes=4 bytes_sent=2039207480 gets_nonblocking=42624 landing_full=0 reserve_stalls=79421 wakes_sent=208541 barrier_ns=281487572759
+world library nodes=4 bytes_sent=252583056 gets_nonblocking=960 landing_full=0 reserve_stalls=6976 wakes_sent=935 barrier_ns=3083734364
+world library nodes=4 bytes_sent=2128916976 gets_nonblocking=6720 landing_full=825 reserve_stalls=45770 wakes_sent=6421 barrier_ns=23023026826
+world library nodes=4 bytes_sent=693625768 gets_nonblocking=1680 landing_full=164 reserve_stalls=13406 wakes_sent=1900 barrier_ns=6622037169
+world summary alltoall rounds=66 exchanges=1056 seconds=10.3 exchanges_per_s=103 failures=0
+mix1 summary atomics rounds=903 updates=181365 seconds=12.2 updates_per_s=14900 failures=0
+mix2 summary rma rounds=2340 transfers=18720 seconds=12.7 transfers_per_s=1479 mib_per_s=136.0 failures=0
+mix3 summary locks rounds=1864 acquisitions=29824 seconds=12.8 acquisitions_per_s=2338 failures=0
+mix0 summary mailbox rounds=16734 messages=267744 seconds=13.0 messages_per_s=20639 mib_per_s=2.7 failures=0
+mix3 summary collectives rounds=714 calls=13966 seconds=5.2 calls_per_s=2669 mib_per_s=29.7 failures=0
+mix1 summary rma rounds=1928 transfers=15424 seconds=7.8 transfers_per_s=1985 mib_per_s=183.1 failures=0
+mix0 summary atomics rounds=979 updates=198228 seconds=8.1 updates_per_s=24506 failures=0
+mix2 summary locks rounds=3900 acquisitions=62400 seconds=14.2 acquisitions_per_s=4404 failures=0
+mix2 summary collectives rounds=551 calls=11078 seconds=6.2 calls_per_s=1793 mib_per_s=20.8 failures=0
+mix1 summary locks rounds=1045 acquisitions=16720 seconds=7.9 acquisitions_per_s=2103 failures=0
+mix0 summary rma rounds=1695 transfers=13560 seconds=8.2 transfers_per_s=1654 mib_per_s=152.7 failures=0
+mix3 summary waits rounds=5396 words=86336 seconds=8.3 words_per_s=10426 failures=0
+world library nodes=4 bytes_sent=5065251800 gets_nonblocking=162184 landing_full=0 reserve_stalls=59168 wakes_sent=252012 barrier_ns=186037448053
+world library nodes=4 bytes_sent=403115904 gets_nonblocking=0 landing_full=0 reserve_stalls=2444 wakes_sent=1315 barrier_ns=4614982148
+world library nodes=4 bytes_sent=906991272 gets_nonblocking=0 landing_full=0 reserve_stalls=5277 wakes_sent=2796 barrier_ns=12818191002
+world library nodes=4 bytes_sent=453490512 gets_nonblocking=0 landing_full=0 reserve_stalls=2617 wakes_sent=1354 barrier_ns=3988770915
+world summary sort rounds=36 keys=301989888 seconds=9.8 keys_per_s=30666969 mib_per_s=234.0 imbalance=1.000 failures=0
+mix0 summary locks rounds=1951 acquisitions=31216 seconds=7.5 acquisitions_per_s=4138 failures=0
+mix3 summary mailbox rounds=35098 messages=561568 seconds=12.6 messages_per_s=44663 mib_per_s=5.8 failures=0
+mix2 summary waits rounds=23955 words=383280 seconds=14.2 words_per_s=26949 failures=0
+mix1 summary collectives rounds=2743 calls=53888 seconds=14.5 calls_per_s=3726 mib_per_s=40.9 failures=0
+mix3 summary atomics rounds=764 updates=153886 seconds=6.7 updates_per_s=22958 failures=0
+mix2 summary mailbox rounds=20032 messages=320512 seconds=10.1 messages_per_s=31675 mib_per_s=4.1 failures=0
+mix1 summary waits rounds=14044 words=224704 seconds=11.8 words_per_s=18989 failures=0
+mix0 summary collectives rounds=2256 calls=44364 seconds=13.7 calls_per_s=3246 mib_per_s=36.0 failures=0
+mix2 summary atomics rounds=491 updates=100085 seconds=7.3 updates_per_s=13620 failures=0
+mix3 summary rma rounds=1584 transfers=12672 seconds=9.8 transfers_per_s=1292 mib_per_s=118.8 failures=0
+mix1 summary mailbox rounds=10772 messages=172352 seconds=9.4 messages_per_s=18378 mib_per_s=2.4 failures=0
+mix0 summary waits rounds=7100 words=113600 seconds=11.4 words_per_s=10004 failures=0
+world library nodes=4 bytes_sent=2332864656 gets_nonblocking=42592 landing_full=0 reserve_stalls=117285 wakes_sent=309210 barrier_ns=269969959190
+world library nodes=4 bytes_sent=252611040 gets_nonblocking=960 landing_full=0 reserve_stalls=7999 wakes_sent=1014 barrier_ns=2904812774
+world library nodes=4 bytes_sent=2115054800 gets_nonblocking=6480 landing_full=828 reserve_stalls=45835 wakes_sent=6153 barrier_ns=24730032802
+world library nodes=4 bytes_sent=473082384 gets_nonblocking=1440 landing_full=165 reserve_stalls=9115 wakes_sent=1340 barrier_ns=4647168343
+world summary alltoall rounds=63 exchanges=1008 seconds=9.8 exchanges_per_s=103 failures=0
+mix1 summary atomics rounds=474 updates=96905 seconds=6.1 updates_per_s=15940 failures=0
+mix0 summary mailbox rounds=14218 messages=227488 seconds=10.7 messages_per_s=21260 mib_per_s=2.8 failures=0
+mix2 summary rma rounds=2177 transfers=17416 seconds=11.3 transfers_per_s=1547 mib_per_s=142.4 failures=0
+mix3 summary locks rounds=1774 acquisitions=28384 seconds=11.3 acquisitions_per_s=2503 failures=0
+mix2 summary locks rounds=1479 acquisitions=23664 seconds=7.1 acquisitions_per_s=3322 failures=0
+mix3 summary collectives rounds=1038 calls=20502 seconds=7.5 calls_per_s=2724 mib_per_s=30.2 failures=0
+mix1 summary rma rounds=2097 transfers=16776 seconds=8.5 transfers_per_s=1970 mib_per_s=181.0 failures=0
+mix0 summary atomics rounds=1464 updates=296025 seconds=11.0 updates_per_s=26969 failures=0
+mix0 summary rma rounds=1324 transfers=10592 seconds=6.4 transfers_per_s=1650 mib_per_s=151.8 failures=0
+mix3 summary waits rounds=4949 words=79184 seconds=6.9 words_per_s=11482 failures=0
+mix1 summary locks rounds=1893 acquisitions=30288 seconds=9.5 acquisitions_per_s=3193 failures=0
+mix2 summary collectives rounds=2224 calls=43566 seconds=14.1 calls_per_s=3084 mib_per_s=33.8 failures=0
+world library nodes=4 bytes_sent=5017008392 gets_nonblocking=151896 landing_full=0 reserve_stalls=51818 wakes_sent=237986 barrier_ns=232355652894
+world library nodes=4 bytes_sent=403079968 gets_nonblocking=0 landing_full=0 reserve_stalls=2461 wakes_sent=1105 barrier_ns=3067701616
+world library nodes=4 bytes_sent=1007734800 gets_nonblocking=0 landing_full=0 reserve_stalls=5812 wakes_sent=2938 barrier_ns=8512334278
+world library nodes=4 bytes_sent=554247840 gets_nonblocking=0 landing_full=0 reserve_stalls=3337 wakes_sent=1681 barrier_ns=4713362207
+world summary sort rounds=40 keys=335544320 seconds=10.1 keys_per_s=33228830 mib_per_s=253.5 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=21160 messages=338560 seconds=9.5 messages_per_s=35655 mib_per_s=4.6 failures=0
+mix2 summary waits rounds=14342 words=229472 seconds=10.6 words_per_s=21566 failures=0
+mix1 summary collectives rounds=1824 calls=35886 seconds=11.3 calls_per_s=3173 mib_per_s=35.2 failures=0
+mix0 summary locks rounds=3632 acquisitions=58112 seconds=13.9 acquisitions_per_s=4184 failures=0
+mix3 summary atomics rounds=635 updates=129153 seconds=5.6 updates_per_s=23145 failures=0
+mix0 summary collectives rounds=1532 calls=30258 seconds=9.6 calls_per_s=3164 mib_per_s=35.3 failures=0
+mix2 summary mailbox rounds=19596 messages=313536 seconds=9.7 messages_per_s=32469 mib_per_s=4.2 failures=0
+mix1 summary waits rounds=21357 words=341712 seconds=14.3 words_per_s=23840 failures=0
+mix0 summary waits rounds=3148 words=50368 seconds=4.7 words_per_s=10747 failures=0
+mix3 summary rma rounds=1439 transfers=11512 seconds=7.3 transfers_per_s=1575 mib_per_s=145.3 failures=0
+mix1 summary mailbox rounds=19839 messages=317424 seconds=9.1 messages_per_s=34880 mib_per_s=4.5 failures=0
+mix2 summary atomics rounds=2244 updates=455095 seconds=14.9 updates_per_s=30635 failures=0
+world library nodes=4 bytes_sent=2029627552 gets_nonblocking=38892 landing_full=0 reserve_stalls=115785 wakes_sent=370826 barrier_ns=336631384073
+world library nodes=4 bytes_sent=252645008 gets_nonblocking=1200 landing_full=162 reserve_stalls=9804 wakes_sent=932 barrier_ns=6097176646
+world library nodes=4 bytes_sent=1876287168 gets_nonblocking=5280 landing_full=660 reserve_stalls=42135 wakes_sent=5594 barrier_ns=22666319104
+world library nodes=4 bytes_sent=489212352 gets_nonblocking=1920 landing_full=165 reserve_stalls=10290 wakes_sent=1642 barrier_ns=5383358246
+world summary alltoall rounds=59 exchanges=944 seconds=9.2 exchanges_per_s=103 failures=0
+mix1 summary atomics rounds=490 updates=99585 seconds=6.4 updates_per_s=15513 failures=0
+mix2 summary rma rounds=1540 transfers=12320 seconds=8.3 transfers_per_s=1488 mib_per_s=137.0 failures=0
+mix0 summary mailbox rounds=10754 messages=172064 seconds=8.3 messages_per_s=20810 mib_per_s=2.7 failures=0
+mix3 summary locks rounds=3377 acquisitions=54032 seconds=14.5 acquisitions_per_s=3723 failures=0
+mix0 summary atomics rounds=959 updates=194090 seconds=8.6 updates_per_s=22655 failures=0
+mix2 summary locks rounds=2013 acquisitions=32208 seconds=9.7 acquisitions_per_s=3336 failures=0
+mix3 summary collectives rounds=1494 calls=29326 seconds=10.8 calls_per_s=2725 mib_per_s=29.9 failures=0
+mix1 summary rma rounds=2832 transfers=22656 seconds=11.6 transfers_per_s=1950 mib_per_s=179.7 failures=0
+mix1 summary locks rounds=1036 acquisitions=16576 seconds=8.0 acquisitions_per_s=2073 failures=0
+mix0 summary rma rounds=1953 transfers=15624 seconds=9.4 transfers_per_s=1663 mib_per_s=153.1 failures=0
+mix3 summary waits rounds=7519 words=120304 seconds=10.2 words_per_s=11751 failures=0
+mix2 summary collectives rounds=1246 calls=24704 seconds=11.1 calls_per_s=2221 mib_per_s=24.0 failures=0
+world library nodes=4 bytes_sent=5502747296 gets_nonblocking=174636 landing_full=0 reserve_stalls=53017 wakes_sent=254896 barrier_ns=228470047797
+world library nodes=4 bytes_sent=403054328 gets_nonblocking=0 landing_full=0 reserve_stalls=2372 wakes_sent=1190 barrier_ns=3678082879
+world library nodes=4 bytes_sent=957388000 gets_nonblocking=0 landing_full=0 reserve_stalls=5417 wakes_sent=2851 barrier_ns=10016813183
+world library nodes=4 bytes_sent=554222024 gets_nonblocking=0 landing_full=0 reserve_stalls=3142 wakes_sent=1605 barrier_ns=4267023270
+world summary sort rounds=39 keys=327155712 seconds=9.8 keys_per_s=33304092 mib_per_s=254.1 imbalance=1.000 failures=0
+mix1 summary collectives rounds=1042 calls=20528 seconds=6.6 calls_per_s=3109 mib_per_s=34.4 failures=0
+mix2 summary waits rounds=9414 words=150624 seconds=7.0 words_per_s=21459 failures=0
+mix3 summary mailbox rounds=32564 messages=521024 seconds=13.0 messages_per_s=39976 mib_per_s=5.2 failures=0
+mix0 summary locks rounds=3720 acquisitions=59520 seconds=13.6 acquisitions_per_s=4372 failures=0
+mix3 summary atomics rounds=1358 updates=273476 seconds=11.8 updates_per_s=23095 failures=0
+mix0 summary collectives rounds=2092 calls=41188 seconds=13.3 calls_per_s=3097 mib_per_s=34.2 failures=0
+mix1 summary waits rounds=15841 words=253456 seconds=13.4 words_per_s=18946 failures=0
+mix2 summary mailbox rounds=28200 messages=451200 seconds=13.7 messages_per_s=32860 mib_per_s=4.3 failures=0
+mix2 summary atomics rounds=779 updates=157662 seconds=11.2 updates_per_s=14040 failures=0
+mix1 summary mailbox rounds=14080 messages=225280 seconds=11.7 messages_per_s=19257 mib_per_s=2.5 failures=0
+mix3 summary rma rounds=2327 transfers=18616 seconds=14.3 transfers_per_s=1301 mib_per_s=119.6 failures=0
+mix0 summary waits rounds=9303 words=148848 seconds=14.4 words_per_s=10364 failures=0
+world library nodes=4 bytes_sent=2715650920 gets_nonblocking=64440 landing_full=0 reserve_stalls=139135 wakes_sent=328397 barrier_ns=240192595858
+world library nodes=4 bytes_sent=252584104 gets_nonblocking=960 landing_full=0 reserve_stalls=6878 wakes_sent=951 barrier_ns=3097424806
+world library nodes=4 bytes_sent=2128874344 gets_nonblocking=6720 landing_full=827 reserve_stalls=44032 wakes_sent=6377 barrier_ns=21487183778
+world library nodes=4 bytes_sent=693973288 gets_nonblocking=1680 landing_full=164 reserve_stalls=15443 wakes_sent=1970 barrier_ns=6881473633
+world summary alltoall rounds=67 exchanges=1072 seconds=10.1 exchanges_per_s=106 failures=0
+mix0 summary mailbox rounds=7182 messages=114912 seconds=5.6 messages_per_s=20425 mib_per_s=2.7 failures=0
+mix2 summary rma rounds=1181 transfers=9448 seconds=6.2 transfers_per_s=1528 mib_per_s=140.9 failures=0
+mix3 summary locks rounds=1226 acquisitions=19616 seconds=6.8 acquisitions_per_s=2868 failures=0
+mix1 summary atomics rounds=1924 updates=389101 seconds=13.2 updates_per_s=29402 failures=0
+mix3 summary collectives rounds=755 calls=14986 seconds=5.5 calls_per_s=2738 mib_per_s=30.5 failures=0
+mix0 summary atomics rounds=1063 updates=214936 seconds=9.0 updates_per_s=23817 failures=0
+mix2 summary locks rounds=2050 acquisitions=32800 seconds=9.6 acquisitions_per_s=3434 failures=0
+mix1 summary rma rounds=2515 transfers=20120 seconds=10.1 transfers_per_s=1986 mib_per_s=182.7 failures=0
+mix1 summary locks rounds=961 acquisitions=15376 seconds=7.4 acquisitions_per_s=2080 failures=0
+mix3 summary waits rounds=5309 words=84944 seconds=8.6 words_per_s=9856 failures=0
+mix2 summary collectives rounds=893 calls=17528 seconds=9.9 calls_per_s=1775 mib_per_s=20.6 failures=0
+mix0 summary rma rounds=2768 transfers=22144 seconds=12.9 transfers_per_s=1715 mib_per_s=157.7 failures=0
+world library nodes=4 bytes_sent=5467172016 gets_nonblocking=176788 landing_full=0 reserve_stalls=54050 wakes_sent=252148 barrier_ns=246791168168
+world library nodes=4 bytes_sent=403056784 gets_nonblocking=0 landing_full=0 reserve_stalls=2323 wakes_sent=1201 barrier_ns=4595109230
+world library nodes=4 bytes_sent=957322680 gets_nonblocking=0 landing_full=0 reserve_stalls=5705 wakes_sent=2954 barrier_ns=8366063592
+world library nodes=4 bytes_sent=554167792 gets_nonblocking=0 landing_full=0 reserve_stalls=3374 wakes_sent=1715 barrier_ns=5041935986
+world summary sort rounds=39 keys=327155712 seconds=10.1 keys_per_s=32437034 mib_per_s=247.5 imbalance=1.000 failures=0
+mix1 summary collectives rounds=992 calls=19768 seconds=6.3 calls_per_s=3162 mib_per_s=35.7 failures=0
+mix0 summary locks rounds=1754 acquisitions=28064 seconds=6.7 acquisitions_per_s=4212 failures=0
+mix2 summary waits rounds=10358 words=165728 seconds=7.1 words_per_s=23315 failures=0
+mix3 summary mailbox rounds=43024 messages=688384 seconds=13.1 messages_per_s=52617 mib_per_s=6.8 failures=0
+mix3 summary atomics rounds=793 updates=162008 seconds=6.9 updates_per_s=23452 failures=0
+mix0 summary collectives rounds=1812 calls=35688 seconds=11.4 calls_per_s=3143 mib_per_s=35.0 failures=0
+mix1 summary waits rounds=14001 words=224016 seconds=11.6 words_per_s=19289 failures=0
+mix2 summary mailbox rounds=26180 messages=418880 seconds=12.2 messages_per_s=34424 mib_per_s=4.5 failures=0
+mix2 summary atomics rounds=307 updates=61313 seconds=4.8 updates_per_s=12837 failures=0
+mix3 summary rma rounds=955 transfers=7640 seconds=5.7 transfers_per_s=1337 mib_per_s=123.6 failures=0
+mix0 summary waits rounds=6791 words=108656 seconds=10.0 words_per_s=10904 failures=0
+mix1 summary mailbox rounds=25556 messages=408896 seconds=12.8 messages_per_s=31949 mib_per_s=4.1 failures=0
+world library nodes=4 bytes_sent=1662310448 gets_nonblocking=27236 landing_full=0 reserve_stalls=93466 wakes_sent=527194 barrier_ns=296436766750
+world library nodes=4 bytes_sent=252584120 gets_nonblocking=1200 landing_full=164 reserve_stalls=6782 wakes_sent=948 barrier_ns=5634592662
+world library nodes=4 bytes_sent=1876711168 gets_nonblocking=5520 landing_full=664 reserve_stalls=40879 wakes_sent=5575 barrier_ns=19491601284
+world library nodes=4 bytes_sent=711482000 gets_nonblocking=2160 landing_full=167 reserve_stalls=16421 wakes_sent=2225 barrier_ns=7248515813
+world summary alltoall rounds=63 exchanges=1008 seconds=9.6 exchanges_per_s=105 failures=0
+mix0 summary mailbox rounds=8694 messages=139104 seconds=6.9 messages_per_s=20054 mib_per_s=2.6 failures=0
+mix2 summary rma rounds=1359 transfers=10872 seconds=7.2 transfers_per_s=1510 mib_per_s=138.9 failures=0
+mix1 summary atomics rounds=618 updates=125969 seconds=7.5 updates_per_s=16885 failures=0
+mix3 summary locks rounds=3213 acquisitions=51408 seconds=13.2 acquisitions_per_s=3887 failures=0
+mix1 summary rma rounds=1669 transfers=13352 seconds=6.9 transfers_per_s=1944 mib_per_s=178.8 failures=0
+mix0 summary atomics rounds=1113 updates=226028 seconds=8.6 updates_per_s=26337 failures=0
+mix3 summary collectives rounds=1513 calls=29726 seconds=9.4 calls_per_s=3155 mib_per_s=34.6 failures=0
+mix2 summary locks rounds=3532 acquisitions=56512 seconds=12.9 acquisitions_per_s=4379 failures=0
+mix3 summary waits rounds=3495 words=55920 seconds=5.5 words_per_s=10095 failures=0
+mix0 summary rma rounds=1482 transfers=11856 seconds=7.2 transfers_per_s=1649 mib_per_s=152.0 failures=0
+mix1 summary locks rounds=1150 acquisitions=18400 seconds=7.8 acquisitions_per_s=2366 failures=0
+mix2 summary collectives rounds=942 calls=18678 seconds=8.5 calls_per_s=2191 mib_per_s=24.5 failures=0
+world library nodes=4 bytes_sent=4060181296 gets_nonblocking=123356 landing_full=0 reserve_stalls=46480 wakes_sent=287510 barrier_ns=221408754642
+world library nodes=4 bytes_sent=403103608 gets_nonblocking=0 landing_full=0 reserve_stalls=2432 wakes_sent=1161 barrier_ns=6361813337
+world library nodes=4 bytes_sent=907035728 gets_nonblocking=0 landing_full=0 reserve_stalls=5463 wakes_sent=2842 barrier_ns=8845707800
+world library nodes=4 bytes_sent=554235920 gets_nonblocking=0 landing_full=0 reserve_stalls=3327 wakes_sent=1685 barrier_ns=5126659064
+world summary sort rounds=38 keys=318767104 seconds=10.0 keys_per_s=32023320 mib_per_s=244.3 imbalance=1.000 failures=0
+mix1 summary collectives rounds=1128 calls=22242 seconds=7.1 calls_per_s=3125 mib_per_s=34.6 failures=0
+mix3 summary mailbox rounds=19499 messages=311984 seconds=8.5 messages_per_s=36915 mib_per_s=4.8 failures=0
+mix2 summary waits rounds=15923 words=254768 seconds=11.3 words_per_s=22551 failures=0
+mix0 summary locks rounds=3844 acquisitions=61504 seconds=14.6 acquisitions_per_s=4224 failures=0
+mix0 summary collectives rounds=1233 calls=24266 seconds=7.9 calls_per_s=3090 mib_per_s=33.8 failures=0
+mix1 summary waits rounds=9501 words=152016 seconds=8.0 words_per_s=19105 failures=0
+mix3 summary atomics rounds=1019 updates=206588 seconds=8.4 updates_per_s=24630 failures=0
+mix2 summary mailbox rounds=37608 messages=601728 seconds=13.0 messages_per_s=46265 mib_per_s=6.0 failures=0
+mix1 summary mailbox rounds=9090 messages=145440 seconds=7.6 messages_per_s=19236 mib_per_s=2.5 failures=0
+mix2 summary atomics rounds=689 updates=140265 seconds=10.5 updates_per_s=13317 failures=0
+mix0 summary waits rounds=8235 words=131760 seconds=14.1 words_per_s=9356 failures=0
+mix3 summary rma rounds=2148 transfers=17184 seconds=14.4 transfers_per_s=1191 mib_per_s=109.7 failures=0
+world library nodes=4 bytes_sent=2424356664 gets_nonblocking=58924 landing_full=0 reserve_stalls=110608 wakes_sent=383220 barrier_ns=306184808566
+world library nodes=4 bytes_sent=252630928 gets_nonblocking=960 landing_full=0 reserve_stalls=9277 wakes_sent=980 barrier_ns=2849276964
+world library nodes=4 bytes_sent=2115019808 gets_nonblocking=6480 landing_full=823 reserve_stalls=44407 wakes_sent=6414 barrier_ns=21323116380
+world library nodes=4 bytes_sent=707794040 gets_nonblocking=1920 landing_full=165 reserve_stalls=13520 wakes_sent=2078 barrier_ns=7030413504
+world summary alltoall rounds=67 exchanges=1072 seconds=10.2 exchanges_per_s=105 failures=0
+mix2 summary rma rounds=1296 transfers=10368 seconds=6.8 transfers_per_s=1527 mib_per_s=140.5 failures=0
+mix1 summary atomics rounds=725 updates=146161 seconds=8.5 updates_per_s=17285 failures=0
+mix0 summary mailbox rounds=18773 messages=300368 seconds=11.6 messages_per_s=25899 mib_per_s=3.4 failures=0
+mix3 summary locks rounds=2220 acquisitions=35520 seconds=11.9 acquisitions_per_s=2981 failures=0
+mix3 summary collectives rounds=699 calls=13792 seconds=5.0 calls_per_s=2733 mib_per_s=30.0 failures=0
+mix0 summary atomics rounds=1017 updates=205102 seconds=8.7 updates_per_s=23454 failures=0
+mix2 summary locks rounds=1932 acquisitions=30912 seconds=9.1 acquisitions_per_s=3401 failures=0
+mix1 summary rma rounds=3463 transfers=27704 seconds=14.2 transfers_per_s=1955 mib_per_s=180.0 failures=0
+mix1 summary locks rounds=1177 acquisitions=18832 seconds=9.1 acquisitions_per_s=2080 failures=0
+mix0 summary rma rounds=1877 transfers=15016 seconds=9.1 transfers_per_s=1647 mib_per_s=151.6 failures=0
+mix2 summary collectives rounds=1005 calls=19574 seconds=9.9 calls_per_s=1980 mib_per_s=21.5 failures=0
+mix3 summary waits rounds=9678 words=154848 seconds=11.1 words_per_s=13960 failures=0
+world library nodes=4 bytes_sent=5631528000 gets_nonblocking=183096 landing_full=0 reserve_stalls=59167 wakes_sent=211548 barrier_ns=224385886303
+world library nodes=4 bytes_sent=403090832 gets_nonblocking=0 landing_full=0 reserve_stalls=2366 wakes_sent=1148 barrier_ns=2874479770
+world library nodes=4 bytes_sent=1007718736 gets_nonblocking=0 landing_full=0 reserve_stalls=5750 wakes_sent=3096 barrier_ns=9790011743
+world library nodes=4 bytes_sent=503938736 gets_nonblocking=0 landing_full=0 reserve_stalls=3056 wakes_sent=1589 barrier_ns=8496027383
+world summary sort rounds=39 keys=327155712 seconds=10.3 keys_per_s=31790445 mib_per_s=242.5 imbalance=1.000 failures=0
+mix0 summary locks rounds=3366 acquisitions=53856 seconds=13.0 acquisitions_per_s=4139 failures=0
+mix2 summary waits rounds=17899 words=286384 seconds=13.0 words_per_s=21990 failures=0
+mix1 summary collectives rounds=2298 calls=45102 seconds=13.8 calls_per_s=3280 mib_per_s=35.9 failures=0
+mix3 summary mailbox rounds=32195 messages=515120 seconds=13.6 messages_per_s=37763 mib_per_s=4.9 failures=0
+mix2 summary mailbox rounds=10117 messages=161872 seconds=5.2 messages_per_s=31129 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=1005 updates=203030 seconds=8.6 updates_per_s=23638 failures=0
+mix1 summary waits rounds=14085 words=225360 seconds=11.9 words_per_s=18925 failures=0
+mix0 summary collectives rounds=2323 calls=45818 seconds=13.8 calls_per_s=3319 mib_per_s=37.0 failures=0
+mix3 summary rma rounds=1921 transfers=15368 seconds=11.2 transfers_per_s=1376 mib_per_s=126.5 failures=0
+mix1 summary mailbox rounds=14284 messages=228544 seconds=11.6 messages_per_s=19728 mib_per_s=2.6 failures=0
+mix0 summary waits rounds=8448 words=135168 seconds=12.1 words_per_s=11217 failures=0
+mix2 summary atomics rounds=913 updates=184312 seconds=12.3 updates_per_s=14937 failures=0
+world library nodes=4 bytes_sent=2522996480 gets_nonblocking=51392 landing_full=0 reserve_stalls=129145 wakes_sent=272058 barrier_ns=240363127384
+world library nodes=4 bytes_sent=252568528 gets_nonblocking=1200 landing_full=166 reserve_stalls=6208 wakes_sent=881 barrier_ns=2914751263
+world library nodes=4 bytes_sent=2349307448 gets_nonblocking=6720 landing_full=825 reserve_stalls=48129 wakes_sent=6869 barrier_ns=27288193726
+world library nodes=4 bytes_sent=236960328 gets_nonblocking=720 landing_full=0 reserve_stalls=4371 wakes_sent=804 barrier_ns=2724858351
+world summary alltoall rounds=62 exchanges=992 seconds=9.6 exchanges_per_s=103 failures=0
+mix1 summary atomics rounds=830 updates=168093 seconds=10.9 updates_per_s=15488 failures=0
+mix3 summary locks rounds=1651 acquisitions=26416 seconds=11.2 acquisitions_per_s=2367 failures=0
+mix2 summary rma rounds=2415 transfers=19320 seconds=12.7 transfers_per_s=1519 mib_per_s=139.9 failures=0
+mix0 summary mailbox rounds=16127 messages=258032 seconds=12.5 messages_per_s=20590 mib_per_s=2.7 failures=0
+mix3 summary collectives rounds=945 calls=18514 seconds=6.9 calls_per_s=2673 mib_per_s=30.1 failures=0
+mix0 summary atomics rounds=1452 updates=293695 seconds=12.4 updates_per_s=23679 failures=0
+mix1 summary rma rounds=3324 transfers=26592 seconds=13.3 transfers_per_s=1994 mib_per_s=183.6 failures=0
+mix2 summary locks rounds=3070 acquisitions=49120 seconds=14.0 acquisitions_per_s=3516 failures=0
+mix2 summary collectives rounds=611 calls=12010 seconds=6.7 calls_per_s=1795 mib_per_s=19.8 failures=0
+mix1 summary locks rounds=1573 acquisitions=25168 seconds=11.9 acquisitions_per_s=2123 failures=0
+mix0 summary rma rounds=2557 transfers=20456 seconds=12.1 transfers_per_s=1692 mib_per_s=155.7 failures=0
+mix3 summary waits rounds=8072 words=129152 seconds=12.2 words_per_s=10559 failures=0
+world library nodes=4 bytes_sent=6914704928 gets_nonblocking=226428 landing_full=0 reserve_stalls=69003 wakes_sent=237949 barrier_ns=176429343569
+world library nodes=4 bytes_sent=403094592 gets_nonblocking=0 landing_full=0 reserve_stalls=2369 wakes_sent=1132 barrier_ns=3608462003
+world library nodes=4 bytes_sent=1007718376 gets_nonblocking=0 landing_full=0 reserve_stalls=5677 wakes_sent=3067 barrier_ns=11216367866
+world library nodes=4 bytes_sent=503864904 gets_nonblocking=0 landing_full=0 reserve_stalls=2995 wakes_sent=1552 barrier_ns=7409826508
+world summary sort rounds=39 keys=327155712 seconds=10.1 keys_per_s=32395799 mib_per_s=247.2 imbalance=1.001 failures=0
+mix3 summary mailbox rounds=16463 messages=263408 seconds=7.3 messages_per_s=36246 mib_per_s=4.7 failures=0
+mix1 summary collectives rounds=1478 calls=29102 seconds=9.1 calls_per_s=3202 mib_per_s=35.4 failures=0
+mix0 summary locks rounds=3817 acquisitions=61072 seconds=14.3 acquisitions_per_s=4267 failures=0
+mix2 summary waits rounds=21888 words=350208 seconds=14.8 words_per_s=23731 failures=0
+mix2 summary mailbox rounds=23631 messages=378096 seconds=12.2 messages_per_s=31097 mib_per_s=4.0 failures=0
+mix3 summary atomics rounds=1504 updates=304420 seconds=13.1 updates_per_s=23307 failures=0
+mix1 summary waits rounds=15544 words=248704 seconds=13.2 words_per_s=18863 failures=0
+mix0 summary collectives rounds=2211 calls=43448 seconds=13.9 calls_per_s=3121 mib_per_s=34.3 failures=0
+mix3 summary rma rounds=1311 transfers=10488 seconds=7.6 transfers_per_s=1378 mib_per_s=126.7 failures=0
+mix1 summary mailbox rounds=9445 messages=151120 seconds=7.7 messages_per_s=19618 mib_per_s=2.6 failures=0
+mix2 summary atomics rounds=659 updates=132884 seconds=10.0 updates_per_s=13257 failures=0
+mix0 summary waits rounds=9291 words=148656 seconds=15.9 words_per_s=9323 failures=0
+world library nodes=4 bytes_sent=1907520520 gets_nonblocking=36736 landing_full=0 reserve_stalls=125542 wakes_sent=254415 barrier_ns=314460076504
+world library nodes=4 bytes_sent=252577216 gets_nonblocking=1200 landing_full=161 reserve_stalls=6444 wakes_sent=842 barrier_ns=2960137282
+world library nodes=4 bytes_sent=2349268424 gets_nonblocking=6720 landing_full=826 reserve_stalls=45819 wakes_sent=6842 barrier_ns=23286113984
+world library nodes=4 bytes_sent=252702408 gets_nonblocking=960 landing_full=0 reserve_stalls=7304 wakes_sent=1050 barrier_ns=3150553293
+world summary alltoall rounds=64 exchanges=1024 seconds=9.5 exchanges_per_s=108 failures=0
+mix1 summary atomics rounds=944 updates=191020 seconds=12.7 updates_per_s=15099 failures=0
+mix0 summary mailbox rounds=16688 messages=267008 seconds=13.3 messages_per_s=20114 mib_per_s=2.6 failures=0
+mix3 summary locks rounds=2103 acquisitions=33648 seconds=14.0 acquisitions_per_s=2398 failures=0
+mix2 summary rma rounds=2737 transfers=21896 seconds=14.4 transfers_per_s=1520 mib_per_s=139.9 failures=0
+mix2 summary locks rounds=2003 acquisitions=32048 seconds=9.7 acquisitions_per_s=3317 failures=0
+mix1 summary rma rounds=2565 transfers=20520 seconds=10.5 transfers_per_s=1957 mib_per_s=180.0 failures=0
+mix0 summary atomics rounds=1210 updates=245307 seconds=10.7 updates_per_s=23021 failures=0
+mix3 summary collectives rounds=1611 calls=31860 seconds=11.4 calls_per_s=2805 mib_per_s=31.3 failures=0
+mix3 summary waits rounds=3757 words=60112 seconds=6.1 words_per_s=9931 failures=0
+mix0 summary rma rounds=1411 transfers=11288 seconds=6.8 transfers_per_s=1657 mib_per_s=152.8 failures=0
+mix1 summary locks rounds=1993 acquisitions=31888 seconds=10.0 acquisitions_per_s=3187 failures=0
+mix2 summary collectives rounds=1635 calls=32284 seconds=11.5 calls_per_s=2810 mib_per_s=31.0 failures=0
+world library nodes=4 bytes_sent=5916841552 gets_nonblocking=184420 landing_full=0 reserve_stalls=68853 wakes_sent=243360 barrier_ns=170110575845
+world library nodes=4 bytes_sent=403124792 gets_nonblocking=0 landing_full=0 reserve_stalls=2520 wakes_sent=1118 barrier_ns=3397978252
+world library nodes=4 bytes_sent=1007773696 gets_nonblocking=0 landing_full=0 reserve_stalls=5901 wakes_sent=3027 barrier_ns=10011386227
+world library nodes=4 bytes_sent=503875776 gets_nonblocking=0 landing_full=0 reserve_stalls=2850 wakes_sent=1495 barrier_ns=4656707958
+world summary sort rounds=39 keys=327155712 seconds=9.9 keys_per_s=33062601 mib_per_s=252.2 imbalance=1.000 failures=0
+mix0 summary locks rounds=1507 acquisitions=24112 seconds=5.8 acquisitions_per_s=4149 failures=0
+mix1 summary collectives rounds=1312 calls=25828 seconds=7.5 calls_per_s=3424 mib_per_s=38.1 failures=0
+mix2 summary waits rounds=19216 words=307456 seconds=10.8 words_per_s=28432 failures=0
+mix3 summary mailbox rounds=43807 messages=700912 seconds=13.3 messages_per_s=52560 mib_per_s=6.8 failures=0
+mix3 summary atomics rounds=1094 updates=221991 seconds=9.4 updates_per_s=23558 failures=0
+mix1 summary waits rounds=11346 words=181536 seconds=9.6 words_per_s=18973 failures=0
+mix0 summary collectives rounds=1776 calls=35034 seconds=11.1 calls_per_s=3158 mib_per_s=34.2 failures=0
+mix2 summary mailbox rounds=27303 messages=436848 seconds=12.2 messages_per_s=35680 mib_per_s=4.6 failures=0
+mix2 summary atomics rounds=354 updates=71695 seconds=5.1 updates_per_s=14001 failures=0
+mix0 summary waits rounds=4627 words=74032 seconds=6.7 words_per_s=11040 failures=0
+mix3 summary rma rounds=1710 transfers=13680 seconds=8.9 transfers_per_s=1543 mib_per_s=142.4 failures=0
+mix1 summary mailbox rounds=17650 messages=282400 seconds=9.5 messages_per_s=29596 mib_per_s=3.8 failures=0
+world library nodes=4 bytes_sent=2262695872 gets_nonblocking=47896 landing_full=0 reserve_stalls=110640 wakes_sent=477455 barrier_ns=249526197002
+world library nodes=4 bytes_sent=252579864 gets_nonblocking=1200 landing_full=165 reserve_stalls=6877 wakes_sent=940 barrier_ns=2914410745
+world library nodes=4 bytes_sent=2128937304 gets_nonblocking=6240 landing_full=654 reserve_stalls=46511 wakes_sent=6504 barrier_ns=22587636001
+world library nodes=4 bytes_sent=693957960 gets_nonblocking=2160 landing_full=331 reserve_stalls=15546 wakes_sent=1970 barrier_ns=10206917248
+world summary alltoall rounds=67 exchanges=1072 seconds=10.4 exchanges_per_s=103 failures=0
+mix3 summary locks rounds=1343 acquisitions=21488 seconds=9.0 acquisitions_per_s=2397 failures=0
+mix2 summary rma rounds=1812 transfers=14496 seconds=9.7 transfers_per_s=1490 mib_per_s=137.3 failures=0
+mix1 summary atomics rounds=848 updates=172023 seconds=10.6 updates_per_s=16210 failures=0
+mix0 summary mailbox rounds=16701 messages=267216 seconds=11.6 messages_per_s=22988 mib_per_s=3.0 failures=0
+mix3 summary collectives rounds=791 calls=15568 seconds=5.7 calls_per_s=2716 mib_per_s=29.7 failures=0
+mix1 summary rma rounds=1996 transfers=15968 seconds=8.1 transfers_per_s=1978 mib_per_s=182.5 failures=0
+mix0 summary atomics rounds=1048 updates=211728 seconds=8.6 updates_per_s=24644 failures=0
+mix2 summary locks rounds=2101 acquisitions=33616 seconds=9.2 acquisitions_per_s=3664 failures=0
+mix3 summary waits rounds=3272 words=52352 seconds=5.2 words_per_s=10053 failures=0
+mix0 summary rma rounds=1252 transfers=10016 seconds=6.1 transfers_per_s=1654 mib_per_s=152.4 failures=0
+mix1 summary locks rounds=2032 acquisitions=32512 seconds=9.6 acquisitions_per_s=3388 failures=0
+mix2 summary collectives rounds=1868 calls=36792 seconds=12.2 calls_per_s=3021 mib_per_s=33.0 failures=0
+world library nodes=4 bytes_sent=4533444856 gets_nonblocking=137868 landing_full=0 reserve_stalls=52202 wakes_sent=234179 barrier_ns=185959912335
+world library nodes=4 bytes_sent=403105016 gets_nonblocking=0 landing_full=0 reserve_stalls=2341 wakes_sent=1256 barrier_ns=3346654023
+world library nodes=4 bytes_sent=957421680 gets_nonblocking=0 landing_full=0 reserve_stalls=5673 wakes_sent=2906 barrier_ns=8669080339
+world library nodes=4 bytes_sent=554305336 gets_nonblocking=0 landing_full=0 reserve_stalls=3382 wakes_sent=1800 barrier_ns=5440131590
+world summary sort rounds=39 keys=327155712 seconds=10.0 keys_per_s=32762659 mib_per_s=250.0 imbalance=1.000 failures=0
+mix3 summary mailbox rounds=16297 messages=260752 seconds=7.4 messages_per_s=35373 mib_per_s=4.6 failures=0
+mix1 summary collectives rounds=1708 calls=33672 seconds=10.7 calls_per_s=3150 mib_per_s=35.1 failures=0
+mix0 summary locks rounds=2849 acquisitions=45584 seconds=11.1 acquisitions_per_s=4089 failures=0
+mix2 summary waits rounds=20099 words=321584 seconds=13.5 words_per_s=23764 failures=0
+mix2 summary mailbox rounds=10787 messages=172592 seconds=5.6 messages_per_s=31048 mib_per_s=4.0 failures=0
+mix1 summary waits rounds=11224 words=179584 seconds=9.5 words_per_s=18824 failures=0
+mix3 summary atomics rounds=1275 updates=257891 seconds=10.8 updates_per_s=23802 failures=0
+mix0 summary collectives rounds=2382 calls=46848 seconds=14.1 calls_per_s=3318 mib_per_s=37.2 failures=0
+mix3 summary rma rounds=1580 transfers=12640 seconds=9.0 transfers_per_s=1402 mib_per_s=128.7 failures=0
+mix0 summary waits rounds=8179 words=130864 seconds=11.0 words_per_s=11937 failures=0
+mix1 summary mailbox rounds=14542 messages=232672 seconds=10.7 messages_per_s=21667 mib_per_s=2.8 failures=0
+mix2 summary atomics rounds=931 updates=188402 seconds=11.5 updates_per_s=16395 failures=0
+world library nodes=4 bytes_sent=2127151072 gets_nonblocking=43240 landing_full=0 reserve_stalls=105351 wakes_sent=238007 barrier_ns=274671434665
+world library nodes=4 bytes_sent=252612680 gets_nonblocking=960 landing_full=0 reserve_stalls=8039 wakes_sent=926 barrier_ns=2985613264
+world library nodes=4 bytes_sent=2128946360 gets_nonblocking=6720 landing_full=831 reserve_stalls=47851 wakes_sent=6408 barrier_ns=22022903559
+world library nodes=4 bytes_sent=693922888 gets_nonblocking=1680 landing_full=165 reserve_stalls=13224 wakes_sent=2034 barrier_ns=6677223241
+world summary alltoall rounds=67 exchanges=1072 seconds=10.2 exchanges_per_s=105 failures=0
+mix2 summary rma rounds=954 transfers=7632 seconds=5.1 transfers_per_s=1485 mib_per_s=136.5 failures=0
+mix0 summary mailbox rounds=7083 messages=113328 seconds=5.5 messages_per_s=20782 mib_per_s=2.7 failures=0
+mix3 summary locks rounds=1219 acquisitions=19504 seconds=6.5 acquisitions_per_s=2983 failures=0
+mix1 summary atomics rounds=1924 updates=388604 seconds=12.9 updates_per_s=30167 failures=0
+mix0 summary atomics rounds=710 updates=143642 seconds=6.3 updates_per_s=22884 failures=0
+mix1 summary rma rounds=2237 transfers=17896 seconds=9.1 transfers_per_s=1961 mib_per_s=180.2 failures=0
+mix3 summary collectives rounds=1725 calls=34026 seconds=11.2 calls_per_s=3035 mib_per_s=33.8 failures=0
+mix2 summary locks rounds=3544 acquisitions=56704 seconds=13.8 acquisitions_per_s=4105 failures=0
+mix0 summary rma rounds=1071 transfers=8568 seconds=5.2 transfers_per_s=1637 mib_per_s=150.7 failures=0
+mix3 summary waits rounds=5969 words=95504 seconds=6.5 words_per_s=14597 failures=0
+mix1 summary locks rounds=2103 acquisitions=33648 seconds=9.3 acquisitions_per_s=3625 failures=0
+mix2 summary collectives rounds=2425 calls=47646 seconds=14.4 calls_per_s=3319 mib_per_s=36.9 failures=0
+world library nodes=4 bytes_sent=4116698800 gets_nonblocking=116732 landing_full=0 reserve_stalls=50838 wakes_sent=354456 barrier_ns=321789378978
+world library nodes=4 bytes_sent=403080032 gets_nonblocking=0 landing_full=0 reserve_stalls=2278 wakes_sent=1157 barrier_ns=2677529265
+world library nodes=4 bytes_sent=1058122056 gets_nonblocking=0 landing_full=0 reserve_stalls=6067 wakes_sent=3158 barrier_ns=9540371027
+world library nodes=4 bytes_sent=554233120 gets_nonblocking=0 landing_full=0 reserve_stalls=3326 wakes_sent=1649 barrier_ns=5649207180
+world summary sort rounds=41 keys=343932928 seconds=10.3 keys_per_s=33527432 mib_per_s=255.8 imbalance=1.000 failures=0
+mix1 summary collectives rounds=1263 calls=24706 seconds=7.8 calls_per_s=3169 mib_per_s=34.5 failures=0
+mix0 summary locks rounds=2495 acquisitions=39920 seconds=9.7 acquisitions_per_s=4128 failures=0
+mix2 summary waits rounds=16632 words=266112 seconds=11.1 words_per_s=23993 failures=0
+mix3 summary mailbox rounds=35276 messages=564416 seconds=12.7 messages_per_s=44333 mib_per_s=5.7 failures=0
+mix3 summary atomics rounds=586 updates=119129 seconds=5.2 updates_per_s=22988 failures=0
+mix1 summary waits rounds=6702 words=107232 seconds=5.7 words_per_s=18741 failures=0
+mix0 summary collectives rounds=1018 calls=20162 seconds=6.4 calls_per_s=3132 mib_per_s=34.5 failures=0
+mix2 summary mailbox rounds=24631 messages=394096 seconds=9.1 messages_per_s=43110 mib_per_s=5.6 failures=0
+mix3 summary rma rounds=1338 transfers=10704 seconds=7.7 transfers_per_s=1393 mib_per_s=128.3 failures=0
+mix1 summary mailbox rounds=15208 messages=243328 seconds=10.9 messages_per_s=22293 mib_per_s=2.9 failures=0
+mix2 summary atomics rounds=1070 updates=216921 seconds=14.5 updates_per_s=14956 failures=0
+mix0 summary waits rounds=11221 words=179536 seconds=15.8 words_per_s=11340 failures=0
+world library nodes=4 bytes_sent=1807978992 gets_nonblocking=35088 landing_full=0 reserve_stalls=108469 wakes_sent=379254 barrier_ns=256281363223
+world library nodes=4 bytes_sent=252628000 gets_nonblocking=1200 landing_full=165 reserve_stalls=9356 wakes_sent=915 barrier_ns=4626298469
+world library nodes=4 bytes_sent=1876217720 gets_nonblocking=5280 landing_full=659 reserve_stalls=38061 wakes_sent=5452 barrier_ns=19177230369
+world library nodes=4 bytes_sent=709640936 gets_nonblocking=1920 landing_full=167 reserve_stalls=14916 wakes_sent=2190 barrier_ns=7111706517
+world summary alltoall rounds=60 exchanges=960 seconds=9.7 exchanges_per_s=99 failures=0
+mix2 summary rma rounds=1106 transfers=8848 seconds=6.2 transfers_per_s=1435 mib_per_s=132.1 failures=0
+mix1 summary atomics rounds=630 updates=128499 seconds=7.8 updates_per_s=16536 failures=0
+mix0 summary mailbox rounds=10098 messages=161568 seconds=7.6 messages_per_s=21254 mib_per_s=2.8 failures=0
+mix3 summary locks rounds=1667 acquisitions=26672 seconds=9.0 acquisitions_per_s=2956 failures=0
+mix3 summary collectives rounds=788 calls=15462 seconds=5.7 calls_per_s=2728 mib_per_s=30.1 failures=0
+mix0 summary atomics rounds=1234 updates=250608 seconds=10.4 updates_per_s=24092 failures=0
+mix2 summary locks rounds=3084 acquisitions=49344 seconds=14.2 acquisitions_per_s=3466 failures=0
+mix1 summary rma rounds=3701 transfers=29608 seconds=14.8 transfers_per_s=1999 mib_per_s=184.1 failures=0
+mix2 summary collectives rounds=584 calls=11586 seconds=6.6 calls_per_s=1765 mib_per_s=19.8 failures=0
+mix1 summary locks rounds=1739 acquisitions=27824 seconds=13.0 acquisitions_per_s=2141 failures=0
+mix0 summary rma rounds=2814 transfers=22512 seconds=13.3 transfers_per_s=1691 mib_per_s=155.7 failures=0
+mix3 summary waits rounds=8722 words=139552 seconds=13.3 words_per_s=10464 failures=0
+world library nodes=4 bytes_sent=6332751264 gets_nonblocking=207716 landing_full=0 reserve_stalls=59099 wakes_sent=243043 barrier_ns=199202048107
+world library nodes=4 bytes_sent=403069824 gets_nonblocking=0 landing_full=0 reserve_stalls=2348 wakes_sent=1140 barrier_ns=2820819583
+world library nodes=4 bytes_sent=1007721344 gets_nonblocking=0 landing_full=0 reserve_stalls=5899 wakes_sent=3086 barrier_ns=9340461249
+world library nodes=4 bytes_sent=554243328 gets_nonblocking=0 landing_full=0 reserve_stalls=3246 wakes_sent=1607 barrier_ns=4479078592
+world summary sort rounds=40 keys=335544320 seconds=10.0 keys_per_s=33521885 mib_per_s=255.8 imbalance=1.000 failures=0
+osoe-pacer failures=0 seconds=3603.5

@@ -997,8 +997,8 @@ static uint64_t own_slot(const struct pieces *pieces, const struct lanes *lanes,
  * Whether every child has sent piece `number` up: each child position's
  * arrival counter shows it, at least - a child may be up to D pieces ahead,
  * and the counter holds the team's whole life, so it is compared with the
- * position's base plus the piece. The loads are acquire (transport.h), so the
- * bytes a child put before its fenced add are there to read.
+ * position's base plus the piece. The loads are seq_cst (transport.h), and so
+ * acquire: the bytes a child put before its fenced add are there to read.
  */
 static bool children_sent(const struct generic_team *team_phase, const struct pieces *pieces,
                           const struct lead_tree *tree, uint64_t number)
@@ -1049,7 +1049,7 @@ static void cleared(unsigned char *read, size_t bytes)
 
 /*
  * The parent's grant, once grant_in says it is in: its words, put before the
- * add the acquire load saw, name the parent's lane, and must name this
+ * add the seq_cst load saw, name the parent's lane, and must name this
  * collective - its epoch, its identity and its bytes - or the job ends naming
  * both leads, a hop before a piece's header would.
  */
@@ -1490,8 +1490,8 @@ static bool round_may_send(const struct round_flight *f)
 }
 
 /* Whether piece `taken` is in: the row's arrival counter against its base, as
- * at least. The load is acquire (transport.h), so the bytes its sender put
- * before its fenced add are there to read. */
+ * at least. The load is seq_cst (transport.h), and so acquire: the bytes its
+ * sender put before its fenced add are there to read. */
 static bool round_may_take(const struct round_flight *f)
 {
     return f->taken < f->receives &&
@@ -1604,7 +1604,7 @@ static void round_take(struct round_flight *f, uint32_t own, uint32_t *sender_la
 /*
  * This lead's reduce-scatter grants, once its grant counter shows every one
  * of them (the file's comment): each round's field, put by that round's
- * receiver before the add the acquire load saw, must name this reduction - its
+ * receiver before the add the seq_cst load saw, must name this reduction - its
  * epoch, its identity and its bytes - and the lane the receiver lends, or the
  * job ends naming that receiver, a hop before a piece's header would. Read,
  * then cleared.
@@ -2547,8 +2547,8 @@ static uint64_t scan_own_slot(const struct scan_flight *f, uint32_t position, ui
 }
 
 /* Whether row `position`'s counter shows piece `piece` of the team's scans,
- * numbered from 0 over the team's life. The load is acquire (transport.h), so
- * the bytes put before the fenced add are there to read. */
+ * numbered from 0 over the team's life. The load is seq_cst (transport.h), and
+ * so acquire: the bytes put before the fenced add are there to read. */
 static bool scan_arrived(uint32_t number, uint32_t position, uint64_t piece)
 {
     return osoe_transport_load(OSOE_REGION_INTERNAL, scan_counter_of_number(number, position), 8) >=

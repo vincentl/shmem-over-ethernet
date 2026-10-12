@@ -66,9 +66,9 @@ enum osoe_blocked_detail {
     OSOE_BLOCKED_DETAIL_TURNOVER,         /* a writer with no room: the buffer turnover */
     OSOE_BLOCKED_DETAIL_CREDIT,           /* a get or fetching AMO: a reply credit */
     OSOE_BLOCKED_DETAIL_REPLY,            /* the reply itself, on the PE's landing slot */
-    /* Layout 16: a wait for the PE's own nonblocking gets, the detail being
-     * the bytes of them still in flight when it began - not a connection's
-     * word, so not counted among them. */
+    /* Layout 16: a wait for the context's own nonblocking gets (the PE's
+     * until layout 21), the detail being the bytes of them still in flight
+     * when it began - not a connection's word, so not counted among them. */
     OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
     /* Layout 17: a point-to-point wait on the program's statics (§4.3), the
      * detail being the offset into them, as OSOE_BLOCKED_DETAIL_OFFSET's is

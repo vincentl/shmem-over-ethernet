@@ -1,0 +1,72 @@
+info kernel 6.18.50+rpt-rpi-2712 aarch64, page size 16384
+info full build: liburing 2.9
+info locked-memory limit (ulimit -l): 8192 KiB
+info kernel 6.18.50+rpt-rpi-2712 aarch64, page size 16384
+info full build: liburing 2.9
+info locked-memory limit (ulimit -l): 8192 KiB
+info kernel 6.18.50+rpt-rpi-2712 aarch64, page size 16384
+info full build: liburing 2.9
+info locked-memory limit (ulimit -l): 8192 KiB
+info kernel 6.18.50+rpt-rpi-2712 aarch64, page size 16384
+info full build: liburing 2.9
+info locked-memory limit (ulimit -l): 8192 KiB
+ok   futex_wait, named shm, woken by other process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error)
+ok   futex_wait, named shm, woken by other process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error)
+ok   futex_wait, named shm, woken by other process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error)
+ok   futex_wait, named shm, woken by other process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error)
+ok   unlinked shm object reopened via /proc       child_exit=0 (3: open /proc/<pid>/fd, 4: map or read, 5: not live)
+ok   futex2 U32 wait (value mismatch)             r=-1 errno=Resource temporarily unavailable
+info futex2 U64 wait                              r=-1 errno=Invalid argument -> U64 NOT implemented (design 4.9 must change)
+ok   unlinked shm object reopened via /proc       child_exit=0 (3: open /proc/<pid>/fd, 4: map or read, 5: not live)
+ok   futex2 U32 wait (value mismatch)             r=-1 errno=Resource temporarily unavailable
+info futex2 U64 wait                              r=-1 errno=Invalid argument -> U64 NOT implemented (design 4.9 must change)
+ok   unlinked shm object reopened via /proc       child_exit=0 (3: open /proc/<pid>/fd, 4: map or read, 5: not live)
+ok   futex2 U32 wait (value mismatch)             r=-1 errno=Resource temporarily unavailable
+info futex2 U64 wait                              r=-1 errno=Invalid argument -> U64 NOT implemented (design 4.9 must change)
+ok   unlinked shm object reopened via /proc       child_exit=0 (3: open /proc/<pid>/fd, 4: map or read, 5: not live)
+ok   futex2 U32 wait (value mismatch)             r=-1 errno=Resource temporarily unavailable
+info futex2 U64 wait                              r=-1 errno=Invalid argument -> U64 NOT implemented (design 4.9 must change)
+ok   uring futex_wait, named shm, woken by process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error, 5: ring)
+ok   SINGLE_ISSUER + CQSIZE                       r=0 sq=64 cq=4096
+ok   opcode FUTEX_WAIT                            
+ok   opcode RECV                                  
+ok   uring futex_wait stale value -> -EAGAIN      res=-11
+ok   shmem_init's io_uring check                  
+ok   register provided buffer ring                ret=0
+ok   TCP_NODELAY                                  
+ok   uring futex_wait, named shm, woken by process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error, 5: ring)
+ok   SINGLE_ISSUER + CQSIZE                       r=0 sq=64 cq=4096
+ok   opcode FUTEX_WAIT                            
+ok   opcode RECV                                  
+ok   uring futex_wait stale value -> -EAGAIN      res=-11
+ok   shmem_init's io_uring check                  
+ok   register provided buffer ring                ret=0
+ok   TCP_NODELAY                                  
+ok   uring futex_wait, named shm, woken by process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error, 5: ring)
+ok   SINGLE_ISSUER + CQSIZE                       r=0 sq=64 cq=4096
+ok   opcode FUTEX_WAIT                            
+ok   opcode RECV                                  
+ok   uring futex_wait stale value -> -EAGAIN      res=-11
+ok   shmem_init's io_uring check                  
+ok   register provided buffer ring                ret=0
+ok   TCP_NODELAY                                  
+ok   uring futex_wait, named shm, woken by process woke=1 child_exit=0 (2: never woken, 3: open by name, 4: wait error, 5: ring)
+ok   SINGLE_ISSUER + CQSIZE                       r=0 sq=64 cq=4096
+ok   opcode FUTEX_WAIT                            
+ok   opcode RECV                                  
+ok   uring futex_wait stale value -> -EAGAIN      res=-11
+ok   shmem_init's io_uring check                  
+ok   register provided buffer ring                ret=0
+ok   TCP_NODELAY                                  
+ok   multishot recv: one CQE per provided buffer  data=8 with_F_MORE=8 buffers=8
+ok   buffer ring exhaustion -> one terminal -ENOBUFS cqes=9 last=-105
+PROBE PASSED (0 failures)
+ok   multishot recv: one CQE per provided buffer  data=8 with_F_MORE=8 buffers=8
+ok   buffer ring exhaustion -> one terminal -ENOBUFS cqes=9 last=-105
+PROBE PASSED (0 failures)
+ok   multishot recv: one CQE per provided buffer  data=8 with_F_MORE=8 buffers=8
+ok   buffer ring exhaustion -> one terminal -ENOBUFS cqes=9 last=-105
+PROBE PASSED (0 failures)
+ok   multishot recv: one CQE per provided buffer  data=8 with_F_MORE=8 buffers=8
+ok   buffer ring exhaustion -> one terminal -ENOBUFS cqes=9 last=-105
+PROBE PASSED (0 failures)
