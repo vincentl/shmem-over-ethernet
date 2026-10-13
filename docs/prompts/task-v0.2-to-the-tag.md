@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 143 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 137 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
@@ -79,14 +79,15 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
    - **`collect`'s places three ways** (A11): each node's total (P29), batched
      with `collectives.c`'s other items (P23, P24); then the scan, modelled
      first, and the crossover (P30, P31), a slice of their own since the
-     allgather's steps change; their measurement in the VM (H24) once both
+     allgather's steps change; a direct exchange of the totals beside them (P33, the
+     author's 2026-10-13); their measurement in the VM (H24) once all
      are in, and on the cluster (H25) in a Part 4 session;
    - **the protocols' smaller items** (P5 to P28), a slice each where a layout
      or the wire changes (P14, P15, D26), batched otherwise;
    - **diagnostics** (D1 to D30), batched by file - `osoe-stat`, `fatal.c` and
      `abort.c`, start-up's messages, settings;
    - **tests** (T14 to T44 but those that need GC);
-   - **build and tools** (B10, B11);
+   - **build and tools** (B10, B11, B14 - the kit's sections Part 4's later items need);
    - the author's answers below decide A7 to A14's items.
 2. **The cluster's first session**: the kit's shake-down (H1 to H3), then the
    first native x86-64 runs - the presets at 0, 2 and 3 helpers, tier 3, the
