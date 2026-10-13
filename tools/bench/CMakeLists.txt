@@ -28,6 +28,27 @@ if(OSOE_INTERNODE)
     set_tests_properties(tools.bench.threads.0-1 PROPERTIES LABELS "tier2" TIMEOUT 180
       PASS_REGULAR_EXPRESSION "threads n=4 target=1 ops=16000 ops_per_s="
       FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
-    osoe_internode_label(tools.bench.0-0-1-1 tools.bench.threads.0-1)
+    # The places line, which runs only when named: collect's places by the way
+    # the default takes (H24; P31).
+    add_test(NAME tools.bench.places.0-0-1-1
+      COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 120 -- $<TARGET_FILE:osoe-bench> places quick)
+    set_tests_properties(tools.bench.places.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 180
+      PASS_REGULAR_EXPRESSION "places way=link lengths=large pes=4 bytes=65560 median_us="
+      FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
+    osoe_internode_label(tools.bench.0-0-1-1 tools.bench.threads.0-1 tools.bench.places.0-0-1-1)
+    # H24's harness, collect-places.sh, once on two logical nodes: every way and
+    # the default, and the summary naming the link the default's job measured
+    # and the way the model takes on it, from shape_timing.py.
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+      add_test(NAME tools.bench.collect-places.2
+        COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/collect-places.sh ${CMAKE_BINARY_DIR}
+                ${CMAKE_CURRENT_BINARY_DIR}/collect-places 2)
+      set_tests_properties(tools.bench.collect-places.2 PROPERTIES LABELS "tier2" TIMEOUT 300
+        PASS_REGULAR_EXPRESSION
+        "2 round 1: a hop of [0-9]+ ns, a message cost of [0-9]+ ns, [0-9]+ bytes a second: [a-z]+"
+        FAIL_REGULAR_EXPRESSION "ended with status")
+      osoe_internode_label(tools.bench.collect-places.2)
+    endif()
   endif()
 endif()

@@ -1,0 +1,120 @@
+nodes=8 places way=members lengths=equal pes=8 bytes=64 median_us=1327.6 fastest_us=614.8
+nodes=8 places way=members lengths=zeros pes=8 bytes=8 median_us=1201.1 fastest_us=797.1
+nodes=8 places way=members lengths=large pes=8 bytes=65592 median_us=1652.0 fastest_us=901.3
+job nodes=8 way=members status=0 seconds=2
+nodes=8 places way=totals lengths=equal pes=8 bytes=64 median_us=1205.3 fastest_us=680.1
+nodes=8 places way=totals lengths=zeros pes=8 bytes=8 median_us=1444.5 fastest_us=891.0
+nodes=8 places way=totals lengths=large pes=8 bytes=65592 median_us=1623.4 fastest_us=834.3
+job nodes=8 way=totals status=0 seconds=2
+nodes=8 places way=scan lengths=equal pes=8 bytes=64 median_us=1296.3 fastest_us=635.8
+nodes=8 places way=scan lengths=zeros pes=8 bytes=8 median_us=1272.0 fastest_us=731.4
+nodes=8 places way=scan lengths=large pes=8 bytes=65592 median_us=1664.5 fastest_us=1019.2
+job nodes=8 way=scan status=0 seconds=2
+nodes=8 places way=exchange lengths=equal pes=8 bytes=64 median_us=1661.9 fastest_us=759.4
+nodes=8 places way=exchange lengths=zeros pes=8 bytes=8 median_us=1332.9 fastest_us=655.2
+nodes=8 places way=exchange lengths=large pes=8 bytes=65592 median_us=1693.5 fastest_us=788.9
+job nodes=8 way=exchange status=0 seconds=2
+nodes=8 places way=link lengths=equal pes=8 bytes=64 median_us=1467.3 fastest_us=736.0
+nodes=8 places way=link lengths=zeros pes=8 bytes=8 median_us=1484.7 fastest_us=809.1
+nodes=8 places way=link lengths=large pes=8 bytes=65592 median_us=1995.0 fastest_us=723.1
+job nodes=8 way=link status=0 seconds=2
+nodes=16 places way=members lengths=equal pes=16 bytes=128 median_us=2631.9 fastest_us=1433.2
+nodes=16 places way=members lengths=zeros pes=16 bytes=8 median_us=2626.4 fastest_us=1646.0
+nodes=16 places way=members lengths=large pes=16 bytes=65656 median_us=2976.6 fastest_us=1676.8
+job nodes=16 way=members status=0 seconds=4
+nodes=16 places way=totals lengths=equal pes=16 bytes=128 median_us=2935.6 fastest_us=1651.5
+nodes=16 places way=totals lengths=zeros pes=16 bytes=8 median_us=2964.3 fastest_us=1869.5
+nodes=16 places way=totals lengths=large pes=16 bytes=65656 median_us=3133.9 fastest_us=1840.3
+job nodes=16 way=totals status=0 seconds=3
+nodes=16 places way=scan lengths=equal pes=16 bytes=128 median_us=2788.8 fastest_us=1642.2
+nodes=16 places way=scan lengths=zeros pes=16 bytes=8 median_us=2336.3 fastest_us=1617.7
+nodes=16 places way=scan lengths=large pes=16 bytes=65656 median_us=3393.7 fastest_us=1816.1
+job nodes=16 way=scan status=0 seconds=4
+nodes=16 places way=exchange lengths=equal pes=16 bytes=128 median_us=4811.2 fastest_us=1886.7
+nodes=16 places way=exchange lengths=zeros pes=16 bytes=8 median_us=4138.6 fastest_us=1646.0
+nodes=16 places way=exchange lengths=large pes=16 bytes=65656 median_us=4809.6 fastest_us=1515.4
+job nodes=16 way=exchange status=0 seconds=6
+nodes=16 places way=link lengths=equal pes=16 bytes=128 median_us=4617.6 fastest_us=2097.5
+nodes=16 places way=link lengths=zeros pes=16 bytes=8 median_us=4319.4 fastest_us=2153.3
+nodes=16 places way=link lengths=large pes=16 bytes=65656 median_us=4768.6 fastest_us=1586.2
+job nodes=16 way=link status=0 seconds=6
+nodes=32 places way=members lengths=equal pes=32 bytes=256 median_us=5923.0 fastest_us=3850.7
+nodes=32 places way=members lengths=zeros pes=32 bytes=16 median_us=4797.5 fastest_us=2569.6
+nodes=32 places way=members lengths=large pes=32 bytes=65784 median_us=5501.2 fastest_us=3191.2
+job nodes=32 way=members status=0 seconds=7
+nodes=32 places way=totals lengths=equal pes=32 bytes=256 median_us=6489.0 fastest_us=4128.1
+nodes=32 places way=totals lengths=zeros pes=32 bytes=16 median_us=4446.7 fastest_us=2859.2
+nodes=32 places way=totals lengths=large pes=32 bytes=65784 median_us=4790.4 fastest_us=2722.2
+job nodes=32 way=totals status=0 seconds=7
+nodes=32 places way=scan lengths=equal pes=32 bytes=256 median_us=5240.2 fastest_us=3811.4
+nodes=32 places way=scan lengths=zeros pes=32 bytes=16 median_us=4541.5 fastest_us=2537.1
+nodes=32 places way=scan lengths=large pes=32 bytes=65784 median_us=5268.0 fastest_us=2811.7
+job nodes=32 way=scan status=0 seconds=7
+nodes=32 places way=exchange lengths=equal pes=32 bytes=256 median_us=11498.6 fastest_us=4094.6
+nodes=32 places way=exchange lengths=zeros pes=32 bytes=16 median_us=11666.8 fastest_us=3078.6
+nodes=32 places way=exchange lengths=large pes=32 bytes=65784 median_us=11653.2 fastest_us=2962.2
+job nodes=32 way=exchange status=0 seconds=14
+nodes=32 places way=link lengths=equal pes=32 bytes=256 median_us=5362.6 fastest_us=3481.7
+nodes=32 places way=link lengths=zeros pes=32 bytes=16 median_us=4930.8 fastest_us=2583.0
+nodes=32 places way=link lengths=large pes=32 bytes=65784 median_us=4910.1 fastest_us=3284.6
+job nodes=32 way=link status=0 seconds=7
+nodes=64 places way=members lengths=equal pes=64 bytes=512 median_us=10870.4 fastest_us=7278.9
+nodes=64 places way=members lengths=zeros pes=64 bytes=32 median_us=9958.1 fastest_us=6099.1
+nodes=64 places way=members lengths=large pes=64 bytes=66040 median_us=12462.8 fastest_us=7739.0
+job nodes=64 way=members status=0 seconds=15
+nodes=64 places way=totals lengths=equal pes=64 bytes=512 median_us=10996.8 fastest_us=5533.0
+nodes=64 places way=totals lengths=zeros pes=64 bytes=32 median_us=10516.2 fastest_us=6739.5
+nodes=64 places way=totals lengths=large pes=64 bytes=66040 median_us=13961.1 fastest_us=7596.0
+job nodes=64 way=totals status=0 seconds=16
+nodes=64 places way=scan lengths=equal pes=64 bytes=512 median_us=10909.8 fastest_us=7502.8
+nodes=64 places way=scan lengths=zeros pes=64 bytes=32 median_us=9098.3 fastest_us=5299.1
+nodes=64 places way=scan lengths=large pes=64 bytes=66040 median_us=13018.7 fastest_us=8283.1
+job nodes=64 way=scan status=0 seconds=14
+nodes=64 places way=exchange lengths=equal pes=64 bytes=512 median_us=39777.1 fastest_us=9448.6
+nodes=64 places way=exchange lengths=zeros pes=64 bytes=32 median_us=35730.4 fastest_us=8345.5
+nodes=64 places way=exchange lengths=large pes=64 bytes=66040 median_us=44579.3 fastest_us=9050.4
+job nodes=64 way=exchange status=0 seconds=49
+nodes=64 places way=link lengths=equal pes=64 bytes=512 median_us=11838.1 fastest_us=7374.9
+nodes=64 places way=link lengths=zeros pes=64 bytes=32 median_us=11431.0 fastest_us=6940.6
+nodes=64 places way=link lengths=large pes=64 bytes=66040 median_us=14566.3 fastest_us=9060.9
+job nodes=64 way=link status=0 seconds=16
+nodes=128 places way=members lengths=equal pes=128 bytes=1024 median_us=23774.1 fastest_us=14902.3
+nodes=128 places way=members lengths=zeros pes=128 bytes=64 median_us=26565.7 fastest_us=17115.8
+nodes=128 places way=members lengths=large pes=128 bytes=66552 median_us=27005.7 fastest_us=18995.8
+job nodes=128 way=members status=0 seconds=35
+nodes=128 places way=totals lengths=equal pes=128 bytes=1024 median_us=24009.5 fastest_us=14481.0
+nodes=128 places way=totals lengths=zeros pes=128 bytes=64 median_us=24935.4 fastest_us=15749.3
+nodes=128 places way=totals lengths=large pes=128 bytes=66552 median_us=28206.8 fastest_us=19275.1
+job nodes=128 way=totals status=0 seconds=34
+nodes=128 places way=scan lengths=equal pes=128 bytes=1024 median_us=23096.5 fastest_us=16358.0
+nodes=128 places way=scan lengths=zeros pes=128 bytes=64 median_us=21156.2 fastest_us=15423.5
+nodes=128 places way=scan lengths=large pes=128 bytes=66552 median_us=29618.3 fastest_us=18042.9
+job nodes=128 way=scan status=0 seconds=33
+nodes=128 places way=exchange lengths=equal pes=128 bytes=1024 median_us=28492.0 fastest_us=17644.5
+nodes=128 places way=exchange lengths=zeros pes=128 bytes=64 median_us=24340.2 fastest_us=17367.7
+nodes=128 places way=exchange lengths=large pes=128 bytes=66552 median_us=35862.2 fastest_us=18554.9
+job nodes=128 way=exchange status=0 seconds=37
+nodes=128 places way=link lengths=equal pes=128 bytes=1024 median_us=27511.8 fastest_us=17252.9
+nodes=128 places way=link lengths=zeros pes=128 bytes=64 median_us=27445.8 fastest_us=16894.3
+nodes=128 places way=link lengths=large pes=128 bytes=66552 median_us=29495.9 fastest_us=19735.5
+job nodes=128 way=link status=0 seconds=38
+nodes=254 places way=members lengths=equal pes=254 bytes=2032 median_us=174345.5 fastest_us=110720.1
+nodes=254 places way=members lengths=zeros pes=254 bytes=128 median_us=174992.3 fastest_us=108078.2
+nodes=254 places way=members lengths=large pes=254 bytes=67560 median_us=179441.0 fastest_us=115321.2
+job nodes=254 way=members status=0 seconds=227
+nodes=254 places way=totals lengths=equal pes=254 bytes=2032 median_us=68336.7 fastest_us=44574.5
+nodes=254 places way=totals lengths=zeros pes=254 bytes=128 median_us=71520.7 fastest_us=45721.8
+nodes=254 places way=totals lengths=large pes=254 bytes=67560 median_us=77131.1 fastest_us=55491.2
+job nodes=254 way=totals status=0 seconds=98
+nodes=254 places way=scan lengths=equal pes=254 bytes=2032 median_us=60941.1 fastest_us=45756.5
+nodes=254 places way=scan lengths=zeros pes=254 bytes=128 median_us=73264.3 fastest_us=41982.4
+nodes=254 places way=scan lengths=large pes=254 bytes=67560 median_us=76676.3 fastest_us=46641.7
+job nodes=254 way=scan status=0 seconds=92
+nodes=254 places way=exchange lengths=equal pes=254 bytes=2032 median_us=71193.5 fastest_us=44707.7
+nodes=254 places way=exchange lengths=zeros pes=254 bytes=128 median_us=65512.6 fastest_us=45159.2
+nodes=254 places way=exchange lengths=large pes=254 bytes=67560 median_us=75448.8 fastest_us=51203.0
+job nodes=254 way=exchange status=0 seconds=96
+nodes=254 places way=link lengths=equal pes=254 bytes=2032 median_us=74731.5 fastest_us=45400.4
+nodes=254 places way=link lengths=zeros pes=254 bytes=128 median_us=70354.8 fastest_us=47219.2
+nodes=254 places way=link lengths=large pes=254 bytes=67560 median_us=76796.1 fastest_us=54318.4
+job nodes=254 way=link status=0 seconds=98

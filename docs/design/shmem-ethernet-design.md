@@ -5465,7 +5465,22 @@ to 64 nodes (`internal-region.h`), a team over more taking the tree;
 `OSOE_COLLECTIVE_PLACES=exchange` forces it, `team.tree.collect_way` names it,
 and `shmem.collect-places.exchange.*` holds it with every case of P29's and a
 run of collects of nothing under perturbation, beside two mutants -
-`docs/design/evidence/v0.2-step4/2026-10-13-collect-exchange/`.
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-exchange/`. **The choice
+among the four (P31)**, by default (`OSOE_COLLECTIVE_PLACES=link`), as a large
+collective's shape is chosen and from the same three numbers of the link
+(`collective-shape.c`, `osoe_places_choose`; `shape_timing.py`'s
+`choose_places`, line for line, and `shmem.shape.places-grid` holding the two to
+the same answers): the members' vector wherever some node is not one run;
+otherwise the least cost of each node's total - a reduction as the data path
+runs it, its small class one piece through the ceiling's tree and a larger one
+the chooser's shape and a hop for its grant - the exchange, a hop and N - 1
+messages, within its room, and the scan, a small tree as deep and a message
+more a step of the gather, where the runs are ordered; each node's total where
+no link is known. On the Pi's link that is the exchange to 60 nodes and the scan
+beyond; on a loopback's, the exchange to 46, each node's total to 128 - where
+its vector becomes a large reduction - and the scan beyond. **Provisional**: the
+cost model's, until H24 (the VM's logical nodes, `tools/bench/collect-places.sh`,
+`osoe-bench places`) and H25 (the cluster) measure the four.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads

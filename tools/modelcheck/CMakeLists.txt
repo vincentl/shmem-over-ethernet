@@ -72,7 +72,12 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME model.shape_timing.grid
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/shape_timing.py grid-compare
             ${PROJECT_SOURCE_DIR}/shmem/tests/shape-grid.txt)
-  set_tests_properties(model.shape_timing model.shape_timing.grid PROPERTIES
+  # And collect's places' choice among its four ways (P31), the same way.
+  add_test(NAME model.shape_timing.places-grid
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/shape_timing.py
+            places-grid-compare ${PROJECT_SOURCE_DIR}/shmem/tests/places-grid.txt)
+  set_tests_properties(model.shape_timing model.shape_timing.grid
+                       model.shape_timing.places-grid PROPERTIES
                        LABELS "tier1;model" TIMEOUT 600)
   # Träff's circulant reduce-scatter and allgather (v0.2 step 3): the rounds'
   # arithmetic for every node count from 2 to 70, against the fold the brief

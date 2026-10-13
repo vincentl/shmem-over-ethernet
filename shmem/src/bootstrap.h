@@ -188,10 +188,13 @@ static inline const char *osoe_collective_shape_name(uint32_t shape)
 /*
  * OSOE_COLLECTIVE_PLACES (P30, P31 of docs/prompts/v0.2-open-items.md): how a
  * collect of differing blocks on a team spanning nodes finds its places
- * (collectives.c, collect_varying). `link`, the default, takes each node's
- * total where every node holds one run of the team's ranks and the members'
- * vector elsewhere; the others force one way, for the tests and the
- * measurements, where the team allows it: `members` the members' vector,
+ * (collectives.c, collect_varying). `link`, the default, takes the way the link
+ * makes cheapest among those the team allows (collective-shape.h,
+ * osoe_places_choose) - each node's total through the tree, its exchange or its
+ * scan where every node holds one run of the team's ranks, the members' vector
+ * elsewhere - and each node's total through the tree where no link is known;
+ * the others force one way, for the tests and the measurements, where the team
+ * allows it: `members` the members' vector,
  * `totals` a reduction of each node's total (P29), `scan` a scan of the nodes'
  * totals among the leads and a gather by ranges (P30), `exchange` a direct
  * exchange of the nodes' totals among the leads (P33). A way the team does not

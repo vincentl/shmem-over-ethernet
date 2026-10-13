@@ -17,7 +17,8 @@
  * step 3, for a reduction - Träff's circulant reduce-scatter and allgather
  * (collective-circulant.h), with a cost of its own under the same three numbers,
  * which the chooser weighs against the trees by the same rule: hence the
- * algorithm in the shape.
+ * algorithm in the shape. And, by the same rule from the same numbers, the way a
+ * collect finds its places (P31; osoe_places_choose, at the end).
  */
 #ifndef OSOE_COLLECTIVE_SHAPE_H
 #define OSOE_COLLECTIVE_SHAPE_H
@@ -116,5 +117,53 @@ struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operati
                                                const struct osoe_link *link, uint32_t ceiling,
                                                uint32_t capacity, uint32_t small_bytes,
                                                uint64_t piece_bytes, bool circulant);
+
+/*
+ * collect's places (P31 of docs/prompts/v0.2-open-items.md; collectives.c,
+ * collect_varying): the four ways a collect of differing blocks on a team
+ * spanning nodes finds each member's place, numbered as team.tree.collect_way
+ * says them (node.h) - the members' vector, a reduction of 8 bytes a member;
+ * each node's total (P29), a reduction of 8 bytes a node; the leads' scan of
+ * the nodes' totals (P30), a small tree and a record more a step of the gather
+ * after; the leads' exchange of the totals (P33), a hop and N - 1 messages.
+ */
+enum osoe_places_way {
+    OSOE_PLACES_MEMBERS = 1,
+    OSOE_PLACES_TOTALS = 2,
+    OSOE_PLACES_SCAN = 3,
+    OSOE_PLACES_EXCHANGE = 4,
+};
+
+/*
+ * What finding a collect's places costs one way on `nodes` leads with
+ * `members` members, nanoseconds, under the link: a reduction as the data path
+ * runs it - the small class one piece through the ceiling's tree, a larger one
+ * osoe_shape_choose's shape and a hop more for its grant, Träff's where
+ * `circulant` allows it as for any reduction; the scan the small tree of its
+ * 16-byte down - a level-order tree's terms standing in for its pre-order
+ * tree's, which is as deep - and a message cost a step of the gather and one
+ * more, for its records and the share; the exchange a hop, and for each of its
+ * N - 1 messages a message cost and a slot's bytes on the sender's link. 0 on
+ * one node, UINT64_MAX where a sum overflows. tools/modelcheck/shape_timing.py's
+ * places_cost(), line for line; provisional until H24 and H25 measure the ways.
+ */
+uint64_t osoe_places_cost(enum osoe_places_way way, uint32_t nodes, uint32_t members,
+                          const struct osoe_link *link, uint32_t ceiling, uint32_t capacity,
+                          uint32_t small_bytes, uint64_t piece_bytes, bool circulant);
+
+/*
+ * The way a collect's places take by default (OSOE_COLLECTIVE_PLACES=link):
+ * the members' vector on one node, or where some node's members are not one
+ * run of the team's ranks (`runs` false); otherwise the least cost of each
+ * node's total, the exchange - on no more nodes than `exchange_nodes`, its room
+ * - and the scan - where the runs meet the node set's positions in order or in
+ * reverse (`ordered`) - ties to that order. shape_timing.py's
+ * choose_places(), line for line.
+ */
+enum osoe_places_way osoe_places_choose(uint32_t nodes, uint32_t members, bool runs,
+                                        bool ordered, uint32_t exchange_nodes,
+                                        const struct osoe_link *link, uint32_t ceiling,
+                                        uint32_t capacity, uint32_t small_bytes,
+                                        uint64_t piece_bytes, bool circulant);
 
 #endif /* OSOE_COLLECTIVE_SHAPE_H */

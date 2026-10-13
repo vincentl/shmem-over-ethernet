@@ -170,7 +170,12 @@ osoe_warnings(shmem_test_collective_shape)
 add_test(NAME shmem.shape.choice COMMAND shmem_test_collective_shape choice)
 add_test(NAME shmem.shape.grid
   COMMAND shmem_test_collective_shape grid ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
-set_tests_properties(shmem.shape.choice shmem.shape.grid PROPERTIES LABELS "tier1" TIMEOUT 60)
+# And collect's places' way and costs (P31), held to places-grid.txt, the model's
+# (model.shape_timing.places-grid checks the model still writes it).
+add_test(NAME shmem.shape.places-grid
+  COMMAND shmem_test_collective_shape places-grid ${CMAKE_CURRENT_SOURCE_DIR}/places-grid.txt)
+set_tests_properties(shmem.shape.choice shmem.shape.grid shmem.shape.places-grid PROPERTIES
+  LABELS "tier1" TIMEOUT 60)
 
 # Träff's circulant rounds on their own (tier 1; v0.2 step 3): every element of
 # every lead's result combined from every node exactly once, for every node
@@ -3010,6 +3015,12 @@ if(OSOE_INTERNODE)
   # falls back to the members' vector and whose first rank of each node takes
   # the scan; and the out-of-order map, falling back to each node's total.
   #
+  # Under the default, the link's choice (P31) is held to the ways the team
+  # allows, and pinned where the link is the Pi's, set by hand (pi-link): each
+  # node's total itself, P29's way, forced on two maps and the out-of-order
+  # one (totals), and the members' vector forced on a block map and a cyclic
+  # one (members).
+  #
   # And forced to the leads' exchange of the nodes' totals (P33),
   # OSOE_COLLECTIVE_PLACES=exchange: block maps of two to seven nodes, negative
   # strides, the out-of-order map - the exchange needs each node one run, not
@@ -3038,7 +3049,11 @@ if(OSOE_INTERNODE)
                  "exchange:block:0,0,1,2,2" "exchange:block:0,0,0,1,1,2,2,2,2,3"
                  "exchange:block:0,1,1,2,3,3,4,5,6" "exchange:negative-stride:0,0,1,2,2"
                  "exchange:negative-stride:0,0,1,1,1,2,3,3,4,4"
-                 "exchange:cyclic:0,1,2,0,1,2,0,1,2" "exchange:unordered:1,1,0,0,2,2")
+                 "exchange:cyclic:0,1,2,0,1,2,0,1,2" "exchange:unordered:1,1,0,0,2,2"
+                 "totals:block:0,0,0,1,1,2,2,2,2,3" "totals:negative-stride:0,0,1,1,1,2,3,3,4,4"
+                 "totals:unordered:1,1,0,0,2,2" "members:block:0,0,1,2,2"
+                 "members:cyclic:0,1,2,0,1,2,0,1,2" "pi-link:block:0,0,0,1,1,2,2,2,2,3"
+                 "pi-link:negative-stride:0,0,1,2,2")
       string(REPLACE ":" ";" parts "${case}")
       list(LENGTH parts fields)
       set(forced "")
@@ -3046,8 +3061,15 @@ if(OSOE_INTERNODE)
       if(fields EQUAL 3)
         list(GET parts 0 way)
         list(REMOVE_AT parts 0)
-        set(forced OSOE_COLLECTIVE_PLACES=${way})
         set(prefix ${way}.)
+        if(way STREQUAL "pi-link")
+          # The default, the way chosen from the Pi's link set by hand: the
+          # exchange on every team of these maps (shape_timing.py places).
+          set(forced OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+              OSOE_LINK_BYTES_PER_SECOND=116000000 OSOE_TEST_PLACES_LINK_WAY=exchange)
+        else()
+          set(forced OSOE_COLLECTIVE_PLACES=${way})
+        endif()
       endif()
       list(GET parts 0 kind)
       list(GET parts 1 map)

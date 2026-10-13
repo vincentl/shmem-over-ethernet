@@ -1,0 +1,535 @@
+Internal ctest changing into directory: /tmp/collect-choice-check/as-before/build/release
+Test project /tmp/collect-choice-check/as-before/build/release
+      Start  26: shmem.shape.choice
+      Start  27: shmem.shape.grid
+      Start  28: shmem.shape.places-grid
+      Start 472: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+ 1/46 Test  #26: shmem.shape.choice ..................................................   Passed    0.01 sec
+      Start 473: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+ 2/46 Test  #27: shmem.shape.grid ....................................................   Passed    0.01 sec
+      Start 474: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+ 3/46 Test  #28: shmem.shape.places-grid .............................................   Passed    0.05 sec
+      Start 475: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 4/46 Test #472: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ......................   Passed    0.22 sec
+      Start 476: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+ 5/46 Test #473: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ......................   Passed    0.23 sec
+      Start 477: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+ 6/46 Test #474: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ............   Passed    0.24 sec
+      Start 478: shmem.collect-places.unordered.1-1-0-0-2-2
+ 7/46 Test #475: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ............   Passed    0.24 sec
+      Start 479: shmem.collect-places.scan.block.0-0-1-1
+ 8/46 Test #479: shmem.collect-places.scan.block.0-0-1-1 .............................   Passed    0.10 sec
+      Start 480: shmem.collect-places.scan.block.0-0-1-2-2
+ 9/46 Test #478: shmem.collect-places.unordered.1-1-0-0-2-2 ..........................   Passed    0.15 sec
+      Start 481: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3
+10/46 Test #476: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 .......................   Passed    0.21 sec
+      Start 482: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4
+11/46 Test #477: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .........................   Passed    0.22 sec
+      Start 483: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6
+12/46 Test #480: shmem.collect-places.scan.block.0-0-1-2-2 ...........................   Passed    0.12 sec
+      Start 484: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7
+13/46 Test #481: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 .................   Passed    0.20 sec
+      Start 485: shmem.collect-places.scan.negative-stride.0-0-1-1
+14/46 Test #482: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 .................   Passed    0.23 sec
+      Start 486: shmem.collect-places.scan.negative-stride.0-0-1-2-2
+15/46 Test #485: shmem.collect-places.scan.negative-stride.0-0-1-1 ...................   Passed    0.15 sec
+      Start 487: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4
+16/46 Test #483: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 ...................   Passed    0.30 sec
+      Start 488: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6
+17/46 Test #486: shmem.collect-places.scan.negative-stride.0-0-1-2-2 .................   Passed    0.24 sec
+      Start 489: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2
+18/46 Test #484: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 ...............   Passed    0.40 sec
+      Start 490: shmem.collect-places.scan.unordered.1-1-0-0-2-2
+19/46 Test #487: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 .......   Passed    0.24 sec
+      Start 491: shmem.collect-places.exchange.block.0-0-1-1
+20/46 Test #490: shmem.collect-places.scan.unordered.1-1-0-0-2-2 .....................   Passed    0.14 sec
+      Start 492: shmem.collect-places.exchange.block.0-0-1-2-2
+21/46 Test #488: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .........   Passed    0.31 sec
+      Start 493: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3
+22/46 Test #489: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ..................   Passed    0.20 sec
+      Start 494: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6
+23/46 Test #491: shmem.collect-places.exchange.block.0-0-1-1 .........................   Passed    0.14 sec
+      Start 495: shmem.collect-places.exchange.negative-stride.0-0-1-2-2
+24/46 Test #492: shmem.collect-places.exchange.block.0-0-1-2-2 .......................   Passed    0.16 sec
+      Start 496: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4
+25/46 Test #493: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.21 sec
+      Start 497: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2
+26/46 Test #495: shmem.collect-places.exchange.negative-stride.0-0-1-2-2 .............   Passed    0.16 sec
+      Start 498: shmem.collect-places.exchange.unordered.1-1-0-0-2-2
+27/46 Test #494: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 ...............   Passed    0.30 sec
+      Start 499: shmem.collect-places.totals.block.0-0-0-1-1-2-2-2-2-3
+28/46 Test #498: shmem.collect-places.exchange.unordered.1-1-0-0-2-2 .................   Passed    0.17 sec
+      Start 500: shmem.collect-places.totals.negative-stride.0-0-1-1-1-2-3-3-4-4
+29/46 Test #497: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.19 sec
+      Start 501: shmem.collect-places.totals.unordered.1-1-0-0-2-2
+30/46 Test #496: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 ...   Passed    0.26 sec
+      Start 502: shmem.collect-places.members.block.0-0-1-2-2
+31/46 Test #499: shmem.collect-places.totals.block.0-0-0-1-1-2-2-2-2-3 ...............   Passed    0.17 sec
+      Start 503: shmem.collect-places.members.cyclic.0-1-2-0-1-2-0-1-2
+32/46 Test #501: shmem.collect-places.totals.unordered.1-1-0-0-2-2 ...................   Passed    0.15 sec
+      Start 504: shmem.collect-places.pi-link.block.0-0-0-1-1-2-2-2-2-3
+33/46 Test #502: shmem.collect-places.members.block.0-0-1-2-2 ........................   Passed    0.16 sec
+      Start 505: shmem.collect-places.pi-link.negative-stride.0-0-1-2-2
+34/46 Test #500: shmem.collect-places.totals.negative-stride.0-0-1-1-1-2-3-3-4-4 .....   Passed    0.23 sec
+      Start 506: shmem.collect-places.link.zeros.0-0-1-1-2-2-3
+35/46 Test #505: shmem.collect-places.pi-link.negative-stride.0-0-1-2-2 ..............***Failed    0.13 sec
+PE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collePE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collePE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+ct's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+ct's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collePE 0: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+ct's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+PE 3: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a colle/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) fact's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+iled
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collePE 0: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+ct's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for PE 2: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for PE 2: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for PE 0: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) faPE 2: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+iled
+a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for PE 0: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) fa/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+iled
+PE 4: every other rank backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summedPE 4: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+ 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's backwards spans 2 nodes, each one run, in reverse, and its lead here took way 2 and summed 2 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 2
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+
+      Start 507: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3
+36/46 Test #503: shmem.collect-places.members.cyclic.0-1-2-0-1-2-0-1-2 ...............   Passed    0.18 sec
+      Start 598: shmem.shape.chosen.pi.4
+37/46 Test #504: shmem.collect-places.pi-link.block.0-0-0-1-1-2-2-2-2-3 ..............***Failed    0.19 sec
+PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) fa/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+iled
+PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places PE 1: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the world spans 4 nodes, each one run, in order, and its lead here took way 2 and summed 4 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 4
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's plPE 2: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+aces under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) fa/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+iled
+PE 0: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's plPE 4: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+aces under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 2: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 0: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the even ranks spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths fPE 7: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+or a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) faPE 8: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+iled
+PE 6: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths fPE 3: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+or a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths fPE 7: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+or a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) fa/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+iled
+PE 8: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths fPE 6: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+or a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths fPE 9: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+or a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 5: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 7: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 8: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 6: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths fPE 5: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+or a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 3: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 4: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+PE 9: the ranks past the first node's spans 3 nodes, each one run, in order, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+/tmp/collect-choice-check/as-before/shmem/tests/test-collect-places.c:259: CHECK(summed == want && way == (uint64_t)want_way) failed
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 8 exited with status 1
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 9 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+
+      Start 599: shmem.shape.chosen.pi.16
+38/46 Test #598: shmem.shape.chosen.pi.4 .............................................   Passed    0.34 sec
+      Start 600: shmem.shape.chosen.loopback.16
+39/46 Test #506: shmem.collect-places.link.zeros.0-0-1-1-2-2-3 .......................   Passed    0.50 sec
+      Start 603: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15
+40/46 Test #599: shmem.shape.chosen.pi.16 ............................................   Passed    0.79 sec
+      Start 604: shmem.shape.back-to-back.0-0-1-1-2-2-3-3-4-4-5-5-6-6-7-7
+41/46 Test #507: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 ...................   Passed    1.14 sec
+42/46 Test #600: shmem.shape.chosen.loopback.16 ......................................   Passed    1.03 sec
+43/46 Test #603: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ......   Passed    2.91 sec
+44/46 Test #604: shmem.shape.back-to-back.0-0-1-1-2-2-3-3-4-4-5-5-6-6-7-7 ............   Passed    2.57 sec
+      Start 601: shmem.shape.chosen.pi.64
+45/46 Test #601: shmem.shape.chosen.pi.64 ............................................   Passed    1.71 sec
+      Start 602: shmem.shape.chosen.loopback.64
+46/46 Test #602: shmem.shape.chosen.loopback.64 ......................................   Passed    1.71 sec
+
+96% tests passed, 2 tests failed out of 46
+
+Label Time Summary:
+internode    =  19.63 sec*proc (43 tests)
+tier1        =   0.07 sec*proc (3 tests)
+tier2        =  19.63 sec*proc (43 tests)
+
+Total Test time (real) =   8.63 sec
+
+The following tests FAILED:
+	504 - shmem.collect-places.pi-link.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	505 - shmem.collect-places.pi-link.negative-stride.0-0-1-2-2 (Failed)
+Errors while running CTest

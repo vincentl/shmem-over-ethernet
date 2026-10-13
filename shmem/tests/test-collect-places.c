@@ -1,14 +1,16 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * collect's places (P29, P30 and P33 of docs/prompts/v0.2-open-items.md;
- * collectives.c, collect_varying): from each node's total where every node of a
- * team holds one run of its ranks, and from the members' vector where some node
- * does not - or the way OSOE_COLLECTIVE_PLACES forces, where the team allows it:
- * the members' vector anywhere, the leads' scan of the nodes' totals where the
- * runs meet the node set's positions in order or in reverse, and the leads'
- * exchange of the nodes' totals where every node is one run - on teams of the
- * map the launcher was given, which OSOE_TEST_MAP gives again. The first
- * argument names the case:
+ * collect's places (P29, P30, P31 and P33 of docs/prompts/v0.2-open-items.md;
+ * collectives.c, collect_varying): where every node of a team holds one run of
+ * its ranks, from each node's total - through the tree, the leads' exchange or,
+ * where the runs meet the node set's positions in order or in reverse, the
+ * leads' scan, as the link makes cheapest by default - and from the members'
+ * vector where some node does not; or the way OSOE_COLLECTIVE_PLACES forces,
+ * where the team allows it - on teams of the map the launcher was given, which
+ * OSOE_TEST_MAP gives again. Under the default the way is the link's, which the
+ * test pins only where OSOE_TEST_PLACES_LINK_WAY names it - the links set by
+ * hand (OSOE_LINK_*) - and otherwise holds to the ways the team allows. The
+ * first argument names the case:
  *
  *   block            the world, its even ranks and the ranks past the first
  *                    node's, on a block map: each node's total;
@@ -68,14 +70,17 @@ enum {
     FIRST_CREATED_NUMBER = 3,       /* after the world, SHMEM_TEAM_SHARED and the finalize team */
 };
 
-/* team.tree.collect_way's values (node.h, enum osoe_collect_way). */
-enum way { WAY_NONE, WAY_MEMBERS, WAY_TOTALS, WAY_SCAN, WAY_EXCHANGE };
+/* team.tree.collect_way's values (node.h, enum osoe_collect_way), and the
+ * test's own for a way the link chooses among those the team allows. */
+enum way { WAY_NONE, WAY_MEMBERS, WAY_TOTALS, WAY_SCAN, WAY_EXCHANGE, WAY_CHOSEN };
 static const char *const way_names[] = { "none", "the members' vector", "each node's total",
-                                         "the leads' scan", "the leads' exchange" };
+                                         "the leads' scan", "the leads' exchange",
+                                         "one the link chooses" };
 
 static int me, npes;
 static int node_of_rank[MAX_PES];
 static const char *forced;              /* OSOE_COLLECTIVE_PLACES, or "link" */
+static const char *link_way;            /* OSOE_TEST_PLACES_LINK_WAY, or NULL */
 static unsigned char *source, *dest;    /* LONGEST and MAX_PES * LONGEST bytes, symmetric */
 
 /* A team as the test expects it. */
@@ -143,16 +148,21 @@ static void runs_of(struct team_case *t)
 }
 
 /* The way the library takes on `t` (collectives.c, places_way): the forced one
- * where the team allows it, and the one it falls back to. */
+ * where the team allows it, and the one it falls back to; under the default
+ * the one OSOE_TEST_PLACES_LINK_WAY names, and otherwise any the team allows
+ * (WAY_CHOSEN). */
 static enum way way_of(const struct team_case *t)
 {
     if (t->nodes < 2)
         return WAY_NONE;
     if (!t->one_run || strcmp(forced, "members") == 0)
         return WAY_MEMBERS;
-    if (strcmp(forced, "scan") == 0 && (t->in_order || t->reversed))
+    const char *named = strcmp(forced, "link") == 0 ? link_way : forced;
+    if (!named)
+        return WAY_CHOSEN;
+    if (strcmp(named, "scan") == 0 && (t->in_order || t->reversed))
         return WAY_SCAN;
-    if (strcmp(forced, "exchange") == 0)
+    if (strcmp(named, "exchange") == 0)
         return WAY_EXCHANGE;            /* the tests' teams span a few nodes, within its room */
     return WAY_TOTALS;
 }
@@ -231,6 +241,9 @@ static void collect(const struct team_case *t, const struct lengths *lengths, in
                                   &summed));
     CHECK(osoe_test_scoped_metric("team.tree.collect_way", OSOE_MSCOPE_TEAM, block, &way));
     enum way want_way = way_of(t);
+    if (want_way == WAY_CHOSEN && (way == WAY_TOTALS || way == WAY_EXCHANGE ||
+                                   (way == WAY_SCAN && (t->in_order || t->reversed))))
+        want_way = (enum way)way;       /* the link's choice, among those the team allows */
     uint64_t want = want_way == WAY_NONE      ? 0
                     : want_way == WAY_MEMBERS ? (uint64_t)t->members
                     : want_way == WAY_SCAN    ? 1
@@ -313,6 +326,7 @@ int main(int argc, char **argv)
     CHECK_FATAL(argc == 2);
     const char *which = argv[1];
     forced = getenv("OSOE_COLLECTIVE_PLACES") ? getenv("OSOE_COLLECTIVE_PLACES") : "link";
+    link_way = getenv("OSOE_TEST_PLACES_LINK_WAY");
     source = shmem_malloc(LONGEST);
     dest = shmem_malloc((size_t)MAX_PES * LONGEST);
     CHECK_FATAL(source && dest);

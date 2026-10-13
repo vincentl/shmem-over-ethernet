@@ -230,3 +230,167 @@ design §5.5, the proposal, the evidence's README and directory.
 - **For the VM**: the tier-3 tests (`tier3.<link>.collect-places.exchange.*`);
   aarch64's suites; and the README's memory figures at the defaults there,
   which the program on `internal-region.h` computes the same on any machine.
+
+### 4. P31: the choice among the four ways, and H24's harness
+
+**Done.** Commit: the one that adds this entry. The default,
+`OSOE_COLLECTIVE_PLACES=link`, now chooses among the ways the team allows from
+the link's cost of each, as `collective-shape.c` chooses a large collective's
+tree or Träff's circulant; the setting that forces each way was built at P30
+(`members`, `totals`, `scan`) and P33 (`exchange`), and its README row says what
+the default now does.
+
+**Files**: `shmem/src/collective-shape.h`, `collective-shape.c`
+(`osoe_places_cost`, `osoe_places_choose`); `collectives.c` (`places_chosen`,
+`places_way`, `collect_varying`'s comment); `bootstrap.h` (the setting's
+comment); `tools/modelcheck/shape_timing.py` (`places_cost`, `choose_places`,
+the PLACES checks, the modes `places`, `places-grid`, `places-grid-compare`),
+the models' `CMakeLists.txt` and README; `shmem/tests/places-grid.txt` (new),
+`test-collective-shape.c`, `test-collect-places.c`, `CMakeLists.txt`;
+`tools/bench/osoe-bench.c` (`places`), `tools/bench/collect-places.sh` (new)
+and the bench's `CMakeLists.txt` (two smoke tests); the README (settings,
+`collect` and tools rows), `tools/README.md`, design §5.5, the evidence's README
+and directory.
+
+- **The costs**, in the closed form the shapes' chooser uses, under the link's
+  three numbers (a hop, a message cost, bytes a second): the members' vector and
+  each node's total as the data path runs a reduction of 8 bytes a member or a
+  node - one piece through the ceiling's tree while it is in the small class,
+  and past it the chooser's shape, Träff's where a reduction of the team's
+  would take it, and a hop more for the grant; the scan its small tree of
+  16-byte downs (a level-order tree's terms standing in for the pre-order
+  tree's, which is as deep) and a message cost a step of the gather and one
+  more, for the records and the share; the exchange a hop, and a message cost
+  and a 16-byte slot's time on the sender's link for each of its N - 1
+  messages.
+- **The choice**: the members' vector wherever some node is not one run, or on
+  one node; otherwise the least of each node's total, the exchange - within its
+  room, 64 nodes - and the scan - where the runs are ordered - ties to that
+  order. Each node's total, P29's way, where no link is known: a job of one
+  node, or `OSOE_COLLECTIVE_SHAPE=fixed`, which keeps runs repeatable.
+- **The defaults by node count** (`shape_timing.py places`), one PE a node and
+  the defaults' ceiling 8, capacity 4 and 1 KiB small class:
+
+  | link | 2 to 46 nodes | 47 to 60 | 61 to 128 | 129 on |
+  |---|---|---|---|---|
+  | the Pi's (a hop of 86 µs, 7 µs a message, 116 MB/s) | the exchange | the exchange | the scan | the scan |
+  | a loopback's (20 µs, 2 µs, 4 GB/s) | the exchange | each node's total | each node's total | the scan |
+
+  Sixteen PEs a node change none of it here: what moves the answer is the
+  nodes, and the members' vector only where some node is not one run. Each
+  node's total gives way to the scan where its vector, 8 bytes a node, leaves
+  the 1 KiB small class at 129 nodes and becomes a large reduction with a grant.
+  **Provisional**, as the README, design §5.5 and both files' comments say:
+  the cost model's, until H24 and H25 measure the ways.
+- **The C is the model's, line for line**: `shmem.shape.places-grid` reads
+  `places-grid.txt` - 6,210 inputs over five links, 23 node counts, one, four
+  and sixteen PEs a node, runs and order, three settings of ceiling, capacity
+  and small class, Träff's allowed and not - and requires
+  `osoe_places_choose`'s way and `osoe_places_cost`'s four costs to be the
+  model's on every line: 6,210 of 6,210. `model.shape_timing.places-grid`
+  checks the model still writes that file, and `model.shape_timing` checks
+  what must hold whatever H24 moves (PLACES: the members' vector without runs
+  and on one node; on the Pi's link and a loopback's the exchange on four
+  nodes, the scan on 200 ordered nodes and each node's total on 200 unordered
+  ones, never the exchange past its room, no way free past one node).
+- **Tests at tier 2**: `shmem.collect-places.*` under the default now accept
+  only a way the team allows - each node's total, the exchange, or the scan
+  where the runs are ordered - and check every byte and the count for the way
+  taken; `pi-link.*`, the Pi's link set by hand (`OSOE_LINK_*`), pin the
+  default to the exchange on two maps; `totals.*` and `members.*` force P29's
+  way and the members' vector on maps where the default no longer takes them.
+- **Two mutants beside their control** (`docs/design/evidence/v0.2-step4/
+  2026-10-13-collect-choice/`), `shmem.collect-places.*` and `shmem.shape.*`:
+  the control passes all 46; **"as before"**, a copy whose default takes each
+  node's total wherever the team allows it, as before P31, fails exactly the
+  two `pi-link` cases, each PE naming way 2 where the Pi's link must take the
+  exchange; **"no hop"**, a copy whose exchange costs no hop, fails exactly
+  `shmem.shape.places-grid`, the C differing from the model on 5,940 of the
+  grid's 6,210 lines. Neither fails anything else.
+- **H24's harness**, `tools/bench/collect-places.sh BUILD OUTDIR [NODES...]`:
+  `osoe-bench places quick` - a `collect` of differing blocks across the world,
+  three patterns of lengths (every PE's 8 bytes; every PE's 0 but every
+  sixteenth's 8; PE 0's 64 KiB and every other's 8), the median and fastest of
+  200 after 200 - by each way and by the default, at 8, 16, 32, 64, 128 and 254
+  logical nodes, one PE a node; with `TIER3=1` over tier 3's namespaces and the
+  Pi-like link (`tools/launch/tier3.sh pi`), otherwise over loopback. The
+  jobs run under `SHMEM_DEBUG`, whose start-up line gives the link each
+  measured, which `places.txt` keeps, and the summary names the way the chooser
+  takes on the default's link. `ROUNDS=N` runs each node count's jobs N times,
+  the ways in turn, and the table takes the median of the rounds' medians - one
+  job's median here differed from the next's by up to three times at 2 nodes
+  (the members' vector 111 µs in one job and 283 to 338 µs in four more), as
+  much as the ways differ. Past 64 nodes the exchange is each node's total, its
+  fallback, which the table says. A failed job is said, and the script exits
+  1. Two smoke tests keep both working, tier 2 as the bench's others and
+  likewise not under ThreadSanitizer: `tools.bench.places.0-0-1-1`
+  (`osoe-bench places quick` on two nodes of two PEs) and
+  `tools.bench.collect-places.2` (the harness on two logical nodes, passing
+  when its summary names the default's link and way, failing on any job that
+  ends badly).
+- **The sample, run once here** over loopback - not tier 3, which needs netem -
+  on four vCPUs carrying every node's lead, agent and progress thread, so that
+  its numbers measure this machine's CPUs as much as the ways, in 16 min 15 s,
+  every job ending 0 (`h24-sample/` in the evidence's directory: `places.txt`
+  and `summary.txt`). It was taken with the harness's first form - one round,
+  no links kept - and the rounds and the links were added after, from what it
+  showed (median
+  microseconds a collect; the exchange past 64 nodes is each node's total, its
+  fallback):
+
+  | nodes | lengths | members | totals | scan | exchange | default |
+  |---|---|---|---|---|---|---|
+  | 8 | equal | 1,328 | 1,205 | 1,296 | 1,662 | 1,467 |
+  | 8 | large | 1,652 | 1,623 | 1,664 | 1,694 | 1,995 |
+  | 8 | zeros | 1,201 | 1,444 | 1,272 | 1,333 | 1,485 |
+  | 16 | equal | 2,632 | 2,936 | 2,789 | 4,811 | 4,618 |
+  | 16 | large | 2,977 | 3,134 | 3,394 | 4,810 | 4,769 |
+  | 16 | zeros | 2,626 | 2,964 | 2,336 | 4,139 | 4,319 |
+  | 32 | equal | 5,923 | 6,489 | 5,240 | 11,499 | 5,363 |
+  | 32 | large | 5,501 | 4,790 | 5,268 | 11,653 | 4,910 |
+  | 32 | zeros | 4,798 | 4,447 | 4,542 | 11,667 | 4,931 |
+  | 64 | equal | 10,870 | 10,997 | 10,910 | 39,777 | 11,838 |
+  | 64 | large | 12,463 | 13,961 | 13,019 | 44,579 | 14,566 |
+  | 64 | zeros | 9,958 | 10,516 | 9,098 | 35,730 | 11,431 |
+  | 128 | equal | 23,774 | 24,010 | 23,096 | 28,492 | 27,512 |
+  | 128 | large | 27,006 | 28,207 | 29,618 | 35,862 | 29,496 |
+  | 128 | zeros | 26,566 | 24,935 | 21,156 | 24,340 | 27,446 |
+  | 254 | equal | 174,346 | 68,337 | 60,941 | 71,194 | 74,732 |
+  | 254 | large | 179,441 | 77,131 | 76,676 | 75,449 | 76,796 |
+  | 254 | zeros | 174,992 | 71,521 | 73,264 | 65,513 | 70,355 |
+
+  What it says, as far as a machine of four CPUs can: on 8 nodes the four ways
+  are within a third of each other. **From 16 to 64 nodes the exchange is the
+  slowest, 1.6 to 3.6 times the others** - here every lead's N - 1 messages
+  out and N - 1 in, N(N - 1) in all, land on the same four CPUs, where on a
+  cluster each lead's own CPU and link carry its own; the cost model charges
+  each lead its own sends, as it charges every collective's, so the two
+  disagree by design, and **tier 3's logical nodes share one machine's CPUs
+  just as these do** - H24 in the VM will charge the exchange the same way, its
+  netem delays costing no CPU, and only a cluster of tens of nodes can settle
+  the exchange's crossover, which the four Pis cannot (a finding for the
+  response). The default's times follow the exchange's on 16 nodes and the
+  tree's and the scan's from 32: on the link this loaded machine measured, the
+  chooser left the exchange between 16 and 32 nodes, earlier than a loopback
+  link of 20 µs and 2 µs would; the sample's harness did not yet record that
+  link, which the harness now does for every job. Past 64 the exchange column
+  is each node's total, as the fallback should make it. **On 254 nodes the
+  members' vector is 2.5 times every other way** (the fastest of 200 too: 111 ms
+  against 45 for each node's total), though with one PE a node its vector is
+  the size of each node's total's and goes through the same reduction. Not
+  explained here; the likeliest cause is that each job measures its own link
+  as it starts, on a machine this loaded, and a large reduction's shape follows
+  that link - which is why the harness now keeps every job's link beside its
+  numbers, and H24 should look.
+- **Runs here**: the release preset without a warning; the static checks 13 of
+  13; the release suite, models aside, **915: 913 passed, 2 skipped** (the root
+  refusal tests), in 5 min 6 s - 10 more than at P33's commit: the grid, the
+  seven forced and pinned cases, the two smoke tests; `model.shape_timing`
+  (with PLACES), `model.shape_timing.grid`, `model.shape_timing.places-grid`
+  and `model.selftest` passed; the single-node build without a warning, its
+  collect, team and shape tests 64 of 64.
+- **For the VM**: H24 itself, `TIER3=1 ROUNDS=3 sh
+  tools/bench/collect-places.sh build/release <dir>` (sudo and netem), whose
+  numbers, with H25's on the cluster, decide the defaults - bearing in mind
+  that its logical nodes share the VM's CPUs; and the tier-3 and aarch64 runs
+  listed for P30 and P33.

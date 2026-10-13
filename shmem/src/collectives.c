@@ -44,6 +44,8 @@
 #include "barrier.h"
 #include "base/epoch.h"
 #include "blocked.h"
+#include "collective-circulant.h"
+#include "collective-shape.h"
 #include "collectives.h"
 #include "combine.h"
 #include "fatal.h"
@@ -554,11 +556,41 @@ static uint64_t places_from_scan(const char *routine, struct osoe_team *t, uint3
 }
 
 /*
+ * The way collect's places take by default, OSOE_COLLECTIVE_PLACES=link (P31):
+ * the least cost of the ways the team allows, under the link every PE holds
+ * alike since the end of shmem_init (link-measure.h), as a large collective's
+ * shape is chosen (collective-shape.h, osoe_places_choose) - each node's total
+ * on few nodes or the exchange, the scan on many; provisional until H24 and H25
+ * measure the four. Each node's total where nothing is measured: a job of one
+ * node, or OSOE_COLLECTIVE_SHAPE=fixed, which keeps runs repeatable.
+ */
+static enum osoe_collect_way places_chosen(const struct osoe_team *t, bool ordered)
+{
+    const struct osoe_bootstrap *b = &osoe.bootstrap;
+    if (b->collective_shape == OSOE_COLLECTIVE_SHAPE_FIXED ||
+        osoe.job.link_source == OSOE_LINK_NONE)
+        return OSOE_COLLECT_WAY_TOTALS;
+    /* Träff's where a reduction of the team's would take it (internode-generic.c,
+     * shape_of): under `link`, and where its rows fit the region's words. */
+    bool circulant = b->collective_shape == OSOE_COLLECTIVE_SHAPE_LINK &&
+                     osoe_circulant_rows(t->nodes) <= osoe_internal_circulant_rows(b->node_count);
+    enum osoe_places_way way =
+        osoe_places_choose(t->nodes, t->members, true, ordered,
+                           osoe_internode_exchange_most_nodes(), &osoe.job.link,
+                           b->collective_fanout, b->collective_pipeline,
+                           b->small_collective_bytes, OSOE_INTERNAL_PIECE_BYTES, circulant);
+    return way == OSOE_PLACES_SCAN       ? OSOE_COLLECT_WAY_SCAN
+           : way == OSOE_PLACES_EXCHANGE ? OSOE_COLLECT_WAY_EXCHANGE
+                                         : OSOE_COLLECT_WAY_TOTALS;
+}
+
+/*
  * Which way collect's places take on `t` (collect_varying's comment), from the
  * walk of its ranks (team.h, osoe_team_node_runs) - NULL where some node's
- * members are not one run, or on one node - and OSOE_COLLECTIVE_PLACES: the
- * way the setting names where the team allows it, and otherwise the one it
- * falls back to, every lead alike from what every PE holds alike.
+ * members are not one run, or on one node - and OSOE_COLLECTIVE_PLACES: by
+ * default the cheapest the team allows (places_chosen), and forced, the way the
+ * setting names where the team allows it and otherwise the one it falls back
+ * to, every lead alike from what every PE holds alike.
  */
 static enum osoe_collect_way places_way(const struct osoe_team *t,
                                         const struct osoe_team_node_run *runs)
@@ -566,6 +598,8 @@ static enum osoe_collect_way places_way(const struct osoe_team *t,
     uint32_t setting = osoe.bootstrap.collective_places;
     if (!runs || setting == OSOE_COLLECTIVE_PLACES_MEMBERS)
         return OSOE_COLLECT_WAY_MEMBERS;
+    if (setting == OSOE_COLLECTIVE_PLACES_LINK)
+        return places_chosen(t, t->node_runs_order != OSOE_TEAM_RUNS_UNORDERED);
     if (setting == OSOE_COLLECTIVE_PLACES_SCAN && t->node_runs_order != OSOE_TEAM_RUNS_UNORDERED)
         return OSOE_COLLECT_WAY_SCAN;
     if (setting == OSOE_COLLECTIVE_PLACES_EXCHANGE &&
@@ -620,27 +654,30 @@ static enum osoe_collect_way places_way(const struct osoe_team *t,
  *     every node's total, as the reduction would leave them.
  *
  * Which way a team takes is OSOE_COLLECTIVE_PLACES's where the team allows it
- * (places_way): by default each node's total where every node is one run, the
- * members' vector elsewhere; forced, the members' vector anywhere, the scan
- * where the runs meet the positions in order or in reverse and the exchange
- * where the team spans few enough nodes, each falling back to each node's
- * total, and that to the members' vector. What the team allows is
- * found once, at its first such collect, by its lead on each node (team.h,
- * osoe_team_node_runs), from what every PE holds alike - the team's ranks and
- * the job's rank map - and every PE holds the setting alike, which the job's
- * rendezvous and each node's segment check, so every lead takes the same way.
- * Were two ever to differ, they would wait on different words, or their
- * reductions would differ in size, which the reduction's checks name where its
- * pieces meet (internode-generic.c): a piece's header carries its bytes and
- * its collective - the leads' scan has an identity of its own - and a large
- * one's grant its epoch, identity and bytes - but for a lead that takes as
- * small what its child takes as large, whose child waits for a grant until the
- * deadlock detector names the hang (shmem.lanes.class-split-hang). The lead
+ * (places_way): by default the cheapest the link makes of those the team
+ * allows, as a large collective's shape is chosen (places_chosen; P31) - the
+ * exchange on few nodes, each node's total through the tree on more, and the
+ * scan where its vector would be a large reduction, at the defaults, while H24
+ * and H25 have yet to measure them - and each node's total where no link is
+ * known; the members' vector wherever some node is not one run. Forced, the
+ * members' vector anywhere, the scan where the runs meet the positions in order
+ * or in reverse and the exchange where the team spans few enough nodes, each
+ * falling back to each node's total, and that to the members' vector. What the
+ * team allows is found once, at its first such collect, by its lead on each
+ * node (team.h, osoe_team_node_runs), from what every PE holds alike - the
+ * team's ranks and the job's rank map - and every PE holds the setting alike,
+ * which the job's rendezvous and each node's segment check, so every lead takes
+ * the same way. Were two ever to differ, they would wait on different words, or
+ * their reductions would differ in size, which the reduction's checks name
+ * where its pieces meet (internode-generic.c): a piece's header carries its
+ * bytes and its collective - the leads' scan has an identity of its own - and a
+ * large one's grant its epoch, identity and bytes - but for a lead that takes
+ * as small what its child takes as large, whose child waits for a grant until
+ * the deadlock detector names the hang (shmem.lanes.class-split-hang). The lead
  * publishes the way it took and how many lengths it summed between the nodes -
  * a member's each, a node's each - by the tree or the exchange - or under the
  * scan its own node's alone (team.tree.collect_way and
- * team.tree.collect_lengths, node.h). The data keeps
- * the allgather every way.
+ * team.tree.collect_lengths, node.h). The data keeps the allgather every way.
  */
 static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
                            const void *source, size_t block)
