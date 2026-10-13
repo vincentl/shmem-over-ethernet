@@ -2811,6 +2811,18 @@ which allows only below `0x2_0000_0000`, the band
 - **It publishes `B` in the control segment** before any sibling reads it.
 - **Every other PE maps its own heap at the published `B`**, and fails loudly if it
   cannot. All local PEs run the same binary, so the lead's choice suits them.
+- **Under ThreadSanitizer the heap's `mmap` says `MAP_FIXED` as well as
+  `MAP_FIXED_NOREPLACE`** (P34): the tool's interception of `mmap` replaces an
+  address outside its application memory with none where the call does not say
+  `MAP_FIXED`, and refuses the call, `EINVAL`, where it does. Asked by
+  `MAP_FIXED_NOREPLACE` alone, it handed the kernel a request for address 0
+  itself, which a user is refused below `vm.mmap_min_addr` and root may map - and
+  the tool then ended the process, so every job root ran in the `tsan` preset
+  died at the first candidate, on x86-64 and aarch64 alike. The kernel reads the
+  two flags together as `MAP_FIXED_NOREPLACE` alone (it sets `MAP_FIXED` itself
+  for that flag, since 4.17), so a candidate the tool keeps is passed over, and
+  one `OSOE_HEAP_BASE` sets is refused naming the tool (`node.c`,
+  `UNDER_THREAD_SANITIZER`; `shmem.heap-base.candidates`).
 - **`OSOE_HEAP_BASE` replaces the list** for systems where none of the candidates
   is free. It must be a multiple of the page, which the mapping needs, and one
   that is not is refused by name - a Pi 5's page is 16 KiB, so a base chosen on

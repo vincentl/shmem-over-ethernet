@@ -60,6 +60,32 @@ static const uint64_t heap_base_candidates[] = {
     UINT64_C(0x000100000000),
 };
 
+/*
+ * ThreadSanitizer's interception of mmap, asked for an address outside its
+ * application memory, replaces the address with none where the call does not
+ * say MAP_FIXED, and refuses the call with EINVAL where it does. Asked for a
+ * candidate by MAP_FIXED_NOREPLACE alone, then, it hands the kernel a request
+ * for address 0 itself: a user is refused (EPERM, below vm.mmap_min_addr) and
+ * the next candidate is tried, but root may map page 0, and the tool then ends
+ * the process ("mmap at bad address") - as the first two candidates, its shadow
+ * and its meta ranges on x86-64, did to every job root ran (P34 of
+ * docs/prompts/v0.2-open-items.md). So under it the heap asks MAP_FIXED as
+ * well, which the kernel reads as MAP_FIXED_NOREPLACE alone - it sets MAP_FIXED
+ * itself for that flag, since Linux 4.17, the library's floor - and a candidate
+ * the tool keeps for itself is refused by name and the next one tried, never
+ * mapped at 0.
+ */
+#if defined(__SANITIZE_THREAD__)
+#define UNDER_THREAD_SANITIZER 1
+#elif defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define UNDER_THREAD_SANITIZER 1
+#endif
+#endif
+#ifndef UNDER_THREAD_SANITIZER
+#define UNDER_THREAD_SANITIZER 0
+#endif
+
 /* Sections of the control segment start on a cache line, so none shares one. */
 static uint64_t align_up(uint64_t n);
 
@@ -429,6 +455,10 @@ static const char *heap_refusal(int refused)
                "mappings";
     case EPERM:
         return "the kernel refuses an address that low (vm.mmap_min_addr)";
+#if UNDER_THREAD_SANITIZER
+    case EINVAL:
+        return "ThreadSanitizer keeps that address for itself, outside its application memory";
+#endif
     default:
         return strerror(refused);
     }
@@ -475,7 +505,8 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
     for (size_t i = 0; i < ncandidates && !mapped_at; i++) {
         void *want = (void *)(uintptr_t)(candidates[i] + shift);
         void *p = mmap(want, n->heap_bytes, PROT_READ | PROT_WRITE,
-                       MAP_SHARED | MAP_FIXED_NOREPLACE, fd, 0);
+                       MAP_SHARED | MAP_FIXED_NOREPLACE | (UNDER_THREAD_SANITIZER ? MAP_FIXED : 0),
+                       fd, 0);
         *refused = p == MAP_FAILED ? errno : 0;
         if (p == want)
             mapped_at = candidates[i];

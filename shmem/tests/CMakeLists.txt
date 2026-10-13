@@ -1600,12 +1600,32 @@ set_tests_properties(shmem.refuse.heap_base_signed PROPERTIES LABELS "tier2" TIM
 # where the lead said only to set OSOE_HEAP_BASE (D12): one past the end of any
 # process's address space, a multiple of every page size, which the kernel
 # refuses with ENOMEM to root as to anyone - unlike 0x1000, which root may map.
+# Under ThreadSanitizer the tool refuses it first, as outside its application
+# memory, and the reason names the tool (P34; node.c, UNDER_THREAD_SANITIZER),
+# where the tool once made it a request for address 0.
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(osoe_heap_base_reason "ThreadSanitizer keeps that address for itself")
+else()
+  set(osoe_heap_base_reason "it runs past")
+endif()
 add_test(NAME shmem.refuse.heap_base_not_mapped
   COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=0x7fffffffffff0000
           $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
 set_tests_properties(shmem.refuse.heap_base_not_mapped PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION
-  "OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: it runs past")
+  "OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: ${osoe_heap_base_reason}")
+# The library's own candidates, OSOE_HEAP_BASE unset whatever the shell sets
+# (P34): a job starts, and each PE's start-up line (SHMEM_DEBUG) shows its heap
+# at a candidate - never at address 0, which ThreadSanitizer's interception of
+# mmap made of the first two, so that every job root ran in the tsan preset
+# ended in the tool's "mmap at bad address" (node.c, UNDER_THREAD_SANITIZER).
+# In the other presets it holds the candidates to a job that starts.
+add_test(NAME shmem.heap-base.candidates
+  COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_HEAP_BASE SHMEM_DEBUG=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.heap-base.candidates PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "heap [0-9]+ bytes at 0x[0-9a-f]+"
+  FAIL_REGULAR_EXPRESSION "exited with status [1-9];killed by signal;timeout after;left behind")
 # OSOE_TEST_NOTICE_SECONDS, a testing hook, is refused by name when it is not a
 # whole number of seconds from 1 to 3600, where it was taken as unset and the
 # notice left at 30 s (D17).
