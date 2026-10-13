@@ -398,3 +398,19 @@ its full run, as the first session did the kit.
 the open items' references to "FL §11" for H15 to H19 still find their text,
 which now points to §13; the brief's sections numbered otherwise would move
 them.
+
+## The end of the session
+
+**Part 3 was not started**, to keep the credit for the response; every item of it
+remains (the response, "What remains of Part 3").
+
+**The final tree, `48fcda2`'s** (no library or test file changed after P32):
+
+- `tsan`, as root, nothing set (`ctest --test-dir build/tsan -j4 --timeout
+  300`): no warning, **631 tests, 630 passed, 1 skipped**, the gate passing, 4 min
+  20 s;
+- `debug` (`cmake --preset debug`, `ctest --test-dir build/debug -LE model -j4`):
+  no warning, **930 tests, 928 passed, 2 skipped**, 6 min 12 s;
+- release's static checks: 13 of 13.
+
+The complete account is `docs/prompts/cloud-session-3-response.md`.
