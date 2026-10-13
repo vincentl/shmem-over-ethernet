@@ -3045,10 +3045,14 @@ if(OSOE_INTERNODE)
   # the scan; and the out-of-order map, falling back to each node's total.
   #
   # Under the default, the link's choice (P31) is held to the ways the team
-  # allows, and pinned where the link is the Pi's, set by hand (pi-link): each
-  # node's total itself, P29's way, forced on two maps and the out-of-order
-  # one (totals), and the members' vector forced on a block map and a cyclic
-  # one (members).
+  # allows, and pinned where the link is the Pi's, set by hand (pi-link): the
+  # exchange on a block map of four nodes and negative strides on three, and
+  # each node's total on an out-of-order map of seventeen nodes, one PE each,
+  # where the cost model alone would take the exchange and the default stops
+  # at 16 nodes (P35; collective-shape.h, OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST)
+  # - the scan not allowed there; each node's total itself, P29's way, forced on
+  # two maps and the out-of-order one (totals), and the members' vector forced
+  # on a block map and a cyclic one (members).
   #
   # And forced to the leads' exchange of the nodes' totals (P33),
   # OSOE_COLLECTIVE_PLACES=exchange: block maps of two to seven nodes, negative
@@ -3083,20 +3087,26 @@ if(OSOE_INTERNODE)
                  "totals:block:0,0,0,1,1,2,2,2,2,3" "totals:negative-stride:0,0,1,1,1,2,3,3,4,4"
                  "totals:unordered:1,1,0,0,2,2" "members:block:0,0,1,2,2"
                  "members:cyclic:0,1,2,0,1,2,0,1,2" "pi-link:block:0,0,0,1,1,2,2,2,2,3"
-                 "pi-link:negative-stride:0,0,1,2,2")
+                 "pi-link:negative-stride:0,0,1,2,2"
+                 "pi-link:unordered:1,0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16:totals")
       string(REPLACE ":" ";" parts "${case}")
       list(LENGTH parts fields)
       set(forced "")
       set(prefix "")
-      if(fields EQUAL 3)
+      if(fields GREATER_EQUAL 3)
         list(GET parts 0 way)
         list(REMOVE_AT parts 0)
         set(prefix ${way}.)
         if(way STREQUAL "pi-link")
           # The default, the way chosen from the Pi's link set by hand: the
-          # exchange on every team of these maps (shape_timing.py places).
+          # exchange on every team of these maps, or the way a fourth field
+          # names (shape_timing.py places).
+          set(link_way exchange)
+          if(fields EQUAL 4)
+            list(GET parts 2 link_way)
+          endif()
           set(forced OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
-              OSOE_LINK_BYTES_PER_SECOND=116000000 OSOE_TEST_PLACES_LINK_WAY=exchange)
+              OSOE_LINK_BYTES_PER_SECOND=116000000 OSOE_TEST_PLACES_LINK_WAY=${link_way})
         else()
           set(forced OSOE_COLLECTIVE_PLACES=${way})
         endif()

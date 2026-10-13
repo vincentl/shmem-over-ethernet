@@ -614,10 +614,20 @@ def simulate_circulant(nodes, n, s, W, h, o, B, links='sender'):
 # H25 measure the four (docs/prompts/v0.2-open-items.md), and the choice
 # follows them. collective-shape.c's osoe_places_cost and osoe_places_choose,
 # line for line; shmem.shape.places-grid holds the two to the same answers.
+#
+# The default takes the exchange on no more than 16 nodes, however cheap these
+# costs find it past them (P35, the author's decision of 2026-10-13): H24
+# measured it the fastest of the four at 8 and 16 logical nodes and slower than
+# the scan at 32, on one machine whose CPUs carry every lead's N - 1 messages at
+# once - which overstates its cost, so a cluster can only move the crossover
+# up (docs/design/evidence/v0.2-step4/2026-10-13-h24/). Past them each node's
+# total or the scan, as the costs choose; provisional until H25.
+# collective-shape.h's OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST.
 
 PLACES_WAYS = ('members', 'totals', 'scan', 'exchange')
 PLACES_DOWN_BYTES = 16          # the leads' scan's down, the before and the total
 EXCHANGE_SLOT_BYTES = 16        # the exchange's slot, the epoch and the total
+EXCHANGE_DEFAULT_NODES_MOST = 16  # the most nodes the default takes the exchange on (P35)
 
 
 def gather_steps(nodes):
@@ -668,13 +678,14 @@ def choose_places(nodes, members, runs, ordered, room, link, ceiling, capacity, 
     """osoe_places_choose: the way a collect's places take by default. The
     members' vector where some node's members are not one run (`runs` false) or
     on one node; otherwise the least cost of each node's total, the exchange -
-    on no more nodes than its `room` - and the scan - where the runs are
-    `ordered` - ties to that order."""
+    on no more nodes than its `room`, nor than EXCHANGE_DEFAULT_NODES_MOST - and
+    the scan - where the runs are `ordered` - ties to that order."""
     if nodes <= 1 or not runs:
         return 'members'
     best, least = 'totals', places_cost('totals', nodes, members, link, ceiling, capacity,
                                         small_bytes, s, circulant)
-    for way, allowed in (('exchange', nodes <= room), ('scan', ordered)):
+    exchange = nodes <= room and nodes <= EXCHANGE_DEFAULT_NODES_MOST
+    for way, allowed in (('exchange', exchange), ('scan', ordered)):
         if not allowed:
             continue
         c = places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s, circulant)
@@ -966,8 +977,8 @@ def places_grid_lines():
     links = [PI_LINK, LOOPBACK_LINK, (1000000, 50000, 12000000), (5000, 500, 25000000000),
              (50000, 3000, 2700000000)]
     for link in links:
-        for nodes in (1, 2, 3, 4, 7, 8, 9, 16, 31, 46, 47, 60, 61, 64, 65, 100, 128, 129, 200,
-                      254, 512, 1000, 4096):
+        for nodes in (1, 2, 3, 4, 7, 8, 9, 16, 17, 31, 46, 47, 60, 61, 64, 65, 100, 128, 129,
+                      200, 254, 512, 1000, 4096):
             for per_node in (1, 4, 16):
                 for runs, ordered in ((False, False), (True, False), (True, True)):
                     for ceiling, capacity, small in ((8, 4, 1024), (4, 2, 128), (32, 8, 16384)):
@@ -988,10 +999,11 @@ def places_grid_lines():
 def check_places(failures):
     """What the places' choice must say, whatever H24 and H25 move: the
     members' vector without runs and on one node; on the Pi's link and a
-    loopback's, the exchange on few nodes, and past 128 - where each node's
-    total becomes a large reduction, with its grant - the scan where the runs
-    are ordered, each node's total where they are not; and none of the costs
-    zero past one node."""
+    loopback's, the exchange on few nodes, never past its room nor past the
+    default's cap (P35) - which the costs alone would cross on both links - and
+    past 128 - where each node's total becomes a large reduction, with its
+    grant - the scan where the runs are ordered, each node's total where they
+    are not; and none of the costs zero past one node."""
     for name, link in (('the Pi', PI_LINK), ('loopback', LOOPBACK_LINK)):
         if choose_places(8, 8, False, False, 64, link, 8, 4, 1024) != 'members':
             failures.append(f'PLACES: on {name} a team with no runs does not take the members')
@@ -1006,6 +1018,11 @@ def check_places(failures):
                             'total')
         if choose_places(100, 100, True, True, 64, link, 8, 4, 1024) == 'exchange':
             failures.append(f'PLACES: on {name} 100 nodes take the exchange past its room')
+        past = EXCHANGE_DEFAULT_NODES_MOST + 1
+        for ordered in (True, False):
+            if choose_places(past, past, True, ordered, 64, link, 8, 4, 1024) == 'exchange':
+                failures.append(f'PLACES: on {name} {past} nodes take the exchange past the '
+                                f'default\'s {EXCHANGE_DEFAULT_NODES_MOST}')
         for w in PLACES_WAYS:
             if places_cost(w, 8, 8, link, 8, 4, 1024) == 0:
                 failures.append(f'PLACES: on {name} the {w} costs nothing on 8 nodes')

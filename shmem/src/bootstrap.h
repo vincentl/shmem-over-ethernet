@@ -190,8 +190,9 @@ static inline const char *osoe_collective_shape_name(uint32_t shape)
  * collect of differing blocks on a team spanning nodes finds its places
  * (collectives.c, collect_varying). `link`, the default, takes the way the link
  * makes cheapest among those the team allows (collective-shape.h,
- * osoe_places_choose) - each node's total through the tree, its exchange or its
- * scan where every node holds one run of the team's ranks, the members' vector
+ * osoe_places_choose) - each node's total through the tree, its exchange, on no
+ * more than 16 nodes (P35), or its scan where every node holds one run of the
+ * team's ranks, the members' vector
  * elsewhere - and each node's total through the tree where no link is known;
  * the others force one way, for the tests and the measurements, where the team
  * allows it: `members` the members' vector,

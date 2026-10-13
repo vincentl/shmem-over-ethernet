@@ -5474,13 +5474,24 @@ the same answers): the members' vector wherever some node is not one run;
 otherwise the least cost of each node's total - a reduction as the data path
 runs it, its small class one piece through the ceiling's tree and a larger one
 the chooser's shape and a hop for its grant - the exchange, a hop and N - 1
-messages, within its room, and the scan, a small tree as deep and a message
-more a step of the gather, where the runs are ordered; each node's total where
-no link is known. On the Pi's link that is the exchange to 60 nodes and the scan
-beyond; on a loopback's, the exchange to 46, each node's total to 128 - where
-its vector becomes a large reduction - and the scan beyond. **Provisional**: the
-cost model's, until H24 (the VM's logical nodes, `tools/bench/collect-places.sh`,
-`osoe-bench places`) and H25 (the cluster) measure the four.
+messages, within its room and on no more than 16 nodes, and the scan, a small
+tree as deep and a message more a step of the gather, where the runs are
+ordered; each node's total where no link is known. **The exchange stops at 16
+nodes (P35, the author's decision of 2026-10-13)**, however cheap the costs
+find it past them: H24 measured it the fastest of the four at 8 and 16 logical
+nodes and slower than the scan at 32 (`docs/design/evidence/v0.2-step4/
+2026-10-13-h24/`), on one machine whose CPUs carry every lead's N - 1 messages
+at once, which overstates its cost - so a cluster can only move the crossover
+up - where the costs alone took it to 60 nodes on the Pi's link and 46 on a
+loopback's (`collective-shape.h`, `OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST`;
+`shape_timing.py`'s `EXCHANGE_DEFAULT_NODES_MOST`; `shmem.shape.places-grid`, and
+`shmem.collect-places.pi-link.unordered.*`, seventeen nodes taking each node's
+total). `OSOE_COLLECTIVE_PLACES=exchange` still forces it to its room. On the
+Pi's link the default is then the exchange to 16 nodes, each node's total to
+25 and the scan beyond; on a loopback's, the exchange to 16, each node's total
+to 128 - where its vector becomes a large reduction - and the scan beyond.
+**Provisional**: the cost model's and H24's, until H25 (the cluster) measures
+the four, and may raise the 16.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads

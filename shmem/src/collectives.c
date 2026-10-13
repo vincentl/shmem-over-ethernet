@@ -559,10 +559,11 @@ static uint64_t places_from_scan(const char *routine, struct osoe_team *t, uint3
  * The way collect's places take by default, OSOE_COLLECTIVE_PLACES=link (P31):
  * the least cost of the ways the team allows, under the link every PE holds
  * alike since the end of shmem_init (link-measure.h), as a large collective's
- * shape is chosen (collective-shape.h, osoe_places_choose) - each node's total
- * on few nodes or the exchange, the scan on many; provisional until H24 and H25
- * measure the four. Each node's total where nothing is measured: a job of one
- * node, or OSOE_COLLECTIVE_SHAPE=fixed, which keeps runs repeatable.
+ * shape is chosen (collective-shape.h, osoe_places_choose) - the exchange on
+ * few nodes, never past 16 (P35), each node's total or the scan past them;
+ * provisional until H25 measures the four. Each node's total where nothing is
+ * measured: a job of one node, or OSOE_COLLECTIVE_SHAPE=fixed, which keeps runs
+ * repeatable.
  */
 static enum osoe_collect_way places_chosen(const struct osoe_team *t, bool ordered)
 {
