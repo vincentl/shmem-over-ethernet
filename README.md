@@ -1322,14 +1322,21 @@ specification or takes a choice the specification leaves open.
   type-generic interfaces are C11's `_Generic`, as the specification defines
   them. In C11 the routines whose C11 synopsis gives one name two argument
   lists - `shmem_sync`, `shmem_signal_add`, `shmem_signal_set` - are macros that
-  choose by argument count, so a program that declares or defines one by name, a
-  profiling wrapper, writes `(shmem_signal_add)` in parentheses.
+  choose by argument count, and a program may still declare or define one by
+  its plain name, as a profiling wrapper written as the specification's example
+  in §10 does: the macro leaves it a declaration of the function. The
+  deprecated `shmem_wait` and `shmem_wait_until` on a `long`, whose names C11
+  gives the type-generic waits, a wrapper writes in parentheses,
+  `(shmem_wait_until)`.
 - **MPI in the same program has not been tried**: the test suite's programs that
   mix the two are not built here.
 - **`shmemx.h` is empty.** The cache routines (`shmem_set_cache_inv` and five
   more) were deprecated in 1.3 and left the specification after 1.4; osoe keeps
   them as routines that do nothing, for programs that still call them, which is
-  right on a cache-coherent machine, as every one osoe runs on is.
+  right on a cache-coherent machine, as every one osoe runs on is. They are
+  declared in `shmem.h`, where those programs look for them, though §5 allows
+  that header only the specification's interfaces; `shmemx.h`, where §5 puts
+  the rest, would take them only renamed `shmemx_`.
 
 ## Toward RDMA: a RoCE backend
 
@@ -1438,7 +1445,7 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  470 tests labelled `internode` - those of a job of more than one node, of
+  476 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the

@@ -341,7 +341,7 @@ def agent(i, design):
     B = [('A0', ('set', 'phase', lambda L: 0, '@LOOP')),
          ('LOOP', ('nd', choose, '@CHECK')),
          ('CHECK', ('check', lambda M, L: None if not M[VIOLATION] else
-                    f'declared, but {deadlocked(M) or "?"}', '@AFTER')),
+                    f'SAFETY: declared, but {deadlocked(M) or "?"}', '@AFTER')),
          ('AFTER', ('br', lambda L: L.get('phase') == 6, '@END', '@LOOP')),
          ('END', ('done',))]
     return assemble(B)
@@ -382,7 +382,7 @@ SCENARIOS = {
     'barrier': ([], [('barrier', 2)], [('wait',)]),
 }
 
-# (design, scenario, expect_ok)
+# (design, scenario, expect): True, or the property the breakage must fail
 CASES = [
     ('design', 'deadlock', True),
     ('design', 'put_wakes', True),
@@ -392,16 +392,16 @@ CASES = [
     ('design', 'compute', True),
     ('design', 'chain', True),
     ('design', 'barrier', True),
-    ('waits_only', 'get_far', False),
-    ('no_acks', 'put_silent', False),
-    ('no_idle', 'put_silent', False),
-    ('no_pass', 'put_wakes', False),
-    ('coarse_waits', 'barrier', False),
-    ('one_collection', 'put_wakes', False),
-    ('no_blocked', 'compute', False),
+    ('waits_only', 'get_far', 'SAFETY'),
+    ('no_acks', 'put_silent', 'SAFETY'),
+    ('no_idle', 'put_silent', 'SAFETY'),
+    ('no_pass', 'put_wakes', 'SAFETY'),
+    ('coarse_waits', 'barrier', 'SAFETY'),
+    ('one_collection', 'put_wakes', 'SAFETY'),
+    ('no_blocked', 'compute', 'SAFETY'),
     # The barrier's arrival on the control wire (v0.2 step 4 part 2).
     ('control_wire_acked', 'barrier', True),
-    ('control_wire', 'barrier', False),
+    ('control_wire', 'barrier', 'SAFETY'),
 ]
 
 
@@ -418,7 +418,7 @@ def main():
         # reachable from every state.
         res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
                       idle_ok=lambda i, M, L: i >= N, done=lambda M: M[DECLARED] == 1)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

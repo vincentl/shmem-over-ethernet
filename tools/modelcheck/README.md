@@ -57,13 +57,18 @@ and before a release; on 2026-10-03 the six took 22 minutes.
 2. **State the guarantee with ghosts.** Record what the specification talks about
    in ghost memory (keys starting with `$`), such as "this call returned" or "this
    byte landed". Check it with a `check` instruction at the point the guarantee
-   must hold.
+   must hold, whose message begins with the property's name and a colon -
+   `ORDER: team 0: ...` - so that a failure says which property failed.
 3. **Abstract what is already proven.** Use `nd` for a nondeterministic
    environment (a network, a progress thread) and `await` for a wait whose wake
    protocol another model covers.
 4. **Break the design on purpose.** Every rule the design states should have a
    variant that drops it and fails with a trace. A model in which nothing can fail
-   proves nothing.
+   proves nothing. Each broken variant names the property it must fail - a check's
+   name, or LOST WAKE, STUCK or TRAPPED - and `report(res, expect=...)` compares:
+   a variant that fails some other way, its own check no longer reached, is as
+   unexpected as a design that fails (`engine.py`'s "Properties"). The models
+   that search with their own code compare the same way, with `engine.judge`.
 
 ## Keeping it fast
 

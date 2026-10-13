@@ -74,6 +74,8 @@ Usage:
 """
 import sys
 
+import engine
+
 NONE = 0xFFFFFFFF
 
 
@@ -180,7 +182,8 @@ def combine_check(n, count, broken=None):
     for lead in range(n):
         for e in range(count):
             if have[lead][e] != full:
-                return f'N {n}, {count} elements: lead {lead} element {e} holds {have[lead][e]}'
+                return (f'RESULT: N {n}, {count} elements: lead {lead} element {e} holds '
+                        f'{have[lead][e]}')
     return None
 
 
@@ -234,21 +237,26 @@ def step_of_check(n, count):
         s = step_of(src, n, step, count)
         d = step_of(dst, n, step, count)
         if s[0] != dst or not s[1] or (s[4], s[5]) != (a, b):
-            return f'N {n}, {count} elements, step {step}: lead {src} sends {s}, not {kind} {a}..{b} to {dst}'
+            return (f'SCHEDULE: N {n}, {count} elements, step {step}: lead {src} sends {s}, '
+                    f'not {kind} {a}..{b} to {dst}')
         if d[0] != src or not d[2] or (d[6], d[7]) != (a, b):
-            return f'N {n}, {count} elements, step {step}: lead {dst} receives {d}, not {kind} {a}..{b} from {src}'
+            return (f'SCHEDULE: N {n}, {count} elements, step {step}: lead {dst} receives {d}, '
+                    f'not {kind} {a}..{b} from {src}')
         combines = kind in ('fold', 'halving')
         if d[3] != combines:
-            return f'N {n}, {count} elements, step {step}: lead {dst} combines {d[3]} in a {kind}'
+            return (f'SCHEDULE: N {n}, {count} elements, step {step}: lead {dst} combines '
+                    f'{d[3]} in a {kind}')
         seen.add((step, src, 'send'))
         seen.add((step, dst, 'receive'))
     for step in range(step_count(n)):
         for rank in range(n):
             t = step_of(rank, n, step, count)
             if t[1] and (step, rank, 'send') not in seen:
-                return f'N {n}, step {step}: lead {rank} sends where the schedule has nothing'
+                return (f'SCHEDULE: N {n}, step {step}: lead {rank} sends where the schedule '
+                        f'has nothing')
             if t[2] and (step, rank, 'receive') not in seen:
-                return f'N {n}, step {step}: lead {rank} receives where the schedule has nothing'
+                return (f'SCHEDULE: N {n}, step {step}: lead {rank} receives where the '
+                        f'schedule has nothing')
     return None
 
 
@@ -448,8 +456,9 @@ PROTOCOL_CASES = [
     ('four leads, three rows', 4, 4, 2, 3),
     ('five leads, the fold and two halvings', 5, 4, 2, 2),
 ]
-BREAKAGES = ['row_early', 'no_grant', 'stale_grant', 'early_unfold', 'exchange_no_lag',
-             'one_way_no_credit']
+# each breakage, and the property it must fail
+BREAKAGES = {'row_early': 'UP', 'no_grant': 'LANE', 'stale_grant': 'LANE', 'early_unfold': 'UP',
+             'exchange_no_lag': 'UP', 'one_way_no_credit': 'UP'}
 
 
 def protocol(want):
@@ -464,7 +473,7 @@ def protocol(want):
         threads = [assemble(lead_program(design, n, nodes, count, W, R, 2)) for n in range(nodes)]
         res = explore(f'{design}: {name}', threads, {}, max_seconds=900,
                       liveness_max_states=3_000_000, progress=60)
-        report(res, expect_ok=expect)
+        report(res, expect=expect)
         return res
 
     for name, nodes, count, W, R in PROTOCOL_CASES:
@@ -475,16 +484,17 @@ def protocol(want):
         cases = [c for c in PROTOCOL_CASES if want(f'{design}: {c[0]}')]
         if not cases:
             continue
-        breakage_failed[design] = False
+        breakage_failed[design] = None
         for name, nodes, count, W, R in cases:
             res = run(design, name, nodes, count, W, R, None)
             if not res.ok:
-                breakage_failed[design] = True
+                # A limit is recorded by its verdict, which names no property: unexpected.
+                breakage_failed[design] = res.failed or res.verdict
                 break
     return ok
 
 
-breakage_failed = {}
+breakage_failed = {}        # breakage -> what its first failing case fails, or None
 
 
 def main(argv):
@@ -513,11 +523,14 @@ def main(argv):
     print(f'arithmetic, N 2 to 70 at {len(counts_for(70))} lengths: '
           f'{"every element combined from every node once" if not failures else failures[:3]}')
     ok = ok and not failures
-    for broken in ('fold_half', 'early_unfold'):
+    for broken, expect in (('fold_half', 'RESULT'), ('early_unfold', 'RESULT')):
         caught = [why for n in (3, 5, 6, 7, 12) for count in counts_for(n)
                   for why in [combine_check(n, count, broken)] if why]
-        print(f'broken {broken}: {"fails: " + caught[0] if caught else "PASSES - the check cannot see it"}')
-        ok = ok and bool(caught)
+        wrong = engine.judge(not caught, engine.named(caught[0] if caught else None), expect)
+        mark = '' if wrong is None else '   <-- UNEXPECTED' + wrong
+        print(f'broken {broken}: '
+              f'{"fails: " + caught[0] if caught else "PASSES - the check cannot see it"}{mark}')
+        ok = ok and wrong is None
     for n in (4, 8, 16, 7, 33, 70):
         o, i = bytes_sent(n, 1 << 20)
         print(f'   N {n:2d}: the busiest lead sends {o / (1 << 20):.2f} and receives '
@@ -525,10 +538,16 @@ def main(argv):
     pats = argv[2:]
     want = lambda name: not pats or any(x in name for x in pats)
     ok = protocol(want) and ok
-    for design in BREAKAGES:
+    for design, expect in BREAKAGES.items():
         if design in breakage_failed:
-            print(f'breakage {design}: {"fails" if breakage_failed[design] else "NEVER FAILS"}')
-            ok = ok and breakage_failed[design]
+            failed = breakage_failed[design]
+            wrong = engine.judge(failed is None, failed, expect)
+            if wrong is None:
+                print(f'breakage {design}: fails {failed}')
+            else:
+                print(f'breakage {design}: {"fails" if failed else "NEVER FAILS"}'
+                      f'   <-- UNEXPECTED{wrong}')
+            ok = ok and wrong is None
     print('ok' if ok else 'FAILED')
     return 0 if ok else 1
 

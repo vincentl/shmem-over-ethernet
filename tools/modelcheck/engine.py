@@ -40,7 +40,7 @@ Instructions (labels starting with '@' are resolved by assemble)
   ('nd',    fn(M, L) -> [(mem_upd, loc_upd, label)], nxt)
             one successor per alternative; blocked while the list is empty
   ('await', cond(M, L), nxt)                    abstract blocking wait
-  ('check', fn(M, L) -> None | message, nxt)
+  ('check', fn(M, L) -> None | message, nxt)    message: 'NAME: what failed' (Properties)
   ('done',)
 A var of '_' discards the result.
 
@@ -81,6 +81,15 @@ costs two machine words per edge and three per state, so it runs only while the
 model stays under `liveness_max_states`; past that the result line says the
 check did not run. `liveness=False` turns it off.
 
+Properties. A check names the property it holds: its message begins with the
+property's name and a colon - 'ORDER: team 0: epoch 2 forwarded after 0'. A
+result's `failed` is that name when a check fails, the verdict itself for LOST
+WAKE, STUCK and TRAPPED, and None for a result that holds or did not finish.
+A model's broken variant names the property it must fail (`report`'s
+`expect`), and `report` compares: a variant that fails some other way - STUCK
+where it was written to fail NO_KILL, its own check no longer reached - is as
+unexpected as a design that fails (the round-four review's correctness F5).
+
 Guards. A progress line on stderr every `progress` seconds (states, rate,
 stack, depth, largest memory value), and TIME LIMIT, STATE LIMIT and DEPTH LIMIT verdicts
 with the trace that reached them. A model with an unbounded loop or counter
@@ -90,6 +99,7 @@ growing in the progress lines.
 import hashlib
 import marshal
 from array import array
+import re
 import sys
 import time
 
@@ -179,6 +189,18 @@ class Result:
     @property
     def complete(self):
         return self.verdict not in ('TIME LIMIT', 'STATE LIMIT', 'DEPTH LIMIT')
+
+    @property
+    def failed(self):
+        """The property this result fails (Properties, above): the name its
+        failed check's message begins with - VIOLATION where it begins with
+        none - or LOST WAKE, STUCK or TRAPPED; None if it holds or did not
+        finish."""
+        if self.verdict == 'VIOLATION':
+            return named(self.message) or 'VIOLATION'
+        if self.verdict in ('LOST WAKE', 'STUCK', 'TRAPPED'):
+            return self.verdict
+        return None
 
 
 class Explorer:
@@ -642,9 +664,43 @@ def _trapped(nstates, edge_from, edge_to, finished, parent):
     return -1
 
 
-def report(res, expect_ok=None, tso=False, extra='', out=sys.stdout):
-    """Print one result line. Returns False for an unexpected or incomplete result."""
-    unexpected = res.complete and expect_ok is not None and expect_ok != res.ok
+NAME = re.compile(r'([A-Z][A-Z0-9_]*(?: [A-Z][A-Z0-9_]*)*): ')
+
+
+def named(message):
+    """The property a failure's message names - the capitals before its first
+    colon, 'ORDER' or 'FALSE DEAF' (Properties, above) - or None."""
+    name = NAME.match(message or '')
+    return name.group(1) if name else None
+
+
+def judge(held, failed, expect):
+    """Why a case's outcome is unexpected - '' or a reason, for the result
+    line's mark - or None when it is as expected. `held` is whether it held,
+    `failed` the property it failed; `expect` is report's. The models that
+    search with their own code judge their cases by this too."""
+    if expect is None:
+        return None
+    if expect is True or expect is False:
+        return None if expect == held else ''
+    if held:
+        return f': holds, where it must fail {expect}'
+    if failed != expect:
+        return f': fails {failed}, where it must fail {expect}'
+    return None
+
+
+def report(res, expect=None, tso=False, extra='', out=sys.stdout, expect_ok=None):
+    """Print one result line. Returns False for an unexpected or incomplete result.
+
+    `expect` is True for a case that must hold, and for one that must fail the
+    name of the property it must fail - a check's, or LOST WAKE, STUCK or
+    TRAPPED (Properties, above). `expect_ok` is the older spelling, True or
+    False, whose False takes any failure: what a model whose broken variants
+    name no property still passes."""
+    wrong = judge(res.ok, res.failed, expect_ok if expect is None else expect) \
+        if res.complete else None
+    unexpected = wrong is not None
     bound = '' if res.exact else f', miss<{max(res.states, 1) ** 2 / 2 ** 97:.0e}'
     live = '' if res.liveness is None or res.verdict != 'ok' else (
         ' +live' if res.liveness == 'ok' else f' [liveness {res.liveness}]')
@@ -653,7 +709,7 @@ def report(res, expect_ok=None, tso=False, extra='', out=sys.stdout):
     clock = f'{res.seconds:7.1f}s, ' if out.isatty() else ''
     print(f"{res.name:<60} {'TSO' if tso else 'SC '} states={res.states:>11,} depth={res.max_depth:>3} "
           f"({clock}{bound.lstrip(', ')}) -> {res.verdict}{live}{extra}"
-          f"{'   <-- UNEXPECTED' if unexpected else ''}", file=out, flush=True)
+          f"{'   <-- UNEXPECTED' + wrong if unexpected else ''}", file=out, flush=True)
     if res.verdict != 'ok':
         if res.message:
             print(f'    {res.message}', file=out)

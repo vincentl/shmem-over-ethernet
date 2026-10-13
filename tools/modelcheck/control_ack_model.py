@@ -39,6 +39,8 @@ Checked:
               request to carry, the goodbye to send) has its busy bit set, or
               a segment arrived to read.
   NO_LATE     no tree message is enqueued after this side's goodbye.
+  APPLIED_MONOTONE  a segment arrives with a sequence number above the last one
+              applied: none is applied twice or out of order.
   LIVE_QUIET  from every state before either side closes, a state where both
               sides' quiet holds is reachable (AG EF), the environment adding
               nothing.
@@ -61,6 +63,7 @@ import sys
 from collections import deque
 
 import os
+import engine
 APP = {0: int(os.environ.get('APP0', '1')), 1: int(os.environ.get('APP1', '1'))}
 DET = {0: int(os.environ.get('DET0', '1')), 1: int(os.environ.get('DET1', '0'))}
 SEQ_CAP = int(os.environ.get('SEQ_CAP', '10'))
@@ -166,7 +169,7 @@ def receive(n, seg, v):
         return put(n, ended=True)
     seq, ack, flag, gb, napp, ndet = seg
     if seq <= get(n, 'applied'):
-        raise Violation(f'applied regressed: {seq} after {get(n, "applied")}')
+        raise Violation(f'APPLIED_MONOTONE: applied regressed: {seq} after {get(n, "applied")}')
     n = put(n, applied=seq, got_app=get(n, 'got_app') + napp)
     if flag and v != 'no_owe':
         n = put(n, owe=True)
@@ -344,19 +347,20 @@ def trace(seen, S):
     return list(reversed(steps))
 
 
+# (variant, expect): True for a case that must hold, else the property it must fail
 VARIANTS = [
     ('design', True),
     ('busy_without_request', True),     # control_busy without request_owed: redundant
-    ('unacked', False),                 # as first built: no last_application_seq on a control wire
-    ('answer_asks', False),             # the echo: an answer asks
-    ('no_owe_clear', False),            # a seal does not pay the debt
-    ('no_request_in_flush', False),     # a request is carried only by other traffic
-    ('quiet_no_mark', False),           # quiet raises the want without the busy bit
-    ('no_owe', False),                  # a request is never owed an answer
-    ('goodbye_by_count', False),        # 3d30d1c's goodbye: any empty segment
-    ('no_flagged', False),              # the late request not remembered: endless asking
-    ('goodbye_no_ack', False),          # the goodbye pays no debt (LIVE_QUIET_EACH's breakage)
-    ('no_goodbye_seal', False),         # closing seals nothing (LIVE_CLOSE's breakage)
+    ('unacked', 'SAFETY'),              # as first built: no last_application_seq on a control wire
+    ('answer_asks', 'QUIESCES'),        # the echo: an answer asks
+    ('no_owe_clear', 'BOUNDED'),        # a seal does not pay the debt
+    ('no_request_in_flush', 'LIVE_QUIET'),   # a request is carried only by other traffic
+    ('quiet_no_mark', 'STRANDED'),      # quiet raises the want without the busy bit
+    ('no_owe', 'LIVE_QUIET'),           # a request is never owed an answer
+    ('goodbye_by_count', 'NO_LATE'),    # 3d30d1c's goodbye: any empty segment
+    ('no_flagged', 'BOUNDED'),          # the late request not remembered: endless asking
+    ('goodbye_no_ack', 'LIVE_QUIET_EACH'),   # the goodbye pays no debt (LIVE_QUIET_EACH's breakage)
+    ('no_goodbye_seal', 'LIVE_CLOSE'),  # closing seals nothing (LIVE_CLOSE's breakage)
 ]
 
 
@@ -369,9 +373,14 @@ def main():
         QUIET_SEEN[0] = QUIET_SEEN[1] = False
         held, why, states, tr = explore(v)
         verdict = 'holds' if held else ('FAILS' if held is False else 'NO VERDICT')
-        exp = '' if expect is None else ('as expected' if held == expect else 'UNEXPECTED')
-        ok &= expect is None or held == expect
-        print(f'control-ack/{v} APP={APP} DET={DET}: {verdict} ({states} states): {why} {exp}',
+        if held is None:        # past MAX_STATES: no verdict, which no expectation takes
+            wrong = None if expect is None else ': no verdict'
+        else:
+            wrong = engine.judge(held, engine.named(why), expect)
+        exp = '' if expect is None else (' as expected' if wrong is None else
+                                         '   <-- UNEXPECTED' + wrong)
+        ok &= wrong is None
+        print(f'control-ack/{v} APP={APP} DET={DET}: {verdict} ({states} states): {why}{exp}',
               flush=True)
         if tr:
             print('   trace: ' + ' ; '.join(tr[-14:]))

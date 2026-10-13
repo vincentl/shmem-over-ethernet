@@ -110,18 +110,18 @@ def case(design, members, epochs):
             [list(range(members))])
 
 
-# (design, members, epochs, expect_ok). Four and five waiters, two epochs: the
-# second epoch is what puts a next-epoch waiter on the word.
+# (design, members, epochs, expect): True, or the property it must fail. Four and five
+# waiters, two epochs: the second epoch is what puts a next-epoch waiter on the word.
 CASES = [
     ('design', 4, 2, True),
     ('design', 5, 2, True),
     ('design', 4, 3, True),
     ('wake_one', 4, 2, True),
     ('unmasked', 4, 1, True),        # one epoch cannot show it: no next-epoch waiter
-    ('unmasked', 4, 2, False),
-    ('unmasked', 5, 2, False),
-    ('no_pass', 4, 1, False),
-    ('no_pass', 4, 2, False),
+    ('unmasked', 4, 2, 'LOST WAKE'),
+    ('unmasked', 5, 2, 'LOST WAKE'),
+    ('no_pass', 4, 1, 'LOST WAKE'),
+    ('no_pass', 4, 2, 'LOST WAKE'),
 ]
 
 if __name__ == '__main__':
@@ -133,5 +133,5 @@ if __name__ == '__main__':
             continue
         res = explore(name, threads, mem0, symmetric=sym, max_seconds=900,
                       liveness_max_states=4_000_000)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     sys.exit(0 if ok else 1)

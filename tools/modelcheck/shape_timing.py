@@ -52,6 +52,8 @@ import os
 import statistics
 import sys
 
+import engine
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 EVIDENCE = os.path.join(HERE, '..', '..', 'docs', 'design', 'evidence', 'pi-cluster')
 
@@ -672,12 +674,12 @@ def fit(rows, o_range=range(0, 11)):
 def check_table(rows, h, o, B, failures):
     w = within_noise(rows, h, o, B)
     if w < PI_WITHIN:
-        failures.append(f'the fit lands {w} of the Pi\'s {len(rows)} lines within the noise, '
-                        f'fewer than the record\'s {PI_WITHIN}')
+        failures.append(f'TABLE: the fit lands {w} of the Pi\'s {len(rows)} lines within the '
+                        f'noise, fewer than the record\'s {PI_WITHIN}')
     r = table_regret(rows, h, o, B)
     if max(r) > 0.10:
-        failures.append(f'choosing by the model costs up to {max(r):.3f} against the fastest '
-                        'shape the Pi measured, more than 10%')
+        failures.append(f'TABLE: choosing by the model costs up to {max(r):.3f} against the '
+                        'fastest shape the Pi measured, more than 10%')
 
 
 def check_terms(failures, interior=1, count_runs=True):
@@ -687,7 +689,8 @@ def check_terms(failures, interior=1, count_runs=True):
                 a = tree_terms_walk(op, nodes, k, interior)
                 b = tree_terms(op, nodes, k, interior)
                 if (a[0], a[1], a[2]) != (b[0], b[1], b[2]):
-                    failures.append(f'tree_terms({op}, {nodes}, {k}) = {b}, the walk says {a}')
+                    failures.append(f'TERMS: tree_terms({op}, {nodes}, {k}) = {b}, '
+                                    f'the walk says {a}')
                     return
     if not count_runs:
         return
@@ -702,8 +705,9 @@ def check_terms(failures, interior=1, count_runs=True):
                 busiest = max(counts.values()) // pieces
                 beta = tree_terms(op, nodes, k, interior)[2]
                 if beta != busiest:
-                    failures.append(f'{op} on {nodes} nodes at k = {k}: the closed form counts '
-                                    f'{beta} pieces on the busiest link, the loop {busiest}')
+                    failures.append(f'TERMS: {op} on {nodes} nodes at k = {k}: the closed form '
+                                    f'counts {beta} pieces on the busiest link, the loop '
+                                    f'{busiest}')
                     return
 
 
@@ -723,7 +727,7 @@ def check_choices(failures):
         regrets.sort()
         p90, worst = regrets[int(len(regrets) * 0.9)], regrets[-1]
         if p90 > p90_bound or worst > max_bound:
-            failures.append(f'against {links} links the closed form\'s choices cost p90 '
+            failures.append(f'CHOICES: against {links} links the closed form\'s choices cost p90 '
                             f'{p90:.3f}, worst {worst:.3f}, beyond {p90_bound} and {max_bound}')
 
 
@@ -743,32 +747,34 @@ def check_pins(failures):
     """What collective-shape.c's test pins too (shmem.shape.choice)."""
     for op in ('reduce', 'broadcast'):
         if choose(op, 4, 8, PI_LINK, 8, 4, 1024) != (8, 1):
-            failures.append(f'an 8-byte {op} is not the small class\'s ceiling tree')
+            failures.append(f'PINS: an 8-byte {op} is not the small class\'s ceiling tree')
         if choose(op, 4, 2048, PI_LINK, 8, 4, 1024)[0] < 3:
-            failures.append(f'a 2 KiB {op} on four nodes of the Pi does not take the star')
+            failures.append(f'PINS: a 2 KiB {op} on four nodes of the Pi does not take the star')
         if choose(op, 4, 1 << 20, PI_LINK, 8, 4, 1024)[0] != 2:
-            failures.append(f'a 1 MiB {op} on four nodes of the Pi does not take k = 2')
+            failures.append(f'PINS: a 1 MiB {op} on four nodes of the Pi does not take k = 2')
         c = crossover(op, 4, PI_LINK)
         if c is None or not 16384 <= c <= 65536:
-            failures.append(f'the Pi\'s {op} crossover on four nodes is at {c} bytes, '
+            failures.append(f'PINS: the Pi\'s {op} crossover on four nodes is at {c} bytes, '
                             'not between 16 and 64 KiB as F2 measured')
         lc = crossover(op, 4, LOOPBACK_LINK)
         if c is not None and lc is not None and lc < 8 * c:
-            failures.append(f'a loopback link\'s {op} crossover ({lc}) is not far above the Pi\'s ({c})')
+            failures.append(f'PINS: a loopback link\'s {op} crossover ({lc}) is not far above '
+                            f'the Pi\'s ({c})')
     # Träff's (v0.2 step 3): on four nodes of the Pi a 1 MiB reduction takes
     # it where it is allowed, and nothing else does - not a 2 KiB reduction,
     # not a broadcast, not a reduction where the data path does not allow it,
     # not one whose rows a lane cannot hold.
     if choose_shape('reduce', 4, 1 << 20, PI_LINK, 8, 4, 1024, circulant=True)[0] != 'circulant':
-        failures.append('a 1 MiB reduction on four nodes of the Pi does not take Träff\'s')
+        failures.append('PINS: a 1 MiB reduction on four nodes of the Pi does not take Träff\'s')
     if choose_shape('reduce', 4, 2048, PI_LINK, 8, 4, 1024, circulant=True)[0] != 'tree':
-        failures.append('a 2 KiB reduction on four nodes of the Pi takes Träff\'s')
+        failures.append('PINS: a 2 KiB reduction on four nodes of the Pi takes Träff\'s')
     if choose_shape('broadcast', 4, 1 << 20, PI_LINK, 8, 4, 1024, circulant=True)[0] != 'tree':
-        failures.append('a broadcast takes Träff\'s')
+        failures.append('PINS: a broadcast takes Träff\'s')
     if choose_shape('reduce', 4, 1 << 20, PI_LINK, 8, 4, 1024)[0] != 'tree':
-        failures.append('a reduction takes Träff\'s where the data path does not allow it')
+        failures.append('PINS: a reduction takes Träff\'s where the data path does not allow it')
     if choose_shape('reduce', 16, 1 << 20, PI_LINK, 2, 4, 1024, circulant=True)[0] != 'tree':
-        failures.append('Träff\'s taken on 16 nodes with a ceiling of 2, whose lanes hold 3 rows')
+        failures.append('PINS: Träff\'s taken on 16 nodes with a ceiling of 2, whose lanes '
+                        'hold 3 rows')
 
 
 def check_circulant(failures):
@@ -788,11 +794,11 @@ def check_circulant(failures):
             picked = sim_c if algorithm == 'circulant' else trees[k]
             regrets.append(picked / min(sim_c, min(trees.values())) - 1)
         if max(errors) > error_bound:
-            failures.append(f'against {links} links Träff\'s closed form errs by up to '
+            failures.append(f'CIRCULANT: against {links} links Träff\'s closed form errs by up to '
                             f'{max(errors):.3f}, beyond {error_bound}')
         if max(regrets) > regret_bound:
-            failures.append(f'against {links} links the choice between the trees and Träff\'s '
-                            f'costs up to {max(regrets):.3f}, beyond {regret_bound}')
+            failures.append(f'CIRCULANT: against {links} links the choice between the trees '
+                            f'and Träff\'s costs up to {max(regrets):.3f}, beyond {regret_bound}')
 
 
 def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
@@ -804,6 +810,16 @@ def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
         check_pins(failures)
         check_circulant(failures)
     return failures
+
+
+def unexpected(failures, check):
+    """A broken variant must fail the check written for it, `check`, at least once:
+    one failure's message begins with its name. The mark for the variant's result
+    line: empty when it does, else why not."""
+    names = [engine.named(f) for f in failures]
+    failed = check if check in names else (names[0] if names else None)
+    wrong = engine.judge(not failures, failed, check)
+    return '' if wrong is None else '   <-- UNEXPECTED' + wrong
 
 
 # ---- The grid collective-shape.c's test reads -------------------------------
@@ -857,21 +873,23 @@ def main(argv):
     for f in failures:
         print('   ', f)
     ok = not failures
-    # The broken variants, each of which must fail.
+    # The broken variants, each of which must fail the check written for it.
     w, h, o, B = fit(rows, o_range=[0])
     broken = checks(rows, h, o, B, choices=False, count_runs=False)
+    mark = unexpected(broken, 'TABLE')
     print(f'broken message_cost (o = 0, h {h} and B {B} refitted): '
-          f'{"fails" if broken else "PASSES - the check cannot see it"}')
+          f'{"fails" if broken else "PASSES - the check cannot see it"}{mark}')
     for f in broken[:2]:
         print('   ', f)
-    ok = ok and bool(broken)
+    ok = ok and not mark
     broken = []
     check_terms(broken, interior=0)
+    mark = unexpected(broken, 'TERMS')
     print(f'broken interior (an interior lead counted k, not k + 1): '
-          f'{"fails" if broken else "PASSES - the check cannot see it"}')
+          f'{"fails" if broken else "PASSES - the check cannot see it"}{mark}')
     for f in broken[:2]:
         print('   ', f)
-    ok = ok and bool(broken)
+    ok = ok and not mark
     print('ok' if ok else 'FAILED')
     return 0 if ok else 1
 

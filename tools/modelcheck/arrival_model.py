@@ -22,7 +22,9 @@ lead has already consumed and forwarded k+1. If that argument holds, a single
 epoch word per team needs no queue, no sequence number and no second slot. If
 it does not, a post can overwrite one the lead has not read, and a node stops
 arriving - a hang on every *other* node, which is the worst place to debug it.
-POSTED and CONSUMED below are that argument, checked rather than asserted.
+POSTED and CONSUMED below are that argument, checked rather than asserted:
+OVERWRITE, no post over an epoch the lead has not consumed; and ORDER, each
+epoch forwarded once, in order.
 
 Designs
   design      the arriver publishes the epoch and then bumps the lead's wake
@@ -113,7 +115,7 @@ def arriver(design, epochs, members):
         # The one-word argument, checked at the only moment it can fail: this
         # post is about to overwrite whatever is in the word.
         B += [(p + 'C', ('check', lambda M, L, e=e: None if M[POSTED] == M[CONSUMED] else
-                         f'epoch {e} posted over epoch {M[POSTED]}, which the lead '
+                         f'OVERWRITE: epoch {e} posted over epoch {M[POSTED]}, which the lead '
                          f'has not consumed: one word per team is not enough',
                          '@' + p + 'G')),
               (p + 'G', ('gpre', lambda M, L: ({POSTED: M[POSTED] + 1}, {}), '@' + p + 'S')),
@@ -142,7 +144,7 @@ def order(M, L):
     case that argument ever stops holding, but no case exercises it.
     """
     return (None if L['h'] == M[FORWARDED] + 1 else
-            f"epoch {L['h']} forwarded after {M[FORWARDED]}: an arrival was "
+            f"ORDER: epoch {L['h']} forwarded after {M[FORWARDED]}: an arrival was "
             f"{'repeated' if L['h'] <= M[FORWARDED] else 'skipped'}")
 
 
@@ -204,7 +206,7 @@ def case(design, members, epochs):
     return (f'arrival/{design} members={members} epochs={epochs}', threads, mem, sym)
 
 
-# (design, members, epochs, tso, expect_ok).
+# (design, members, epochs, tso, expect): True, or the property the breakage must fail.
 #
 # The epochs=1 rows are the measurement behind the docstring's note: wake_after
 # already fails there, while consume_reread and noconsume do not, because those
@@ -225,20 +227,20 @@ CASES = [
     ('design', 2, 2, True, True),
     ('design', 3, 2, True, True),
 
-    ('wake_after', 2, 1, False, False),     # the first arrival is already enough
-    ('wake_after', 2, 2, False, False),
-    ('wake_after', 3, 2, False, False),
+    ('wake_after', 2, 1, False, 'STUCK'),   # the first arrival is already enough
+    ('wake_after', 2, 2, False, 'STUCK'),
+    ('wake_after', 3, 2, False, 'STUCK'),
 
-    ('nowake', 2, 1, False, False),
-    ('nowake', 2, 2, False, False),
+    ('nowake', 2, 1, False, 'STUCK'),
+    ('nowake', 2, 2, False, 'STUCK'),
 
     ('consume_reread', 2, 1, False, True),  # one epoch cannot show this one
-    ('consume_reread', 2, 2, False, False),
-    ('consume_reread', 3, 2, False, False),
+    ('consume_reread', 2, 2, False, 'OVERWRITE'),
+    ('consume_reread', 3, 2, False, 'OVERWRITE'),
 
     ('noconsume', 2, 1, False, True),       # nor this one
-    ('noconsume', 2, 2, False, False),
-    ('noconsume', 3, 2, False, False),
+    ('noconsume', 2, 2, False, 'ORDER'),
+    ('noconsume', 3, 2, False, 'ORDER'),
 ]
 
 if __name__ == '__main__':
@@ -249,5 +251,5 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         res = explore(name, threads, mem0, tso=tso, symmetric=sym, max_seconds=180)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

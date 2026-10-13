@@ -448,8 +448,8 @@ T01_U12 = {'T': [0, 1], 'U': [1, 2]}
 ALL = {'T': [0, 1, 2], 'U': [0, 1, 2]}
 T01 = {'T': [0, 1]}
 ROTATING = {'T': [0, 1, 2, 3]}
-# (design, nodes, threads a node, fanout, depth, teams, order, pieces, expect_ok);
-# an order entry is (team, root index, {node: leading thread}).
+# (design, nodes, threads a node, fanout, depth, teams, order, pieces, expect: True, or the
+# property it must fail); an order entry is (team, root index, {node: leading thread}).
 CASES = [
     # The first model's cases, one thread a node: node 1 the parent in both
     # teams, its two children - nodes 0 and 2 - at position 0 of each tree.
@@ -460,36 +460,36 @@ CASES = [
     ('design', 3, 1, 2, 2, ALL, [('T', 0, {}), ('U', 1, {})], 3, True),
     ('design', 3, 1, 1, 2, ALL, [('T', 0, {}), ('U', 2, {})], 3, True),          # chains
     ('design', 4, 1, 2, 2, {'T': [0, 1, 2], 'U': [1, 2, 3]}, [('T', 1, {}), ('U', 0, {})], 3, True),
-    ('no_grant', 3, 1, 2, 2, T01_U12, [('T', 1, {}), ('U', 0, {})], 3, False),
+    ('no_grant', 3, 1, 2, 2, T01_U12, [('T', 1, {}), ('U', 0, {})], 3, 'LANE'),
     # With every node in both teams and one order, pushing without the grant
     # corrupts no piece - the first model found UP holding here, consecutive
     # collectives on one team again - but it puts into a lane its parent has
     # not yet bound to the collective, which E5's rule forbids (LANE).
-    ('no_grant', 3, 1, 2, 2, ALL, [('T', 0, {}), ('U', 1, {})], 3, False),
-    ('stale_grant', 3, 1, 2, 2, T01_U12, [('T', 1, {}), ('U', 0, {}), ('T', 1, {})], 2, False),
+    ('no_grant', 3, 1, 2, 2, ALL, [('T', 0, {}), ('U', 1, {})], 3, 'LANE'),
+    ('stale_grant', 3, 1, 2, 2, T01_U12, [('T', 1, {}), ('U', 0, {}), ('T', 1, {})], 2, 'LANE'),
     # Two threads on node 1, leading T and U at once: each its own lane.
     ('design', 3, 2, 2, 2, T01_U12, [('T', 1, {1: 0}), ('U', 0, {1: 1})], 2, True),
-    ('one_lane', 3, 2, 2, 2, T01_U12, [('T', 1, {1: 0}), ('U', 0, {1: 1})], 2, False),
+    ('one_lane', 3, 2, 2, 2, T01_U12, [('T', 1, {1: 0}), ('U', 0, {1: 1})], 2, 'LANE'),
     # T's parent, node 1, leads its two collectives on two threads in turn:
     # the child must put each into the lane its grant names.
     ('design', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1})], 2, True),
-    ('lane_early', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1})], 2, False),
-    ('stale_grant', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1})], 2, False),
+    ('lane_early', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1})], 2, 'LANE'),
+    ('stale_grant', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1})], 2, 'LANE'),
     # T's child, node 1, on two threads in turn: the parent must release into
     # the lane the child's first arrival names.
     ('design', 2, 2, 1, 1, T01, [('T', 0, {1: 0}), ('T', 0, {1: 1})], 2, True),
-    ('release_lane_early', 2, 2, 1, 1, T01, [('T', 0, {1: 0}), ('T', 0, {1: 1})], 2, False),
+    ('release_lane_early', 2, 2, 1, 1, T01, [('T', 0, {1: 0}), ('T', 0, {1: 1})], 2, 'LANE'),
     # Broadcasts need no grant: node 1 leads T's broadcast and U's reduction at
     # once on two threads; a child's lanes across broadcasts on two threads; a
     # team's reduction, broadcast and reduction led by its threads in turn.
     ('design', 3, 2, 2, 2, T01_U12, [('T', 1, {1: 0}, 'b'), ('U', 0, {1: 1})], 2, True),
     ('design', 2, 2, 1, 1, T01, [('T', 0, {1: 0}, 'b'), ('T', 0, {1: 1}, 'b')], 2, True),
     ('release_lane_early', 2, 2, 1, 1, T01, [('T', 0, {1: 0}, 'b'), ('T', 0, {1: 1}, 'b')], 2,
-     False),
+     'LANE'),
     ('design', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1}, 'b'), ('T', 1, {1: 0})], 2,
      True),
     ('lane_early', 2, 2, 1, 1, T01, [('T', 1, {1: 0}), ('T', 1, {1: 1}, 'b'), ('T', 1, {1: 1})],
-     2, False),
+     2, 'LANE'),
     # Small collectives through each team number's own slots, between large
     # ones through the lanes: node 1 the parent in both teams, one thread, and
     # two threads leading the two teams at once.
@@ -498,7 +498,7 @@ CASES = [
      2, True),
     ('design', 3, 2, 2, 2, T01_U12,
      [('T', 1, {1: 0}, 's'), ('U', 0, {1: 1}), ('T', 1, {1: 0}), ('U', 0, {1: 1}, 's')], 2, True),
-    ('node_small', 3, 1, 2, 2, T01_U12, [('T', 1, {}, 's'), ('U', 0, {}, 's')], 2, False),
+    ('node_small', 3, 1, 2, 2, T01_U12, [('T', 1, {}, 's'), ('U', 0, {}, 's')], 2, 'UP'),
     # The small path's release slot shared by a node's teams (node_small_down,
     # round six's H3): the only breakage that reaches the small path's DOWN
     # check, which every large-path breakage meets LANE before. Two teams that
@@ -509,7 +509,7 @@ CASES = [
     ('node_small_down', 3, 1, 2, 2, {'T': [0, 1], 'U': [0, 2]},
      [('T', 1, {}, 's'), ('U', 1, {}, 's'), ('T', 1, {}, 's')], 2, True),
     ('node_small_down', 3, 2, 2, 2, {'T': [0, 1], 'U': [0, 2]},
-     [('T', 1, {0: 0}, 's'), ('U', 1, {0: 1}, 's')], 2, False),
+     [('T', 1, {0: 0}, 's'), ('U', 1, {0: 1}, 's')], 2, 'DOWN'),
     ('design', 3, 2, 2, 2, {'T': [0, 1], 'U': [0, 2]},
      [('T', 1, {0: 0}, 's'), ('U', 1, {0: 1}, 's')], 2, True),
     # One team over four nodes whose tree turns between collectives, as a
@@ -522,9 +522,9 @@ CASES = [
     # be the next collective's.
     ('design', 4, 2, 2, 2, ROTATING, [('T', 0, {}), ('T', 1, {2: 1}, 'b')], 1, True),
     ('design', 4, 2, 2, 2, ROTATING, [('T', 0, {}, 'b'), ('T', 1, {2: 1}, 'b')], 2, True),
-    ('release_lane_late', 4, 2, 2, 2, ROTATING, [('T', 0, {}), ('T', 1, {2: 1}, 'b')], 1, False),
+    ('release_lane_late', 4, 2, 2, 2, ROTATING, [('T', 0, {}), ('T', 1, {2: 1}, 'b')], 1, 'LANE'),
     ('release_lane_late', 4, 2, 2, 2, ROTATING, [('T', 0, {}, 'b'), ('T', 1, {2: 1}, 'b')], 2,
-     False),
+     'LANE'),
     # More pieces than the window keep the rule safe even read late: node 1
     # takes release 0 before it can send its last piece up.
     ('release_lane_late', 4, 2, 2, 1, ROTATING, [('T', 0, {}), ('T', 1, {2: 1}, 'b')], 2, True),
@@ -541,7 +541,7 @@ def main():
             continue
         res = explore(name, progs, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, count=count: M[FIN] == count)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

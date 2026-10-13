@@ -2694,6 +2694,13 @@ derivation in full.
 
 - **Futex words** are `_Atomic uint32_t`, with a `_Static_assert` that its size
   and alignment equal `uint32_t`'s (true for GCC on aarch64 and x86-64).
+- **The shared words are lock-free.** Every atomic word processes share is an
+  `_Atomic uint32_t` or an `_Atomic uint64_t`, and C11 expects two mappings of
+  one atomic object to communicate only where it is lock-free (C11 §7.17.5):
+  `base/lock-free.h` refuses, when compiling, a compiler whose `<stdatomic.h>`
+  says those types are never lock-free, and `shmem_init` asks the objects
+  where it says sometimes. GCC and Clang say always on x86-64 and aarch64, so
+  nothing is asked there (the step D review, portability Q4).
 - **Outline atomics** on ARMv8.0 cores without LSE, such as the Pi 4's Cortex-A72,
   link statically from `libgcc.a`; a test binary's `NEEDED` list is libc only
   (review, lead-verified), so invariant 15 holds.
@@ -7301,10 +7308,14 @@ context, dispatched on arity first as the AMO generics are (§7.3).
 `signal_set` and `signal_add` (§9.8.7, §9.8.5) take a leading context in C11
 the same way, by arity alone, since their pointer is a plain `uint64_t *` and
 there is no type to select on; a C11 program that declares or defines either by
-name - a profiling wrapper - writes `(shmem_signal_add)`, as it does
-`(shmem_sync)`. C++ has no context-first form of them in the specification and
-gets none: an overload would make a program that takes the routine's address
-ambiguous (the adversarial read of 2026-10-02). osoe's C++ `shmem_sync(team)`
+its plain name - a profiling wrapper, as the specification's profiling example
+defines `shmem_long_put` - gets the function, as it does `shmem_sync`'s
+deprecated form: the form without a context passes its arguments as written to
+the parenthesized name, so a parameter list makes a declaration of the function
+(the round-four review's conformance M1). C++ has no context-first form of them
+in the specification and gets none: an overload would make a program that takes
+the routine's address ambiguous (the adversarial read of 2026-10-02). osoe's
+C++ `shmem_sync(team)`
 is an extension of that kind - the C/C++ synopsis gives the team form only as
 `shmem_team_sync` - which predates the read and stays. Every
 routine reaches the transport through the body of `putmem` or `getmem` with its

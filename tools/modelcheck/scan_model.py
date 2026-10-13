@@ -186,8 +186,8 @@ def member(design, pe, members, k, order):
                                        M[UPC(pe, j, key)] >= want, None)))
             steps.append((f'{p}V{j}', ('check', lambda M, L, j=j, tag=tag, key=key:
                                        None if M[TAG(UP(pe, j, key))] == tag else
-                                       f'PE {pe} read up-slot {j} with tag {M[TAG(UP(pe, j, key))]}, '
-                                       f'not this scan\'s {tag}', None)))
+                                       f'VALUE: PE {pe} read up-slot {j} with tag '
+                                       f'{M[TAG(UP(pe, j, key))]}, not this scan\'s {tag}', None)))
             steps.append((f'{p}T{j}', ('ghost', lambda M, L, j=j, key=key:
                                        ({UNREAD(UP(pe, j, key)): 0},
                                         {f'c{j}': M[UP(pe, j, key)]}), None)))
@@ -217,7 +217,7 @@ def member(design, pe, members, k, order):
                          f'PE {pe} puts its subtree total into PE {ppe}\'s up-slot {position}')]
             steps.append((f'{p}P', ('nd', put_up, None)))
             steps.append((f'{p}O', ('check', lambda M, L: None if not M[('$overwrite',)] else
-                                    f'PE {pe} overwrote an unread slot', None)))
+                                    f'SLOT: PE {pe} overwrote an unread slot', None)))
             steps.append((f'{p}A', ('add', lambda L, ppe=ppe, position=position, key=key:
                                     UPC(ppe, position, key), lambda L: 1, '_', None)))
             want = expected_down.get(scope, 0) + 1
@@ -226,7 +226,7 @@ def member(design, pe, members, k, order):
                                     M[DOWNC(pe, key)] >= want, None)))
             steps.append((f'{p}DV', ('check', lambda M, L, tag=tag, key=key:
                                      None if M[TAG(DOWN(pe, key))] == tag else
-                                     f'PE {pe} read its down-slot with tag '
+                                     f'VALUE: PE {pe} read its down-slot with tag '
                                      f'{M[TAG(DOWN(pe, key))]}, not this scan\'s {tag}', None)))
             steps.append((f'{p}DT', ('ghost', lambda M, L, key=key: ({UNREAD(DOWN(pe, key)): 0},
                                                             {'before': M[DOWN(pe, key)]}), None)))
@@ -236,8 +236,8 @@ def member(design, pe, members, k, order):
         expect = sum(source(x, r, members) for r in range(rank))  # ranks before, in this team
         steps.append((f'{p}X', ('check', lambda M, L, expect=expect, x=x:
                                 None if L['before'] == expect else
-                                f'PE {pe}\'s exclusive result in scan {x} is {L["before"]:b}, '
-                                f'not {expect:b}', None)))
+                                f'RESULT: PE {pe}\'s exclusive result in scan {x} is '
+                                f'{L["before"]:b}, not {expect:b}', None)))
         for j, (c, _) in enumerate(kids):
             cpe = pe_of(team, c, members)
 
@@ -250,7 +250,7 @@ def member(design, pe, members, k, order):
                          f'PE {pe} puts the sum before child {j} into PE {cpe}\'s down-slot')]
             steps.append((f'{p}Q{j}', ('nd', put_down, None)))
             steps.append((f'{p}QO{j}', ('check', lambda M, L: None if not M[('$overwrite',)] else
-                                        f'PE {pe} overwrote an unread down-slot', None)))
+                                        f'SLOT: PE {pe} overwrote an unread down-slot', None)))
             steps.append((f'{p}QA{j}', ('add', lambda L, cpe=cpe, key=key: DOWNC(cpe, key),
                                         lambda L: 1, '_', None)))
         # Chain the steps.
@@ -283,7 +283,7 @@ def case(design, members, k, order):
     return (f'scan/{design} members={members} k={k} order={order}', threads, mem, members)
 
 
-# (design, members, fan-out, order, expect_ok)
+# (design, members, fan-out, order, expect): True, or the property it must fail
 CASES = [
     ('design', 3, 2, 'AA', True),
     ('design', 4, 2, 'AB', True),
@@ -294,11 +294,11 @@ CASES = [
     ('design', 4, 2, 'CA', True),
     ('design', 4, 2, 'CAB', True),
     ('design', 5, 2, 'CB', True),
-    ('no_ready', 4, 2, 'CA', False),
+    ('no_ready', 4, 2, 'CA', 'SLOT'),
     ('design', 4, 2, 'ZXY', True),
-    ('shared_ready', 4, 2, 'ZXY', False),
-    ('no_left_sums', 4, 2, 'A', False),
-    ('team_counts', 4, 2, 'AB', False),
+    ('shared_ready', 4, 2, 'ZXY', 'SLOT'),
+    ('no_left_sums', 4, 2, 'A', 'RESULT'),
+    ('team_counts', 4, 2, 'AB', 'VALUE'),
     ('per_team', 3, 2, 'AA', True),
     ('per_team', 4, 2, 'ABA', True),
     ('per_team', 5, 3, 'AB', True),
@@ -306,7 +306,7 @@ CASES = [
     ('per_team', 4, 2, 'CAB', True),
     ('per_team', 4, 2, 'ZXY', True),
     ('per_team', 5, 2, 'AAA', True),
-    ('per_team_pe_counts', 4, 2, 'AB', False),
+    ('per_team_pe_counts', 4, 2, 'AB', 'STUCK'),
 ]
 
 
@@ -319,7 +319,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, n=n: M[FIN] == n)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

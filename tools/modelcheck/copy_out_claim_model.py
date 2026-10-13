@@ -86,13 +86,14 @@ def copier(design, p, records, again, then):
 
     copy = [(p + 'Y', ('check', lambda M, L:
                        None if M[ARENA(L['r'])] == L['t'] else
-                       f'copied reply {M[ARENA(L["r"])]} for get {L["t"]}: the record was reused',
+                       f'OWN: copied reply {M[ARENA(L["r"])]} for get {L["t"]}: '
+                       f'the record was reused',
                        '@' + p + 'Y1')),
             (p + 'Y1', ('ghost', lambda M, L: ({COPIES(L['t']): M[COPIES(L['t'])] + 1}, {}),
                         '@' + p + 'Y2')),
             (p + 'Y2', ('check', lambda M, L:
                         None if M[COPIES(L['t'])] == 1 else
-                        f'get {L["t"]} copied {M[COPIES(L["t"])]} times', '@' + p + 'Y3'))]
+                        f'ONCE: get {L["t"]} copied {M[COPIES(L["t"])]} times', '@' + p + 'Y3'))]
     if design == 'credit_first':
         # claim, credit, copy, free
         B += [(p + 'G', ('br', lambda L: True, '@' + p + 'K', '@' + p + 'K'))]
@@ -123,7 +124,7 @@ def quiet(design, p, gets, records, then):
                      any(M[STATE(r)] == LANDED for r in range(records)), '@' + p + 'P'))]
     B += copier(design, p, records, '@' + p + 'Q', '@' + p + 'Q')
     B += [(p + 'RET', ('check', lambda M, L, g=gets:
-                       next((f'quiet returned with get {t} not yet copied'
+                       next((f'COMPLETE: quiet returned with get {t} not yet copied'
                              for t in range(1, g + 1) if M[COPIES(t)] != 1), None),
                        then))]
     return B
@@ -202,14 +203,14 @@ def case(design, gets, records, quieters):
     return name, threads, mem, 3 + quieters
 
 
-# (design, gets, records, quieters, expect_ok)
+# (design, gets, records, quieters, expect): True, or the property the breakage must fail
 CASES = [
     ('design', 2, 1, 1, True),
     ('design', 2, 2, 1, True),
     ('design', 3, 2, 1, True),
-    ('no_claim', 2, 2, 1, False),
-    ('credit_first', 2, 2, 1, False),
-    ('free_first', 2, 1, 1, False),
+    ('no_claim', 2, 2, 1, 'ONCE'),
+    ('credit_first', 2, 2, 1, 'COMPLETE'),
+    ('free_first', 2, 1, 1, 'OWN'),
 ]
 
 
@@ -222,7 +223,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=600, liveness_max_states=3_000_000,
                       done=lambda M, n=nthreads: M[DONE] == n)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

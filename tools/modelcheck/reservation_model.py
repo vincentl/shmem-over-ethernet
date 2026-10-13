@@ -807,7 +807,7 @@ def fill_case(variant, writers, sizes, cap, least, replies=0, quiet=True):
     return name, threads, mem
 
 
-# (design, writers, msgs, cap, replies, tso, expect_ok)
+# (design, writers, msgs, cap, replies, tso, expect: True, or the property it must fail)
 CASES = [
     ('design', 1, 2, 1, 0, False, True),
     ('design', 2, 1, 1, 0, False, True),
@@ -826,16 +826,16 @@ CASES = [
     ('current', 2, 1, 2, 1, False, True),
     ('current', 2, 1, 1, 1, True, True),
 
-    ('release_unsealed', 2, 2, 1, 0, False, False),
-    ('release_unsealed', 2, 2, 2, 0, False, False),
-    ('sendable_ge', 2, 2, 2, 0, False, False),
-    ('seq_at_seal', 2, 2, 1, 0, False, False),
-    ('head_before_seq', 2, 2, 1, 0, False, False),
-    ('head_before_seq', 1, 2, 1, 0, False, False),
-    ('two_open', 2, 2, 2, 0, False, False),
-    ('two_open', 1, 3, 1, 0, False, False),
-    ('seal_store', 2, 2, 2, 0, False, False),
-    ('promote_unchecked', 2, 1, 2, 0, False, False),
+    ('release_unsealed', 2, 2, 1, 0, False, 'QUIET'),
+    ('release_unsealed', 2, 2, 2, 0, False, 'QUIET'),
+    ('sendable_ge', 2, 2, 2, 0, False, 'QUIET'),
+    ('seq_at_seal', 2, 2, 1, 0, False, 'SEQ'),
+    ('head_before_seq', 2, 2, 1, 0, False, 'SEQ'),
+    ('head_before_seq', 1, 2, 1, 0, False, 'SEQ'),
+    ('two_open', 2, 2, 2, 0, False, 'SEGSEQ'),
+    ('two_open', 1, 3, 1, 0, False, 'SEGSEQ'),
+    ('seal_store', 2, 2, 2, 0, False, 'QUIET'),
+    ('promote_unchecked', 2, 1, 2, 0, False, 'TORN'),
 
     # v0.2 step 4's zero-copy send: a buffer lent to the kernel until every
     # notification of its sends has come
@@ -847,27 +847,27 @@ CASES = [
     ('zero_copy', 1, 2, 2, 1, False, True),   # beside a reply, by the opportunistic drain
     ('zero_copy', 2, 1, 2, 1, False, True),
     ('zero_copy', 2, 2, 2, 0, True, True),    # x86-TSO
-    ('zc_release_on_send', 2, 2, 1, 0, False, False),
-    ('zc_release_on_send', 1, 2, 2, 1, False, False),
-    ('zc_first_notification', 2, 2, 2, 0, False, False),
-    ('zc_both_lent', 2, 2, 2, 0, False, False),
+    ('zc_release_on_send', 2, 2, 1, 0, False, 'SEQ'),
+    ('zc_release_on_send', 1, 2, 2, 1, False, 'SEQ'),
+    ('zc_first_notification', 2, 2, 2, 0, False, 'SEQ'),
+    ('zc_both_lent', 2, 2, 2, 0, False, 'BOTH LENT'),
     # a send by reference refused (the locked-memory limit), once a connection
     ('zc_refused', 1, 2, 2, 0, False, True),
     ('zc_refused', 2, 1, 2, 0, False, True),
     ('zc_refused', 2, 2, 2, 0, False, True),
     ('zc_refused', 1, 2, 2, 1, False, True),  # beside a reply, by the opportunistic drain
     ('zc_refused', 2, 2, 2, 0, True, True),   # x86-TSO
-    ('zc_refused_owes_none', 2, 2, 2, 0, False, False),
+    ('zc_refused_owes_none', 2, 2, 2, 0, False, 'SEQ'),
 
-    ('open_resets', 1, 1, 2, 1, False, False),
-    ('filled_short', 1, 1, 2, 1, False, False),
-    ('drain_no_pop', 1, 1, 2, 1, False, False),
-    ('drain_lifo', 0, 0, 4, 2, False, False),
+    ('open_resets', 1, 1, 2, 1, False, 'QUIET'),
+    ('filled_short', 1, 1, 2, 1, False, 'STUCK'),
+    ('drain_no_pop', 1, 1, 2, 1, False, 'ONCE'),
+    ('drain_lifo', 0, 0, 4, 2, False, 'ORDER'),
 ]
 
 # v0.2 step 4's first rung, filling the room: a message takes the room the open
 # buffer has, down to `least` units. (variant, writers, sizes, cap, least,
-# replies, tso, expect_ok)
+# replies, tso, expect: True, or the property it must fail)
 FILL_CASES = [
     ('fill', 1, (2, 2), 3, 1, 0, False, True),     # the second message splits across buffers
     ('fill', 1, (3, 1), 2, 1, 0, False, True),     # a put in two parts, then its signal
@@ -888,9 +888,9 @@ FILL_CASES = [
     ('fill', None, ((3, 1), (1,)), 3, 1, 1, False, True),   # the stream's signal; a reply
     ('fill', None, ((2, 2), (1, 1)), 3, 1, 0, True, True),  # x86-TSO
 
-    ('fill_stale', 2, (2,), 3, 1, 0, False, False),
-    ('fill_no_advance', 1, (3,), 2, 1, 0, False, False),
-    ('fill_floor', 1, (2, 1), 2, 2, 0, False, False),
+    ('fill_stale', 2, (2,), 3, 1, 0, False, 'OVERFLOW'),
+    ('fill_no_advance', 1, (3,), 2, 1, 0, False, 'ONCE'),
+    ('fill_floor', 1, (2, 1), 2, 2, 0, False, 'STUCK'),
 ]
 
 if __name__ == '__main__':
@@ -908,12 +908,12 @@ if __name__ == '__main__':
         # adversarial read of the refusal, finding 3 and N2).
         res = explore(name, threads, mem0, tso=tso, max_seconds=1500 if zc else 240,
                       liveness_max_states=7_000_000 if zc else 400_000)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     for variant, writers, sizes, cap, least, replies, tso, expect in FILL_CASES:
         name, threads, mem0 = fill_case(variant, writers, sizes, cap, least, replies)
         if not keep(name):
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=600,
                       liveness_max_states=3_000_000)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

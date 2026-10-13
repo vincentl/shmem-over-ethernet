@@ -48,6 +48,8 @@ Checked
   LOWEST   split 1, the lowest parent number, runs at most two rounds: it loses
            one only to split 2 making a number of its own held, which happens
            once.
+  CAPACITY each split finds on every member the numbers it asks for: the model's
+           own sizing of the pools, so that a split never fails for want of one.
   and, by the engine: no stuck thread, and from every reachable state the run can
   still finish (AG EF done). A lower split's wait on a pending word ends once
   the word is cleared and the waiter runs before the higher split takes it
@@ -179,15 +181,16 @@ def take_checks(s, members, pe, var):
     def unique(M, L):
         for n in bits(L[var]):
             if M[HOLDS(pe, n)]:
-                return f'PE {pe} holds the teams of splits {M[HOLDS(pe, n)]} and {s} under number {n}'
+                return (f'UNIQUE: PE {pe} holds the teams of splits {M[HOLDS(pe, n)]} and {s} '
+                        f'under number {n}')
         return None
 
     def one(M, L):
         for q in members:
             other = M[TOOK(s, q)]
             if q != pe and other and other - 1 != L[var]:
-                return (f'split {s} gave PE {q} numbers {sorted(bits(other - 1))} and PE {pe} '
-                        f'numbers {sorted(bits(L[var]))}')
+                return (f'ONE: split {s} gave PE {q} numbers {sorted(bits(other - 1))} and '
+                        f'PE {pe} numbers {sorted(bits(L[var]))}')
         return None
 
     def record(M, L):
@@ -223,8 +226,8 @@ def split_pending(design, case, pe, s, p, then):
     def lowest_rounds(M, L):
         if design == 'no_pending' or s != min(parents) or M[ROUNDS(s, pe)] <= 2:
             return None
-        return (f'split {s}, the lowest parent number, began round {M[ROUNDS(s, pe)]} on PE {pe}: '
-                f'it lost a round to a pending number')
+        return (f'LOWEST: split {s}, the lowest parent number, began round {M[ROUNDS(s, pe)]} '
+                f'on PE {pe}: it lost a round to a pending number')
 
     # Rounds are counted for split 1 alone, which LOWEST bounds; split 2's
     # count would make every round a new state.
@@ -235,8 +238,8 @@ def split_pending(design, case, pe, s, p, then):
          (p + 'Rk', ('check', lowest_rounds, '@' + p + '1p'))]
     B += reduction(s, members, 1, lambda L: ~L['h'] & every, 'rm', p, '@' + p + 'N')
     B += [(p + 'N', ('check', lambda M, L: None if lowest_bits(L['rm'], count) is not None else
-                     f'split {s} found fewer than {count} numbers free on every member, which '
-                     f'these splits of {numbers} numbers cannot meet', '@' + p + 'Nn')),
+                     f'CAPACITY: split {s} found fewer than {count} numbers free on every member, '
+                     f'which these splits of {numbers} numbers cannot meet', '@' + p + 'Nn')),
           (p + 'Nn', ('set', 'want', lambda L: lowest_bits(L['rm'], count), '@' + p + 'Nt'))]
     if design == 'no_pending':
         # Taken at once: held, as the single-threaded library does.
@@ -325,7 +328,7 @@ def split_token(case, pe, s, p, then):
           (p + 'By', ('gpost', lambda M, L: ({}, {v: DEL for v in ('t', 'may', 'took', 'h', 'rm')}),
                       '@' + p + 'R')),
           (p + 'N', ('check', lambda M, L: None if L['rm'] >> 1 else
-                     f'split {s} found no number free on every member', '@' + p + 'Nn')),
+                     f'CAPACITY: split {s} found no number free on every member', '@' + p + 'Nn')),
           (p + 'Nn', ('set', 'want', lambda L: 1 << lowest(L['rm'] >> 1), '@' + p + 'Tu')),
           (p + 'Tu', ('check', unique, '@' + p + 'To')),
           (p + 'To', ('check', one, '@' + p + 'Ta')),
@@ -395,12 +398,12 @@ CASES = [
     ('two_high', 'design', True),
     ('second_low', 'design', True),
     ('second_high', 'design', True),
-    ('crossed', 'token', False),
-    ('shared', 'no_pending', False),
-    ('shared', 'release_first', False),
-    ('shared', 'higher_waits', False),
-    ('shared', 'lower_fails', False),
-    ('two_low', 'higher_waits', False),
+    ('crossed', 'token', 'TRAPPED'),
+    ('shared', 'no_pending', 'UNIQUE'),
+    ('shared', 'release_first', 'UNIQUE'),
+    ('shared', 'higher_waits', 'STUCK'),
+    ('shared', 'lower_fails', 'LOWEST'),
+    ('two_low', 'higher_waits', 'STUCK'),
 ]
 
 
@@ -413,7 +416,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
                       done=lambda M, count=count: M[DONE] == count)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

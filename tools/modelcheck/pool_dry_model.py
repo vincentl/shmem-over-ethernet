@@ -221,7 +221,7 @@ def split(design, case, who, need, p, then):
         for b in range(blocks):
             seen = L[f'o{b}']
             if seen not in (A, C, L_OWNER, T_OUTSIDE):
-                return f'A failed dry, having found block {b} {OWNERS[seen]}'
+                return f'LEGIT: A failed dry, having found block {b} {OWNERS[seen]}'
         return None
 
     B = [(p, ('set', 'round', lambda L: 0, '@' + p + 'R')),
@@ -329,11 +329,11 @@ CASES = [
     ('remote', 'design', True),
     ('split_first', 'design', True),
     ('two', 'design', True),
-    ('two', 'first', False),
-    ('member', 'odd_only', False),
-    ('member', 'zero_at_leave', False),
-    ('parent', 'first_round_final', False),
-    ('split_first', 'departing', False),
+    ('two', 'first', 'TRAPPED'),
+    ('member', 'odd_only', 'LEGIT'),
+    ('member', 'zero_at_leave', 'LEGIT'),
+    ('parent', 'first_round_final', 'LEGIT'),
+    ('split_first', 'departing', 'TRAPPED'),
 ]
 
 
@@ -347,7 +347,7 @@ def main():
         res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
                       done=lambda M, n=len(threads): M[DONE] == n,
                       symmetric=[[1, 2]] if which == 'parent' else ())
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

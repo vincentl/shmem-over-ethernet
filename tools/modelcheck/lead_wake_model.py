@@ -287,7 +287,8 @@ def case(design, layout, helpers=0):
             threads, mem)
 
 
-# (design, [(connection, ops) per writer], tso, expect_ok[, helpers])
+# (design, [(connection, ops) per writer], tso, expect[, helpers]); expect is True, or the
+# property the case must fail
 CASES = [
     ('every_writer', [(0, 1), (1, 1)], True, True),
     ('every_writer', [(0, 2), (1, 2)], True, True),
@@ -298,18 +299,18 @@ CASES = [
     ('design', [(0, 1), (1, 1), (0, 1)], True, True),
 
     ('lead_release', [(0, 1), (1, 1)], False, True),     # SC cannot show it
-    ('lead_release', [(0, 1), (1, 1)], True, False),
+    ('lead_release', [(0, 1), (1, 1)], True, 'LOST WAKE'),
     ('writer_plain', [(0, 1), (1, 1)], False, True),     # nor this one
-    ('writer_plain', [(0, 1), (1, 1)], True, False),
-    ('no_recheck', [(0, 1), (1, 1)], False, False),
-    ('no_bump', [(0, 1), (1, 1)], False, False),
+    ('writer_plain', [(0, 1), (1, 1)], True, 'LOST WAKE'),
+    ('no_recheck', [(0, 1), (1, 1)], False, 'LOST WAKE'),
+    ('no_bump', [(0, 1), (1, 1)], False, 'LOST WAKE'),
 
     ('ring', [(0, 1), (1, 1)], False, True),
     ('ring', [(0, 1), (1, 1)], True, True),
     ('ring', [(0, 2), (1, 2)], True, True),
     ('ring', [(0, 1), (1, 1), (0, 1)], True, True),
-    ('ring_every_idle', [(0, 1), (1, 1)], False, False),
-    ('ring_no_bump', [(0, 1), (1, 1)], False, False),
+    ('ring_every_idle', [(0, 1), (1, 1)], False, 'AT MOST ONE ARMED'),
+    ('ring_no_bump', [(0, 1), (1, 1)], False, 'STUCK'),
 
     # Owners (Part 1): one helper owns every data connection; two split them,
     # connections 0 and 2 to owner 1 and connection 1 to owner 2.
@@ -318,12 +319,12 @@ CASES = [
     ('design', [(0, 2), (1, 2)], True, True, 2),
     ('ring', [(0, 1), (1, 1)], True, True, 2),
     ('ring', [(0, 1), (1, 1), (2, 1)], True, True, 2),
-    ('lead_release', [(0, 1), (2, 1)], True, False, 2),
-    ('no_recheck', [(0, 1), (2, 1)], False, False, 2),
-    ('ring_no_bump', [(0, 1), (2, 1)], False, False, 2),
-    ('wrong_owner', [(0, 1), (1, 1)], False, False, 2),
-    ('mark_wake_apart', [(0, 1), (1, 1)], False, False, 2),
-    ('mark_wake_apart', [(0, 1), (1, 1)], True, False, 2),
+    ('lead_release', [(0, 1), (2, 1)], True, 'LOST WAKE', 2),
+    ('no_recheck', [(0, 1), (2, 1)], False, 'LOST WAKE', 2),
+    ('ring_no_bump', [(0, 1), (2, 1)], False, 'STUCK', 2),
+    ('wrong_owner', [(0, 1), (1, 1)], False, 'LOST WAKE', 2),
+    ('mark_wake_apart', [(0, 1), (1, 1)], False, 'LOST WAKE', 2),
+    ('mark_wake_apart', [(0, 1), (1, 1)], True, 'LOST WAKE', 2),
 ]
 
 if __name__ == '__main__':
@@ -335,5 +336,5 @@ if __name__ == '__main__':
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=900,
                       liveness_max_states=4_000_000)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

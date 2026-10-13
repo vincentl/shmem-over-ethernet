@@ -184,9 +184,12 @@ void shmem_ctx_putmem_signal_nbi(shmem_ctx_t ctx, void *dest, const void *source
  * routine itself a leading context, shmem_signal_add(ctx, sig_addr, signal,
  * pe); it shares the name, so C11 counts the arguments to tell them apart (with
  * the generics, below). The macros come after these declarations, so the
- * function itself stays reachable as (shmem_signal_add)(...), which is also how
- * a definition or a declaration of it - an interposer's (§10) - is written in
- * C11. C++ has no such form in the specification (its C/C++ synopsis gives the
+ * function itself stays reachable as (shmem_signal_add)(...); and since a
+ * macro passes three arguments to that name as they are written, a definition
+ * or a declaration of it by its plain name - an interposer's (§10), as the
+ * specification's example defines shmem_long_put - expands to one of the name
+ * in parentheses, and declares the same function. C++ has no such form in the
+ * specification (its C/C++ synopsis gives the
  * context to shmem_ctx_signal_add alone), and an overload would break a
  * program that takes the routine's address, so it has none (the adversarial
  * read of 2026-10-02). */
@@ -937,7 +940,11 @@ void *shrealloc(void *ptr, size_t size);
 void *shmemalign(size_t alignment, size_t size);
 
 /* SHMEM_CACHE (Annex F.2.7): no-ops on every cache-coherent machine, which is
- * every machine osoe targets. */
+ * every machine osoe targets. They left the specification after 1.4 and are
+ * declared here all the same, where the programs that still call them look:
+ * §5 allows this header only the specification's interfaces, and shmemx.h,
+ * where it puts the rest, only shmemx_ names, so neither header meets its
+ * letter (the round-four review's conformance M5). */
 void shmem_clear_cache_inv(void);
 void shmem_set_cache_inv(void);
 void shmem_set_cache_line_inv(void *dest);
@@ -1523,13 +1530,18 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
  * plain uint64_t * either way, so nothing is selected on a type and no
  * _Generic is involved. The three-argument form is called by its parenthesized
  * name, which no function-like macro expands, so the function is reached
- * through the name of its own macro; the four-argument form is the named
- * shmem_ctx_ routine. Fewer than three arguments name an identifier nothing
- * declares, so the mistake does not compile - where an empty choice would have
- * compiled to an update that never happened.
+ * through the name of its own macro, its arguments as they are written: each
+ * is a whole argument of that call, which needs no parentheses of its own, and
+ * a parameter list passes through unchanged - so a definition or a declaration
+ * by the plain name, a profiler's (§10), is one of the name in parentheses,
+ * where parameters each put in parentheses did not compile (the round-four
+ * review's conformance M1; profiler-plain-names.c). The four-argument form is
+ * the named shmem_ctx_ routine. Fewer than three arguments name an identifier
+ * nothing declares, so the mistake does not compile - where an empty choice
+ * would have compiled to an update that never happened.
  */
 #define OSOE_SIGNAL_SET_3(sig_addr, signal, pe)                                  \
-    (shmem_signal_set)((sig_addr), (signal), (pe))
+    (shmem_signal_set)(sig_addr, signal, pe)
 #define OSOE_SIGNAL_SET_4(ctx, sig_addr, signal, pe)                             \
     shmem_ctx_signal_set((ctx), (sig_addr), (signal), (pe))
 #define shmem_signal_set(...)                                                    \
@@ -1537,7 +1549,7 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
                osoe_shmem_signal_set_takes_three_or_four_arguments,              \
                osoe_shmem_signal_set_takes_three_or_four_arguments, )(__VA_ARGS__)
 #define OSOE_SIGNAL_ADD_3(sig_addr, signal, pe)                                  \
-    (shmem_signal_add)((sig_addr), (signal), (pe))
+    (shmem_signal_add)(sig_addr, signal, pe)
 #define OSOE_SIGNAL_ADD_4(ctx, sig_addr, signal, pe)                             \
     shmem_ctx_signal_add((ctx), (sig_addr), (signal), (pe))
 #define shmem_signal_add(...)                                                    \
@@ -1628,13 +1640,14 @@ OSOE_AMO_DEPRECATED_TYPES(OSOE_AMO_DECL_DEPRECATED_STANDARD)
 /* spec §9.10.3's shmem_sync(team), beside the deprecated active-set shmem_sync
  * of four arguments (declared above): the count picks, as it does between the
  * forms with and without a context, and the deprecated one is called by its
- * parenthesized name, which no function-like macro expands. Two or three
- * arguments name an identifier nothing declares, so the mistake does not
- * compile - where an empty choice would have compiled to a sync that never
- * happened. */
+ * parenthesized name, which no function-like macro expands, with its arguments
+ * as they are written, as the signal updates' three-argument form is: so a
+ * profiler defines it by its plain name too. Two or three arguments name an
+ * identifier nothing declares, so the mistake does not compile - where an
+ * empty choice would have compiled to a sync that never happened. */
 #define OSOE_SYNC_1(team) shmem_team_sync(team)
 #define OSOE_SYNC_4(PE_start, logPE_stride, PE_size, pSync)                      \
-    (shmem_sync)((PE_start), (logPE_stride), (PE_size), (pSync))
+    (shmem_sync)(PE_start, logPE_stride, PE_size, pSync)
 #define shmem_sync(...)                                                          \
     OSOE_PICK4(__VA_ARGS__, OSOE_SYNC_4, osoe_shmem_sync_takes_one_or_four_arguments,  \
                osoe_shmem_sync_takes_one_or_four_arguments, OSOE_SYNC_1, )(__VA_ARGS__)

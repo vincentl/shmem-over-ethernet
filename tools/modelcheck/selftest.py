@@ -11,12 +11,16 @@ It also holds the engine's own checks to a case each must catch. The trapped-
 state check (engine.py, "Liveness") is the one that has no other witness: a
 wire reader that takes a byte and never publishes that it did has no state
 without a successor, so LOST WAKE and STUCK never fire and the engine used to
-report it `ok`. It must be TRAPPED.
+report it `ok`. It must be TRAPPED. And a failed check must be named by its
+message (engine.py, "Properties"): a writer that does not wait for room fails
+BOUND, which `report` must take where a case names BOUND and refuse where it
+names another property.
 
 Exits nonzero on any mismatch, so ctest can run it.
 
 Usage: selftest.py
 """
+import io
 import sys
 
 import engine
@@ -33,25 +37,27 @@ SLOT = lambda i: ('slot', i)            # the ring itself, cap bytes
 SENT = lambda i: ('$sent', i)           # value of the i'th byte written
 
 
-def ring_writer(nbytes, cap):
+def ring_writer(nbytes, cap, wait=True):
     """Send nbytes bytes, values 1..nbytes so that 0 is 'nothing here'; blocked
-    while the ring is full; each byte stored, checked against overwriting,
-    published, then woken."""
+    while the ring is full - unless not `wait`, the engine's own named case
+    below; each byte stored, checked against overwriting, published, then
+    woken."""
     B = []
     for k in range(nbytes):
         p = f'w{k}_'
         nxt = f'@w{k + 1}_L' if k + 1 < nbytes else '@WEND'
         B += [(p + 'L', ('load', lambda L: CONS, 'c', '@' + p + 'P')),
               (p + 'P', ('load', lambda L: PROD, 'p', '@' + p + 'R')),
-              (p + 'R', ('await', lambda M, L, cap=cap: M[PROD] - M[CONS] < cap,
-                         '@' + p + 'L2')),
+              (p + 'R', ('await', lambda M, L, cap=cap, wait=wait:
+                         not wait or M[PROD] - M[CONS] < cap, '@' + p + 'L2')),
               (p + 'L2', ('load', lambda L: CONS, 'c', '@' + p + 'P2')),
               (p + 'P2', ('load', lambda L: PROD, 'p', '@' + p + 'W')),
               (p + 'W', ('store', lambda L, cap=cap: SLOT(L['p'] % cap),
                          lambda L, k=k: k + 1, False, '@' + p + 'C')),
               (p + 'C', ('check', lambda M, L, cap=cap:
                          None if M[PROD] - M[CONS] < cap else
-                         f'wrote byte {L["p"]} over a full ring: {M[PROD] - M[CONS]} outstanding, capacity {cap}',
+                         f'BOUND: wrote byte {L["p"]} over a full ring: {M[PROD] - M[CONS]} '
+                         f'outstanding, capacity {cap}',
                          '@' + p + 'G')),
               (p + 'G', ('gpre', lambda M, L, k=k: ({SENT(k): k + 1}, {}), '@' + p + 'S')),
               (p + 'S', ('store', lambda L: PROD, lambda L: L['p'] + 1, False, '@' + p + 'K')),
@@ -77,9 +83,18 @@ def wire_reader_never_advances():
     return engine.explore('x', threads, mem, out=sys.stderr)
 
 
-# Cases a check must catch, with the verdict it must give.
+def ring_overrun():
+    """The ring's writer that does not wait for room, and no reader: its second
+    byte overwrites the first."""
+    threads = [ring_writer(2, 1, wait=False)]
+    mem = {PROD: 0, CONS: 0, WAKE: 0}
+    return engine.explore('x', threads, mem, out=sys.stderr)
+
+
+# Cases a check must catch, with the property it must fail (engine.py, "Properties").
 MUST_FAIL = [
     ('trapped: wire reader never advances', wire_reader_never_advances, 'TRAPPED'),
+    ('named: ring writer does not wait', ring_overrun, 'BOUND'),
 ]
 
 CASES = [
@@ -115,8 +130,18 @@ if __name__ == '__main__':
     for name, fn, want in MUST_FAIL:
         engine.REDUCE = True
         r = fn()
-        caught = r.verdict == want
+        caught = r.failed == want
         good &= caught
-        print(f'{name:<48} {r.verdict:<9} {r.states:>9,} states  '
+        print(f'{name:<48} {r.failed or r.verdict:<9} {r.states:>9,} states  '
               f'{"caught" if caught else "NOT CAUGHT, expected " + want}', flush=True)
+    # report's comparison: the variant named for what it fails is expected, and
+    # named for anything else - a property it does not fail, or none - is not.
+    print()
+    r = ring_overrun()
+    for want, expected in (('BOUND', True), ('STUCK', False), (True, False)):
+        judged = engine.report(r, expect=want, out=io.StringIO())
+        good &= judged == expected
+        print(f'report: ring writer named {str(want):<6} '
+              f'{"expected" if judged else "UNEXPECTED"}  '
+              f'{"right" if judged == expected else "WRONG"}', flush=True)
     sys.exit(0 if good else 1)

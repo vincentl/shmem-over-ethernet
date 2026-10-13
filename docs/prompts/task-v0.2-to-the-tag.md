@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 150 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 143 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
@@ -86,7 +86,7 @@ jobs start (`docs/pi-cluster.md`). **The development VMs**: `osoe` (with Slurm),
    - **diagnostics** (D1 to D30), batched by file - `osoe-stat`, `fatal.c` and
      `abort.c`, start-up's messages, settings;
    - **tests** (T14 to T44 but those that need GC);
-   - **build and tools** (B3 to B6, B10, B11);
+   - **build and tools** (B10, B11);
    - the author's answers below decide A7 to A14's items.
 2. **The cluster's first session**: the kit's shake-down (H1 to H3), then the
    first native x86-64 runs - the presets at 0, 2 and 3 helpers, tier 3, the

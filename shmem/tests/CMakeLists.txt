@@ -72,6 +72,17 @@ add_test(NAME shmem.memory-orders
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckMemoryOrders.cmake)
 set_tests_properties(shmem.memory-orders PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# The pkg-config search this build was configured with, for the nested
+# configures below, which find liburing again: a cross build names its target's
+# liburing so (PKG_CONFIG_LIBDIR, say), and ctest's own environment need not -
+# without it shmem.strict-c11's nested build found the host's and failed to
+# link (the ninth review's P9-5). Each is passed set or empty, and an empty one
+# is unset there.
+set(osoe_pkg_config_environment)
+foreach(var PKG_CONFIG_LIBDIR PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR)
+  list(APPEND osoe_pkg_config_environment "-D${var}=$ENV{${var}}")
+endforeach()
+
 # A static build is not one of the four presets (none sets BUILD_SHARED_LIBS),
 # so this proves it on its own: a nested configure and build of libosoe as a
 # static archive, then a link of a tiny consumer against that archive alone -
@@ -88,6 +99,7 @@ add_test(NAME shmem.static-link
           "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
           "-DURING_LIBRARIES=${LIBURING_LINK_LIBRARIES}"
           -DSINGLE_NODE=${OSOE_SINGLE_NODE}
+          ${osoe_pkg_config_environment}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStaticLink.cmake)
 set_tests_properties(shmem.static-link PROPERTIES LABELS "tier1" TIMEOUT 180)
 
@@ -104,6 +116,7 @@ add_test(NAME shmem.strict-c11
           "-DC_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}"
           "-DTOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
           -DSINGLE_NODE=${OSOE_SINGLE_NODE}
+          ${osoe_pkg_config_environment}
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckStrictC11.cmake)
 set_tests_properties(shmem.strict-c11 PROPERTIES LABELS "tier1" TIMEOUT 600)
 
@@ -2528,6 +2541,41 @@ foreach(standard c99 c11 c17)
             ${CMAKE_CURRENT_SOURCE_DIR}/headers.c)
   set_tests_properties(shmem.headers.${standard} PROPERTIES LABELS "tier1" TIMEOUT 30)
 endforeach()
+# And C23, as GCC 15 and later compile every program that names no standard
+# (gnu23), so every program oshcc builds there (the ninth review's P9-6): with
+# the build's compiler where it takes -std=c23, otherwise the first of gcc-15,
+# gcc-14 and clang that does - Ubuntu 24.04's gcc is 13, whose C23 is -std=c2x.
+# Where none does, the test is registered all the same and skips, saying so.
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-std=c23 OSOE_C_COMPILER_TAKES_C23)
+set(osoe_c23_compiler "")
+if(OSOE_C_COMPILER_TAKES_C23)
+  set(osoe_c23_compiler "${CMAKE_C_COMPILER}")
+else()
+  foreach(name gcc-15 gcc-14 clang)
+    find_program(osoe_c23_candidate NAMES ${name} NO_CACHE)
+    if(osoe_c23_candidate)
+      execute_process(COMMAND ${osoe_c23_candidate} -std=c23 -E -x c /dev/null
+                      RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
+      if(rc EQUAL 0)
+        set(osoe_c23_compiler "${osoe_c23_candidate}")
+        break()
+      endif()
+    endif()
+  endforeach()
+endif()
+if(osoe_c23_compiler)
+  add_test(NAME shmem.headers.c23
+    COMMAND ${osoe_c23_compiler} -std=c23 -Wall -Wextra -Wpedantic -Werror
+            -fsyntax-only -I${PROJECT_SOURCE_DIR}/shmem/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/headers.c)
+else()
+  add_test(NAME shmem.headers.c23
+    COMMAND ${CMAKE_COMMAND} -E echo
+            "SKIPPED: no compiler here takes -std=c23 (${CMAKE_C_COMPILER}, gcc-15, gcc-14, clang)")
+  set_tests_properties(shmem.headers.c23 PROPERTIES SKIP_REGULAR_EXPRESSION "SKIPPED:")
+endif()
+set_tests_properties(shmem.headers.c23 PROPERTIES LABELS "tier1" TIMEOUT 30)
 find_program(OSOE_CXX_COMPILER NAMES c++ g++ clang++)
 if(OSOE_CXX_COMPILER)
   foreach(standard c++11 c++17)
@@ -2540,6 +2588,17 @@ if(OSOE_CXX_COMPILER)
 else()
   message(STATUS "No C++ compiler: the headers' C++ test is not registered")
 endif()
+
+# A profiler written as §10's example is - pshmem.h included, each routine it
+# intercepts defined by its plain name - for the three routines whose C11 forms
+# share a name, which shmem.h makes macros that count their arguments
+# (profiler-plain-names.c; the round-four review's conformance M1). Under C11,
+# where the macros are.
+add_test(NAME shmem.profiler-plain-names
+  COMMAND ${CMAKE_C_COMPILER} -std=c11 -Wall -Wextra -Wpedantic -Werror
+          -fsyntax-only -I${PROJECT_SOURCE_DIR}/shmem/include
+          ${CMAKE_CURRENT_SOURCE_DIR}/profiler-plain-names.c)
+set_tests_properties(shmem.profiler-plain-names PROPERTIES LABELS "tier1" TIMEOUT 30)
 
 # A C11 generic called with the wrong number of arguments fails to compile,
 # naming what it takes (generic-arity.c): one wrong call from each family the

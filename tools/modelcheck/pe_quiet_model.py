@@ -147,8 +147,8 @@ def quiet(kind, nodes, gets, puts, variant=''):
         bad_gets = [k for k, _ in gets if k in L['pre'] and M[LAND(k)] != M[SIZE(k)]]
         bad_puts = [k for k in covered if k in L['pre'] and not M[FLUSHED(k)]]
         if bad_gets or bad_puts:
-            return (f'{kind} quiet returned with prior get(s) {bad_gets} incomplete, '
-                    f'prior put(s) {bad_puts} unflushed')
+            return (f'{"GETS" if bad_gets else "PUTS"}: {kind} quiet returned with prior '
+                    f'get(s) {bad_gets} incomplete, prior put(s) {bad_puts} unflushed')
         return None
 
     def flush(node):
@@ -202,7 +202,7 @@ def quiet(kind, nodes, gets, puts, variant=''):
     return assemble(B)
 
 
-def run(name, gets_by_thread, puts_by_thread, quiets, nodes, variant='', expect_ok=None):
+def run(name, gets_by_thread, puts_by_thread, quiets, nodes, variant='', expect=None):
     gets = [g for thread in gets_by_thread for g in thread]
     puts = [p for thread in puts_by_thread for p in thread]
     mem = {GEN: 0, FULL: 0, WAKE: 0, QLOCK: 0}
@@ -222,7 +222,7 @@ def run(name, gets_by_thread, puts_by_thread, quiets, nodes, variant='', expect_
         if len(ix) > 1:
             sym.append(ix)
     res = explore(name, threads, mem, idle_ok=lambda i, M, L: i == lander_ix, symmetric=sym)
-    return report(res, expect_ok=expect_ok)
+    return report(res, expect=expect)
 
 
 FULL_Q = ('full', ())
@@ -230,7 +230,8 @@ PE0 = ('pe', (0,))
 PE1 = ('pe', (1,))
 
 CASES = [
-    # name, gets by thread (id, size), puts by thread (id, node), quiets, variant, expected to pass
+    # name, gets by thread (id, size), puts by thread (id, node), quiets, variant, expect: True,
+    # or the property the variant must fail
     ('design: a get, a put to node 1, a quiet and a pe_quiet of node 0',
      [[(0, 1)]], [[(1, 1)]], [FULL_Q, PE0], '', True),
     ('design: a get, puts to nodes 0 and 1, a quiet and a pe_quiet of node 0',
@@ -244,13 +245,13 @@ CASES = [
     ('full_first: a get, a put to node 1, 2 quiets',
      [[(0, 1)]], [[(1, 1)]], [FULL_Q, FULL_Q], 'any_bump', True),
     ('any_bump: a put to node 1, a quiet and a pe_quiet of node 0',
-     [], [[(1, 1)]], [FULL_Q, PE0], 'any_bump', False),
+     [], [[(1, 1)]], [FULL_Q, PE0], 'any_bump', 'PUTS'),
     ('any_bump: puts to nodes 0 and 1, pe_quiets of node 0 and of node 1',
-     [], [[(1, 0)], [(2, 1)]], [PE0, PE1], 'any_bump', False),
+     [], [[(1, 0)], [(2, 1)]], [PE0, PE1], 'any_bump', 'PUTS'),
     ('pe_full: a put to node 1, a quiet and a pe_quiet of node 0',
-     [], [[(1, 1)]], [FULL_Q, PE0], 'pe_full', False),
+     [], [[(1, 1)]], [FULL_Q, PE0], 'pe_full', 'PUTS'),
     ('at_least: a get, a put to node 1, a quiet',
-     [[(0, 1)]], [[(1, 1)]], [FULL_Q], 'at_least', False),
+     [[(0, 1)]], [[(1, 1)]], [FULL_Q], 'at_least', 'PUTS'),
 ]
 
 if __name__ == '__main__':

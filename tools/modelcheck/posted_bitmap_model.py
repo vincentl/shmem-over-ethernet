@@ -48,6 +48,16 @@ Breakages
   clear_after       the agent loads the summary and clears it after it has taken
                     the words, rather than exchanging it: a summary bit set in
                     between is cleared unread.
+  kept_bits         the agent loads a bitmap word rather than exchanging it, so
+                    a bit it took stays set, and keeps no record of the word it
+                    took last (internode-am.c's `consumed`): a later pass that
+                    the summary sends to that word takes the bit again and
+                    forwards the same arrival a second time. ORDER alone fails
+                    it - the root takes no epoch twice and the agent counts
+                    only what moved, so nothing waits - and either half alone
+                    holds: this design hands the agent no word it has taken (the
+                    step D review, correctness G3), and the comparison with the
+                    word last taken passes over a kept bit's.
 
 Usage: posted_bitmap_model.py [substring ...]   runs the cases whose names match
 """
@@ -107,18 +117,24 @@ def lead(design):
     """The agent: a pass, then a sleep if it took nothing, until every arrival
     of every team is forwarded."""
     def forward(M, L):
+        """The root takes each team's next epoch once, and the agent counts
+        what it forwarded: an arrival out of order moves neither, so that only
+        ORDER, checked at 'FO', sees one."""
         b = L['b']
         if L['h'] != M[FORWARDED(b)] + 1:
-            return {}, {}               # ORDER is checked at 'FO'
-        return {FORWARDED(b): M[FORWARDED(b)] + 1}, {f'c{b}': L['h'], 'took': 1}
+            return {}, {}
+        took = {'took': 1, 'n': (L['n'] or 0) + 1}
+        if design != 'kept_bits':
+            took[f'c{b}'] = L['h']
+        return {FORWARDED(b): M[FORWARDED(b)] + 1}, took
 
     def order(M, L):
         b = L['b']
         if L['h'] == (L[f'c{b}'] or 0):
             return None                 # not new: nothing to forward
         return (None if L['h'] == M[FORWARDED(b)] + 1 else
-                f"team {b}: epoch {L['h']} forwarded after {M[FORWARDED(b)]}: an arrival was "
-                f"{'repeated' if L['h'] <= M[FORWARDED(b)] else 'skipped'}")
+                f"ORDER: team {b}: epoch {L['h']} forwarded after {M[FORWARDED(b)]}: an arrival "
+                f"was {'repeated' if L['h'] <= M[FORWARDED(b)] else 'skipped'}")
 
     B = [('L', ('br', lambda L: (L['n'] or 0) >= TEAMS * EPOCHS, '@LEND', '@W')),
          ('W', ('load', lambda L: WAKE, 'w', '@S0')),
@@ -132,10 +148,15 @@ def lead(design):
               ('SZ', ('br', lambda L: L['s'] != 0, '@SX', '@D')),
               ('SX', ('andn', lambda L: SUMMARY, lambda L: (1 << 2) - 1, 's', '@G0'))]
     # Each group the summary named, in order; each block of it whose bit was set.
+    if design == 'kept_bits':
+        take = ('GX', ('load', lambda L: POSTED(L['g']), 'x', '@B0'))
+    else:
+        take = ('GX', ('andn', lambda L: POSTED(L['g']), lambda L: (1 << TEAMS) - 1, 'x',
+                       '@B0'))
     B += [('G0', ('set', 'g', lambda L: 0, '@G')),
           ('G', ('br', lambda L: L['g'] >= 2, '@D', '@GS')),
           ('GS', ('br', lambda L: (L['s'] >> L['g']) & 1, '@GX', '@GN')),
-          ('GX', ('andn', lambda L: POSTED(L['g']), lambda L: (1 << TEAMS) - 1, 'x', '@B0')),
+          take,
           ('B0', ('set', 'b', lambda L: 0, '@BL')),
           ('BL', ('br', lambda L: L['b'] >= TEAMS, '@GN', '@BS')),
           ('BS', ('br', lambda L: (L['x'] >> L['b']) & 1 and GROUP[L['b']] == L['g'],
@@ -143,8 +164,7 @@ def lead(design):
           ('BH', ('load', lambda L: HANDOFF(L['b']), 'h', '@FO')),
           ('FO', ('check', order, '@FW')),
           ('FW', ('br', lambda L: L['h'] != (L[f"c{L['b']}"] or 0), '@FF', '@BN')),
-          ('FF', ('ghost', forward, '@FN')),
-          ('FN', ('set', 'n', lambda L: (L['n'] or 0) + 1, '@BN')),
+          ('FF', ('ghost', forward, '@BN')),
           ('BN', ('set', 'b', lambda L: L['b'] + 1, '@BL')),
           ('GN', ('set', 'g', lambda L: L['g'] + 1, '@G'))]
     if design == 'clear_after':
@@ -186,10 +206,11 @@ def case(design):
 
 CASES = [
     ('design', True),
-    ('summary_first', False),
-    ('wake_first', False),
-    ('bits_first', False),
-    ('clear_after', False),
+    ('summary_first', 'STUCK'),
+    ('wake_first', 'STUCK'),
+    ('bits_first', 'STUCK'),
+    ('clear_after', 'STUCK'),
+    ('kept_bits', 'ORDER'),
 ]
 
 
@@ -202,7 +223,7 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
                       done=lambda M: M[DONE] == TEAMS + 2)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

@@ -44,6 +44,8 @@ Variants
 import sys
 from collections import deque
 
+import engine
+
 
 def run(variant):
     wires = ('D',) if variant == 'one_wire' else ('C', 'D')
@@ -153,15 +155,17 @@ def run(variant):
 
 def main():
     ok = True
-    for variant, expect in (('one_wire', True), ('two_wires', False), ('either_wire', True),
+    for variant, expect in (('one_wire', True), ('two_wires', 'LIVE_END'), ('either_wire', True),
                             ('control_only', True)):
         held, states, tr = run(variant)
-        print(f'carrier/{variant}: {"holds" if held else "FAILS: both carriers wait for each other"}'
-              f' ({states} states)', flush=True)
+        failure = None if held else 'LIVE_END: both carriers wait for each other'
+        wrong = engine.judge(held, engine.named(failure), expect)
+        mark = '' if wrong is None else '   <-- UNEXPECTED' + wrong
+        print(f'carrier/{variant}: {"holds" if held else "FAILS: " + failure}'
+              f' ({states} states){mark}', flush=True)
         if tr:
             print('   trace: ' + ' ; '.join(tr))
-        if expect is not None:
-            ok &= held == expect
+        ok &= wrong is None
     return 0 if ok else 1
 
 

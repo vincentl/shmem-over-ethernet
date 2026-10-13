@@ -224,7 +224,7 @@ def with_done(threads, count):
     return out + threads[count:]
 
 
-# (design, rounds per PE, credits, bitset classes, tso, expect_ok)
+# (design, rounds per PE, credits, bitset classes, tso, expect: True, or the property it must fail)
 CASES = [
     ('design', [1, 1], 1, 32, False, True),
     ('design', [1, 1, 1], 1, 32, False, True),
@@ -233,10 +233,10 @@ CASES = [
     ('design', [2, 1, 1], 1, 2, False, True),
     ('design', [1, 1, 1], 2, 32, True, True),
 
-    ('pool_handoff', [1, 1, 1], 1, 32, False, False),
-    ('wake_any', [1, 1, 1], 1, 32, False, False),
-    ('bump_first', [1, 1], 1, 32, False, False),
-    ('eager_available', [1, 1, 1], 1, 32, False, False),
+    ('pool_handoff', [1, 1, 1], 1, 32, False, 'BARGE'),
+    ('wake_any', [1, 1, 1], 1, 32, False, 'LOST WAKE'),
+    ('bump_first', [1, 1], 1, 32, False, 'LOST WAKE'),
+    ('eager_available', [1, 1, 1], 1, 32, False, 'OVERSUBSCRIBED'),
 ]
 
 if __name__ == '__main__':
@@ -249,5 +249,5 @@ if __name__ == '__main__':
             continue
         res = explore(name, threads, mem0, tso=tso, max_seconds=900,
                       liveness_max_states=4_000_000)
-        ok &= report(res, expect_ok=expect, tso=tso)
+        ok &= report(res, expect=expect, tso=tso)
     sys.exit(0 if ok else 1)

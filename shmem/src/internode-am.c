@@ -168,8 +168,14 @@ void osoe_internode_arrive(uint32_t team, uint32_t epoch)
  * takes the bits. An agent whose load read the bump finds the bits, and through
  * their exchange the word, which was stored before them; one whose load came
  * before it finds the wait's compare fail and passes again - the rule that
- * makes the handoff sound already (§5.3). A bit taken whose word was taken in
- * an earlier pass is a word that has not moved, and costs nothing.
+ * makes the handoff sound already (§5.3). In this order no bit is taken for a
+ * word already taken: a member posts again only once its last post is
+ * forwarded and released, and each post sets its bit once, after its word. So
+ * the comparison with the word last consumed never passes a word over here;
+ * it is kept as the guard it is, should a bit ever be taken twice -
+ * posted_bitmap_model.py's `kept_bits`, bits loaded rather than exchanged,
+ * forwards an arrival twice without it, and ORDER fails (the step D review,
+ * correctness G3).
  */
 static bool take_arrival(uint32_t block)
 {

@@ -238,11 +238,11 @@ def agent(design, node, n, k, epochs, enabled):
         return out
 
     messages = {
-        P1: lambda L: f'node {node} released epoch {L["e1"]} before node {L["e2"]} arrived',
-        P2: lambda L: f'node {node} released epoch {L["e1"]} with its counter at {L["e2"]}: '
+        P1: lambda L: f'P1: node {node} released epoch {L["e1"]} before node {L["e2"]} arrived',
+        P2: lambda L: f'P2: node {node} released epoch {L["e1"]} with its counter at {L["e2"]}: '
                       f'not exactly once, in order',
-        P3_OPEN: lambda L: f'node {node} has epochs {L["e1"]} and {L["e2"]} open at once',
-        P3_CLOSED: lambda L: f'node {node} booked an arrival for epoch {L["e1"]}, which it '
+        P3_OPEN: lambda L: f'P3: node {node} has epochs {L["e1"]} and {L["e2"]} open at once',
+        P3_CLOSED: lambda L: f'P3: node {node} booked an arrival for epoch {L["e1"]}, which it '
                              f'closed (it has closed through {L["e2"]})',
     }
     init = {'consumed': 0, 'open': 0, 'own': 0, 'mask': 0, 'done_to': 0, 'down': 0,
@@ -299,7 +299,9 @@ def case(design, n, k, members, epochs=EPOCHS, targeted=False):
     return name, threads, mem, sym, idle_ok
 
 
-# (design, nodes, k, {node: members}, tso, expect_ok[, epochs]).
+# (design, nodes, k, {node: members}, tso, expect[, epochs]): expect is True, or the property
+# the run with every check on must fail; the run with a breakage's own check only must fail
+# the property BREAKS gives.
 #
 # Five nodes with k = 2 is the smallest tree of depth 2: the root, an interior
 # node with two leaves, and a leaf of the root. Node 1, the interior one, has
@@ -316,20 +318,21 @@ CASES = [
     ('design', 5, 4, {0: 2}, False, True),
     ('design', 4, 1, {}, False, True),
 
-    ('forward_early', 5, 2, {1: 2}, False, False),
-    ('no_reset', 5, 2, {1: 2}, False, False),
-    ('release_first', 5, 2, {1: 2}, False, False),
-    ('release_first', 5, 2, {1: 2}, True, False),
-    ('wrong_epoch', 5, 2, {1: 2}, False, False),
-    ('release_twice', 5, 2, {1: 2}, False, False),
+    ('forward_early', 5, 2, {1: 2}, False, 'P3'),
+    ('no_reset', 5, 2, {1: 2}, False, 'P3'),
+    ('release_first', 5, 2, {1: 2}, False, 'P3'),
+    ('release_first', 5, 2, {1: 2}, True, 'P3'),
+    ('wrong_epoch', 5, 2, {1: 2}, False, 'P3'),
+    ('release_twice', 5, 2, {1: 2}, False, 'P2'),
 ]
 
 # The property each breakage breaks, by the message its check prints.
 #
 # **Which check a broken variant trips first depends on the search order, not
-# on the variant**, so each is run twice. With every check on it must fail -
-# some defence catches it. With only its own property's check on it must fail
-# on that property, which is the evidence that it breaks what it is said to:
+# on the variant**, so each is run twice. With every check on it must fail the
+# property CASES names, whichever defence catches it first. With only its own
+# property's check on it must fail on that property (BREAKS), which is the
+# evidence that it breaks what it is said to:
 # forward_early, for one, is usually caught first by P3's refusal of a late
 # child's arrival for an epoch already closed - the same fatal progress.c's
 # book_arrival raises, and what the C mutation of it hit - while a root
@@ -341,6 +344,9 @@ FIRST = {
     'wrong_epoch': 'which it closed',
     'release_twice': 'not exactly once',
 }
+# The property each breakage breaks (the docstring's), which its own check alone must fail.
+BREAKS = {'forward_early': 'P1', 'no_reset': 'P1', 'release_first': 'P3', 'wrong_epoch': 'P3',
+          'release_twice': 'P2'}
 
 if __name__ == '__main__':
     keep = select(sys.argv)
@@ -349,7 +355,7 @@ if __name__ == '__main__':
     for design, n, k, members, tso, expect, *rest in CASES:
         runs.append((design, n, k, members, tso, expect, rest, False))
         if design in TARGET:
-            runs.append((design, n, k, members, tso, expect, rest, True))
+            runs.append((design, n, k, members, tso, BREAKS[design], rest, True))
     for design, n, k, members, tso, expect, rest, targeted in runs:
         name, threads, mem0, sym, idle_ok = case(design, n, k, members, *rest,
                                                  targeted=targeted)
@@ -357,7 +363,7 @@ if __name__ == '__main__':
             continue
         res = explore(name, threads, mem0, tso=tso, symmetric=sym, idle_ok=idle_ok,
                       max_seconds=1800, liveness_max_states=4_000_000)
-        good = report(res, expect_ok=expect, tso=tso)
+        good = report(res, expect=expect, tso=tso)
         if targeted and res.complete and (res.message is None or
                                           FIRST[design] not in res.message):
             print(f'    <-- UNEXPECTED: {design} must fail on "{FIRST[design]}"')

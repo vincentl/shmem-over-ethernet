@@ -17,6 +17,8 @@ and the model is here because they are easy to conflate:
                they fit the landing zone the origin sized for them (§3.12: a
                reply cannot be written to a private `dest`, so it lands in the
                node segment first).
+  CREDITS      and under both, the credit itself never goes below zero: no
+               credit is handed out twice (race_take's failure).
 
 The credit is per **connection**, not per PE: several PEs of a node share it, so
 they contend on one counter. That contention is modelled, not abstracted.
@@ -100,7 +102,7 @@ def origin(design, pe, nops, C, nbi):
             # A resource count that went negative has been handed out twice.
             B += [(p + 'T4', ('check', lambda M, L:
                               None if M[CRED] >= 0 else
-                              f'credits went to {M[CRED]}: handed out twice',
+                              f'CREDITS: credits went to {M[CRED]}: handed out twice',
                               '@' + p + 'S'))]
         B += [(p + 'S', ('add', lambda L, pe=pe: SENT(pe), lambda L: 1, '_', nxt))]
         return B
@@ -202,7 +204,8 @@ def target(design, npes, nreq, C, bound):
     if bound == 'descriptors':
         B += [('CDESC', ('check', lambda M, L, C=C:
                          None if L['n'] <= C else
-                         f'{L["n"]} reply descriptors alive on the connection, credit is {C}',
+                         f'DESCRIPTORS: {L["n"]} reply descriptors alive on the connection, '
+                         f'credit is {C}',
                          '@ADV'))]
     else:
         B += [('CDESC', ('br', lambda L: True, '@ADV', '@ADV'))]
@@ -213,7 +216,8 @@ def target(design, npes, nreq, C, bound):
     if bound == 'landing':
         B += [('CLAND', ('check', lambda M, L, C=C:
                          None if L['l'] <= C else
-                         f'{L["l"]} replies in flight toward one PE, its landing zone holds {C}',
+                         f'LANDING: {L["l"]} replies in flight toward one PE, '
+                         f'its landing zone holds {C}',
                          '@ADV'))]
     else:
         B += [('CLAND', ('br', lambda L: True, '@ADV', '@ADV'))]
@@ -238,9 +242,9 @@ def case(design, npes, nops, C, bound, nbi=False):
     return (f'credit/{design}{tag} pes={npes} ops={nops} C={C} [{bound}]', threads, mem, ())
 
 
-# (design, pes, ops, C, bound, nbi, expect_ok). Each bound is checked on its own,
-# so a breakage that violates both is not reported as violating only the one the
-# explorer happened to reach first.
+# (design, pes, ops, C, bound, nbi, expect): True, or the property the breakage must
+# fail. Each bound is checked on its own, so a breakage that violates both is not
+# reported as violating only the one the explorer happened to reach first.
 #
 # Two results here are the reason the model was worth writing, and neither was
 # the prediction it started from.
@@ -266,21 +270,21 @@ for _b in ('descriptors', 'landing'):
         ('design', 1, 2, 1, _b, False, True), ('design', 2, 1, 1, _b, False, True),
         ('design', 2, 2, 1, _b, False, True), ('design', 2, 2, 2, _b, False, True),
         ('race_take', 1, 2, 1, _b, False, True),
-        ('race_take', 2, 2, 1, _b, False, False),
+        ('race_take', 2, 2, 1, _b, False, 'CREDITS'),
         ('on_apply', 1, 2, 1, _b, False, True),
-        ('on_apply', 2, 2, 1, _b, False, _b == 'landing'),  # descriptors only
+        ('on_apply', 2, 2, 1, _b, False, 'DESCRIPTORS' if _b == 'descriptors' else True),
         # Blocking gets cannot show on_drain's defect; see note 2 above.
         ('on_drain', 1, 2, 1, _b, False, True),
         ('on_drain', 2, 2, 1, _b, False, True),
         ('none', 1, 2, 1, _b, False, True),
-        ('none', 2, 2, 1, _b, False, _b == 'landing'),  # descriptors only
+        ('none', 2, 2, 1, _b, False, 'DESCRIPTORS' if _b == 'descriptors' else True),
         # Nonblocking issue: one PE, several requests outstanding at once. This
         # is out of scope for this slice and is modelled because it is the only
         # configuration in which the landing bound binds.
         ('design', 1, 2, 1, _b, True, True), ('design', 1, 3, 2, _b, True, True),
-        ('on_drain', 1, 2, 1, _b, True, _b == 'descriptors'),
+        ('on_drain', 1, 2, 1, _b, True, 'LANDING' if _b == 'landing' else True),
         # on_apply returns the credit earliest of all and breaks both bounds.
-        ('on_apply', 1, 2, 1, _b, True, False),
+        ('on_apply', 1, 2, 1, _b, True, 'DESCRIPTORS' if _b == 'descriptors' else 'LANDING'),
     ]
 
 if __name__ == '__main__':
@@ -291,5 +295,5 @@ if __name__ == '__main__':
         if not keep(name):
             continue
         res = explore(name, threads, mem0, symmetric=sym, max_seconds=120)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     sys.exit(0 if ok else 1)
