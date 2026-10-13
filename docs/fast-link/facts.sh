@@ -3,7 +3,9 @@
 # docs/fast-link.md §2: what each node is, gathered on every node at once by
 # one task a node, into OUTDIR/facts.txt, each line prefixed by its node's name.
 # The interface is the one the node's route to the first node uses. The kernel's
-# settings are read from /proc/sys and ethtool by its path: Debian 13 keeps
+# settings are read from /proc/sys - busy polling's two among them, which §15
+# sets, and perf's paranoia, which §13's profile meets - and ethtool by its
+# path (its -c the interrupt coalescing §15 turns off): Debian 13 keeps
 # /usr/sbin off a user's PATH, and sysctl and ethtool are there. A fact that
 # cannot be read says why, in its line, rather than going missing.
 # usage: facts.sh NODES OUTDIR
@@ -36,7 +38,8 @@ for option in -i -k -c -l -g; do /usr/sbin/ethtool $option "$interface" 2>&1 | s
 for key in net.core.netdev_max_backlog net.core.rmem_max net.core.wmem_max net.ipv4.tcp_rmem \
            net.ipv4.tcp_wmem net.ipv4.tcp_congestion_control net.ipv4.tcp_notsent_lowat \
            net.ipv4.tcp_mtu_probing net.ipv4.tcp_slow_start_after_idle net.core.somaxconn \
-           net.core.default_qdisc kernel.io_uring_disabled; do
+           net.core.default_qdisc net.core.busy_read net.core.busy_poll \
+           kernel.io_uring_disabled kernel.perf_event_paranoid; do
     echo "$key = $(cat "/proc/sys/${key//.//}" 2>&1)" | say sysctl
 done
 echo "memlock $(ulimit -l), open files $(ulimit -n), stack $(ulimit -s)" | say limits

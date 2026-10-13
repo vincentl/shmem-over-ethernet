@@ -1,0 +1,19 @@
+== facts 12:19:31
+exit 0, jobs that failed: 0
+== gets 12:19:32
+exit 0, jobs that failed: 0
+== collect 12:19:41
+exit 0, jobs that failed: 0
+== behind 12:19:46
+exit 0, jobs that failed: 0
+== window 12:22:23
+exit 0, jobs that failed: 0
+== tuning 12:22:45
+exit 0, jobs that failed: 0
+== trees 12:23:39
+exit 0, jobs that failed: 0
+DONE 12:27:52
+
+real	8m20.711s
+user	12m53.623s
+sys	9m33.744s

@@ -1,0 +1,28 @@
+# 2026-10-13T12:23:39Z trees.sh on vm
+# kit 143e3a17d80133452c6063bda90c0fd68cb0516a
+# launcher osoe-launch, build <repo>/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+vm: 3ee3357: built, 3 warnings
+vm: de3dc42: built, 3 warnings
+vm: 49c62d3: built, 3 warnings
+vm: 2dcf8d6: built, 3 warnings
+12:26:48 exit 0 put-64k-de3dc42-r1.txt:  <repo>/build/trees/de3dc42/build/release/kit/multistream put 65536 2
+12:26:50 exit 0 put-1m-de3dc42-r1.txt:  <repo>/build/trees/de3dc42/build/release/kit/multistream put 1048576 2
+12:26:54 exit 0 hol-de3dc42-r1.txt:  <repo>/build/trees/de3dc42/build/release/kit/hol 2
+12:26:59 exit 0 mailbox-de3dc42-r1.txt:  <repo>/build/trees/de3dc42/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+12:27:01 exit 0 put-64k-3ee3357-r1.txt:  <repo>/build/trees/3ee3357/build/release/kit/multistream put 65536 2
+12:27:03 exit 0 put-1m-3ee3357-r1.txt:  <repo>/build/trees/3ee3357/build/release/kit/multistream put 1048576 2
+12:27:07 exit 0 hol-3ee3357-r1.txt:  <repo>/build/trees/3ee3357/build/release/kit/hol 2
+12:27:13 exit 0 mailbox-3ee3357-r1.txt:  <repo>/build/trees/3ee3357/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+12:27:15 exit 0 put-64k-main-r1.txt:  <repo>/build/release/kit/multistream put 65536 2
+12:27:17 exit 0 put-1m-main-r1.txt:  <repo>/build/release/kit/multistream put 1048576 2
+12:27:20 exit 0 hol-main-r1.txt:  <repo>/build/release/kit/hol 2
+12:27:25 exit 0 mailbox-main-r1.txt:  <repo>/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+12:27:27 exit 0 put-64k-2dcf8d6-r1.txt:  <repo>/build/trees/2dcf8d6/build/release/kit/multistream put 65536 2
+12:27:29 exit 0 put-1m-2dcf8d6-r1.txt:  <repo>/build/trees/2dcf8d6/build/release/kit/multistream put 1048576 2
+12:27:33 exit 0 hol-2dcf8d6-r1.txt:  <repo>/build/trees/2dcf8d6/build/release/kit/hol 2
+12:27:38 exit 0 mailbox-2dcf8d6-r1.txt:  <repo>/build/trees/2dcf8d6/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+12:27:41 exit 0 put-64k-49c62d3-r1.txt:  <repo>/build/trees/49c62d3/build/release/kit/multistream put 65536 2
+12:27:43 exit 0 put-1m-49c62d3-r1.txt:  <repo>/build/trees/49c62d3/build/release/kit/multistream put 1048576 2
+12:27:47 exit 0 hol-49c62d3-r1.txt:  <repo>/build/trees/49c62d3/build/release/kit/hol 2
+12:27:52 exit 0 mailbox-49c62d3-r1.txt:  <repo>/build/trees/49c62d3/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+# done 12:27:52

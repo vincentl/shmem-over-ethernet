@@ -1,0 +1,8 @@
+# 12:28:58 nodes=5 pes_per_node=1 
+# bash <repo>/docs/fast-link/tuning-node.sh off 50 one
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 0, busy_poll 0
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 0, busy_poll 0
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 0, busy_poll 0
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 0, busy_poll 0
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 0, busy_poll 0
+# exit 0

@@ -1,0 +1,165 @@
+== <dry>/out/behind
+jobs: 40, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  put-1m     pes=2 h=0                 job 4695 (n=1)
+                                       node 935 (735-1076, n=5)
+                                       cpu/GiB 0.581 (n=1)
+                                       peers in calls 1.51 (1.46-1.56, n=5)
+                                       with quiets 1.77 (1.76-1.80, n=5), in quiets 0.158 (0.134-0.187, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.995
+                                       link 2122 MiB/s, hop 36.2 us, message 10.5 us; unsent limit 284810 B
+  put-1m-profiled pes=2 h=0            job 4108 (n=1)
+                                       node 831 (769-868, n=5)
+                                       cpu/GiB 0.640 (n=1)
+                                       peers in calls 1.47 (1.40-1.53, n=5)
+                                       with quiets 1.71 (1.69-1.81, n=5), in quiets 0.171 (0.145-0.186, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.997
+                                       link 1563 MiB/s, hop 33.2 us, message 28.9 us; unsent limit 209755 B
+  put-1m     pes=2 h=1                 job 4668 (n=1)
+                                       node 898 (872-1075, n=5)
+                                       cpu/GiB 0.602 (n=1)
+                                       peers in calls 1.52 (1.41-1.53, n=5)
+                                       with quiets 1.75 (1.71-1.81, n=5), in quiets 0.158 (0.136-0.180, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 2212 MiB/s, hop 22.2 us, message 18.0 us; unsent limit 296952 B
+  put-1m-profiled pes=2 h=1            job 4774 (n=1)
+                                       node 925 (854-1061, n=5)
+                                       cpu/GiB 0.594 (n=1)
+                                       peers in calls 1.52 (1.48-1.59, n=5)
+                                       with quiets 1.79 (1.78-1.84, n=5), in quiets 0.161 (0.149-0.176, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 4879 MiB/s, hop 46.8 us, message 18.5 us; unsent limit 654891 B
+  put-1m     pes=2 h=2                 job 4952 (n=1)
+                                       node 988 (956-1029, n=5)
+                                       cpu/GiB 0.567 (n=1)
+                                       peers in calls 1.55 (1.54-1.56, n=5)
+                                       with quiets 1.71 (1.69-1.72, n=5), in quiets 0.102 (0.0970-0.103, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 2103 MiB/s, hop 45.6 us, message 18.4 us; unsent limit 282324 B
+  put-1m-profiled pes=2 h=2            job 4714 (n=1)
+                                       node 932 (912-991, n=5)
+                                       cpu/GiB 0.608 (n=1)
+                                       peers in calls 1.56 (1.54-1.57, n=5)
+                                       with quiets 1.73 (1.70-1.74, n=5), in quiets 0.108 (0.0960-0.109, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 1537 MiB/s, hop 30.4 us, message 9.61 us; unsent limit 206264 B
+  put-1m     pes=2 h=4                 job 5402 (n=1)
+                                       node 1082 (1027-1139, n=5)
+                                       cpu/GiB 0.542 (n=1)
+                                       peers in calls 1.55 (1.52-1.56, n=5)
+                                       with quiets 1.68 (1.65-1.69, n=5), in quiets 0.0820 (0.0780-0.0840, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 2283 MiB/s, hop 35.0 us, message 16.7 us; unsent limit 306449 B
+  put-1m-profiled pes=2 h=4            job 5178 (n=1)
+                                       node 1027 (991-1082, n=5)
+                                       cpu/GiB 0.558 (n=1)
+                                       peers in calls 1.57 (1.56-1.59, n=5)
+                                       with quiets 1.69 (1.67-1.72, n=5), in quiets 0.0840 (0.0760-0.0860, n=5), over 2.00 (2.00-2.00, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 1447 MiB/s, hop 10.5 us, message 24.2 us; unsent limit 194209 B
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-barrier h=0            alone  median 168 (n=1)              p99 383 (n=1)             
+  hol-barrier h=0            stream median 1020 (n=1)             p99 5747 (n=1)             stream 1373 (n=1)
+  hol-barrier h=1            alone  median 167 (n=1)              p99 364 (n=1)             
+  hol-barrier h=1            stream median 328 (n=1)              p99 3059 (n=1)             stream 1311 (n=1)
+  hol-barrier h=2            alone  median 157 (n=1)              p99 307 (n=1)             
+  hol-barrier h=2            stream median 423 (n=1)              p99 2364 (n=1)             stream 1318 (n=1)
+  hol-barrier h=4            alone  median 152 (n=1)              p99 308 (n=1)             
+  hol-barrier h=4            stream median 432 (n=1)              p99 2711 (n=1)             stream 905 (n=1)
+  hol-broadcast-65536 h=0    alone  median 385 (n=1)              p99 763 (n=1)             
+  hol-broadcast-65536 h=0    stream median 1480 (n=1)             p99 7273 (n=1)             stream 1520 (n=1)
+  hol-broadcast-65536 h=1    alone  median 410 (n=1)              p99 1076 (n=1)            
+  hol-broadcast-65536 h=1    stream median 2185 (n=1)             p99 6600 (n=1)             stream 1545 (n=1)
+  hol-broadcast-65536 h=2    alone  median 379 (n=1)              p99 947 (n=1)             
+  hol-broadcast-65536 h=2    stream median 1813 (n=1)             p99 5938 (n=1)             stream 1169 (n=1)
+  hol-broadcast-65536 h=4    alone  median 324 (n=1)              p99 767 (n=1)             
+  hol-broadcast-65536 h=4    stream median 1189 (n=1)             p99 4842 (n=1)             stream 1083 (n=1)
+  hol-broadcast-8 h=0        alone  median 174 (n=1)              p99 409 (n=1)             
+  hol-broadcast-8 h=0        stream median 1388 (n=1)             p99 5262 (n=1)             stream 1620 (n=1)
+  hol-broadcast-8 h=1        alone  median 183 (n=1)              p99 448 (n=1)             
+  hol-broadcast-8 h=1        stream median 1647 (n=1)             p99 5923 (n=1)             stream 2208 (n=1)
+  hol-broadcast-8 h=2        alone  median 158 (n=1)              p99 353 (n=1)             
+  hol-broadcast-8 h=2        stream median 914 (n=1)              p99 4306 (n=1)             stream 1166 (n=1)
+  hol-broadcast-8 h=4        alone  median 177 (n=1)              p99 411 (n=1)             
+  hol-broadcast-8 h=4        stream median 801 (n=1)              p99 4202 (n=1)             stream 1204 (n=1)
+  hol-fetch-add h=0          alone  median 64.0 (n=1)             p99 134 (n=1)             
+  hol-fetch-add h=0          stream median 537 (n=1)              p99 4557 (n=1)             stream 1719 (n=1)
+  hol-fetch-add h=1          alone  median 66.0 (n=1)             p99 148 (n=1)             
+  hol-fetch-add h=1          stream median 620 (n=1)              p99 3690 (n=1)             stream 1735 (n=1)
+  hol-fetch-add h=2          alone  median 68.0 (n=1)             p99 137 (n=1)             
+  hol-fetch-add h=2          stream median 502 (n=1)              p99 1982 (n=1)             stream 1992 (n=1)
+  hol-fetch-add h=4          alone  median 65.0 (n=1)             p99 161 (n=1)             
+  hol-fetch-add h=4          stream median 239 (n=1)              p99 2824 (n=1)             stream 1392 (n=1)
+  hol-reduce-65536 h=0       alone  median 448 (n=1)              p99 959 (n=1)             
+  hol-reduce-65536 h=0       stream median 1447 (n=1)             p99 5761 (n=1)             stream 1292 (n=1)
+  hol-reduce-65536 h=1       alone  median 468 (n=1)              p99 1481 (n=1)            
+  hol-reduce-65536 h=1       stream median 1719 (n=1)             p99 9538 (n=1)             stream 1434 (n=1)
+  hol-reduce-65536 h=2       alone  median 896 (n=1)              p99 3105 (n=1)            
+  hol-reduce-65536 h=2       stream median 4217 (n=1)             p99 13405 (n=1)            stream 1129 (n=1)
+  hol-reduce-65536 h=4       alone  median 470 (n=1)              p99 939 (n=1)             
+  hol-reduce-65536 h=4       stream median 1480 (n=1)             p99 6903 (n=1)             stream 1028 (n=1)
+  hol-reduce-8 h=0           alone  median 179 (n=1)              p99 417 (n=1)             
+  hol-reduce-8 h=0           stream median 1441 (n=1)             p99 6239 (n=1)             stream 1844 (n=1)
+  hol-reduce-8 h=1           alone  median 183 (n=1)              p99 316 (n=1)             
+  hol-reduce-8 h=1           stream median 1199 (n=1)             p99 5138 (n=1)             stream 1701 (n=1)
+  hol-reduce-8 h=2           alone  median 177 (n=1)              p99 415 (n=1)             
+  hol-reduce-8 h=2           stream median 967 (n=1)              p99 3599 (n=1)             stream 1539 (n=1)
+  hol-reduce-8 h=4           alone  median 183 (n=1)              p99 357 (n=1)             
+  hol-reduce-8 h=4           stream median 996 (n=1)              p99 3895 (n=1)             stream 1048 (n=1)
+
+nstat-h0-r1.txt
+  vm TcpRetransSegs                  72                 0.0
+  vm TcpExtDelayedACKLost            53                 0.0
+  vm TcpExtTCPSackRecovery           43                 0.0
+  vm TcpExtTCPFastRetrans            72                 0.0
+
+nstat-h1-r1.txt
+  vm TcpRetransSegs                  40                 0.0
+  vm TcpExtDelayedACKLost            31                 0.0
+  vm TcpExtTCPSackRecovery           25                 0.0
+  vm TcpExtTCPFastRetrans            38                 0.0
+  vm TcpExtTCPLossProbes             6                  0.0
+  vm TcpExtTCPLossProbeRecovery      1                  0.0
+
+nstat-h2-r1.txt
+  vm TcpRetransSegs                  21                 0.0
+  vm TcpExtDelayedACKLost            15                 0.0
+  vm TcpExtTCPSackRecovery           13                 0.0
+  vm TcpExtTCPFastRetrans            21                 0.0
+
+nstat-h4-r1.txt
+  vm TcpRetransSegs                  15                 0.0
+  vm TcpExtDelayedACKLost            13                 0.0
+  vm TcpExtTCPSackRecovery           7                  0.0
+  vm TcpExtTCPLostRetransmit         1                  0.0
+  vm TcpExtTCPFastRetrans            15                 0.0
+  vm TcpExtTCPLossProbes             1                  0.0
+
+profile-pes2-h0-r1.txt
+  vm profile: perf record failed:
+  vm <repo>/docs/fast-link/profile.sh: line 16: perf: command not found
+
+profile-pes2-h1-r1.txt
+  vm profile: perf record failed:
+  vm <repo>/docs/fast-link/profile.sh: line 16: perf: command not found
+
+profile-pes2-h2-r1.txt
+  vm profile: perf record failed:
+  vm <repo>/docs/fast-link/profile.sh: line 16: perf: command not found
+
+profile-pes2-h4-r1.txt
+  vm profile: perf record failed:
+  vm <repo>/docs/fast-link/profile.sh: line 16: perf: command not found

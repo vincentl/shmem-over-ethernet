@@ -270,3 +270,131 @@ is now true.
 **For the VM**: `ctest --test-dir build/release -R '^shmem\.(landing-default|am-size|get-pieces|context|get-nbi|start-up\.landing)'`,
 and the README's 4 × 4 figure with the VM's 128-byte lines. H28 measures the
 split on the cluster (B14's `gets.sh`).
+
+### 4. B14: the kit's missing sections
+
+**Done for six of its seven; H7's stopped**, as the brief allows: it needs the
+library changed. Commit: the one that adds this entry. No library file changes:
+the kit's scripts, probes, summary and runbook only; no wire or layout change.
+
+**The four trees** the lead's map named are in `git log` as named:
+`3ee3357` (2026-10-07, the author's answers to step 4's §8 - the tree before
+Part 0's first rung), `de3dc42` (2026-10-07, the first rung merged: a put fills
+the room the open buffer has), `49c62d3` (2026-10-08, the second and third
+rungs merged), `2dcf8d6` (2026-10-08, the fourth rung merged: the pass parses
+each provided buffer where the kernel put it); `44f24bb`, the fifth rung, which
+§6 also listed, is not needed for rungs 1 and 4.
+
+**Each section, in the kit's form** - `common.sh`'s `kit_start` and `launch`,
+its settings as environment variables with defaults, `rotate`'s order each
+round, and its `run.txt` - with its runbook section and its line in
+`dry-run.sh`:
+
+- **H25, `collect`'s places: `collect.sh`, §12.** `osoe-bench places quick`
+  by each way forced (`OSOE_COLLECTIVE_PLACES` members, totals, scan,
+  exchange) and by the default, link, every node at once at 8, 16 and 32 PEs a
+  node, three rounds, the ways in another order each: H24's
+  `tools/bench/collect-places.sh` as the kit runs jobs under Slurm.
+  `summarize.py` gains the places lines - each way's medians side by side for
+  each PE count and pattern - and, for each default job's measured link, the
+  way `shape_timing.py`'s `choose_places` takes on it (P35's cap included).
+- **H28, the landing budget: `gets.sh`, §8.** A loop over `PES_PER_NODE` (1,
+  4, 8 and 16 by default) for `multistream get`, and `ZONES` "default
+  262144 1048576", "default" the zone unset - the script unsets
+  `OSOE_GET_LANDING_BYTES`, so the library's own (P32) runs, and each PE's
+  start-up line names it; the default's files carry no zone, which
+  `summarize.py` prints as "default (unset)". The first session's sweep is
+  `ZONES="262144 1048576 4194304 16777216" PES_PER_NODE=8`.
+- **H15 to H19, behind a stream: `behind.sh` with `profile.sh`, §13.** At 0,
+  1, 2 and 4 helpers, three rounds: `hol` - now any number of nodes, two PEs
+  each, each node's first PE streaming to the next node's but the last's (on
+  two nodes PE 0's stream alone, as before) - timing a fetch-add (H16), the
+  barrier of the nodes' second PEs (H15), and their reduction and broadcast of
+  8 bytes and 64 KiB (H17), alone and behind the streams; `nstat -n`, a
+  `multistream put` and `nstat` on every node (H18); and the same stream with
+  every node's CPUs profiled beside it (`perf record -a -g` by `PERF`, then
+  its report by thread name, library and symbol; H19) - a step of the job's
+  own allocation, `srun --overlap`, through `common.sh`'s new `beside`, since
+  a job holds its nodes whole. `summarize.py`'s hol table is by operation and
+  helper count, and it prints nstat's lines of loss and retransmission and a
+  profile's top lines.
+- **H13, the window and the chooser: `window.sh` with `shapes.c`, §14.** A new
+  probe, `shapes`: a sum reduction and a broadcast over the world at 64 KiB,
+  256 KiB, 1 MiB and 4 MiB, in osoe-bench's line form (osoe-bench's own
+  `collectives` stops at 64 KiB). By `OSOE_COLLECTIVE_SHAPE` link and tree and
+  every fixed shape of fan-outs 2, 4, 8 and windows 1, 2, 4, 8, at 8 PEs a
+  node, three rounds. `build.sh` builds `shapes` with the other probes.
+- **H27, latency tuning: `tuning.sh` with `tuning-node.sh`, §15; `facts.sh`,
+  §2.** Each round the image's settings and the tuned - coalescing off by
+  `ethtool -C` (each parameter by its own call, so that one a driver refuses
+  leaves the others set), busy polling on (`net.core.busy_read`,
+  `busy_poll`, 50) - in another order: `ping` from the first node to the
+  second, `osoe-bench quick latency atomic barrier` one PE a node on the two,
+  `hol` there, the mailbox on every node, and `floor.sh` whole (`FLOOR=1`);
+  each node's settings kept before and put back at the end, and by a trap when
+  the script is ended. `facts.sh` records `net.core.busy_read`, `busy_poll`
+  and `kernel.perf_event_paranoid`.
+- **H6, the ladder's code rungs: `trees.sh`, §16.** The four trees written by
+  `git archive` into `build/trees/COMMIT`, copied to every other node as
+  `build.sh` copies the tree, and built on every node at once, each with the
+  kit's `multistream` and `hol` compiled by its own `oshcc`; then between the
+  first two nodes, two PEs each, every tree and the kit's own in another order
+  each round: `multistream put` at 64 KiB and 1 MiB, `hol`, the mailbox. §6
+  points to it.
+- **H7, io_uring's task-run flags and registered files: stopped, §17.** `main`
+  has no setting that turns `COOP_TASKRUN`, `DEFER_TASKRUN` or registered
+  files on: Part 0 measured them in experiment builds chosen by an environment
+  variable and merged none (`docs/decisions/2026-10-07-one-thread-profile.md`,
+  "Measured and not taken"), and no commit holds them (`git log --all
+  -i --grep=taskrun` finds only the merge that records them not taken). A
+  section needs that setting in the library, which the brief keeps out of the
+  kit's work; §17 says so.
+
+**Other files**: `hol.c` (operations, any number of nodes; its line gains
+`op=` and `bytes=`, its count is `operations=` where it was `fetch_adds=`,
+which nothing read; the ladder's four-PE fetch-add runs as before, with no team
+split); `summarize.py` (above, and the mailbox's lines name their case, which
+tuned and default share); `dry-run.sh` (`SECTIONS` picks sections; the new
+sections at small sizes); the runbook's opening, its table of what Part 4
+decides, §2, §6, §8, §11 (what to bring back for the new sections, and what
+the kit once left out now in it); `docs/README.md`'s row for the kit.
+
+**The dry run**, here, after `OUT=<scratch> KIT_LAUNCHER=osoe-launch bash
+docs/fast-link/build.sh <nodes>` (the release build and the six probes,
+`shapes` among them, the probes' only warnings `multistream.c`'s three
+`-Wformat-truncation`, from `main`): `SECTIONS="facts gets collect behind window
+tuning trees" bash docs/fast-link/dry-run.sh <dry>/out`, five logical nodes on
+four vCPUs - every section exit 0, **no job failed**, 8 min 21 s:
+
+| Section | Jobs | What it showed |
+|---|---|---|
+| facts | 1 | the new keys read |
+| gets | 6 | the default's start-up lines "landing zone 1048576 bytes" at 2 PEs a node; summarized |
+| collect | 5 | the four ways' and the default's places lines, summarized side by side |
+| behind | 40 | hol's six operations at 0, 1, 2 and 4 helpers, alone and behind; nstat's retransmissions; the profile's file "perf: command not found" |
+| window | 6 | `shapes`' lines at the chooser's two and four fixed shapes, in osoe-bench's table |
+| tuning | 11, and the floor twice | `eth0` refused the coalescing call, busy polling set to 50 and put back to 0, ping and the rest in both states |
+| trees | 20 | the four trees built ("built, 3 warnings" each - the probe's three), every case on each and on the kit's own |
+
+`tuning-node.sh` then came to set each coalescing parameter by its own call,
+since one refused parameter failed the whole call: `SECTIONS=tuning` again,
+exit 0, no job failed, 51 s - `eth0` refusing `adaptive-tx` alone, the others
+set, busy polling 50 and back to 0 at the end. The records, the repository and
+the scratch directory written `<repo>` and `<dry>`, are
+`docs/design/evidence/v0.2-step4/2026-10-13-kit-b14-dry-run/` (18 files, its row
+in that README). The static checks' licence and settings tests, with the new
+files staged: 4 of 4.
+
+**Not shown here, and for the cluster**: every Slurm path is unexercised in this
+sandbox, which has no Slurm - `launch`'s `salloc`/`srun` as before, and new:
+`beside`'s `srun --overlap` inside the job's own allocation, and `trees.sh`'s
+copy to other nodes (`ssh`, `rsync`) and its build by `srun`; `perf` (absent
+here; `PERF="sudo -n perf"` or `kernel.perf_event_paranoid=-1` on the cluster);
+`ethtool -C` on a NIC that takes the coalescing settings; and any number. The
+first cluster session should run each new section once with `ROUNDS=1` before
+its full run, as the first session did the kit.
+
+**For the lead**: the runbook's new sections are §12 to §17, after §11, so that
+the open items' references to "FL §11" for H15 to H19 still find their text,
+which now points to §13; the brief's sections numbered otherwise would move
+them.
