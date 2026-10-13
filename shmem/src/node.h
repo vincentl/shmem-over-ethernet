@@ -665,8 +665,9 @@ struct osoe_collective_state {
     _Atomic uint32_t collect_lengths;
     /*
      * Layout 39 (P30), in the same room: the way that collect found its places,
-     * an enum osoe_collect_way - the members' vector, each node's total, or the
-     * leads' scan of the nodes' totals - so that a test pins the way where the
+     * an enum osoe_collect_way - the members' vector, each node's total, the
+     * leads' scan of the nodes' totals, or their exchange (P33) - so that a
+     * test pins the way where the
      * count alone cannot tell two apart, and osoe-stat shows it. Written with
      * collect_lengths.
      */
@@ -679,13 +680,15 @@ _Static_assert(sizeof(struct osoe_collective_state) == 128,
 
 /* The ways a collect of differing blocks finds its places (collectives.c,
  * collect_varying), as team.tree.collect_way says them: none yet across nodes,
- * the members' vector, a reduction of each node's total (P29), or a scan of
- * the nodes' totals among the leads with a gather by ranges (P30). */
+ * the members' vector, a reduction of each node's total (P29), a scan of the
+ * nodes' totals among the leads with a gather by ranges (P30), or a direct
+ * exchange of the nodes' totals among the leads (P33). */
 enum osoe_collect_way {
     OSOE_COLLECT_WAY_NONE,
     OSOE_COLLECT_WAY_MEMBERS,
     OSOE_COLLECT_WAY_TOTALS,
     OSOE_COLLECT_WAY_SCAN,
+    OSOE_COLLECT_WAY_EXCHANGE,
 };
 
 /*

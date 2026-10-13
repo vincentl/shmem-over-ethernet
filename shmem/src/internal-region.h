@@ -92,7 +92,8 @@
  * five rows, so four more lines up to 32 nodes, five to 1,024, six to 32,768
  * and seven past.
  *
- * Then **the scans' area** (below), and last **the lanes**: one per thread
+ * Then **the scans' area** (below), **the exchange's words** (below, P33), and
+ * last **the lanes**: one per thread
  * record of the PE (node.h), each `fanout + 1` rows of D slots, a piece's
  * header and its 16 KiB each (OSOE_INTERNAL_SLOT_BYTES) - a
  * row for each child position's pieces and one for what the parent sends
@@ -411,6 +412,53 @@ static inline uint64_t osoe_internal_scan_bytes(uint32_t fanout, uint32_t max_te
     return (uint64_t)max_teams * osoe_internal_team_scan_bytes(fanout, small_collective_bytes);
 }
 
+/*
+ * Then **the exchange's words** (P33 of docs/prompts/v0.2-open-items.md;
+ * docs/design/collect-scan-proposal.md, "A direct exchange of the totals"):
+ * collect's node totals put by each lead straight into a slot of every other,
+ * per team number in two sets by the exchange's parity - a counter line for
+ * each set, then each set's slots, one a node position, sixteen bytes each, the
+ * collect's epoch and the total - rounded up to the line. Two sets, so that a
+ * lead writing one collect's totals never meets a slot a slower lead has yet to
+ * read from the collect before (tools/modelcheck/exchange_model.py). Sized by
+ * the job's node count, which every node agrees on, up to
+ * OSOE_INTERNAL_EXCHANGE_NODES_MOST positions: a team over more nodes takes its
+ * totals through the tree, the exchange being for few nodes - each lead sends
+ * N - 1 messages, where the tree's root alone takes N - 1. None on one node.
+ */
+enum {
+    OSOE_INTERNAL_EXCHANGE_NODES_MOST = 64,
+    OSOE_INTERNAL_EXCHANGE_SLOT_BYTES = 16,
+};
+
+/* The node positions a team number's exchange holds in a job of `nodes` nodes. */
+static inline uint32_t osoe_internal_exchange_positions(uint32_t nodes)
+{
+    return nodes < 2 ? 0
+           : nodes < OSOE_INTERNAL_EXCHANGE_NODES_MOST ? nodes
+                                                      : OSOE_INTERNAL_EXCHANGE_NODES_MOST;
+}
+
+/* One team number's exchange words: the two counter lines, then both sets'
+ * slots, rounded up to the line; none for no positions. */
+static inline uint64_t osoe_internal_team_exchange_bytes(uint32_t positions)
+{
+    uint64_t slots = (uint64_t)2 * positions * OSOE_INTERNAL_EXCHANGE_SLOT_BYTES;
+    return positions == 0 ? 0
+                          : 2 * (uint64_t)OSOE_INTERNAL_LINE_BYTES +
+                                (slots + OSOE_INTERNAL_LINE_BYTES - 1) /
+                                    OSOE_INTERNAL_LINE_BYTES * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* Where the exchange's words start: past the scans' area. */
+static inline uint64_t osoe_internal_exchange_offset(uint32_t fanout, uint32_t max_teams,
+                                                     uint32_t small_collective_bytes,
+                                                     uint32_t nodes)
+{
+    return osoe_internal_scan_offset(fanout, max_teams, small_collective_bytes, nodes) +
+           osoe_internal_scan_bytes(fanout, max_teams, small_collective_bytes);
+}
+
 /* One lane: a row of `pipeline` slots per child position, then the release
  * row. */
 static inline uint64_t osoe_internal_lane_bytes(uint32_t fanout, uint32_t pipeline)
@@ -418,20 +466,21 @@ static inline uint64_t osoe_internal_lane_bytes(uint32_t fanout, uint32_t pipeli
     return (uint64_t)(fanout + 1) * pipeline * OSOE_INTERNAL_SLOT_BYTES;
 }
 
-/* Where the lanes start: past the scans' area. */
+/* Where the lanes start: past the exchange's words. */
 static inline uint64_t osoe_internal_lanes_offset(uint32_t fanout, uint32_t max_teams,
                                                   uint32_t small_collective_bytes,
                                                   uint32_t nodes)
 {
-    return osoe_internal_scan_offset(fanout, max_teams, small_collective_bytes, nodes) +
-           osoe_internal_scan_bytes(fanout, max_teams, small_collective_bytes);
+    return osoe_internal_exchange_offset(fanout, max_teams, small_collective_bytes, nodes) +
+           (uint64_t)max_teams *
+               osoe_internal_team_exchange_bytes(osoe_internal_exchange_positions(nodes));
 }
 
 /* The region's size for `max_teams` team numbers and `lanes` lanes, a tree of
  * fan-out `fanout`, `pipeline` pieces in flight, small collectives of up to
  * `small_collective_bytes` and a job of `nodes` nodes, before page rounding:
  * the small rows, the words, the allgather's words, the reduce-scatter's
- * words, the scans' area, then the lanes. */
+ * words, the scans' area, the exchange's words, then the lanes. */
 static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipeline,
                                                   uint32_t max_teams,
                                                   uint32_t small_collective_bytes,

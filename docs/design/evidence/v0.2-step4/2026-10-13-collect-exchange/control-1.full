@@ -1,0 +1,68 @@
+Internal ctest changing into directory: /tmp/collect-exchange-check/control/build/release
+Test project /tmp/collect-exchange-check/control/build/release
+      Start 471: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+      Start 472: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+      Start 473: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+      Start 474: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 1/29 Test #472: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ......................   Passed    0.18 sec
+      Start 475: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+ 2/29 Test #471: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ......................   Passed    0.19 sec
+      Start 476: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+ 3/29 Test #473: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ............   Passed    0.24 sec
+      Start 477: shmem.collect-places.unordered.1-1-0-0-2-2
+ 4/29 Test #474: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ............   Passed    0.26 sec
+      Start 478: shmem.collect-places.scan.block.0-0-1-1
+ 5/29 Test #475: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 .......................   Passed    0.16 sec
+      Start 479: shmem.collect-places.scan.block.0-0-1-2-2
+ 6/29 Test #477: shmem.collect-places.unordered.1-1-0-0-2-2 ..........................   Passed    0.10 sec
+      Start 480: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3
+ 7/29 Test #476: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .........................   Passed    0.18 sec
+      Start 481: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4
+ 8/29 Test #478: shmem.collect-places.scan.block.0-0-1-1 .............................   Passed    0.15 sec
+      Start 482: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6
+ 9/29 Test #479: shmem.collect-places.scan.block.0-0-1-2-2 ...........................   Passed    0.15 sec
+      Start 483: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7
+10/29 Test #480: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 .................   Passed    0.21 sec
+      Start 484: shmem.collect-places.scan.negative-stride.0-0-1-1
+11/29 Test #481: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 .................   Passed    0.21 sec
+      Start 485: shmem.collect-places.scan.negative-stride.0-0-1-2-2
+12/29 Test #482: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 ...................   Passed    0.26 sec
+      Start 486: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4
+13/29 Test #484: shmem.collect-places.scan.negative-stride.0-0-1-1 ...................   Passed    0.13 sec
+      Start 487: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6
+14/29 Test #483: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 ...............   Passed    0.25 sec
+      Start 488: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2
+15/29 Test #485: shmem.collect-places.scan.negative-stride.0-0-1-2-2 .................   Passed    0.16 sec
+      Start 489: shmem.collect-places.scan.unordered.1-1-0-0-2-2
+16/29 Test #486: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 .......   Passed    0.21 sec
+      Start 490: shmem.collect-places.exchange.block.0-0-1-1
+17/29 Test #489: shmem.collect-places.scan.unordered.1-1-0-0-2-2 .....................   Passed    0.14 sec
+      Start 491: shmem.collect-places.exchange.block.0-0-1-2-2
+18/29 Test #488: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ..................   Passed    0.16 sec
+      Start 492: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3
+19/29 Test #487: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .........   Passed    0.26 sec
+      Start 493: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6
+20/29 Test #490: shmem.collect-places.exchange.block.0-0-1-1 .........................   Passed    0.12 sec
+      Start 494: shmem.collect-places.exchange.negative-stride.0-0-1-2-2
+21/29 Test #491: shmem.collect-places.exchange.block.0-0-1-2-2 .......................   Passed    0.12 sec
+      Start 495: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4
+22/29 Test #492: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.17 sec
+      Start 496: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2
+23/29 Test #494: shmem.collect-places.exchange.negative-stride.0-0-1-2-2 .............   Passed    0.14 sec
+      Start 497: shmem.collect-places.exchange.unordered.1-1-0-0-2-2
+24/29 Test #493: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 ...............   Passed    0.23 sec
+      Start 498: shmem.collect-places.link.zeros.0-0-1-1-2-2-3
+25/29 Test #495: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 ...   Passed    0.23 sec
+      Start 499: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3
+26/29 Test #496: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.19 sec
+27/29 Test #497: shmem.collect-places.exchange.unordered.1-1-0-0-2-2 .................   Passed    0.14 sec
+28/29 Test #498: shmem.collect-places.link.zeros.0-0-1-1-2-2-3 .......................   Passed    0.30 sec
+29/29 Test #499: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 ...................   Passed    0.27 sec
+
+100% tests passed, 0 tests failed out of 29
+
+Label Time Summary:
+internode    =   5.52 sec*proc (29 tests)
+tier2        =   5.52 sec*proc (29 tests)
+
+Total Test time (real) =   1.55 sec

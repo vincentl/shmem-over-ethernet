@@ -376,9 +376,10 @@ void osoe_segment_close(struct osoe_segment *s);
  *       lead's last collect of differing blocks summed between the nodes for
  *       its places, a node's total each or a member's length each (P29)
  *   39  team.tree.collect_way, in the same room: the way that collect found its
- *       places - the members' vector, each node's total, or the leads' scan
- *       (P30); and the header's OSOE_COLLECTIVE_PLACES, node.collective_places,
- *       in room before the rendezvous words, which keep their place
+ *       places - the members' vector, each node's total, the leads' scan (P30)
+ *       or their exchange (P33); and the header's OSOE_COLLECTIVE_PLACES,
+ *       node.collective_places, in room before the rendezvous words, which keep
+ *       their place
  *
  * None of 5 to 39 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37

@@ -5448,7 +5448,24 @@ the scan - every PE alike, which the rendezvous and each node's segment check,
 and each lead publishes the way it took (`team.tree.collect_way`, layout 39)
 and its count, one under the scan (`shmem.collect-places.scan.*`, with every
 other case of P29's, and a mutant whose last step is uncut beside its control,
-`docs/design/evidence/v0.2-step4/2026-10-13-collect-scan/`).
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-scan/`). **A fourth, a
+direct exchange of the nodes' totals among the leads (P33**; the proposal's "A
+direct exchange of the totals", built beside P30): where every node is one run,
+each lead puts its node's total into its own position's slot at every other
+lead and adds to that lead's counter, fenced after - one hop where P29's tree
+takes a level each way, N - 1 messages out of every lead - and the places
+follow from the totals as P29's do. Nothing waits before writing the slots, so
+each team number keeps two sets and a counter for each by the exchange's
+parity: a lead writing collect x's total has finished x - 1, so every lead has
+read x - 2's slots, the ones x reuses; and one counter would let an add for
+x + 1 stand in for a slower one for x. The gather after would order both alone,
+but a collect of nothing has none (`exchange_model.py`, its breakages failing
+there and holding with a gather). Its words are sized by the job's node count
+to 64 nodes (`internal-region.h`), a team over more taking the tree;
+`OSOE_COLLECTIVE_PLACES=exchange` forces it, `team.tree.collect_way` names it,
+and `shmem.collect-places.exchange.*` holds it with every case of P29's and a
+run of collects of nothing under perturbation, beside two mutants -
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-exchange/`.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads

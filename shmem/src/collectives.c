@@ -456,7 +456,8 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
  * collect's places from each node's total (collect_varying's comment), on the
  * lead: `places` holds this node's members' lengths at their ranks. Their sum,
  * this node's total, goes at its position in a vector of the team's nodes,
- * zero elsewhere, which the internode reduction sums between the nodes; then,
+ * zero elsewhere, which the internode reduction sums between the nodes - or,
+ * with `exchange`, the leads' exchange fills with every node's (P33); then,
  * the nodes taken in team-rank order (`runs`), each node's base - the totals
  * before it - at the first rank of its run, and for this node its members'
  * places from its base, the total at `members`. A sum past what eight bytes
@@ -466,7 +467,7 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
  */
 static void places_from_node_totals(const char *routine, struct osoe_team *t, uint32_t epoch,
                                     const struct osoe_team_node_run *runs, uint64_t *places,
-                                    struct osoe_element length)
+                                    struct osoe_element length, bool exchange)
 {
     uint32_t nodes = t->nodes, own = t->own_node_run;
     uint32_t first = runs[own].first_rank, end = first + t->local_members;
@@ -480,8 +481,11 @@ static void places_from_node_totals(const char *routine, struct osoe_team *t, ui
         own_total += places[r];
     }
     totals[runs[own].position] = own_total;
-    osoe_internode_reduce(t->block_index, epoch, totals, nodes, OSOE_REDUCTION_SUM, length,
-                          routine);
+    if (exchange)
+        osoe_internode_exchange_node_totals(t->block_index, epoch, own_total, totals, routine);
+    else
+        osoe_internode_reduce(t->block_index, epoch, totals, nodes, OSOE_REDUCTION_SUM, length,
+                              routine);
     if (totals[runs[own].position] != own_total)
         osoe_fatal("%s: %s's nodes' totals hold %llu bytes at this node's position, %u, where "
                    "its members here give %llu: the leads disagree about the team's nodes",
@@ -564,20 +568,24 @@ static enum osoe_collect_way places_way(const struct osoe_team *t,
         return OSOE_COLLECT_WAY_MEMBERS;
     if (setting == OSOE_COLLECTIVE_PLACES_SCAN && t->node_runs_order != OSOE_TEAM_RUNS_UNORDERED)
         return OSOE_COLLECT_WAY_SCAN;
+    if (setting == OSOE_COLLECTIVE_PLACES_EXCHANGE &&
+        t->nodes <= osoe_internode_exchange_most_nodes())
+        return OSOE_COLLECT_WAY_EXCHANGE;
     return OSOE_COLLECT_WAY_TOTALS;
 }
 
 /*
  * collect's places (phase 1 step 8 slice 2, the author's C4,
  * docs/prompts/done/phase1-step8-slice2-prompt.md; and his A11 of 2026-10-11,
- * P29 and P30 of docs/prompts/v0.2-open-items.md). They need not be symmetric -
+ * P29, P30 and P33 of docs/prompts/v0.2-open-items.md). They need not be
+ * symmetric -
  * only the lead reads them - so nothing is borrowed from the heap: each member
  * leaves its length in its own word of the team number's line
  * (internal-region.h), and the lead finds the places it reads in its own
  * memory - a vector of the team's size plus one, the last word the total, or
  * under the scan its own members' and one - and leaves the total in its own
  * word for its members to read after the release. Then the gather itself. The
- * places come one of three ways:
+ * places come one of four ways:
  *
  *   - **each node's total**, for a team spanning nodes each of which holds one
  *     run of consecutive team ranks - every team strided in world ranks over a
@@ -604,13 +612,19 @@ static enum osoe_collect_way places_way(const struct osoe_team *t,
  *     fills its own members' places and no other, and the gather goes by
  *     ranges, each step saying what it carries (internode.h,
  *     osoe_internode_collect_ranges). Eight bytes up and sixteen down a
- *     message, never a large collective, and a record a step of the gather.
+ *     message, never a large collective, and a record a step of the gather;
+ *   - **an exchange of the nodes' totals** (P33; places_from_node_totals
+ *     again), where every node holds one run and the team spans no more nodes
+ *     than the exchange has room for: each lead puts its total straight to
+ *     every other, one hop and N - 1 messages a lead, and every lead holds
+ *     every node's total, as the reduction would leave them.
  *
  * Which way a team takes is OSOE_COLLECTIVE_PLACES's where the team allows it
  * (places_way): by default each node's total where every node is one run, the
  * members' vector elsewhere; forced, the members' vector anywhere, the scan
- * where the runs meet the positions in order or in reverse, falling back to
- * each node's total, and that to the members' vector. What the team allows is
+ * where the runs meet the positions in order or in reverse and the exchange
+ * where the team spans few enough nodes, each falling back to each node's
+ * total, and that to the members' vector. What the team allows is
  * found once, at its first such collect, by its lead on each node (team.h,
  * osoe_team_node_runs), from what every PE holds alike - the team's ranks and
  * the job's rank map - and every PE holds the setting alike, which the job's
@@ -623,8 +637,9 @@ static enum osoe_collect_way places_way(const struct osoe_team *t,
  * small what its child takes as large, whose child waits for a grant until the
  * deadlock detector names the hang (shmem.lanes.class-split-hang). The lead
  * publishes the way it took and how many lengths it summed between the nodes -
- * a member's each, a node's each, or under the scan its own node's alone
- * (team.tree.collect_way and team.tree.collect_lengths, node.h). The data keeps
+ * a member's each, a node's each - by the tree or the exchange - or under the
+ * scan its own node's alone (team.tree.collect_way and
+ * team.tree.collect_lengths, node.h). The data keeps
  * the allgather every way.
  */
 static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
@@ -654,13 +669,15 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
          * wait as every reduction is (data_collective_at): eight bytes a
          * length, so more than OSOE_SMALL_COLLECTIVE_BYTES / 8 of them are
          * summed as a large reduction, whose children wait for its grant. The
-         * scan is never large, and enters nothing. */
+         * scan is never large and the exchange is no reduction, and neither
+         * enters anything. */
         const struct osoe_team_node_run *runs =
             t->internode ? osoe_team_node_runs(t, routine) : NULL;
         enum osoe_collect_way way = places_way(t, runs);
         by_scan = way == OSOE_COLLECT_WAY_SCAN;
+        bool reduced = way == OSOE_COLLECT_WAY_MEMBERS || way == OSOE_COLLECT_WAY_TOTALS;
         uint64_t summed = way == OSOE_COLLECT_WAY_MEMBERS ? members : by_scan ? 1 : t->nodes;
-        if (t->internode && !by_scan)
+        if (t->internode && reduced)
             osoe_internode_reduce_enter(t->block_index, k + 1, summed, OSOE_REDUCTION_SUM,
                                         length, routine);
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * local, routine);
@@ -678,8 +695,9 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
                 *(const uint64_t *)member_copy(t->local_ids[m], length_at);
         if (by_scan) {
             total = places_from_scan(routine, t, k + 1, own.reverse, places);
-        } else if (way == OSOE_COLLECT_WAY_TOTALS) {
-            places_from_node_totals(routine, t, k + 1, runs, places, length);
+        } else if (way == OSOE_COLLECT_WAY_TOTALS || way == OSOE_COLLECT_WAY_EXCHANGE) {
+            places_from_node_totals(routine, t, k + 1, runs, places, length,
+                                    way == OSOE_COLLECT_WAY_EXCHANGE);
             total = places[members];
         } else {
             if (t->internode)

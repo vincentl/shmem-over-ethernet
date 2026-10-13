@@ -402,8 +402,11 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         b->collective_places = OSOE_COLLECTIVE_PLACES_TOTALS;
     else if (strcmp(places, "scan") == 0)
         b->collective_places = OSOE_COLLECTIVE_PLACES_SCAN;
+    else if (strcmp(places, "exchange") == 0)
+        b->collective_places = OSOE_COLLECTIVE_PLACES_EXCHANGE;
     else
-        osoe_fatal("OSOE_COLLECTIVE_PLACES='%s' is not link, members, totals or scan", places);
+        osoe_fatal("OSOE_COLLECTIVE_PLACES='%s' is not link, members, totals, scan or exchange",
+                   places);
     static const char *const link_names[3] = { "OSOE_LINK_HOP_NS", "OSOE_LINK_MESSAGE_NS",
                                                "OSOE_LINK_BYTES_PER_SECOND" };
     uint64_t *const link_values[3] = { &b->link_hop_ns, &b->link_message_ns,

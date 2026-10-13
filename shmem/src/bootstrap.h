@@ -193,23 +193,27 @@ static inline const char *osoe_collective_shape_name(uint32_t shape)
  * vector elsewhere; the others force one way, for the tests and the
  * measurements, where the team allows it: `members` the members' vector,
  * `totals` a reduction of each node's total (P29), `scan` a scan of the nodes'
- * totals among the leads and a gather by ranges (P30). A way the team does not
+ * totals among the leads and a gather by ranges (P30), `exchange` a direct
+ * exchange of the nodes' totals among the leads (P33). A way the team does not
  * allow falls back - `scan` to `totals` where the runs meet the node set's
- * positions in neither order, `totals` to `members` where some node's members
- * are not one run - as `link` does.
+ * positions in neither order, `exchange` to `totals` where the team spans more
+ * nodes than the exchange has room for, `totals` to `members` where some node's
+ * members are not one run - as `link` does.
  */
-#define OSOE_COLLECTIVE_PLACES_LINK    0u
-#define OSOE_COLLECTIVE_PLACES_MEMBERS 1u
-#define OSOE_COLLECTIVE_PLACES_TOTALS  2u
-#define OSOE_COLLECTIVE_PLACES_SCAN    3u
+#define OSOE_COLLECTIVE_PLACES_LINK     0u
+#define OSOE_COLLECTIVE_PLACES_MEMBERS  1u
+#define OSOE_COLLECTIVE_PLACES_TOTALS   2u
+#define OSOE_COLLECTIVE_PLACES_SCAN     3u
+#define OSOE_COLLECTIVE_PLACES_EXCHANGE 4u
 
 /* collect's way to its places as the setting spells it. */
 static inline const char *osoe_collective_places_name(uint32_t places)
 {
-    return places == OSOE_COLLECTIVE_PLACES_MEMBERS  ? "members"
-           : places == OSOE_COLLECTIVE_PLACES_TOTALS ? "totals"
-           : places == OSOE_COLLECTIVE_PLACES_SCAN   ? "scan"
-                                                     : "link";
+    return places == OSOE_COLLECTIVE_PLACES_MEMBERS    ? "members"
+           : places == OSOE_COLLECTIVE_PLACES_TOTALS   ? "totals"
+           : places == OSOE_COLLECTIVE_PLACES_SCAN     ? "scan"
+           : places == OSOE_COLLECTIVE_PLACES_EXCHANGE ? "exchange"
+                                                       : "link";
 }
 
 /*

@@ -277,7 +277,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * (P29; layout 38): which way its places were found, by a count. */
     TEAM("team.tree.collect_lengths", BLOCK_TREE(collect_lengths)),
     /* The way that collect found its places, an enum osoe_collect_way - 1 the
-     * members' vector, 2 each node's total, 3 the leads' scan (P30; layout 39). */
+     * members' vector, 2 each node's total, 3 the leads' scan (P30; layout 39),
+     * 4 the leads' exchange (P33). */
     TEAM("team.tree.collect_way", BLOCK_TREE(collect_way)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
@@ -403,7 +404,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     ND("node.link.measured_bytes_per_second", measured_link_bytes_per_second, OSOE_MTYPE_U64,
        OSOE_MKIND_STATE, ""),
     /* How collect finds its places (layout 39, P30 and P31): 0 link, 1 members,
-     * 2 totals, 3 scan - OSOE_COLLECTIVE_PLACES. */
+     * 2 totals, 3 scan, 4 exchange - OSOE_COLLECTIVE_PLACES. */
     ND("node.collective_places", collective_places, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     /* The lead that made the segment: while no PE has joined, the segment is a
      * start under way as long as it lives, and a failed start's once it is

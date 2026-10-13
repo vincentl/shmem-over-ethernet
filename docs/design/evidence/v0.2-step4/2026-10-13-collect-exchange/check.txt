@@ -1,0 +1,63 @@
+mutated lines one-slot: 1
+mutated lines one-counter: 1
+build control: warnings 0
+build one-slot: warnings 0
+build one-counter: warnings 0
+== control round 1 03:56:33
+100% tests passed, 0 tests failed out of 29
+== control round 2 03:56:34
+100% tests passed, 0 tests failed out of 29
+== control round 3 03:56:36
+100% tests passed, 0 tests failed out of 29
+== one-slot round 1 03:56:38
+76% tests passed, 7 tests failed out of 29
+	491 - shmem.collect-places.exchange.block.0-0-1-2-2 (Failed)
+	492 - shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	493 - shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 (Failed)
+	494 - shmem.collect-places.exchange.negative-stride.0-0-1-2-2 (Failed)
+	495 - shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 (Failed)
+	496 - shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 (Failed)
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+osoe: PE 2: shmem_collectmem: this node's slot for the total of node 2's lead (PE 3) is epoch 12's, and this node's lead (PE 2) is in epoch 11's collect: PEs called different collectives
+osoe: PE 4: shmem_collectmem: this node's slot for the total of node 2's lead (PE 6) is epoch 10's, and this node's lead (PE 4) is in epoch 9's collect: PEs called different collectives
+== one-slot round 2 03:56:39
+72% tests passed, 8 tests failed out of 29
+	490 - shmem.collect-places.exchange.block.0-0-1-1 (Failed)
+	491 - shmem.collect-places.exchange.block.0-0-1-2-2 (Failed)
+	492 - shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	493 - shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 (Failed)
+	494 - shmem.collect-places.exchange.negative-stride.0-0-1-2-2 (Failed)
+	495 - shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 (Failed)
+	496 - shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 (Failed)
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+osoe: PE 3: shmem_collectmem: this node's slot for the total of node 1's lead (PE 2) is epoch 12's, and this node's lead (PE 3) is in epoch 11's collect: PEs called different collectives
+osoe: PE 5: shmem_collectmem: this node's slot for the total of node 3's lead (PE 9) is epoch 14's, and this node's lead (PE 5) is in epoch 13's collect: PEs called different collectives
+== one-slot round 3 03:56:41
+72% tests passed, 8 tests failed out of 29
+	490 - shmem.collect-places.exchange.block.0-0-1-1 (Failed)
+	491 - shmem.collect-places.exchange.block.0-0-1-2-2 (Failed)
+	492 - shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	493 - shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 (Failed)
+	494 - shmem.collect-places.exchange.negative-stride.0-0-1-2-2 (Failed)
+	495 - shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 (Failed)
+	496 - shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 (Failed)
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+osoe: PE 2: shmem_collectmem: this node's slot for the total of node 0's lead (PE 0) is epoch 8's, and this node's lead (PE 2) is in epoch 7's collect: PEs called different collectives
+osoe: PE 4: shmem_collectmem: this node's slot for the total of node 1's lead (PE 2) is epoch 10's, and this node's lead (PE 4) is in epoch 9's collect: PEs called different collectives
+== one-counter round 1 03:56:42
+97% tests passed, 1 tests failed out of 29
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+osoe: PE 2: shmem_collectmem: this node's slot for the total of node 2's lead (PE 4) holds nothing: no total was put there, and this node's lead (PE 2) is in epoch 17's collect: PEs called different collectives
+== one-counter round 2 03:56:44
+93% tests passed, 2 tests failed out of 29
+	493 - shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 (Failed)
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+osoe: PE 6: shmem_collectmem: this node's slot for the total of node 0's lead (PE 0) holds nothing: no total was put there, and this node's lead (PE 6) is in epoch 3's collect: PEs called different collectives
+osoe: PE 1: shmem_collectmem: this node's slot for the total of node 3's lead (PE 4) holds nothing: no total was put there, and this node's lead (PE 1) is in epoch 19's collect: PEs called different collectives
+== one-counter round 3 03:56:45
+93% tests passed, 2 tests failed out of 29
+	496 - shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 (Failed)
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+osoe: PE 0: shmem_collectmem: this node's slot for the total of node 2's lead (PE 4) holds nothing: no total was put there, and this node's lead (PE 0) is in epoch 5's collect: PEs called different collectives
+osoe: PE 2: shmem_collectmem: this node's slot for the total of node 2's lead (PE 4) holds nothing: no total was put there, and this node's lead (PE 2) is in epoch 5's collect: PEs called different collectives
+DONE 03:56:53

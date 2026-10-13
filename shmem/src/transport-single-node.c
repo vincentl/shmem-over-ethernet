@@ -344,6 +344,23 @@ void osoe_internode_collect_ranges(uint32_t team, uint32_t epoch, void *buffer, 
     unreachable("osoe_internode_collect_ranges");
 }
 
+void osoe_internode_exchange_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                         uint64_t *totals, const char *routine)
+{
+    (void)team;
+    (void)epoch;
+    (void)own;
+    (void)totals;
+    (void)routine;
+    unreachable("osoe_internode_exchange_node_totals");
+}
+
+/* No team of a job of one node spans nodes: no room asked for. */
+uint32_t osoe_internode_exchange_most_nodes(void)
+{
+    return 0;
+}
+
 void osoe_internode_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
                          size_t count, struct osoe_element element, bool inclusive,
                          const char *routine)

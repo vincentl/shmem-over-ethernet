@@ -625,6 +625,11 @@ struct generic_team {
     uint64_t circulant_arrival_base[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
     uint64_t circulant_credit_base;
     uint64_t circulant_grant_base;
+    /* collect's exchanges of the node totals (P33): how many the team has made,
+     * whose parity picks the set of slots and the counter, and the adds each
+     * set's counter has had - N - 1 an exchange of its parity. */
+    uint64_t exchanges;
+    uint64_t exchange_base[2];
 };
 
 static struct generic_team *teams;
@@ -3319,12 +3324,139 @@ void osoe_internode_generic_collect_ranges(uint32_t team, uint32_t epoch, void *
     atomic_store_explicit(&team_phase->published->gather_shares, shares, memory_order_release);
 }
 
+/* ---- collect's node totals by a direct exchange (P33) -------------------- */
+
+/*
+ * docs/design/collect-scan-proposal.md, "A direct exchange of the totals", and
+ * tools/modelcheck/exchange_model.py, whose leads these are. P29's way gives
+ * every lead every node's total through a reduction of a vector of the nodes,
+ * up the tree and down; the exchange gives the same in one hop: each lead puts
+ * its node's total, with the collect's epoch, into its own position's slot at
+ * every other lead and adds one to that lead's counter, fenced after the put,
+ * and a lead whose counter shows the other N - 1 reads its slots. Nothing waits
+ * before writing them - the reason it is one hop - so each team number keeps
+ * two sets of slots and a counter for each (internal-region.h), the exchange's
+ * parity choosing, and both rules hold without leaning on what follows:
+ *   - **the slots**: a lead writing exchange x's total has finished x - 1, which
+ *     it finished only with every lead's x - 1 total, which each lead put as it
+ *     entered x - 1, after finishing x - 2 - after reading x - 2's slots, the
+ *     ones x reuses. One set fails (the model's one_slot): a lead that finished
+ *     a collect of nothing - which has no gather - writes the next collect's
+ *     total over a slot its reader has yet to read;
+ *   - **the counters**: an add for x + 1 into a counter that x also counts can
+ *     arrive before a slower lead's add for x, and the wait for x would read a
+ *     slot not yet written (one_counter); within a parity an add for x + 2 comes
+ *     only after its sender finished x + 1, so after every lead entered x + 1 and
+ *     finished its wait for x.
+ * The counters are cumulative over the team's life and compared as at least: a
+ * parity's gains N - 1 an exchange of that parity, kept in exchange_base. Each
+ * slot names its collect's epoch, and a total of another is named with its
+ * sender, as a piece's header is (§5.5's "asserted on receipt"); a reader
+ * clears what it read. A lead's puts begin at the next position on, so that no
+ * lead is everyone's first. Costs, with N nodes: a hop and N - 1 messages out of
+ * every lead and as many in, against the tree's 2 ceil(log_k N) levels; O(N) a
+ * lead to read.
+ */
+struct exchange_slot {
+    uint32_t epoch;
+    uint32_t reserved;
+    uint64_t total;
+};
+_Static_assert(sizeof(struct exchange_slot) == OSOE_INTERNAL_EXCHANGE_SLOT_BYTES,
+               "an exchange's slot is the size the region keeps for it");
+
+static uint32_t exchange_positions(void)
+{
+    return osoe_internal_exchange_positions(osoe.bootstrap.node_count);
+}
+
+/* Team number `number`'s exchange words. */
+static uint64_t exchange_of_number(uint32_t number)
+{
+    return osoe_internal_exchange_offset(osoe.bootstrap.collective_fanout,
+                                         osoe.bootstrap.max_teams,
+                                         osoe.bootstrap.small_collective_bytes,
+                                         osoe.bootstrap.node_count) +
+           (uint64_t)number * osoe_internal_team_exchange_bytes(exchange_positions());
+}
+
+/* Set `parity`'s counter, a line each. */
+static uint64_t exchange_counter(uint32_t number, uint32_t parity)
+{
+    return exchange_of_number(number) + (uint64_t)parity * OSOE_INTERNAL_LINE_BYTES;
+}
+
+/* Set `parity`'s slot for the node at `position`, past both counters' lines. */
+static uint64_t exchange_slot(uint32_t number, uint32_t parity, uint32_t position)
+{
+    return exchange_of_number(number) + 2 * (uint64_t)OSOE_INTERNAL_LINE_BYTES +
+           ((uint64_t)parity * exchange_positions() + position) *
+               OSOE_INTERNAL_EXCHANGE_SLOT_BYTES;
+}
+
+uint32_t osoe_internode_generic_exchange_most_nodes(void)
+{
+    return exchange_positions();
+}
+
+void osoe_internode_generic_exchange_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                                 uint64_t *totals, const char *routine)
+{
+    struct generic_team *team_phase = registered_team(team, routine);
+    uint32_t n = team_phase->count, i = team_phase->index, number = number_of(team);
+    if (n > exchange_positions())
+        osoe_fatal("%s: team %u spans %u nodes, and the exchange of collect's totals has room "
+                   "for %u", routine, number, n, exchange_positions());
+    uint32_t parity = (uint32_t)(team_phase->exchanges % 2);
+    struct exchange_slot mine = { epoch, 0, own };
+    struct osoe_transport_context *context = osoe_transport_context_default();
+    for (uint32_t d = 1; d < n; d++) {
+        int peer = (int)lead_of(team, (i + d) % n, routine);
+        osoe_transport_put(context, peer, OSOE_REGION_INTERNAL, exchange_slot(number, parity, i),
+                           &mine, sizeof mine, OSOE_TRANSPORT_MORE);
+        osoe_transport_rmw(context, peer, OSOE_REGION_INTERNAL, exchange_counter(number, parity),
+                           OSOE_RMW_ADD, 8, 1, 0,
+                           OSOE_TRANSPORT_FENCED | (d + 1 < n ? OSOE_TRANSPORT_MORE : 0));
+        osoe_perturb();
+    }
+    team_phase->exchange_base[parity] += n - 1;
+    osoe_region_wait(routine, OSOE_REGION_INTERNAL, exchange_counter(number, parity), 8, false,
+                     OSOE_COMPARISON_GREATER_OR_EQUAL, team_phase->exchange_base[parity],
+                     OSOE_BLOCKED_DETAIL_EPOCH, epoch);
+    osoe_perturb();
+    for (uint32_t j = 0; j < n; j++) {
+        if (j == i) {
+            totals[j] = own;
+            continue;
+        }
+        struct exchange_slot got;
+        unsigned char *slot = internal(exchange_slot(number, parity, j));
+        memcpy(&got, slot, sizeof got);
+        cleared(slot, sizeof got);
+        if (got.epoch != epoch) {
+            uint32_t sender = lead_of(team, j, routine);
+            char theirs[64];
+            if (got.epoch == 0)
+                snprintf(theirs, sizeof theirs, "holds nothing: no total was put there");
+            else
+                snprintf(theirs, sizeof theirs, "is epoch %u's", got.epoch);
+            osoe_fatal("%s: this node's slot for the total of node %u's lead (PE %u) %s, and "
+                       "this node's lead (PE %u) is in epoch %u's collect: PEs called different "
+                       "collectives", routine, osoe_node_of(&osoe.job, sender), sender, theirs,
+                       osoe.job.me, epoch);
+        }
+        totals[j] = got.total;
+    }
+    team_phase->exchanges++;
+}
+
 /* Every counter of team number `number` in this PE's internal region
  * (internal-region.h): its arrivals, its release and its grant, the grant's
  * words, its gathers' READY and DATA lines whole - the counters, and past them
  * the shape, the records and the shares of collect's gather by ranges (P30) -
- * its scans' rows and their grant, and its reduce-scatter's words - the
- * counters, the grant's words and the senders' lanes. Atomic stores, as
+ * its scans' rows and their grant, its reduce-scatter's words - the counters,
+ * the grant's words and the senders' lanes - and its exchange's counters and
+ * slots (P33). Atomic stores, as
  * each counter is written by the transport's adds; the split's sync that
  * follows orders them before any. Zeroing the grant counter keeps the count
  * exact against the team that held the number before - a grant's epoch and
@@ -3359,5 +3491,12 @@ void osoe_internode_generic_number_taken(uint32_t number)
         memset(internal(circulant_reduce_scatter_grant_words(number)), 0,
                (size_t)rows * sizeof(struct circulant_grant_field));
         memset(internal(circulant_senders(number)), 0, OSOE_INTERNAL_LINE_BYTES);
+    }
+    if (exchange_positions() > 0) {
+        for (uint32_t parity = 0; parity < 2; parity++)
+            atomic_store_explicit((_Atomic uint64_t *)internal(exchange_counter(number, parity)),
+                                  0, memory_order_release);
+        memset(internal(exchange_slot(number, 0, 0)), 0,
+               (size_t)2 * exchange_positions() * OSOE_INTERNAL_EXCHANGE_SLOT_BYTES);
     }
 }

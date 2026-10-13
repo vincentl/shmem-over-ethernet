@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * collect's places (P29 and P30 of docs/prompts/v0.2-open-items.md;
+ * collect's places (P29, P30 and P33 of docs/prompts/v0.2-open-items.md;
  * collectives.c, collect_varying): from each node's total where every node of a
  * team holds one run of its ranks, and from the members' vector where some node
  * does not - or the way OSOE_COLLECTIVE_PLACES forces, where the team allows it:
- * the members' vector anywhere, and the leads' scan of the nodes' totals where
- * the runs meet the node set's positions in order or in reverse - on teams of
- * the map the launcher was given, which OSOE_TEST_MAP gives again. The first
+ * the members' vector anywhere, the leads' scan of the nodes' totals where the
+ * runs meet the node set's positions in order or in reverse, and the leads'
+ * exchange of the nodes' totals where every node is one run - on teams of the
+ * map the launcher was given, which OSOE_TEST_MAP gives again. The first
  * argument names the case:
  *
  *   block            the world, its even ranks and the ranks past the first
@@ -26,7 +27,14 @@
  *   unordered        the world on a block map whose nodes are numbered out of
  *                    the ranks' order (-m 1,1,0,0,2,2), each node one run that
  *                    meets the node set's positions in neither order: the scan
- *                    forced falls back to each node's total.
+ *                    forced falls back to each node's total;
+ *   zeros            the world collecting nothing, again and again - every
+ *                    member giving 0, so that no gather follows the places and
+ *                    a lead may enter the next collect while another still
+ *                    reads this one's - with lengths that differ every eighth
+ *                    time: the exchange's two sets of slots and counters
+ *                    (exchange_model.py), which a run under OSOE_TEST_PERTURB
+ *                    finds wanting where they are one.
  *
  * A team past the first node's that would span one node alone, on a map of two,
  * is left out: it has no internode phase to find places for.
@@ -61,9 +69,9 @@ enum {
 };
 
 /* team.tree.collect_way's values (node.h, enum osoe_collect_way). */
-enum way { WAY_NONE, WAY_MEMBERS, WAY_TOTALS, WAY_SCAN };
+enum way { WAY_NONE, WAY_MEMBERS, WAY_TOTALS, WAY_SCAN, WAY_EXCHANGE };
 static const char *const way_names[] = { "none", "the members' vector", "each node's total",
-                                         "the leads' scan" };
+                                         "the leads' scan", "the leads' exchange" };
 
 static int me, npes;
 static int node_of_rank[MAX_PES];
@@ -144,6 +152,8 @@ static enum way way_of(const struct team_case *t)
         return WAY_MEMBERS;
     if (strcmp(forced, "scan") == 0 && (t->in_order || t->reversed))
         return WAY_SCAN;
+    if (strcmp(forced, "exchange") == 0)
+        return WAY_EXCHANGE;            /* the tests' teams span a few nodes, within its room */
     return WAY_TOTALS;
 }
 
@@ -335,8 +345,17 @@ int main(int argc, char **argv)
     } else if (strcmp(which, "unordered") == 0) {
         CHECK_FATAL(world.one_run && !world.in_order && !world.reversed && world.nodes > 2);
         collects_on(&world, 0);
+    } else if (strcmp(which, "zeros") == 0) {
+        CHECK_FATAL(world.one_run && world.nodes > 2);
+        struct lengths nothing = { .what = "every member giving 0, again" };
+        struct lengths differ = { .what = "lengths that differ, between the zeros" };
+        for (int r = 0; r < npes; r++)
+            differ.of[r] = (size_t)(r % 3) * 7 + 1;
+        for (int round = 0; round < 96; round++)
+            collect(&world, round % 8 == 7 ? &differ : &nothing, round);
     } else {
-        fprintf(stderr, "no case '%s': block, negative-stride, cyclic or unordered\n", which);
+        fprintf(stderr, "no case '%s': block, negative-stride, cyclic, unordered or zeros\n",
+                which);
         CHECK_FATAL(false);
     }
 

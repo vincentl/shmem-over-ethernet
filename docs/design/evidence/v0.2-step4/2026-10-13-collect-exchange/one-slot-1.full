@@ -1,0 +1,175 @@
+Internal ctest changing into directory: /tmp/collect-exchange-check/one-slot/build/release
+Test project /tmp/collect-exchange-check/one-slot/build/release
+      Start 471: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+      Start 472: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+      Start 473: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+      Start 474: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 1/29 Test #473: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ............   Passed    0.21 sec
+      Start 475: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+ 2/29 Test #471: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ......................   Passed    0.23 sec
+      Start 476: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+ 3/29 Test #474: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ............   Passed    0.23 sec
+      Start 477: shmem.collect-places.unordered.1-1-0-0-2-2
+ 4/29 Test #472: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ......................   Passed    0.24 sec
+      Start 478: shmem.collect-places.scan.block.0-0-1-1
+ 5/29 Test #477: shmem.collect-places.unordered.1-1-0-0-2-2 ..........................   Passed    0.11 sec
+      Start 479: shmem.collect-places.scan.block.0-0-1-2-2
+ 6/29 Test #478: shmem.collect-places.scan.block.0-0-1-1 .............................   Passed    0.11 sec
+      Start 480: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3
+ 7/29 Test #475: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 .......................   Passed    0.18 sec
+      Start 481: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4
+ 8/29 Test #476: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .........................   Passed    0.18 sec
+      Start 482: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6
+ 9/29 Test #479: shmem.collect-places.scan.block.0-0-1-2-2 ...........................   Passed    0.13 sec
+      Start 483: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7
+10/29 Test #480: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 .................   Passed    0.19 sec
+      Start 484: shmem.collect-places.scan.negative-stride.0-0-1-1
+11/29 Test #481: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 .................   Passed    0.23 sec
+      Start 485: shmem.collect-places.scan.negative-stride.0-0-1-2-2
+12/29 Test #484: shmem.collect-places.scan.negative-stride.0-0-1-1 ...................   Passed    0.15 sec
+      Start 486: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4
+13/29 Test #482: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 ...................   Passed    0.31 sec
+      Start 487: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6
+14/29 Test #483: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 ...............   Passed    0.30 sec
+      Start 488: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2
+15/29 Test #485: shmem.collect-places.scan.negative-stride.0-0-1-2-2 .................   Passed    0.16 sec
+      Start 489: shmem.collect-places.scan.unordered.1-1-0-0-2-2
+16/29 Test #489: shmem.collect-places.scan.unordered.1-1-0-0-2-2 .....................   Passed    0.13 sec
+      Start 490: shmem.collect-places.exchange.block.0-0-1-1
+17/29 Test #486: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 .......   Passed    0.23 sec
+      Start 491: shmem.collect-places.exchange.block.0-0-1-2-2
+18/29 Test #488: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ..................   Passed    0.16 sec
+      Start 492: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3
+19/29 Test #487: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .........   Passed    0.26 sec
+      Start 493: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6
+20/29 Test #490: shmem.collect-places.exchange.block.0-0-1-1 .........................   Passed    0.12 sec
+      Start 494: shmem.collect-places.exchange.negative-stride.0-0-1-2-2
+21/29 Test #491: shmem.collect-places.exchange.block.0-0-1-2-2 .......................***Failed    0.12 sec
+osoe: PE 2: shmem_collectmem: this node's slot for the total of node 2's lead (PE 3) is epoch 12's, and this node's lead (PE 2) is in epoch 11's collect: PEs called different collectives
+osoe: PE 2: control segment /osoe.20518.0.1.0 (osoe-stat /osoe.20518.0.1.0, while any PE of this node is alive)
+osoe: PE 3: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 1: ending: the job is aborting on behalf of PE 2; this PE was not waiting in the library
+osoe: PE 4: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 0: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 3 exited with status 1
+
+      Start 495: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4
+22/29 Test #492: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 .............***Failed    0.16 sec
+osoe: PE 4: shmem_collectmem: this node's slot for the total of node 2's lead (PE 6) is epoch 10's, and this node's lead (PE 4) is in epoch 9's collect: PEs called different collectives
+osoe: PE 4: control segment /osoe.20519.0.1.0 (osoe-stat /osoe.20519.0.1.0, while any PE of this node is alive)
+osoe: PE 4: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_collectmem
+osoe: PE 2: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_collectmem
+osoe: PE 1: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_barrier_all
+osoe: PE 8: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_collectmem
+osoe: PE 6: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_collectmem
+osoe: PE 7: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 8 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 9 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+
+      Start 496: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2
+23/29 Test #493: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 ...............***Failed    0.16 sec
+osoe: PE 1: shmem_collectmem: this node's slot for the total of node 4's lead (PE 6) is epoch 20's, and this node's lead (PE 1) is in epoch 19's collect: PEs called different collectives
+osoe: PE 1: control segment /osoe.20539.0.1.0 (osoe-stat /osoe.20539.0.1.0, while any PE of this node is alive)
+osoe: PE 0: shmem_collectmem: this node's slot for the total of node 2's lead (PE 3) is epoch 20's, and this node's lead (PE 0) is in epoch 19's collect: PEs called different collectives
+osoe: PE 0: control segment /osoe.20539.0.0.0 (osoe-stat /osoe.20539.0.0.0, while any PE of this node is alive)
+osoe: PE 2: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe: PE 5: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 7 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+
+      Start 497: shmem.collect-places.exchange.unordered.1-1-0-0-2-2
+24/29 Test #494: shmem.collect-places.exchange.negative-stride.0-0-1-2-2 .............***Failed    0.14 sec
+osoe: PE 2: shmem_collectmem: this node's slot for the total of node 0's lead (PE 0) is epoch 10's, and this node's lead (PE 2) is in epoch 9's collect: PEs called different collectives
+osoe: PE 2: control segment /osoe.20571.0.1.0 (osoe-stat /osoe.20571.0.1.0, while any PE of this node is alive)
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+
+      Start 498: shmem.collect-places.link.zeros.0-0-1-1-2-2-3
+25/29 Test #495: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 ...***Failed    0.16 sec
+osoe: PE 7: shmem_collectmem: this node's slot for the total of node 0's lead (PE 1) is epoch 14's, and this node's lead (PE 7) is in epoch 13's collect: PEs called different collectives
+osoe: PE 7: control segment /osoe.20584.0.3.0 (osoe-stat /osoe.20584.0.3.0, while any PE of this node is alive)
+osoe: PE 3: ending: the job is aborting on behalf of PE 7; this PE was not waiting in the library
+osoe: PE 0: ending: the job is aborting on behalf of PE 7; this PE was waiting in shmem_collectmem
+osoe-launch: rank 3 exited with status 1
+osoe: PE 4: ending: the job is aborting on behalf of PE 7; this PE was waiting in shmem_collectmem
+osoe: PE 9: ending: the job is aborting on behalf of PE 7; this PE was waiting in shmem_collectmem
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 6 killed by signal 15
+
+      Start 499: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3
+26/29 Test #497: shmem.collect-places.exchange.unordered.1-1-0-0-2-2 .................   Passed    0.13 sec
+27/29 Test #496: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 ..............***Failed    0.22 sec
+osoe: PE 0: shmem_collectmem: this node's slot for the total of node 1's lead (PE 1) is epoch 10's, and this node's lead (PE 0) is in epoch 9's collect: PEs called different collectives
+osoe: PE 0: control segment /osoe.20605.0.0.0 (osoe-stat /osoe.20605.0.0.0, while any PE of this node is alive)
+osoe: PE 6: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_barrier_all
+osoe: PE 3: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 7 killed by signal 15
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+
+28/29 Test #499: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 ...................***Failed    0.13 sec
+osoe: PE 0: shmem_collectmem: this node's slot for the total of node 2's lead (PE 4) is epoch 4's, and this node's lead (PE 0) is in epoch 3's collect: PEs called different collectives
+osoe: PE 0: control segment /osoe.20663.0.0.0 (osoe-stat /osoe.20663.0.0.0, while any PE of this node is alive)
+osoe: PE 1: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_collectmem
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 6 killed by signal 15
+
+29/29 Test #498: shmem.collect-places.link.zeros.0-0-1-1-2-2-3 .......................   Passed    0.27 sec
+
+76% tests passed, 7 tests failed out of 29
+
+Label Time Summary:
+internode    =   5.40 sec*proc (29 tests)
+tier2        =   5.40 sec*proc (29 tests)
+
+Total Test time (real) =   1.50 sec
+
+The following tests FAILED:
+	491 - shmem.collect-places.exchange.block.0-0-1-2-2 (Failed)
+	492 - shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	493 - shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 (Failed)
+	494 - shmem.collect-places.exchange.negative-stride.0-0-1-2-2 (Failed)
+	495 - shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 (Failed)
+	496 - shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 (Failed)
+	499 - shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 (Failed)
+Errors while running CTest

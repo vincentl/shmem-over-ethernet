@@ -45,9 +45,9 @@
  * progress thread (§3.12), in whichever local process runs it, exactly once per
  * (team, epoch) on every participating node. The data half,
  * osoe_internode_reduce, osoe_internode_broadcast and osoe_internode_collect,
- * and collect's osoe_internode_scan_node_totals and
- * osoe_internode_collect_ranges, is called by the team's local lead on its own
- * application thread, and blocks - a reduction entered first with
+ * and collect's osoe_internode_scan_node_totals, osoe_internode_collect_ranges
+ * and osoe_internode_exchange_node_totals, is called by the team's local lead
+ * on its own application thread, and blocks - a reduction entered first with
  * osoe_internode_reduce_enter, on the
  * same thread, which does not; osoe_internode_scan by every member, on its own
  * thread. Which application thread leads a team's collective may change from
@@ -169,6 +169,8 @@
  *     (P30): the generic implementation, its puts and fenced adds RDMA writes
  *     and atomics with no change to it - the scan's small pieces, and each
  *     step's record written with the step's bytes and before its add.
+ *   - osoe_internode_exchange_node_totals (P33): the generic implementation,
+ *     a write of sixteen bytes and an atomic add to each other lead.
  */
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
@@ -466,6 +468,30 @@ void osoe_internode_scan_node_totals(uint32_t team, uint32_t epoch, uint64_t own
 void osoe_internode_collect_ranges(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                                    uint64_t share_start, uint64_t share_end, bool reverse,
                                    const char *routine);
+
+/*
+ * collect's node totals by a direct exchange among the leads (P33): `own` is
+ * this node's total; on return `totals[j]` holds the total of the node at
+ * position j of the team's node set, for every position - this node's `own` -
+ * as the reduction of a vector of the nodes' totals would leave it. Called by
+ * the team's local lead, once per node per collect of differing blocks and
+ * before its gather, with the collect's epoch, as osoe_internode_collect is;
+ * only for a team over at most osoe_internode_exchange_most_nodes() nodes.
+ *
+ * The generic implementation: each lead puts its total into its own position's
+ * slot at every other lead and adds one to that lead's counter, fenced after -
+ * one hop where a reduction's tree takes two levels each way, N - 1 messages
+ * out of each lead - in one of two sets of slots and counters by the
+ * exchange's parity, so that nothing waits before writing them
+ * (tools/modelcheck/exchange_model.py).
+ */
+void osoe_internode_exchange_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                         uint64_t *totals, const char *routine);
+
+/* The most nodes a team may span for osoe_internode_exchange_node_totals - the
+ * generic implementation's room in the internal region, the job's node count
+ * up to a ceiling - every node's alike; 0 on one node. */
+uint32_t osoe_internode_exchange_most_nodes(void);
 
 /*
  * The internode phase of a prefix scan (spec §9.10.10; phase 1 step 10 slice

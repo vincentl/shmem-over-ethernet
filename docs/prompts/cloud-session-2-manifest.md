@@ -154,3 +154,79 @@ design and model READMEs, and the evidence's README and directory.
   aarch64 - the release and debug suites, and the header offsets (128-byte
   lines there: `ready` should stay at 512, the field fitting the padding before
   it, as here).
+
+### 3. P33: collect's node totals by a direct exchange among the leads
+
+**Done.** Commit: the one that adds this entry. Modelled first, then built;
+its design section is the proposal's new "A direct exchange of the totals".
+
+**Files**: `tools/modelcheck/exchange_model.py` (new) and the models'
+`CMakeLists.txt` and README; `shmem/src/internal-region.h` (the exchange's
+words), `internode.h`, `internode-generic.c`, `internode-generic.h`,
+`internode-am.c`, `transport-single-node.c`, `collectives.c`, `bootstrap.h`,
+`bootstrap.c`, `node.h`, `metrics.c`, `tools/stat/segment.h`;
+`shmem/tests/test-collect-places.c`, `shmem/tests/CMakeLists.txt`; the README,
+design §5.5, the proposal, the evidence's README and directory.
+
+- **The model**, `exchange_model.py`: each lead puts its total into its slot at
+  every other lead and adds to that lead's counter; a lead whose counter shows
+  N - 1 reads its slots. Its collects run with the gather after - abstracted as
+  its one fact that matters here, no lead returning before every lead entered -
+  or without, as a collect of nothing has none. Design: two sets of slots and a
+  counter each by the exchange's parity, ok and live on two to four leads with
+  and without gathers (211,168 states the largest). Breakages: `one_slot`
+  fails SLOT and `one_counter` fails VALUE where a collect of nothing stands
+  alone, and each holds with a gather after every exchange - the gather alone
+  would order them, which is why the design must not lean on it. All nine
+  cases as expected, in 17 s. Two slips in the model's own first draft were
+  fixed before any result was used: a counter captured late by its lambdas,
+  and `one_slot` changing the counter with the slots.
+- **The C**: `osoe_internode_exchange_node_totals(team, epoch, own, totals)` and
+  `osoe_internode_exchange_most_nodes()` at the seam; the generic
+  implementation's puts begin at the next position on, each a 16-byte slot (the
+  epoch and the total) and a fenced add, the wait on the parity's counter
+  against its cumulative base, each slot's epoch checked as read - naming the
+  sender of another collect's total - and cleared. collect's fourth way where
+  every node is one run and the team spans no more nodes than the room,
+  `places_from_node_totals` taking the totals from the exchange in place of the
+  reduction; `OSOE_COLLECTIVE_PLACES=exchange` (falling back to `totals`);
+  `team.tree.collect_way` 4; `collect_lengths` the team's nodes, as P29's.
+- **Its words, and a decision**: per team number, two counters' lines and two
+  sets of 16-byte slots a node position, between the scans' area and the lanes,
+  sized by the job's node count **to 64 nodes**
+  (`OSOE_INTERNAL_EXCHANGE_NODES_MOST`). I first sized them to 256, to let H24
+  force the exchange across all of tier 3's logical nodes, but that adds 8.25
+  KiB to every team number in every PE's region past 256 nodes - a third more -
+  for a way the cost model loses past a few dozen nodes on every link it knows;
+  at 64 it adds 2.25 KiB from 64 nodes on and 384 bytes on two to four. H24's
+  harness reports the exchange's fallback past 64.
+- **Wire and layout**, plainly: **the internal region's layout changes** - the
+  exchange's words move the lanes by their size, computed alike on every node
+  from the job's node count - and what a lead puts into a peer's region is new,
+  **a wire change**. The node segment stays at P30's layout 39 and the
+  rendezvous at "osoeup-6". The README's memory figures follow, computed with a
+  program on `internal-region.h` whose "without" column reproduces the old
+  figures exactly: a team number 24.6 KiB at 4 nodes, 28.1 at 64, 29.3 at 500
+  and 29.6 at a thousand (24.25, 25.9, 27.0, 27.4 before); the region 15.73,
+  16.60 and 16.88 MiB at the memory table's three sizes (15.63, 16.04, 16.32).
+- **Tests**: `shmem.collect-places.exchange.*`, eight at tier 2 - block maps of
+  two, three, four and seven nodes, two negative strides, the out-of-order map
+  (which the exchange takes, needing no order) and the cyclic map - and
+  `shmem.collect-places.{link,exchange}.zeros.0-0-1-1-2-2-3`, the world
+  collecting nothing 96 times with lengths every eighth, under
+  `OSOE_TEST_PERTURB`; and two over tier 3's links, registered. 29 of 29.
+- **Two mutants beside their control**
+  (`docs/design/evidence/v0.2-step4/2026-10-13-collect-exchange/`), three rounds
+  each: the control 29 of 29 every round; one set of slots fails 7 or 8 of the
+  exchange's cases each round (each case's collects include one of nothing),
+  each named by a slot holding the next collect's epoch; one counter fails the
+  zeros case every round and one more in two, each named by a slot holding
+  nothing. Neither fails a case the exchange does not take.
+- **Runs here**: the release preset without a warning; the static checks 13 of
+  13; `model.exchange`, `model.lane` and `model.selftest` passed; the release
+  suite, models aside, **905: 903 passed, 2 skipped** (the root refusal tests),
+  in 5 min 15 s - 10 more than at P30's commit; the single-node build without a
+  warning, its collect and team tests 61 of 61.
+- **For the VM**: the tier-3 tests (`tier3.<link>.collect-places.exchange.*`);
+  aarch64's suites; and the README's memory figures at the defaults there,
+  which the program on `internal-region.h` computes the same on any machine.

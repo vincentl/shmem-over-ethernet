@@ -3009,6 +3009,16 @@ if(OSOE_INTERNODE)
   # received - and negative strides on four of them; a cyclic map, whose world
   # falls back to the members' vector and whose first rank of each node takes
   # the scan; and the out-of-order map, falling back to each node's total.
+  #
+  # And forced to the leads' exchange of the nodes' totals (P33),
+  # OSOE_COLLECTIVE_PLACES=exchange: block maps of two to seven nodes, negative
+  # strides, the out-of-order map - the exchange needs each node one run, not
+  # the runs in order - and the cyclic map, whose world falls back to the
+  # members' vector; and the world collecting nothing again and again (zeros),
+  # so that no gather follows the exchange and a lead may write the next
+  # collect's totals while another still reads this one's, under
+  # OSOE_TEST_PERTURB's yields and sleeps between the steps, at the default and
+  # under the exchange.
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     add_executable(shmem_test_collect-places test-collect-places.c
       ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -3024,7 +3034,11 @@ if(OSOE_INTERNODE)
                  "scan:block:0,0,1,2,3,3,4,5,6,7,7" "scan:negative-stride:0,0,1,1"
                  "scan:negative-stride:0,0,1,2,2" "scan:negative-stride:0,0,1,1,1,2,3,3,4,4"
                  "scan:negative-stride:0,1,1,2,3,3,4,5,6" "scan:cyclic:0,1,2,0,1,2,0,1,2"
-                 "scan:unordered:1,1,0,0,2,2")
+                 "scan:unordered:1,1,0,0,2,2" "exchange:block:0,0,1,1"
+                 "exchange:block:0,0,1,2,2" "exchange:block:0,0,0,1,1,2,2,2,2,3"
+                 "exchange:block:0,1,1,2,3,3,4,5,6" "exchange:negative-stride:0,0,1,2,2"
+                 "exchange:negative-stride:0,0,1,1,1,2,3,3,4,4"
+                 "exchange:cyclic:0,1,2,0,1,2,0,1,2" "exchange:unordered:1,1,0,0,2,2")
       string(REPLACE ":" ";" parts "${case}")
       list(LENGTH parts fields)
       set(forced "")
@@ -3047,6 +3061,16 @@ if(OSOE_INTERNODE)
       set_tests_properties(shmem.collect-places.${prefix}${kind}.${label} PROPERTIES
         LABELS "tier2" TIMEOUT 90)
       osoe_internode_label(shmem.collect-places.${prefix}${kind}.${label})
+    endforeach()
+    foreach(way "link" "exchange")
+      set(name shmem.collect-places.${way}.zeros.0-0-1-1-2-2-3)
+      add_test(NAME ${name}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1,1,2,2,3
+                OSOE_COLLECTIVE_PLACES=${way} OSOE_TEST_PERTURB=1
+                $<TARGET_FILE:osoe-launch> -n 7 -m 0,0,1,1,2,2,3 -t 120 --
+                $<TARGET_FILE:shmem_test_collect-places> zeros)
+      set_tests_properties(${name} PROPERTIES LABELS "tier2" TIMEOUT 180)
+      osoe_internode_label(${name})
     endforeach()
   endif()
 endif()
@@ -4496,10 +4520,11 @@ if(OSOE_INTERNODE)
       # total on a block map, under a positive stride and a negative one, and
       # the members' vector on a cyclic map, over the shaped link; and the same
       # forced to the leads' scan (P30), on the seven-node map whose last step
-      # cuts inside a range received.
+      # cuts inside a range received, and to the leads' exchange (P33).
       foreach(case "block:0,0,0,1,1,2,2,2,2,3" "negative-stride:0,0,0,1,1,2,2,2,2,3"
                    "cyclic:0,1,2,0,1,2,0,1,2" "scan:block:0,1,1,2,3,3,4,5,6"
-                   "scan:negative-stride:0,1,1,2,3,3,4,5,6" "scan:cyclic:0,1,2,0,1,2,0,1,2")
+                   "scan:negative-stride:0,1,1,2,3,3,4,5,6" "scan:cyclic:0,1,2,0,1,2,0,1,2"
+                   "exchange:block:0,1,1,2,3,3,4,5,6" "exchange:unordered:1,1,0,0,2,2")
         string(REPLACE ":" ";" parts "${case}")
         list(LENGTH parts fields)
         set(forced "")
