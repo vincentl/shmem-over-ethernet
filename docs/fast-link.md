@@ -401,6 +401,18 @@ which three rounds can draw unevenly (`docs/decisions/README.md`). A rule the
 author may then give: for example a count that follows the link's measured
 bandwidth and the node's peers, or the setting alone as today.
 
+**H26, the helpers under a site's binding** (B11). Most sites run Slurm with
+`task/affinity` and `task/cgroup`, each task bound to the cores it was allotted,
+where the kit runs `task/none`. `docs/fast-link/binding.sh NODES site` switches
+every node to that binding - it restarts slurmctld and every slurmd, and ends with
+a job's two tasks' allowed CPUs, one core each - and `binding.sh NODES none`
+switches back, which every other section needs. Under it, run this section's
+streams and collectives at 0, 1, 2 and 4 helpers at one count of PEs, Slurm's
+binding left on (`KIT_SRUN='-K1 --overcommit'`, without `--cpu-bind=none`), and
+again with a core reserved for the helpers (`--cpus-per-task=2`), beside the
+unbound rows above: a helper shares its PE's core unless the job reserves one.
+Tried on the development VM's one-node Slurm, both ways (2026-10-13).
+
 ## 6. The ladder
 
 ```sh
