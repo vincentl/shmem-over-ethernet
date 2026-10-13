@@ -11,7 +11,10 @@ the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
 `2026-10-10-fast-link-dry-run/` for the kit as its two reads left it,
 `2026-10-11-fast-link-kit-fixes/` for the kit as round nine left it, and
 `2026-10-11-kit-c4-standard-16/` for the kit as it was set for
-`c4-standard-16`). The first session on a cluster, on 2026-10-12
+`c4-standard-16`; §8's loop over PE counts and §12 to §16, added by the third
+cloud session for B14 of `docs/prompts/v0.2-open-items.md`, have run only in
+that session's dry run, on an x86-64 sandbox's logical nodes,
+`docs/prompts/cloud-session-3-manifest.md`). The first session on a cluster, on 2026-10-12
 (`docs/fast-link-results.md`), ran §1 and §2, §3's probe and suite, §4, §6, §8
 and §9 on eight `c4-standard-16`; §5, §7 and §10 have run only in the VM, and
 so has `verify.sh`, which made that session's by-hand `cluster-verify.sh` a
@@ -46,6 +49,12 @@ What Part 4 decides, and from what:
 | The ladder's rungs on a fast link: the unsent limit and its rule, the connection buffer, the receive buffers | Part 0's ladder, measured on the Pi and the VM (`docs/decisions/2026-10-07.md`, item 12) | §6 |
 | The landing zone's size, which holds a large get | `docs/design/blocking-get-proposal.md`, (d) | §8 |
 | The receive pool at many peers sending at once | the review of step 4's merge point, scale S3 | §9 |
+| The landing zone's per-node budget (P32's default) | the author's A5, 2026-10-12; H28 | §8 |
+| `collect`'s places: where each way wins, and P35's 16 nodes | P31 and P35, provisional; H25 | §12 |
+| What waits behind a stream at each helper count | §11's list, once left out; H15 to H19 | §13 |
+| The pipeline's window and the chooser's shapes | round four's scale S2; H13 | §14 |
+| What a site's latency tuning buys | the cluster's first session; H27 | §15 |
+| The ladder's code rungs, 1 and 4 | Part 0's ladder; H6 | §16 |
 
 And beside them, osoe's first x86-64 kernel and its first node counts past the
 Pi's four - which the first session had, at eight nodes (§3, §8, §9) - and the
@@ -232,8 +241,10 @@ coalescing and queues (`/usr/sbin/ethtool -i/-k/-c/-l`), the TCP and core
 network settings, read from `/proc/sys` (`net.core.netdev_max_backlog`,
 `rmem_max`, `wmem_max`, `net.ipv4.tcp_rmem`, `tcp_wmem`,
 `tcp_congestion_control`, `tcp_notsent_lowat`, `tcp_slow_start_after_idle`,
-`net.core.somaxconn`), the locked-memory, open-file
-and stack limits a Slurm step sees, `io_uring_disabled`, logind's `RemoveIPC`,
+`net.core.somaxconn`, and busy polling's `net.core.busy_read` and `busy_poll`,
+which §15 sets), the locked-memory, open-file
+and stack limits a Slurm step sees, `io_uring_disabled`, `perf_event_paranoid`
+(which §13's profile meets), logind's `RemoveIPC`,
 liburing's version, each node's name as every other resolves it, and Slurm's
 configuration. A fact that cannot be read says why in its line. Kept with the results: a number without them is not comparable
 with another.
@@ -415,9 +426,9 @@ unsent limit its own link measurement gave:
   (the default), 64 KiB × 64, 16 KiB × 256, with the stream.
 
 Rungs 1 (fill the room) and 4 (parse in place) are code, not settings: measuring
-them without means building the trees before them (`3ee3357`, `de3dc42`,
-`49c62d3`, `2dcf8d6`, `44f24bb`), which this runbook leaves out unless the
-others leave time. 33 jobs of about fifteen seconds: about ten minutes.
+them without means building the trees before them, which §16 does (`3ee3357`
+and `de3dc42` for rung 1, `49c62d3` and `2dcf8d6` for rung 4). 33 jobs of about
+fifteen seconds: about ten minutes.
 
 ## 7. The zero-copy send
 
@@ -446,12 +457,19 @@ docs/fast-link/gets.sh NODES out/gets
 
 Question 4's probe (`get-pieces`), one PE on each of two nodes: a put and
 quiet, a blocking get, and a nonblocking get and quiet, from 16 KiB to 64 MiB,
-at a landing zone (`OSOE_GET_LANDING_BYTES`) of 256 KiB (the default), 1 MiB,
-4 MiB and 16 MiB; then `multistream get` at 8 PEs a node over every node at the
-same zones. A get's pieces, a blocking get's as a nonblocking get's, go out
-together only as far as the zone holds them - four pieces at the default - so
-where a round trip's time carries more than the zone, the zone sets a get's
-speed; the zone's size for a fast link is the proposal's (d). The pieces in
+at each landing zone of `ZONES`; then `multistream get` over every node at each
+count of `PES_PER_NODE`, at the same zones. A get's pieces, a blocking get's as
+a nonblocking get's, go out together only as far as the zone holds them - four
+pieces at 256 KiB, sixteen at 1 MiB - so where a round trip's time carries more
+than the zone, the zone sets a get's speed. The first session ran zones of 256
+KiB (the default then), 1, 4 and 16 MiB at 8 PEs a node (H9); on its numbers
+the author made the default a node's budget, 4 MiB split among its PEs, between
+256 KiB and 1 MiB a PE (P32: 1 MiB at one to four PEs a node, 512 KiB at eight,
+256 KiB at sixteen). This section now measures that budget (H28): the zone
+unset, "default" - the script unsets `OSOE_GET_LANDING_BYTES`, so the library's
+own is what runs, and each PE's start-up line names the zone it had - beside
+256 KiB and 1 MiB fixed, at 1, 4, 8 and 16 PEs a node; the first session's
+sweep is `ZONES="262144 1048576 4194304 16777216" PES_PER_NODE=8`. The pieces in
 flight toward a node are bounded by its connection's reply credits too
 (`OSOE_AM_CREDITS`, 64 a connection, shared by the node's PEs), which this
 does not vary: with the stream's blocks spread over the peers, a connection
@@ -459,7 +477,8 @@ carries about 8/7 of one PE's pieces at once at eight nodes of 8 PEs, so the
 credits
 hold a zone back only from a few MiB. `get-pieces`' one PE, alone on its
 connection, has at most 64 pieces of 64 KiB, 4 MiB, in flight: past a zone of
-4 MiB its line is the credits', not the zone's. 24 jobs: about ten minutes.
+4 MiB its line is the credits', not the zone's. 45 jobs: about fifteen
+minutes.
 
 ## 9. Fan-in
 
@@ -518,16 +537,158 @@ The README's sentences the numbers replace or confirm:
   `OSOE_GET_LANDING_BYTES` row (§8);
 - **The platforms:** the opening's "largest job across separate machines", and
   the Limits entry "Tested on aarch64, and on x86-64 since 2026-10-12" (§3,
-  §10).
+  §10);
+- **collect's places:** the `OSOE_COLLECTIVE_PLACES` row's defaults, "the
+  exchange on no more than 16 nodes" and "provisional ... until H25", and
+  design §5.5's (§12);
+- **The landing zone's budget:** the `OSOE_GET_LANDING_BYTES` row's default and
+  the Limits entry on a large get's "which H28 is to measure" (§8);
+- **The shapes:** the `OSOE_COLLECTIVE_SHAPE`, `OSOE_COLLECTIVE_FANOUT` and
+  `OSOE_COLLECTIVE_PIPELINE` rows, where the chooser's costs were fitted to the
+  Pi (§14);
+- **Behind a stream and tuned:** the "What does not scale" entry on helpers and
+  the README's latency sentences, with what §13 and §15 find.
 
-Not measured by the kit, and left open: a barrier behind the stream at each
-helper count - its messages go on the control wires, which the lead's agent
-keeps at every count, so that a helper count reaches it only through the CPU
-the helpers take, and §5 times the barrier alone; a fetch-add behind the stream
-at each count, which goes on the stream's own data wire whichever thread holds
-it - the head of line §6 measures at no helpers; the collectives behind a
-stream, which §5 times alone at each count, their payloads on the data wires
-the helpers hold; TCP's retransmissions around a stream (`nstat`), which would
-explain a cloud link's rate; and a profile of the progress threads on x86-64.
+What the kit once left out is in it now: a barrier, a fetch-add and the
+collectives behind a stream at each helper count, TCP's retransmissions around
+a stream and a profile of the progress threads (§13), the pipeline's window and
+the chooser (§14), latency tuning (§15) and the ladder's code rungs (§16). Not
+in it: io_uring's task-run flags and registered files (§17).
 
 The decisions are the author's, each in a dated record beside the results.
+
+## 12. collect's places
+
+```sh
+docs/fast-link/collect.sh NODES out/collect
+```
+
+H25: the crossover among `collect`'s four ways to its places, which H24
+measured only on one machine's logical nodes, whose CPUs carry every lead's
+messages at once (`docs/design/evidence/v0.2-step4/2026-10-13-h24/`).
+`osoe-bench places` - a `collect` of differing blocks over the world, three
+patterns of lengths: every PE's 8 bytes, every sixteenth PE's alone, and PE 0's
+64 KiB beside every other's 8 - by each way forced (`OSOE_COLLECTIVE_PLACES`:
+`members`, `totals`, `scan`, `exchange`) and by the default, `link`, the way
+the link makes cheapest, the leads' exchange on no more than 16 nodes (P35,
+provisional until this), every node at once at 8, 16 and 32 PEs a node, three
+rounds, the ways in another order each round. `tools/bench/collect-places.sh`
+is the same measurement at one PE a node on logical nodes; this is it as the
+kit runs its jobs. `summarize.py` sets the ways' medians side by side for each
+PE count and pattern, and beside them each default job's link and the way
+`shape_timing.py`'s `choose_places` takes on it, the C's own (held to it by
+`shmem.shape.places-grid`): where a way the chooser does not take beats the
+one it takes, its costs, or P35's 16, are what to move. 45 jobs of a few
+seconds: about five minutes.
+
+## 13. Behind a stream, at each helper count
+
+```sh
+docs/fast-link/behind.sh NODES out/behind
+```
+
+What §5 times alone, behind a stream (H15 to H19), every node at once, at 0, 1,
+2 and 4 helpers, three rounds, the counts in another order each round:
+
+- **hol's operations** (`hol SECONDS OPERATION [BYTES]`), two PEs a node: each
+  node's first PE streams 1 MiB puts to the next node's, all but the last
+  node's, while PE 1 times an operation alone and then behind the streams - a
+  fetch-add to PE 3, behind PE 0's stream on the same connection, at each count
+  (H16, where §6 has it at none); the barrier of the nodes' second PEs, whose
+  messages go on the control wires the lead's agent keeps, so that a helper
+  count reaches it only through the CPU the helpers take (H15); and their sum
+  reduction and broadcast of 8 bytes and of 64 KiB, whose payloads go on the
+  data wires the helpers hold (H17). The team runs as many operations as PE 1
+  sets from the operation's time alone, and only those that end while PE 0's
+  stream runs count toward the stream's line.
+- **TCP's counters around a stream** (H18): `nstat -n` on every node, then
+  `multistream put` in 1 MiB blocks at 8 PEs a node, then `nstat` on every
+  node - its retransmissions (`TcpRetransSegs`, `TcpExtTCPLostRetransmit`,
+  `TcpExtTCPSackRecovery` and the rest) since, which would explain a cloud
+  link's rate.
+- **The progress threads profiled** (H19): the same stream with every node's
+  CPUs profiled for five seconds, three seconds in (`profile.sh`: `perf record
+  -a -g`, then its report by thread name, library and symbol, so that
+  `osoe-agent` and `osoe-helper-N` are told from the PEs' own). It is a step of
+  the job's own allocation beside the job's (`common.sh`'s `beside`, `srun
+  --overlap`), since a job holds its nodes whole. `perf` must be installed
+  (`linux-perf` on Debian) and allowed every process: `PERF="sudo -n perf"`, or
+  `kernel.perf_event_paranoid` at -1, which facts.sh records; where it is not,
+  the profile's file says why and the section goes on.
+
+`summarize.py` gives hol's lines by operation and helper count, the streams'
+rates, and the counters as `nstat` printed them. Four helpers need four peers,
+five nodes. 40 jobs of about twenty seconds and 16 of a few: about twenty
+minutes.
+
+## 14. The pipeline's window and the chooser
+
+```sh
+docs/fast-link/window.sh NODES out/window
+```
+
+H13: the large reduction's and broadcast's time (`shapes`: 64 KiB, 256 KiB,
+1 MiB and 4 MiB, four to 256 of the leads' 16 KiB pieces), every node at once
+at 8 PEs a node, by the chooser - `OSOE_COLLECTIVE_SHAPE=link`, the default, a
+tree's fan-out and window or Träff's from the three numbers of the link each
+job measures at start-up - and by `tree`, its trees alone, beside every fixed
+shape of fan-outs 2, 4 and 8 and windows 1, 2, 4 and 8
+(`OSOE_COLLECTIVE_SHAPE=fixed`, `OSOE_COLLECTIVE_FANOUT`,
+`OSOE_COLLECTIVE_PIPELINE`), three rounds in another order each. The chooser's
+costs were fitted to the Pi's table (`shape_timing.py`); where a fixed shape
+beats the one it takes at a size, they are off on this link, and the
+`OSOE_COLLECTIVE_*` rows say so. 42 jobs of about fifteen seconds: about ten
+minutes.
+
+## 15. Latency tuning
+
+```sh
+docs/fast-link/tuning.sh NODES out/tuning
+```
+
+H27: what a site's latency tuning gives - interrupt coalescing off (`ethtool -C`:
+`adaptive-rx` and `adaptive-tx` off, `rx-usecs` and `tx-usecs` 0) and busy
+polling on (`net.core.busy_read` and `busy_poll`, 50 µs) on every node, by
+`sudo -n` (`tuning-node.sh`), each node's settings before kept and put back at
+the end, and when the script is ended - beside the image's settings, the two in
+another order each round, three rounds: `ping`'s round trip from the first node
+to the second, 200 at 10 ms (0.27 ms on average at the image's settings and
+0.14 at best with coalescing off, on 2026-10-12); `osoe-bench`'s latency,
+atomic and barrier, one PE on each of the two (osoe's hop, 148 µs on idle nodes
+against 47 on busy ones that day); `hol`'s fetch-add alone and behind a stream;
+the mailbox on every node at 8 PEs; and §4's floor whole, into
+`floor-STATE-rROUND/` (`FLOOR=0` leaves it out). Each node's line in
+`tuning-*.txt` says the settings it then had. About forty minutes with the
+floor, ten without.
+
+## 16. The ladder's code rungs
+
+```sh
+docs/fast-link/trees.sh NODES out/trees
+```
+
+H6: §6's two rungs that are code, not settings - rung 1, a put fills the room
+the open buffer has (`de3dc42`, beside `3ee3357` before it), and rung 4, the
+pass parses each provided buffer where the kernel put it (`2dcf8d6`, beside
+`49c62d3` before it) - Part 0's trees beside the kit's own. The script writes
+each tree into `build/trees/COMMIT` by `git archive`, so it runs where the
+checkout has its `.git` (the first node, or a head node off the list), copies
+`build/trees` to every other node as `build.sh` copies the tree, and builds
+each tree there with the kit's probes compiled by that tree's own `oshcc`;
+`BUILD=0` takes the trees already built. Then, between the first two nodes,
+two PEs each, every tree and the kit's own in another order each round, three
+rounds: `multistream put` at 64 KiB and at 1 MiB blocks - the rungs' own
+measures (`docs/decisions/2026-10-07-one-thread-profile.md`) - `hol`'s
+fetch-add alone and behind the stream, and the mailbox. Each case's files
+carry its tree's commit, `main` for the kit's. Building four trees takes a few
+minutes a node; the 60 jobs about fifteen.
+
+## 17. Not in the kit: io_uring's flags
+
+H7 - io_uring's `COOP_TASKRUN` and `DEFER_TASKRUN` and registered files on a
+fast link - needs the library changed: Part 0 measured them in experiment
+builds whose choice was an environment variable, and merged none
+(`docs/decisions/2026-10-07-one-thread-profile.md`, "Measured and not taken"),
+so `main` has no setting that turns them on, and no commit holds the
+experiments. A section for them waits for that setting, which is the author's
+to ask for.

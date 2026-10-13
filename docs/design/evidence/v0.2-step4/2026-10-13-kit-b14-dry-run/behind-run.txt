@@ -1,0 +1,44 @@
+# 2026-10-13T12:19:46Z behind.sh on vm
+# kit 143e3a17d80133452c6063bda90c0fd68cb0516a
+# launcher osoe-launch, build <repo>/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+12:19:51 exit 0 hol-fetch-add-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/hol 2 fetch-add
+12:19:57 exit 0 hol-barrier-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/hol 2 barrier
+12:20:03 exit 0 hol-reduce-8-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/hol 2 reduce 8
+12:20:08 exit 0 hol-reduce-65536-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/hol 2 reduce 65536
+12:20:14 exit 0 hol-broadcast-8-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/hol 2 broadcast 8
+12:20:20 exit 0 hol-broadcast-65536-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/hol 2 broadcast 65536
+12:20:20 exit 0 nstat-before-h1-r1.txt:  nstat -n
+12:20:22 exit 0 put-1m-pes2-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/multistream put 1048576 2
+12:20:22 exit 0 nstat-h1-r1.txt:  bash -c nstat | sed "s/^/$(hostname) /"
+12:20:24 exit 0 put-1m-profiled-pes2-h1-r1.txt: OSOE_PROGRESS_HELPERS=1 <repo>/build/release/kit/multistream put 1048576 2 (beside: bash '<repo>/docs/fast-link/profile.sh' 1)
+12:20:29 exit 0 hol-fetch-add-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/hol 2 fetch-add
+12:20:35 exit 0 hol-barrier-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/hol 2 barrier
+12:20:42 exit 0 hol-reduce-8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/hol 2 reduce 8
+12:20:47 exit 0 hol-reduce-65536-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/hol 2 reduce 65536
+12:20:54 exit 0 hol-broadcast-8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/hol 2 broadcast 8
+12:21:00 exit 0 hol-broadcast-65536-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/hol 2 broadcast 65536
+12:21:00 exit 0 nstat-before-h0-r1.txt:  nstat -n
+12:21:02 exit 0 put-1m-pes2-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/multistream put 1048576 2
+12:21:02 exit 0 nstat-h0-r1.txt:  bash -c nstat | sed "s/^/$(hostname) /"
+12:21:04 exit 0 put-1m-profiled-pes2-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 <repo>/build/release/kit/multistream put 1048576 2 (beside: bash '<repo>/docs/fast-link/profile.sh' 1)
+12:21:09 exit 0 hol-fetch-add-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/hol 2 fetch-add
+12:21:16 exit 0 hol-barrier-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/hol 2 barrier
+12:21:22 exit 0 hol-reduce-8-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/hol 2 reduce 8
+12:21:28 exit 0 hol-reduce-65536-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/hol 2 reduce 65536
+12:21:34 exit 0 hol-broadcast-8-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/hol 2 broadcast 8
+12:21:40 exit 0 hol-broadcast-65536-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/hol 2 broadcast 65536
+12:21:40 exit 0 nstat-before-h4-r1.txt:  nstat -n
+12:21:42 exit 0 put-1m-pes2-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/multistream put 1048576 2
+12:21:42 exit 0 nstat-h4-r1.txt:  bash -c nstat | sed "s/^/$(hostname) /"
+12:21:44 exit 0 put-1m-profiled-pes2-h4-r1.txt: OSOE_PROGRESS_HELPERS=4 <repo>/build/release/kit/multistream put 1048576 2 (beside: bash '<repo>/docs/fast-link/profile.sh' 1)
+12:21:48 exit 0 hol-fetch-add-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/hol 2 fetch-add
+12:21:55 exit 0 hol-barrier-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/hol 2 barrier
+12:22:01 exit 0 hol-reduce-8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/hol 2 reduce 8
+12:22:07 exit 0 hol-reduce-65536-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/hol 2 reduce 65536
+12:22:13 exit 0 hol-broadcast-8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/hol 2 broadcast 8
+12:22:19 exit 0 hol-broadcast-65536-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/hol 2 broadcast 65536
+12:22:19 exit 0 nstat-before-h2-r1.txt:  nstat -n
+12:22:21 exit 0 put-1m-pes2-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/multistream put 1048576 2
+12:22:21 exit 0 nstat-h2-r1.txt:  bash -c nstat | sed "s/^/$(hostname) /"
+12:22:23 exit 0 put-1m-profiled-pes2-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 <repo>/build/release/kit/multistream put 1048576 2 (beside: bash '<repo>/docs/fast-link/profile.sh' 1)
+# done 12:22:23

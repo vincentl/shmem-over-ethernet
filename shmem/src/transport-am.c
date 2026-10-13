@@ -120,7 +120,7 @@ void osoe_transport_settings_check(const struct osoe_bootstrap *b)
         osoe_fatal("%s", why);
     }
     struct osoe_am_configuration am;
-    osoe_am_configuration_read(&am);
+    osoe_am_configuration_read(&am, b->local_count);
     osoe_wire_settings_check(b);
 }
 

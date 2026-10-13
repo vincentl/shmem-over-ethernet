@@ -1,0 +1,69 @@
+== <dry>/out/window
+jobs: 6, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  shapes-fixed-k2-d1 pes=2 h=-
+    reduce bytes=65536       1484 (n=1)
+    broadcast bytes=65536    1165 (n=1)
+    reduce bytes=262144      5268 (n=1)
+    broadcast bytes=262144   4252 (n=1)
+    reduce bytes=1048576     20619 (n=1)
+    broadcast bytes=1048576  18068 (n=1)
+    reduce bytes=4194304     82991 (n=1)
+    broadcast bytes=4194304  67317 (n=1)
+    unsent limit 16384 B
+  shapes-fixed-k2-d4 pes=2 h=-
+    reduce bytes=65536       528 (n=1)
+    broadcast bytes=65536    501 (n=1)
+    reduce bytes=262144      2202 (n=1)
+    broadcast bytes=262144   1807 (n=1)
+    reduce bytes=1048576     8569 (n=1)
+    broadcast bytes=1048576  6672 (n=1)
+    reduce bytes=4194304     42314 (n=1)
+    broadcast bytes=4194304  30292 (n=1)
+    unsent limit 16384 B
+  shapes-fixed-k4-d1 pes=2 h=-
+    reduce bytes=65536       1018 (n=1)
+    broadcast bytes=65536    870 (n=1)
+    reduce bytes=262144      3566 (n=1)
+    broadcast bytes=262144   3332 (n=1)
+    reduce bytes=1048576     16922 (n=1)
+    broadcast bytes=1048576  14356 (n=1)
+    reduce bytes=4194304     70024 (n=1)
+    broadcast bytes=4194304  57126 (n=1)
+    unsent limit 16384 B
+  shapes-fixed-k4-d4 pes=2 h=-
+    reduce bytes=65536       502 (n=1)
+    broadcast bytes=65536    506 (n=1)
+    reduce bytes=262144      2319 (n=1)
+    broadcast bytes=262144   1668 (n=1)
+    reduce bytes=1048576     7040 (n=1)
+    broadcast bytes=1048576  6762 (n=1)
+    reduce bytes=4194304     33541 (n=1)
+    broadcast bytes=4194304  27357 (n=1)
+    unsent limit 16384 B
+  shapes-link pes=2 h=-
+    reduce bytes=65536       611 (n=1)
+    broadcast bytes=65536    475 (n=1)
+    reduce bytes=262144      1878 (n=1)
+    broadcast bytes=262144   1575 (n=1)
+    reduce bytes=1048576     6940 (n=1)
+    broadcast bytes=1048576  6579 (n=1)
+    reduce bytes=4194304     31800 (n=1)
+    broadcast bytes=4194304  27652 (n=1)
+    link 2881 MiB/s, hop 41.9 us, message 23.0 us; unsent limit 386693 B
+  shapes-tree pes=2 h=-
+    reduce bytes=65536       520 (n=1)
+    broadcast bytes=65536    490 (n=1)
+    reduce bytes=262144      2128 (n=1)
+    broadcast bytes=262144   1819 (n=1)
+    reduce bytes=1048576     8507 (n=1)
+    broadcast bytes=1048576  6579 (n=1)
+    reduce bytes=4194304     31481 (n=1)
+    broadcast bytes=4194304  25742 (n=1)
+    link 2609 MiB/s, hop 36.2 us, message 22.7 us; unsent limit 350140 B

@@ -1,0 +1,15 @@
+# 2026-10-13T12:28:07Z tuning.sh on vm
+# kit 143e3a17d80133452c6063bda90c0fd68cb0516a
+# launcher osoe-launch, build <repo>/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+12:28:07 exit 0 tuning-on-r1.txt:  bash <repo>/docs/fast-link/tuning-node.sh on 50 one
+12:28:11 exit 0 bench-tuned-r1.txt:  <repo>/build/release/tools/bench/osoe-bench quick latency atomic barrier
+12:28:16 exit 0 hol-tuned-r1.txt:  <repo>/build/release/kit/hol 2
+12:28:21 exit 0 mailbox-tuned-pes2-r1.txt:  <repo>/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+12:28:33 exit 0 floor-tuned-r1: floor.sh
+12:28:33 exit 0 tuning-off-r1.txt:  bash <repo>/docs/fast-link/tuning-node.sh off 50 one
+12:28:37 exit 0 bench-default-r1.txt:  <repo>/build/release/tools/bench/osoe-bench quick latency atomic barrier
+12:28:41 exit 0 hol-default-r1.txt:  <repo>/build/release/kit/hol 2
+12:28:46 exit 0 mailbox-default-pes2-r1.txt:  <repo>/build/release/tools/pacer/osoe-pacer --seconds 5 mailbox
+12:28:58 exit 0 floor-default-r1: floor.sh
+# done 12:28:58
+12:28:58 exit 0 tuning-off-end.txt:  bash <repo>/docs/fast-link/tuning-node.sh off 50 one

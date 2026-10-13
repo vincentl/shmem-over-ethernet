@@ -270,7 +270,10 @@ int main(void)
         CHECK_FATAL(shmem_ctx_create(0, &a) == 0 && shmem_ctx_create(0, &b) == 0);
         /* Every extent of the zone, a one-word get taking one. */
         const char *zone = getenv("OSOE_GET_LANDING_BYTES");
-        int n = zone ? atoi(zone) / 1024 : 256;
+        /* Unset, the node's 4 MiB split among its PEs, between 256 KiB and
+         * 1 MiB (P32). */
+        int share = (4 << 20) / shmem_team_n_pes(SHMEM_TEAM_SHARED) / 1024;
+        int n = zone ? atoi(zone) / 1024 : share < 256 ? 256 : share > 1024 ? 1024 : share;
         long *got = calloc((size_t)n + 1, sizeof *got);
         CHECK_FATAL(got != NULL);
         uint64_t full = counter("am.landing_full");

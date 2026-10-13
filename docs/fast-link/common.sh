@@ -121,6 +121,54 @@ launch() {
     return $status
 }
 
+# beside NODES PES OUTFILE [NAME=VALUE...] -- PROGRAM [ARGUMENTS...]: launch's
+# job, and BESIDE - a command line, run by bash - once on every node of it,
+# BESIDE_DELAY seconds in, its output to BESIDE_FILE: for what a node does
+# while a job runs, perf's profile of the progress threads (§13). On a cluster
+# the job holds its nodes whole (salloc --exclusive), so BESIDE is a step of
+# the job's own allocation, beside the job's step (srun --overlap); on one
+# machine it runs here as the job does. The job's status is returned, and
+# logged; BESIDE's is its file's.
+beside() {
+    local nodes=$1 pes=$2 file=$3 settings=()
+    shift 3
+    while [ $# -gt 0 ] && [ "$1" != -- ]; do settings+=("$1"); shift; done
+    shift
+    {
+        echo "# $(date -u +%H:%M:%S) nodes=$nodes pes_per_node=$pes ${settings[*]}"
+        echo "# $*"
+        echo "# beside it, ${BESIDE_DELAY}s in, on every node: $BESIDE > $(basename "$BESIDE_FILE")"
+    } > "$file"
+    local status
+    if [ "$KIT_LAUNCHER" = osoe-launch ]; then
+        env "${settings[@]}" "$KIT_BUILD/tools/launch/osoe-launch" -n $((nodes * pes)) \
+            -m "$(block_map "$nodes" "$pes")" -t "$KIT_TIMEOUT" -- "$@" >> "$file" 2>&1 &
+        local job=$!
+        sleep "$BESIDE_DELAY"
+        timeout -k 30 "$KIT_TIMEOUT" bash -c "$BESIDE" > "$BESIDE_FILE" 2>&1 < /dev/null
+        wait "$job"
+        status=$?
+    else
+        # shellcheck disable=SC2086,SC2016
+        env "${settings[@]}" BESIDE="$BESIDE" BESIDE_FILE="$BESIDE_FILE" BESIDE_DELAY="$BESIDE_DELAY" \
+            timeout -k 30 "$KIT_TIMEOUT" salloc -J osoe-kit -N"$nodes" $KIT_SALLOC bash -c '
+                srun '"$KIT_SRUN"' -N"$1" --ntasks-per-node="$2" "${@:3}" &
+                job=$!
+                sleep "$BESIDE_DELAY"
+                srun --overlap -N"$1" --ntasks-per-node=1 bash -c "$BESIDE" > "$BESIDE_FILE" 2>&1
+                wait "$job"' bash "$nodes" "$pes" "$@" >> "$file" 2>&1 < /dev/null
+        status=$?
+        if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            scancel -u "$(id -un)" -n osoe-kit >> "$file" 2>&1
+            timeout -k 10 120 srun -J osoe-kit-gc -N"$NODE_COUNT" --ntasks-per-node=1 \
+                "$KIT_BUILD/tools/stat/osoe-stat" --gc >> "$file" 2>&1 < /dev/null
+        fi
+    fi
+    echo "# exit $status" >> "$file"
+    echo "$(date -u +%H:%M:%S) exit $status $(basename "$file"): ${settings[*]} $* (beside: $BESIDE)" >> "$LOG"
+    return $status
+}
+
 # on NODE COMMAND...: a command on one node of the list (by name), through Slurm
 # on a cluster - a job of one task, beside the others on the node, not of whole
 # nodes - or here on the one machine; ended after KIT_TIMEOUT. Its processes may

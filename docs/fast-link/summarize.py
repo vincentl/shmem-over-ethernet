@@ -10,9 +10,14 @@ that failed (run.txt). A case with fewer rounds than the others lost one.
 
 A section is known by its files: multistream's (its job line, and each node's
 rate, its peers in calls and bytes to each peer), the mailbox's, osoe-bench's
-barrier and collective lines, hol's, get-pieces', fan-in's, echo-uring's and
-iperf3's, the floor test's ratios, the start-up probe's, and the pacer's and
-the SOS programs' outcomes; osoe-bench's other lines are printed as they are.
+barrier and collective lines and shapes.c's, which take their form, osoe-bench's
+places lines (collect's ways side by side, and the way shape_timing.py's
+choose_places takes on each default job's link), hol's (each operation's,
+alone and behind the stream, at each helper count), get-pieces', fan-in's,
+echo-uring's and iperf3's, ping's round trips, the floor test's ratios, the
+start-up probe's, and the pacer's and the SOS programs' outcomes; osoe-bench's
+other lines are printed as they are, and so are nstat's lines of loss and
+retransmission after a stream and a profile's top lines.
 Every job runs under SHMEM_DEBUG (common.sh), and beside each case it prints
 what its jobs' start-up lines said: the link each measured - PE 0's line - and
 the unsent limit node 0 set from it, which differ from job to job (round nine's
@@ -46,6 +51,26 @@ BENCH = re.compile(r"(barrier|reduce|broadcast|fcollect|alltoall) pes=\d+ "
 BENCH_ORDER = {"barrier": (0, 0), "reduce": (1, 0), "broadcast": (1, 1), "fcollect": (2, 0),
                "alltoall": (2, 1)}
 MULTISTREAM_PEERS = ("peers_in_calls", "peers_in_calls_with_quiets", "quiet_share", "peers_window_s")
+# osoe-bench's places lines (collect's ways, §12), and ping's summary (§15).
+PLACES = re.compile(r"places way=(\w+) lengths=(\w+) pes=(\d+) bytes=\d+ median_us=([0-9.]+) "
+                    r"fastest_us=([0-9.]+)$")
+PING = re.compile(r"rtt min/avg/max/mdev = ([0-9.]+)/([0-9.]+)/([0-9.]+)/([0-9.]+) ms")
+PLACES_WAYS = ("members", "totals", "scan", "exchange", "link")
+
+
+def places_way(nodes, link):
+    """The way the default takes on NODES nodes of one run each, in order, on
+    LINK (hop, message, bytes a second) at the default settings - the ceiling
+    8, the capacity 4, the small class 1 KiB: shape_timing.py's choose_places,
+    which shmem.shape.places-grid holds to the C's; None where the model cannot
+    be found beside the kit."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, os.path.join(here, "..", "..", "tools", "modelcheck"))
+    try:
+        from shape_timing import choose_places
+    except ImportError:
+        return None
+    return choose_places(nodes, nodes, True, True, min(nodes, 64), link, 8, 4, 1024)
 
 
 def figures(x, n=3):
@@ -188,6 +213,9 @@ def summarize(directory):
     echo = {}
     iperf = {}
     startup = defaultdict(lambda: defaultdict(list))
+    places = defaultdict(lambda: defaultdict(list))        # (pes, lengths) -> way -> medians
+    places_pes = {}                                        # (pes a node) -> the job's PEs
+    ping = defaultdict(list)                               # base -> average round trips
     peers = defaultdict(lambda: defaultdict(list))         # key -> node -> [peer spread]
     floor_ratios = []
     outcomes = []
@@ -243,18 +271,25 @@ def summarize(directory):
                 outcomes.append(f"{f}: {line.strip()}")
             elif line.startswith("summary mailbox "):
                 mailbox[key].append(number_fields(line)["messages_per_s"])
+            elif PLACES.match(line):
+                m = PLACES.match(line)
+                places[(parts.get("pes"), m.group(2))][m.group(1)].append(float(m.group(4)))
+                places_pes[parts.get("pes")] = int(m.group(3))
+            elif PING.search(line):
+                ping[base].append(float(PING.search(line).group(2)))
             elif BENCH.match(line):
                 m = BENCH.match(line)
                 name, unit, size = m.group(1), m.group(2) or "", int(m.group(3) or 0)
                 group, order = BENCH_ORDER[name]
                 bench[key][(group, size, order, name, unit)].append(float(m.group(4)))
-            elif line.startswith("hol phase="):
+            elif line.startswith("hol phase=") and "median_us=" in line:
                 fields = number_fields(line)
                 phase = re.search(r"phase=(\w+)", line).group(1)
-                hol[(base, phase)]["median_us"].append(fields["median_us"])
-                hol[(base, phase)]["p99_us"].append(fields["p99_us"])
+                hol[(base, parts.get("h"), phase)]["median_us"].append(fields["median_us"])
+                hol[(base, parts.get("h"), phase)]["p99_us"].append(fields["p99_us"])
                 if phase == "stream":
-                    hol[(base, phase)]["stream_mib_per_s"].append(fields["stream_mib_per_s"])
+                    hol[(base, parts.get("h"), phase)]["stream_mib_per_s"].append(
+                        fields["stream_mib_per_s"])
             elif line.startswith("bytes=") and "get_nbi_quiet_us" in line:
                 fields = number_fields(line)
                 pieces[parts.get("zone")][int(fields["bytes"])].append(
@@ -285,6 +320,13 @@ def summarize(directory):
             other.append((f, [l for l in text.splitlines()
                               if l and not l.startswith("#") and not BENCH.match(l)
                               and not DEBUG_LINE.match(l)][:60]))
+        # TCP's counters after a stream (behind.sh, §13): those of loss and
+        # retransmission, each node's; and a profile's top lines (profile.sh).
+        if f.startswith("nstat-") and not f.startswith("nstat-before-"):
+            other.append((f, [l for l in text.splitlines()
+                              if re.search(r"Retrans|Lost|Timeout|SackRecovery|Loss", l)][:60]))
+        if f.startswith("profile-"):
+            other.append((f, [l for l in text.splitlines() if l and not l.startswith("#")][:40]))
 
     def beside(key, indent):
         line = link_and_limit(links.get(key))
@@ -297,7 +339,7 @@ def summarize(directory):
     for f in unparsed:
         print(f"did not parse: {f}")
     shown = (set(multistream) | set(mailbox) | set(bench) | set(fan_in)
-             | {(b, None, None, None, None) for b, phase in hol} | {("floor", None, None, None, None)}
+             | {(b, h, None, None, None) for b, h, phase in hol} | {("floor", None, None, None, None)}
              | {("get-pieces", None, None, z, None) for z in pieces})
     if shown & set(links):
         print("\nbeside each case: the link its jobs measured at start-up, as PE 0 took it, and the"
@@ -350,8 +392,8 @@ def summarize(directory):
             beside(key, 39)
     if mailbox:
         print("\nmailbox: messages a second (median, range)")
-        for key in sorted(mailbox, key=lambda k: (k[1] or 0, k[2] or 0)):
-            print(f"  pes={key[1]} h={key[2]}  {spread(mailbox[key])}")
+        for key in sorted(mailbox, key=lambda k: (k[1] or 0, k[2] or 0, k[0])):
+            print(f"  {key[0]} pes={key[1]} h={key[2]}  {spread(mailbox[key])}")
             beside(key, 4)
     if bench:
         print("\nosoe-bench: each line's median microseconds over its trips, the median of the"
@@ -366,19 +408,47 @@ def summarize(directory):
                 print(f"    {label:24s} {spread(bench[key][line])}")
             beside(key, 4)
     if hol:
-        print("\nhol: a fetch-add's round trip, microseconds, alone and behind the stream; the stream's MiB/s")
-        for key in sorted(hol):
+        print("\nhol: an operation's time, microseconds - a fetch-add's round trip unless the case"
+              "\nnames another - alone and behind the stream; the stream's MiB/s")
+        for key in sorted(hol, key=lambda k: (k[0], -1 if k[1] is None else k[1], k[2])):
             v = hol[key]
-            line = f"  {key[0]:19s} {key[1]:6s} median {spread(v['median_us']):22s} p99 {spread(v['p99_us']):22s}"
+            label = key[0] + ("" if key[1] is None else f" h={key[1]}")
+            line = f"  {label:26s} {key[2]:6s} median {spread(v['median_us']):22s} p99 {spread(v['p99_us']):22s}"
             if v["stream_mib_per_s"]:
                 line += f" stream {spread(v['stream_mib_per_s'])}"
             print(line)
-            if key[1] == "stream":
-                beside((key[0], None, None, None, None), 22)
+            if key[2] == "stream":
+                beside((key[0], key[1], None, None, None), 29)
+    if places:
+        print("\nplaces: collect's median microseconds by each way and the default (link), the"
+              "\nmedian of the rounds' (range, count); then each default job's link and the way"
+              "\nshape_timing.py's choose_places takes on it")
+        for pes, lengths in sorted(places, key=lambda k: (k[0] or 0, k[1])):
+            by_way = places[(pes, lengths)]
+            print(f"  pes={pes} lengths={lengths}")
+            for way in PLACES_WAYS:
+                if way in by_way:
+                    print(f"    {way:9s} {spread(by_way[way])}")
+        for key in sorted(links, key=lambda k: (k[1] or 0)):
+            if key[0] != "places-link" or not links[key].get("hop_us"):
+                continue
+            v = links[key]
+            pes_a_node, total = key[1], places_pes.get(key[1])
+            nodes = total // pes_a_node if total and pes_a_node else None
+            link = (round(statistics.median(v["hop_us"]) * 1e3),
+                    round(statistics.median(v["message_us"]) * 1e3),
+                    round(statistics.median(v["link_mib_per_s"]) * (1 << 20)))
+            way = places_way(nodes, link) if nodes else None
+            print(f"  the default at pes={pes_a_node}, {nodes} nodes: link {link}, the model's way "
+                  f"{way or '-'}")
+    if ping:
+        print("\nping: the average round trip, milliseconds (median, range, count)")
+        for base in sorted(ping):
+            print(f"  {base:24s} {spread(ping[base])}")
     if pieces:
         print("\nget-pieces: medians of the rounds' medians, microseconds; a get's and a nonblocking get's time over a put's")
         for zone in sorted(pieces, key=lambda z: z or 0):
-            print(f"  zone {zone}")
+            print(f"  zone {zone or 'default (unset)'}")
             beside(("get-pieces", None, None, zone, None), 4)
             for size in sorted(pieces[zone]):
                 rows = pieces[zone][size]

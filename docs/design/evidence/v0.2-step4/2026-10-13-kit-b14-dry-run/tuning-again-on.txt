@@ -1,0 +1,18 @@
+# 12:28:07 nodes=5 pes_per_node=1 
+# bash <repo>/docs/fast-link/tuning-node.sh on 50 one
+vm tuning: adaptive-tx off: netlink error: cannot modify an unsupported parameter (offset 36)
+vm tuning: adaptive-tx off: netlink error: Invalid argument
+vm tuning: adaptive-tx off: netlink error: cannot modify an unsupported parameter (offset 36)
+vm tuning: adaptive-tx off: netlink error: Invalid argument
+vm tuning: adaptive-tx off: netlink error: cannot modify an unsupported parameter (offset 36)
+vm tuning: adaptive-tx off: netlink error: Invalid argument
+vm tuning: adaptive-tx off: netlink error: cannot modify an unsupported parameter (offset 36)
+vm tuning: adaptive-tx off: netlink error: Invalid argument
+vm tuning: adaptive-tx off: netlink error: cannot modify an unsupported parameter (offset 36)
+vm tuning: adaptive-tx off: netlink error: Invalid argument
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 50, busy_poll 50
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 50, busy_poll 50
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 50, busy_poll 50
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 50, busy_poll 50
+vm tuning: eth0: adaptive-rx off rx-usecs 0 tx-usecs 0 busy_read 50, busy_poll 50
+# exit 0

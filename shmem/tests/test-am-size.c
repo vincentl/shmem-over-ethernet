@@ -64,13 +64,42 @@ int main(void)
     CHECK(OSOE_AM_DEFAULT_CHUNK == KB(64));
     CHECK(OSOE_AM_DEFAULT_BUDGET == budget);
     static const char *const settings[] = { "OSOE_AM_CHUNK", "OSOE_AM_BUFFER",
-                                            "OSOE_AM_BUFFER_BUDGET" };
+                                            "OSOE_AM_BUFFER_BUDGET", "OSOE_GET_LANDING_BYTES" };
     for (size_t i = 0; i < sizeof settings / sizeof *settings; i++)
         unsetenv(settings[i]);
     struct osoe_am_configuration configuration;
-    osoe_am_configuration_read(&configuration);
+    osoe_am_configuration_read(&configuration, 1);
     CHECK(configuration.chunk == chunk && configuration.buffer == standard &&
           configuration.budget == budget);
+
+    /*
+     * The landing zone's default (P32; the author's A5): a node's 4 MiB split
+     * among its PEs, in whole 1 KiB extents, between 256 KiB and 1 MiB a PE - so
+     * 1 MiB to each of 1 to 4 PEs, 4 MiB / 5 rounded down to an extent, 512 KiB to
+     * each of 8, and 256 KiB from 16 PEs on; OSOE_GET_LANDING_BYTES replacing it
+     * at any count.
+     */
+    static const struct {
+        uint32_t pes;
+        uint64_t zone;
+    } zones[] = { { 1, MB(1) },        { 2, MB(1) },      { 3, MB(1) },   { 4, MB(1) },
+                  { 5, KB(819) },      { 6, KB(682) },    { 8, KB(512) }, { 15, KB(273) },
+                  { 16, KB(256) },     { 17, KB(256) },   { 64, KB(256) }, { 256, KB(256) } };
+    for (size_t i = 0; i < sizeof zones / sizeof *zones; i++) {
+        osoe_am_configuration_read(&configuration, zones[i].pes);
+        if (configuration.get_landing_bytes != zones[i].zone)
+            fprintf(stderr, "%u PEs a node: a zone of %llu bytes, not %llu\n", zones[i].pes,
+                    (unsigned long long)configuration.get_landing_bytes,
+                    (unsigned long long)zones[i].zone);
+        CHECK(configuration.get_landing_bytes == zones[i].zone);
+        CHECK(osoe_get_landing_default_bytes(zones[i].pes) == zones[i].zone);
+    }
+    setenv("OSOE_GET_LANDING_BYTES", "4096", 1);
+    osoe_am_configuration_read(&configuration, 1);
+    CHECK(configuration.get_landing_bytes == KB(4));
+    osoe_am_configuration_read(&configuration, 64);
+    CHECK(configuration.get_landing_bytes == KB(4));
+    unsetenv("OSOE_GET_LANDING_BYTES");
 
     /*
      * The supported range, §1's "hundreds of nodes", and on to the default's

@@ -909,6 +909,41 @@ osoe_refusal_test(shmem.start-up.landing-bytes.partial-extent 2 0
            "osoe: PE 1: OSOE_GET_LANDING_BYTES=2000 is not a multiple of the landing zone's [0-9]+-byte extents"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
 
+# And its default, a node's 4 MiB split among its PEs, between 256 KiB and
+# 1 MiB a PE (P32; landing-default.sh), as every PE's start-up line shows it:
+# one PE a node, four and five (1 MiB, 1 MiB, 819 KiB in whole extents), eight
+# (512 KiB), sixteen and seventeen (256 KiB); a job of a node of five PEs and a
+# node of one, each node its own; and OSOE_GET_LANDING_BYTES in its place on
+# every PE. A small heap, so that seventeen PEs ask little of /dev/shm.
+foreach(case "1;" "4;" "5;" "8;" "16;" "17;" "0,0,0,0,0,1;" "0,0,1;4096")
+  list(GET case 0 shape)
+  list(GET case 1 bytes)
+  if(shape MATCHES ",")
+    set(map ${shape})
+    string(REPLACE "," "-" label "${map}")
+  else()
+    string(REPEAT "0," ${shape} map)
+    string(REGEX REPLACE ",$" "" map "${map}")
+    set(label L${shape})
+  endif()
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  if(bytes)
+    set(label set.${label})
+  endif()
+  add_test(NAME shmem.landing-default.${label}
+    COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=8m
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/landing-default.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> ${map} ${bytes})
+  set_tests_properties(shmem.landing-default.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "LANDING OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.landing-default.${label})
+  endif()
+endforeach()
+
 # The AM layer's settings and the wire's, which a lead alone read before: the lead
 # when it laid out the segment, and the wire's after the rendezvous and on a job
 # of several nodes only, so that a job of one node accepted OSOE_WIRE_BYTES=abc
@@ -1600,12 +1635,32 @@ set_tests_properties(shmem.refuse.heap_base_signed PROPERTIES LABELS "tier2" TIM
 # where the lead said only to set OSOE_HEAP_BASE (D12): one past the end of any
 # process's address space, a multiple of every page size, which the kernel
 # refuses with ENOMEM to root as to anyone - unlike 0x1000, which root may map.
+# Under ThreadSanitizer the tool refuses it first, as outside its application
+# memory, and the reason names the tool (P34; node.c, UNDER_THREAD_SANITIZER),
+# where the tool once made it a request for address 0.
+if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(osoe_heap_base_reason "ThreadSanitizer keeps that address for itself")
+else()
+  set(osoe_heap_base_reason "it runs past")
+endif()
 add_test(NAME shmem.refuse.heap_base_not_mapped
   COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=0x7fffffffffff0000
           $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
 set_tests_properties(shmem.refuse.heap_base_not_mapped PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION
-  "OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: it runs past")
+  "OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: ${osoe_heap_base_reason}")
+# The library's own candidates, OSOE_HEAP_BASE unset whatever the shell sets
+# (P34): a job starts, and each PE's start-up line (SHMEM_DEBUG) shows its heap
+# at a candidate - never at address 0, which ThreadSanitizer's interception of
+# mmap made of the first two, so that every job root ran in the tsan preset
+# ended in the tool's "mmap at bad address" (node.c, UNDER_THREAD_SANITIZER).
+# In the other presets it holds the candidates to a job that starts.
+add_test(NAME shmem.heap-base.candidates
+  COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_HEAP_BASE SHMEM_DEBUG=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.heap-base.candidates PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "heap [0-9]+ bytes at 0x[0-9a-f]+"
+  FAIL_REGULAR_EXPRESSION "exited with status [1-9];killed by signal;timeout after;left behind")
 # OSOE_TEST_NOTICE_SECONDS, a testing hook, is refused by name when it is not a
 # whole number of seconds from 1 to 3600, where it was taken as unset and the
 # notice left at 30 s (D17).
@@ -3045,10 +3100,14 @@ if(OSOE_INTERNODE)
   # the scan; and the out-of-order map, falling back to each node's total.
   #
   # Under the default, the link's choice (P31) is held to the ways the team
-  # allows, and pinned where the link is the Pi's, set by hand (pi-link): each
-  # node's total itself, P29's way, forced on two maps and the out-of-order
-  # one (totals), and the members' vector forced on a block map and a cyclic
-  # one (members).
+  # allows, and pinned where the link is the Pi's, set by hand (pi-link): the
+  # exchange on a block map of four nodes and negative strides on three, and
+  # each node's total on an out-of-order map of seventeen nodes, one PE each,
+  # where the cost model alone would take the exchange and the default stops
+  # at 16 nodes (P35; collective-shape.h, OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST)
+  # - the scan not allowed there; each node's total itself, P29's way, forced on
+  # two maps and the out-of-order one (totals), and the members' vector forced
+  # on a block map and a cyclic one (members).
   #
   # And forced to the leads' exchange of the nodes' totals (P33),
   # OSOE_COLLECTIVE_PLACES=exchange: block maps of two to seven nodes, negative
@@ -3083,20 +3142,26 @@ if(OSOE_INTERNODE)
                  "totals:block:0,0,0,1,1,2,2,2,2,3" "totals:negative-stride:0,0,1,1,1,2,3,3,4,4"
                  "totals:unordered:1,1,0,0,2,2" "members:block:0,0,1,2,2"
                  "members:cyclic:0,1,2,0,1,2,0,1,2" "pi-link:block:0,0,0,1,1,2,2,2,2,3"
-                 "pi-link:negative-stride:0,0,1,2,2")
+                 "pi-link:negative-stride:0,0,1,2,2"
+                 "pi-link:unordered:1,0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16:totals")
       string(REPLACE ":" ";" parts "${case}")
       list(LENGTH parts fields)
       set(forced "")
       set(prefix "")
-      if(fields EQUAL 3)
+      if(fields GREATER_EQUAL 3)
         list(GET parts 0 way)
         list(REMOVE_AT parts 0)
         set(prefix ${way}.)
         if(way STREQUAL "pi-link")
           # The default, the way chosen from the Pi's link set by hand: the
-          # exchange on every team of these maps (shape_timing.py places).
+          # exchange on every team of these maps, or the way a fourth field
+          # names (shape_timing.py places).
+          set(link_way exchange)
+          if(fields EQUAL 4)
+            list(GET parts 2 link_way)
+          endif()
           set(forced OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
-              OSOE_LINK_BYTES_PER_SECOND=116000000 OSOE_TEST_PLACES_LINK_WAY=exchange)
+              OSOE_LINK_BYTES_PER_SECOND=116000000 OSOE_TEST_PLACES_LINK_WAY=${link_way})
         else()
           set(forced OSOE_COLLECTIVE_PLACES=${way})
         endif()

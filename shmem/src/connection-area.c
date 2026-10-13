@@ -224,7 +224,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         return;                          /* one node: no peers, nothing to map */
 
     struct osoe_am_configuration config;
-    osoe_am_configuration_read(&config);
+    osoe_am_configuration_read(&config, b->local_count);
     a->credits = config.credits;
 
     uint64_t buffer;

@@ -318,7 +318,9 @@ enum osoe_places_way osoe_places_choose(uint32_t nodes, uint32_t members, bool r
     uint64_t least = osoe_places_cost(OSOE_PLACES_TOTALS, nodes, members, link, ceiling, capacity,
                                       small_bytes, piece_bytes, circulant);
     const enum osoe_places_way others[2] = { OSOE_PLACES_EXCHANGE, OSOE_PLACES_SCAN };
-    const bool allowed[2] = { nodes <= exchange_nodes, ordered };
+    const bool allowed[2] = {
+        nodes <= exchange_nodes && nodes <= OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST, ordered
+    };
     for (unsigned i = 0; i < 2; i++) {
         if (!allowed[i])
             continue;

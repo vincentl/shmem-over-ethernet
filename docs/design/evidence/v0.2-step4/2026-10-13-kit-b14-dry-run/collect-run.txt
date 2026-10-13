@@ -1,0 +1,9 @@
+# 2026-10-13T12:19:41Z collect.sh on vm
+# kit 143e3a17d80133452c6063bda90c0fd68cb0516a
+# launcher osoe-launch, build <repo>/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+12:19:42 exit 0 places-totals-pes2-r1.txt: OSOE_COLLECTIVE_PLACES=totals <repo>/build/release/tools/bench/osoe-bench places quick
+12:19:43 exit 0 places-members-pes2-r1.txt: OSOE_COLLECTIVE_PLACES=members <repo>/build/release/tools/bench/osoe-bench places quick
+12:19:44 exit 0 places-link-pes2-r1.txt: OSOE_COLLECTIVE_PLACES=link <repo>/build/release/tools/bench/osoe-bench places quick
+12:19:45 exit 0 places-exchange-pes2-r1.txt: OSOE_COLLECTIVE_PLACES=exchange <repo>/build/release/tools/bench/osoe-bench places quick
+12:19:46 exit 0 places-scan-pes2-r1.txt: OSOE_COLLECTIVE_PLACES=scan <repo>/build/release/tools/bench/osoe-bench places quick
+# done 12:19:46

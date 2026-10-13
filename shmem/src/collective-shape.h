@@ -152,13 +152,30 @@ uint64_t osoe_places_cost(enum osoe_places_way way, uint32_t nodes, uint32_t mem
                           uint32_t small_bytes, uint64_t piece_bytes, bool circulant);
 
 /*
+ * The most nodes the default takes the leads' exchange on (P35 of
+ * docs/prompts/v0.2-open-items.md, the author's decision of 2026-10-13), however
+ * cheap the cost model finds it past them: H24 measured the exchange the
+ * fastest of the four ways at 8 and 16 logical nodes and slower than the scan
+ * at 32 (docs/design/evidence/v0.2-step4/2026-10-13-h24/), on one machine whose
+ * CPUs carry every lead's N - 1 messages at once - which overstates its cost,
+ * so a cluster can only move the crossover up. Past it the default takes each
+ * node's total or the scan, as the link's cost chooses, where the model alone
+ * took the exchange to 60 nodes on the Pi's link and 46 on a loopback's;
+ * OSOE_COLLECTIVE_PLACES=exchange still forces it to its room
+ * (internal-region.h, OSOE_INTERNAL_EXCHANGE_NODES_MOST). Provisional until H25
+ * measures the ways on the cluster. shape_timing.py's
+ * EXCHANGE_DEFAULT_NODES_MOST.
+ */
+enum { OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST = 16 };
+
+/*
  * The way a collect's places take by default (OSOE_COLLECTIVE_PLACES=link):
  * the members' vector on one node, or where some node's members are not one
  * run of the team's ranks (`runs` false); otherwise the least cost of each
- * node's total, the exchange - on no more nodes than `exchange_nodes`, its room
- * - and the scan - where the runs meet the node set's positions in order or in
- * reverse (`ordered`) - ties to that order. shape_timing.py's
- * choose_places(), line for line.
+ * node's total, the exchange - on no more nodes than `exchange_nodes`, its
+ * room, nor than OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST - and the scan - where
+ * the runs meet the node set's positions in order or in reverse (`ordered`) -
+ * ties to that order. shape_timing.py's choose_places(), line for line.
  */
 enum osoe_places_way osoe_places_choose(uint32_t nodes, uint32_t members, bool runs,
                                         bool ordered, uint32_t exchange_nodes,

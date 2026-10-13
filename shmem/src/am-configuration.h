@@ -54,11 +54,20 @@
 
 /*
  * The bytes of a PE's landing zone, which every reply to its gets shares
- * (§4.6, §4.11 item 7; node.h): 256 KiB by default, in the control segment,
- * 256 extents of 1 KiB. Past it a PE completes what it has in flight before it
- * asks for more.
+ * (§4.6, §4.11 item 7; node.h), in the control segment, in extents of 1 KiB.
+ * Past it a PE completes what it has in flight before it asks for more. By
+ * default a node's budget split among its PEs (P32 of
+ * docs/prompts/v0.2-open-items.md; the author's decision A5,
+ * docs/decisions/2026-10-12.md): 4 MiB over the node's PEs, in whole extents,
+ * and no less than 256 KiB nor more than 1 MiB a PE - 1 MiB to each of 1 to 4
+ * PEs a node, 512 KiB to each of 8, 256 KiB to each of 16 and more - since on
+ * Google Cloud's link a zone of 256 KiB served eight PEs a node's gets best and
+ * one PE's large gets needed 1 MiB to match a put (docs/fast-link-results.md).
+ * OSOE_GET_LANDING_BYTES replaces it; H28 measures the split.
  */
-#define OSOE_DEFAULT_GET_LANDING_BYTES  (UINT64_C(256) << 10)
+#define OSOE_GET_LANDING_NODE_BUDGET_BYTES   (UINT64_C(4) << 20)
+#define OSOE_GET_LANDING_LEAST_DEFAULT_BYTES (UINT64_C(256) << 10)
+#define OSOE_GET_LANDING_MOST_DEFAULT_BYTES  (UINT64_C(1) << 20)
 /* Since layout 23 the zone is 1 KiB extents (node.h), at least one and at most
  * as many as a token's 16 bits name, less the one that means none. */
 #define OSOE_MIN_GET_LANDING_BYTES      UINT64_C(1024)
@@ -72,9 +81,15 @@ struct osoe_am_configuration {
     uint64_t budget;        /* OSOE_AM_BUFFER_BUDGET */
     uint32_t credits;       /* OSOE_AM_CREDITS: §3.8's C, per connection */
     bool hugepages;         /* OSOE_AM_HUGEPAGES */
-    uint64_t get_landing_bytes;     /* OSOE_GET_LANDING_BYTES, per PE */
+    uint64_t get_landing_bytes;     /* OSOE_GET_LANDING_BYTES, per PE, or its default */
 };
 
-void osoe_am_configuration_read(struct osoe_am_configuration *c);
+/* The settings, on a node of `local_count` PEs, which the landing zone's
+ * default is split among. */
+void osoe_am_configuration_read(struct osoe_am_configuration *c, uint32_t local_count);
+
+/* The landing zone's default on a node of `local_count` PEs (above): the
+ * budget over them, in whole extents, between the least and the most. */
+uint64_t osoe_get_landing_default_bytes(uint32_t local_count);
 
 #endif /* OSOE_AM_CONFIGURATION_H */

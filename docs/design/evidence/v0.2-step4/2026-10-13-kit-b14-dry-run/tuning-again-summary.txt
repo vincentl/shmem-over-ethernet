@@ -1,0 +1,74 @@
+== <dry>/out/tuning
+jobs: 11, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+mailbox: messages a second (median, range)
+  mailbox-default pes=2 h=None  24310 (n=1)
+    link 2774 MiB/s, hop 30.7 us, message 15.8 us; unsent limit 372360 B
+  mailbox-tuned pes=2 h=None  24711 (n=1)
+    link 1558 MiB/s, hop 47.9 us, message 22.5 us; unsent limit 209085 B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  bench-default pes=None h=-
+    barrier                  89.5 (n=1)
+    link 4043 MiB/s, hop 31.4 us, message 0 us; unsent limit 542688 B
+  bench-tuned pes=None h=-
+    barrier                  75.4 (n=1)
+    link 2128 MiB/s, hop 32.5 us, message 0 us; unsent limit 285626 B
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-default                alone  median 65.0 (n=1)             p99 136 (n=1)             
+  hol-default                stream median 352 (n=1)              p99 3710 (n=1)             stream 1613 (n=1)
+                             link 1271 MiB/s, hop 31.6 us, message 0 us; unsent limit 170526 B
+  hol-tuned                  alone  median 59.0 (n=1)             p99 118 (n=1)             
+  hol-tuned                  stream median 231 (n=1)              p99 2515 (n=1)             stream 1873 (n=1)
+                             link 3484 MiB/s, hop 27.1 us, message 0 us; unsent limit 467596 B
+
+ping: the average round trip, milliseconds (median, range, count)
+  ping-default             0.0210 (n=1)
+  ping-tuned               0.0190 (n=1)
+
+outcomes
+  mailbox-default-pes2-r1.txt: osoe-pacer failures=0 seconds=5.1
+  mailbox-tuned-pes2-r1.txt: osoe-pacer failures=0 seconds=5.7
+
+bench-default-r1.txt
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=59.5 fastest_us=52.9
+  latency get target=1 where=remote bytes=8 median_us=60.4 fastest_us=54.0
+  latency put+quiet target=1 where=remote bytes=64 median_us=57.2 fastest_us=52.5
+  latency get target=1 where=remote bytes=64 median_us=62.1 fastest_us=53.7
+  latency put+quiet target=1 where=remote bytes=512 median_us=60.4 fastest_us=53.0
+  latency get target=1 where=remote bytes=512 median_us=58.3 fastest_us=49.3
+  latency put+quiet target=1 where=remote bytes=4096 median_us=63.5 fastest_us=51.2
+  latency get target=1 where=remote bytes=4096 median_us=62.8 fastest_us=60.0
+  latency put+quiet target=1 where=remote bytes=32768 median_us=71.6 fastest_us=66.5
+  latency get target=1 where=remote bytes=32768 median_us=73.1 fastest_us=59.7
+  latency put+quiet target=1 where=remote bytes=262144 median_us=160.0 fastest_us=139.6
+  latency get target=1 where=remote bytes=262144 median_us=140.6 fastest_us=128.1
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=315.5 fastest_us=271.3
+  latency get target=1 where=remote bytes=1048576 median_us=386.6 fastest_us=303.6
+  atomic fetch-add target=1 where=remote median_us=62.3 fastest_us=55.5
+
+bench-tuned-r1.txt
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=57.4 fastest_us=50.5
+  latency get target=1 where=remote bytes=8 median_us=52.6 fastest_us=47.2
+  latency put+quiet target=1 where=remote bytes=64 median_us=53.7 fastest_us=47.6
+  latency get target=1 where=remote bytes=64 median_us=69.1 fastest_us=58.0
+  latency put+quiet target=1 where=remote bytes=512 median_us=59.3 fastest_us=48.7
+  latency get target=1 where=remote bytes=512 median_us=70.0 fastest_us=49.9
+  latency put+quiet target=1 where=remote bytes=4096 median_us=58.3 fastest_us=53.5
+  latency get target=1 where=remote bytes=4096 median_us=59.7 fastest_us=50.0
+  latency put+quiet target=1 where=remote bytes=32768 median_us=76.1 fastest_us=70.8
+  latency get target=1 where=remote bytes=32768 median_us=78.2 fastest_us=70.0
+  latency put+quiet target=1 where=remote bytes=262144 median_us=147.8 fastest_us=130.0
+  latency get target=1 where=remote bytes=262144 median_us=136.3 fastest_us=113.1
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=278.9 fastest_us=256.1
+  latency get target=1 where=remote bytes=1048576 median_us=392.2 fastest_us=301.9
+  atomic fetch-add target=1 where=remote median_us=53.9 fastest_us=51.3

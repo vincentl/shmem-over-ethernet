@@ -60,6 +60,32 @@ static const uint64_t heap_base_candidates[] = {
     UINT64_C(0x000100000000),
 };
 
+/*
+ * ThreadSanitizer's interception of mmap, asked for an address outside its
+ * application memory, replaces the address with none where the call does not
+ * say MAP_FIXED, and refuses the call with EINVAL where it does. Asked for a
+ * candidate by MAP_FIXED_NOREPLACE alone, then, it hands the kernel a request
+ * for address 0 itself: a user is refused (EPERM, below vm.mmap_min_addr) and
+ * the next candidate is tried, but root may map page 0, and the tool then ends
+ * the process ("mmap at bad address") - as the first two candidates, its shadow
+ * and its meta ranges on x86-64, did to every job root ran (P34 of
+ * docs/prompts/v0.2-open-items.md). So under it the heap asks MAP_FIXED as
+ * well, which the kernel reads as MAP_FIXED_NOREPLACE alone - it sets MAP_FIXED
+ * itself for that flag, since Linux 4.17, the library's floor - and a candidate
+ * the tool keeps for itself is refused by name and the next one tried, never
+ * mapped at 0.
+ */
+#if defined(__SANITIZE_THREAD__)
+#define UNDER_THREAD_SANITIZER 1
+#elif defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define UNDER_THREAD_SANITIZER 1
+#endif
+#endif
+#ifndef UNDER_THREAD_SANITIZER
+#define UNDER_THREAD_SANITIZER 0
+#endif
+
 /* Sections of the control segment start on a cache line, so none shares one. */
 static uint64_t align_up(uint64_t n);
 
@@ -429,6 +455,10 @@ static const char *heap_refusal(int refused)
                "mappings";
     case EPERM:
         return "the kernel refuses an address that low (vm.mmap_min_addr)";
+#if UNDER_THREAD_SANITIZER
+    case EINVAL:
+        return "ThreadSanitizer keeps that address for itself, outside its application memory";
+#endif
     default:
         return strerror(refused);
     }
@@ -475,7 +505,8 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
     for (size_t i = 0; i < ncandidates && !mapped_at; i++) {
         void *want = (void *)(uintptr_t)(candidates[i] + shift);
         void *p = mmap(want, n->heap_bytes, PROT_READ | PROT_WRITE,
-                       MAP_SHARED | MAP_FIXED_NOREPLACE, fd, 0);
+                       MAP_SHARED | MAP_FIXED_NOREPLACE | (UNDER_THREAD_SANITIZER ? MAP_FIXED : 0),
+                       fd, 0);
         *refused = p == MAP_FAILED ? errno : 0;
         if (p == want)
             mapped_at = candidates[i];
@@ -756,7 +787,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * short read.
      */
     struct osoe_am_configuration am;
-    osoe_am_configuration_read(&am);
+    osoe_am_configuration_read(&am, b->local_count);
     /* Since layout 23 a zone is extents (node.h): its header and bitmap, a
      * record an extent, then the extents. A piece of a get is at most a run of
      * 64 extents in one word of the bitmap, and at most a chunk, which the
@@ -1271,17 +1302,6 @@ again:;
                  h->dir.owner_count ? h->dir.owner_count - 1 : 0, b->progress_helpers);
         fail_rendezvous(n, msg);
     }
-    /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
-     * this PE's gets would be counted against a zone of another size. */
-    struct osoe_am_configuration am;
-    osoe_am_configuration_read(&am);
-    if (h->landing_arena_bytes != am.get_landing_bytes) {
-        char msg[256];
-        snprintf(msg, sizeof msg, "OSOE_GET_LANDING_BYTES differs between PEs: the local lead "
-                 "has %u, this PE has %llu (§3.12)", h->landing_arena_bytes,
-                 (unsigned long long)am.get_landing_bytes);
-        fail_rendezvous(n, msg);
-    }
     if (h->job != b->job || h->step != b->step || h->node != b->node ||
         h->session != session || h->dir.local_count != b->local_count ||
         h->world_size != b->world_size)
@@ -1289,6 +1309,19 @@ again:;
                    "session %u; this PE expects %u of %u, session %u", n->control_name,
                    h->dir.local_count, h->world_size, h->session, b->local_count,
                    b->world_size, session);
+    /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
+     * this PE's gets would be counted against a zone of another size. After
+     * the node's PEs are known to be counted alike, which the default is split
+     * among (P32). */
+    struct osoe_am_configuration am;
+    osoe_am_configuration_read(&am, b->local_count);
+    if (h->landing_arena_bytes != am.get_landing_bytes) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_GET_LANDING_BYTES differs between PEs: the local lead "
+                 "has %u, this PE has %llu (§3.12)", h->landing_arena_bytes,
+                 (unsigned long long)am.get_landing_bytes);
+        fail_rendezvous(n, msg);
+    }
     if (h->dir.slots_offset + (uint64_t)h->dir.local_count * h->dir.slot_bytes > n->control_bytes ||
         h->dir.blocks_offset + h->dir.blocks_bytes > n->control_bytes ||
         h->dir.connections_offset + h->dir.connections_bytes > n->control_bytes ||

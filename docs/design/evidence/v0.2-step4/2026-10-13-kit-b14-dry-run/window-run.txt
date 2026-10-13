@@ -1,0 +1,10 @@
+# 2026-10-13T12:22:23Z window.sh on vm
+# kit 143e3a17d80133452c6063bda90c0fd68cb0516a
+# launcher osoe-launch, build <repo>/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+12:22:26 exit 0 shapes-tree-pes2-r1.txt: OSOE_COLLECTIVE_SHAPE=tree <repo>/build/release/kit/shapes 10
+12:22:28 exit 0 shapes-link-pes2-r1.txt: OSOE_COLLECTIVE_SHAPE=link <repo>/build/release/kit/shapes 10
+12:22:31 exit 0 shapes-fixed-k4-d4-pes2-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=4 <repo>/build/release/kit/shapes 10
+12:22:36 exit 0 shapes-fixed-k4-d1-pes2-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=1 <repo>/build/release/kit/shapes 10
+12:22:39 exit 0 shapes-fixed-k2-d4-pes2-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=4 <repo>/build/release/kit/shapes 10
+12:22:45 exit 0 shapes-fixed-k2-d1-pes2-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=1 <repo>/build/release/kit/shapes 10
+# done 12:22:45

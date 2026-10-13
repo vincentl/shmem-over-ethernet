@@ -2811,6 +2811,18 @@ which allows only below `0x2_0000_0000`, the band
 - **It publishes `B` in the control segment** before any sibling reads it.
 - **Every other PE maps its own heap at the published `B`**, and fails loudly if it
   cannot. All local PEs run the same binary, so the lead's choice suits them.
+- **Under ThreadSanitizer the heap's `mmap` says `MAP_FIXED` as well as
+  `MAP_FIXED_NOREPLACE`** (P34): the tool's interception of `mmap` replaces an
+  address outside its application memory with none where the call does not say
+  `MAP_FIXED`, and refuses the call, `EINVAL`, where it does. Asked by
+  `MAP_FIXED_NOREPLACE` alone, it handed the kernel a request for address 0
+  itself, which a user is refused below `vm.mmap_min_addr` and root may map - and
+  the tool then ended the process, so every job root ran in the `tsan` preset
+  died at the first candidate, on x86-64 and aarch64 alike. The kernel reads the
+  two flags together as `MAP_FIXED_NOREPLACE` alone (it sets `MAP_FIXED` itself
+  for that flag, since 4.17), so a candidate the tool keeps is passed over, and
+  one `OSOE_HEAP_BASE` sets is refused naming the tool (`node.c`,
+  `UNDER_THREAD_SANITIZER`; `shmem.heap-base.candidates`).
 - **`OSOE_HEAP_BASE` replaces the list** for systems where none of the candidates
   is free. It must be a multiple of the page, which the mapping needs, and one
   that is not is refused by name - a Pi 5's page is 16 KiB, so a base chosen on
@@ -3318,8 +3330,11 @@ own wake word.
 *As built: nonblocking gets* (after phase 1 step 4, the author's decision on
 the strided forms, 2026-09-24). A PE's landing zone holds, after its blocking
 slot, `OSOE_GETS_IN_FLIGHT` request records (default 64) and an arena of
-`OSOE_GET_LANDING_BYTES` (default 256 KiB) that their replies share (control
-segment layout 16). A nonblocking get asks and returns: each piece - no larger
+`OSOE_GET_LANDING_BYTES` (default 256 KiB; since P32 a node's 4 MiB split among
+its PEs in whole extents, between 256 KiB and 1 MiB a PE, the author's A5 of
+2026-10-12 - a zone of 256 KiB served eight PEs a node's gets best on Google
+Cloud's link, and one PE's large gets needed 1 MiB to match a put) that their
+replies share (control segment layout 16). A nonblocking get asks and returns: each piece - no larger
 than a chunk, the wire's limit or the arena - takes a record and a range of the
 arena, writes the range into the record and then its token, with release,
 adds its bytes to `bytes_issued`, takes a reply credit and goes out. The token
@@ -5474,13 +5489,24 @@ the same answers): the members' vector wherever some node is not one run;
 otherwise the least cost of each node's total - a reduction as the data path
 runs it, its small class one piece through the ceiling's tree and a larger one
 the chooser's shape and a hop for its grant - the exchange, a hop and N - 1
-messages, within its room, and the scan, a small tree as deep and a message
-more a step of the gather, where the runs are ordered; each node's total where
-no link is known. On the Pi's link that is the exchange to 60 nodes and the scan
-beyond; on a loopback's, the exchange to 46, each node's total to 128 - where
-its vector becomes a large reduction - and the scan beyond. **Provisional**: the
-cost model's, until H24 (the VM's logical nodes, `tools/bench/collect-places.sh`,
-`osoe-bench places`) and H25 (the cluster) measure the four.
+messages, within its room and on no more than 16 nodes, and the scan, a small
+tree as deep and a message more a step of the gather, where the runs are
+ordered; each node's total where no link is known. **The exchange stops at 16
+nodes (P35, the author's decision of 2026-10-13)**, however cheap the costs
+find it past them: H24 measured it the fastest of the four at 8 and 16 logical
+nodes and slower than the scan at 32 (`docs/design/evidence/v0.2-step4/
+2026-10-13-h24/`), on one machine whose CPUs carry every lead's N - 1 messages
+at once, which overstates its cost - so a cluster can only move the crossover
+up - where the costs alone took it to 60 nodes on the Pi's link and 46 on a
+loopback's (`collective-shape.h`, `OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST`;
+`shape_timing.py`'s `EXCHANGE_DEFAULT_NODES_MOST`; `shmem.shape.places-grid`, and
+`shmem.collect-places.pi-link.unordered.*`, seventeen nodes taking each node's
+total). `OSOE_COLLECTIVE_PLACES=exchange` still forces it to its room. On the
+Pi's link the default is then the exchange to 16 nodes, each node's total to
+25 and the scan beyond; on a loopback's, the exchange to 16, each node's total
+to 128 - where its vector becomes a large reduction - and the scan beyond.
+**Provisional**: the cost model's and H24's, until H25 (the cluster) measures
+the four, and may raise the 16.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads

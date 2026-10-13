@@ -1,0 +1,10 @@
+# 2026-10-13T12:19:32Z gets.sh on vm
+# kit 143e3a17d80133452c6063bda90c0fd68cb0516a
+# launcher osoe-launch, build <repo>/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+12:19:32 exit 0 get-pieces-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 <repo>/build/release/kit/get-pieces 21 4194304
+12:19:34 exit 0 get-1m-pes1-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 <repo>/build/release/kit/multistream get 1048576 2
+12:19:37 exit 0 get-1m-pes2-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 <repo>/build/release/kit/multistream get 1048576 2
+12:19:37 exit 0 get-pieces-r1.txt:  <repo>/build/release/kit/get-pieces 21 4194304
+12:19:39 exit 0 get-1m-pes1-r1.txt:  <repo>/build/release/kit/multistream get 1048576 2
+12:19:41 exit 0 get-1m-pes2-r1.txt:  <repo>/build/release/kit/multistream get 1048576 2
+# done 12:19:41
