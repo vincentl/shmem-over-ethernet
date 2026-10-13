@@ -5417,6 +5417,22 @@ orders, a run that wraps past position *N* - 1 in two ranges, and its breakage,
 bases summed in the node set's order under a negative stride, fails. The data
 itself keeps the allgather either way.
 A scan (§9.10.10, built since phase 1 step 10) gives each PE its own place in O(1) memory.
+*(P30, the third way, is designed and modelled, not built - stage 1, 2026-10-12,
+`docs/design/collect-scan-proposal.md`, for the lead's and the author's
+decision.)* Each lead would learn only its own node's base and the total, from
+a scan of the nodes' totals among the leads - a pre-order tree over the node
+set's positions through the reductions' small rows and words, a subtree's total
+up and the totals before it with the total down; not the members' scan, which
+is every member's, deeper than P29's tree, and gives no total - and each step
+of the gather would carry a record of its two byte ranges past the receiver's
+DATA counter, the last step cut at its receiver's own share, which that lead put
+past its writer's READY counter as it entered: no lead would need another
+node's places. It takes P29's hops wherever P29's vector of totals is a small
+collective, to 128 nodes at the defaults, and saves the large class's grant
+past that; its bytes, a few words a step against eight a node at every level
+of the tree, would buy time on a real link only at about a thousand nodes.
+`allgather_model.py`'s ranged cases and arithmetic hold it, and its breakages
+fail.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads
