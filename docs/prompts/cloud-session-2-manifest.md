@@ -394,3 +394,44 @@ and directory.
   numbers, with H25's on the cluster, decide the defaults - bearing in mind
   that its logical nodes share the VM's CPUs; and the tier-3 and aarch64 runs
   listed for P30 and P33.
+
+### 5. Part 1's verification, at P31's commit
+
+**Done.** Commit: the one that adds this entry; no code changes. At `58a82bc`:
+
+- **Static checks**: 13 of 13. **Release**, models aside: 915, 913 passed and
+  the 2 root skips (P31's entry). **Changed models**: `allgather_model.py`
+  whole (T32), `lane_model.py` whole (P30), `exchange_model.py` (P33), the
+  shape models and the grid (P31), `selftest.py` at each.
+- **debug** and **asan**: each preset built without a warning; their collect and
+  team tests (`ctest -R 'collect|team'`, 146 each, the internode ones over
+  loopback) **146 of 146** each, in 11 s and 21 s.
+- **tsan**: built without a warning. Its collect and team tests, 73, first
+  failed 45 of 73 at 0 helpers and at 2, every one whose lead maps a heap, at
+  that mapping: "ThreadSanitizer: mmap at bad address: addr=0x0 ...
+  res=0x0". **The sandbox's, not this session's**: `main` at `225d205`, built
+  the same way, fails the same tests with the same line. The cause, from the
+  tool's interceptor: a `MAP_FIXED_NOREPLACE` mapping is a hint to it, and a
+  hint outside its application ranges - the library's first two candidates,
+  `0x100000000000` and `0x300000000000` - is replaced by none, so the kernel
+  is asked for address 0 exactly; a user may not map page 0 and gets `EPERM`,
+  and the library goes on to `0x010000000000`, as in the VM, but **root may**,
+  so here the heap lands at 0 and the tool ends the process. Run as the VM
+  runs it - `OSOE_HEAP_BASE=0x010000000000`, the base the library takes under
+  the tool and the gate's default - **73 of 73 at 0 helpers and at 2**, and
+  the gate (`python3 -I cmake/thread-sanitizer-gate.py judge ...`, as
+  `docs/fast-link/verify.sh` runs it) **passed both**: no report at 0; at 2,
+  three in `shmem.circulant.4.max-teams-4`, each a helper's landing against
+  the zeroing of the circulant's grant words when a split takes a team number
+  (`osoe_internode_generic_number_taken`, code from `main`), which the gate
+  passes by its existing reason. None in P30's records or shares or P33's
+  slots.
+- **Tier 3**, its 27 collect tests (`tier3.{pi,lossy,small}.collect.*` and
+  `.collect-places.*`, the build tree configured again for P30's, P33's and
+  P31's): netem being absent, run over a copy of `tools/launch/tier3.sh` whose
+  one netem line is `tc qdisc add dev link0 root tbf rate 1gbit burst 64kb
+  latency 50ms`, each test's own command from ctest's list with the path
+  swapped - the namespaces, the bridge, the veth links, the addresses
+  10.99.0.N and the small shape's 1,280-byte MTU as tier 3 makes them, shown
+  from inside a rank; netem's delay and loss not. **27 of 27** passed, in 14
+  s. A substitute, not tier 3: **the VM runs them under netem**.
