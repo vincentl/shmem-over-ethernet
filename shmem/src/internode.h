@@ -45,8 +45,10 @@
  * progress thread (§3.12), in whichever local process runs it, exactly once per
  * (team, epoch) on every participating node. The data half,
  * osoe_internode_reduce, osoe_internode_broadcast and osoe_internode_collect,
- * is called by the team's local lead on its own application thread, and
- * blocks - a reduction entered first with osoe_internode_reduce_enter, on the
+ * and collect's osoe_internode_scan_node_totals and
+ * osoe_internode_collect_ranges, is called by the team's local lead on its own
+ * application thread, and blocks - a reduction entered first with
+ * osoe_internode_reduce_enter, on the
  * same thread, which does not; osoe_internode_scan by every member, on its own
  * thread. Which application thread leads a team's collective may change from
  * one collective to the next, as the program's threads take turns on a team;
@@ -163,6 +165,10 @@
  *     (below), and fenced adds become RDMA writes and atomics with no change
  *     to it; or another allgather - a ring, or recursive doubling - moving each
  *     node's blocks once into each peer's buffer, under the same rule.
+ *   - osoe_internode_scan_node_totals and osoe_internode_collect_ranges
+ *     (P30): the generic implementation, its puts and fenced adds RDMA writes
+ *     and atomics with no change to it - the scan's small pieces, and each
+ *     step's record written with the step's bytes and before its add.
  */
 #ifndef OSOE_INTERNODE_H
 #define OSOE_INTERNODE_H
@@ -417,6 +423,49 @@ void osoe_internode_broadcast(uint32_t team, uint32_t epoch, uint32_t root_index
  */
 void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                             size_t block, const uint64_t *places, const char *routine);
+
+/*
+ * collect's places by a scan of the nodes' totals (P30;
+ * docs/design/collect-scan-proposal.md): `own` is this node's total, its
+ * members' lengths summed; on return `*before` holds the totals of the nodes
+ * at positions before this one's in the team's node set, and `*total` every
+ * node's. Called by the team's local lead, once per node per collect of
+ * differing blocks and before its gather, with the collect's epoch, as
+ * osoe_internode_collect is - with no entry call, since it is never a large
+ * collective. The caller turns `before` into its node's base in team-rank
+ * order, which is the positions' order or its reverse (collectives.c).
+ *
+ * The generic implementation: a pre-order tree over the positions at the
+ * fan-out's ceiling, each subtree a contiguous range of positions, through the
+ * team number's small rows and its arrival and release counters - a subtree's
+ * total up, and the totals before the subtree with the total down: 2 levels
+ * of the tree's depth, eight bytes up and sixteen down a message.
+ */
+void osoe_internode_scan_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                     uint64_t *before, uint64_t *total, const char *routine);
+
+/*
+ * The internode phase of collect's gather where each lead knows its own
+ * node's share and nobody else's (P30): the result is `bytes` long, this
+ * node's share the bytes from `share_start` up to `share_end`, already in
+ * `buffer`, and the nodes' shares lie in the order of their positions in the
+ * team's node set - or in its reverse, `reverse`. On return every node's
+ * buffer holds every share, as osoe_internode_collect's does; called as it is,
+ * under the same rule that a peer's buffer is written only once the peer has
+ * entered, with the same `bytes` on every node.
+ *
+ * The generic implementation is that call's allgather, each step carrying a
+ * record of the byte ranges it sends - two at most, a run of shares wrapping
+ * past the last position at most once - past its receiver's DATA counter,
+ * fenced with the bytes, so that a lead forwards what it received without
+ * knowing any other node's place; the last step is cut where its receiver's
+ * own share begins, which that lead says, as it enters, past its writer's
+ * READY counter. Its bytes a call are a few words a step, where places from
+ * the nodes' totals cost eight bytes a node at each level of a reduction.
+ */
+void osoe_internode_collect_ranges(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                                   uint64_t share_start, uint64_t share_end, bool reverse,
+                                   const char *routine);
 
 /*
  * The internode phase of a prefix scan (spec §9.10.10; phase 1 step 10 slice

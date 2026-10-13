@@ -61,3 +61,96 @@ preset builds without a warning and the static checks pass 13 of 13.
   the brief keeps for a change that reruns the whole suite, so it stays; the
   next engine change can drop it.
 - **For the VM**: `ctest --test-dir build/release -R "^model\.(allgather|selftest)$"`.
+
+### 2. P30's C: the leads' scan of the node totals and the gather by ranges
+
+**Done.** Commit: the one that adds this entry. As the proposal's stage 2
+designs it; its new section, "Stage 2, as built", says the five points the design
+left open or the build found, and plainly what is a wire change and what a
+layout one.
+
+**Files**: `shmem/src/internode.h`, `internode-generic.c`, `internode-generic.h`,
+`internode-am.c`, `transport-single-node.c` (the two calls);
+`collectives.c` (the third way, `places_from_scan`, `places_way`, the gather's
+own places); `team.h`, `team.c` (the runs' order); `bootstrap.h`, `bootstrap.c`
+(`OSOE_COLLECTIVE_PLACES`); `node.h`, `node.c`, `metrics.c`,
+`tools/stat/segment.h` (layout 39); `rendezvous.c` ("osoeup-6");
+`internal-region.h` (comments: what the gather's lines hold, and zeroed whole);
+`shmem/tests/test-collect-places.c`, `shmem/tests/CMakeLists.txt`;
+`tools/modelcheck/lane_model.py`; the README, design §5.5, the proposal, the
+design and model READMEs, and the evidence's README and directory.
+
+- **The calls.** `osoe_internode_scan_node_totals(team, epoch, own, &before,
+  &total)`: a pre-order tree over the node set's positions at the fan-out's
+  ceiling, rooted at position 0, through the team number's small rows and its
+  arrival and release counters with the reductions' bases, which it advances as
+  `in_pieces` does; its pieces' header a `collective` of its own (bit 30), which
+  `describe` names. `osoe_internode_collect_ranges(team, epoch, buffer, bytes,
+  share_start, share_end, reverse)`: Bruck's allgather with READY and DATA as
+  before, each step's record (epoch and two ranges, 40 bytes) past the
+  receiver's DATA[s] counter before the fenced add, the share (24 bytes) past the
+  READY[S - 1] counter and the shape's room at entry, the last step cut at it,
+  each record checked - epoch, within the result, continuing what the receiver
+  holds, and not running on into the receiver's share - and the whole result
+  checked at the end. The shape's layout word takes a third value, ranges.
+- **collect's third way** (`collect_varying`): the scan where the runs meet the
+  positions in order or in reverse, never large and so with no
+  `osoe_internode_reduce_enter`; the lead's own members' places only, a vector
+  of its L members and one; the gather by ranges. The walk keeps the runs'
+  order (`node_runs_order`).
+- **The setting**, P31's, built here because the tests need the scan forced:
+  `OSOE_COLLECTIVE_PLACES` = `link` (the default, as before) | `members` |
+  `totals` | `scan`, falling back where the team does not allow the way.
+  Checked between a node's PEs (the header, `open_control`) and between nodes
+  (the rendezvous). The README's settings table has its row, so
+  `shmem.settings-documented` passes.
+- **The counts**: `team.tree.collect_lengths` is 1 under the scan, and
+  `team.tree.collect_way` names the way (1 members, 2 totals, 3 scan).
+- **Wire and layout**, plainly: the internal region's layout is unchanged - no
+  size, no offset - but what a lead puts into a peer's region during a collect
+  is new (records, shares, the shape's third value, the scan's pieces): **a wire
+  change**, which nothing negotiates, every node running one build. **The node
+  segment's layout is 39** (`team.tree.collect_way` in the tree state's room, the
+  header's `collective_places` in room before the rendezvous words; `ready`,
+  `failed` and `aborting` stay at 448, 464 and 512 on x86-64, measured with a
+  program on `node.h`). **The rendezvous's up message is "osoeup-6"**, 88 bytes.
+- **The model beside the reductions** (`lane_model.py`): a leads' scan, kind
+  `q`, is a small collective on its own pre-order tree through the same small
+  slots and counters. Five design cases - the scan between small reductions, a
+  large reduction and a broadcast turned to another root, two threads of a node
+  leading a scan and another team's small reduction at once, five nodes where
+  the two trees give node 1 different numbers of children, and five nodes with a
+  turned broadcast of two pieces (117,603 states) - each ok and live; the
+  breakage `scan_heap_bases`, its bases counted by the reductions' tree, fails
+  STUCK as named. The 33 earlier cases' lines are identical to the model's run
+  before the change; the whole model in 19 s.
+- **Tests**: `shmem.collect-places.scan.*`, twelve at tier 2 - block maps of two,
+  three, four, five, seven and eight nodes, negative strides on four of them,
+  the cyclic map (its world to the members' vector, its first rank of each node
+  the scan) and `-m 1,1,0,0,2,2`, numbered out of the ranks' order (to each
+  node's total) - and `shmem.collect-places.unordered.1-1-0-0-2-2` at the
+  default; each checks every byte, the way and the count. Two of the block
+  case's three teams now tolerate a two-node map (the third, which would span
+  one node, is left out by name). Over tier 3's links, three more registered
+  (`tier3.<link>.collect-places.scan.*`), not runnable here.
+- **The mutant beside its control** (`docs/design/evidence/v0.2-step4/
+  2026-10-13-collect-scan/`): the last step uncut. The control passes all 19 of
+  `shmem.collect-places.*`; the mutant fails the 9 scan cases whose teams span a
+  node count that is not a power of two - on the four- and eight-node maps the
+  splits span three, five and six - each at the record that runs on into its
+  receiver's share, naming the writer and the step, and passes the other 10. A
+  first run of it, before the record's overlap check existed, failed the same 9
+  at the end's whole-result check instead ("a broken invariant"): that is why
+  the check was added (the proposal's "Stage 2, as built").
+- **Runs here**: the release preset without a warning; the static checks 13 of
+  13; the release suite, models aside (`ctest --test-dir build/release -LE model
+  -j4`), **895: 893 passed, 2 skipped** - the two refusal tests root skips - in
+  5 min 10 s, 13 more than at `main` (P29's tests' one more map and P30's
+  twelve); `lane_model.py` whole, 39 cases as expected, in 19 s; the
+  single-node build (`-DOSOE_SINGLE_NODE=ON`) without a warning, its collect and
+  team tests 61 of 61.
+- **Not verified here, for the VM**: tier 3's three new tests and P29's
+  (`ctest --test-dir build/tier3 -R collect-places`), netem being absent; and
+  aarch64 - the release and debug suites, and the header offsets (128-byte
+  lines there: `ready` should stay at 512, the field fitting the padding before
+  it, as here).

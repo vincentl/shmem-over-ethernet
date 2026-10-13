@@ -869,6 +869,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->collective_pipeline = b->collective_pipeline;
     h->small_collective_bytes = b->small_collective_bytes;
     h->collective_shape = b->collective_shape;
+    h->collective_places = b->collective_places;
     h->link_hop_ns = b->link_hop_ns;
     h->link_message_ns = b->link_message_ns;
     h->link_bytes_per_second = b->link_bytes_per_second;
@@ -1196,6 +1197,15 @@ again:;
                  osoe_collective_shape_name(b->collective_shape));
         fail_rendezvous(n, msg);
     }
+    /* And by how collect finds its places (layout 39), which any PE of the node
+     * may decide for a team as its local lead. */
+    if (h->collective_places != b->collective_places) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_COLLECTIVE_PLACES differs between PEs: the local lead "
+                 "has %s, this PE has %s", osoe_collective_places_name(h->collective_places),
+                 osoe_collective_places_name(b->collective_places));
+        fail_rendezvous(n, msg);
+    }
     if (h->link_hop_ns != b->link_hop_ns || h->link_message_ns != b->link_message_ns ||
         h->link_bytes_per_second != b->link_bytes_per_second) {
         char msg[320];
@@ -1407,6 +1417,7 @@ static void collective_state_reset(struct osoe_collective_state *c)
     atomic_store_explicit(&c->algorithm, 0, memory_order_release);
     atomic_store_explicit(&c->circulant_rounds, 0, memory_order_release);
     atomic_store_explicit(&c->collect_lengths, 0, memory_order_release);
+    atomic_store_explicit(&c->collect_way, 0, memory_order_release);
 }
 
 /*

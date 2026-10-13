@@ -58,6 +58,18 @@ struct osoe_team_node_run {
     uint32_t position;
 };
 
+/* How a team's runs, met in team-rank order, meet its node set's positions
+ * (osoe_team_node_runs): in their order - the world, any positive stride over a
+ * block distribution whose nodes are numbered as the ranks rise - in their
+ * reverse - a negative stride over one - or neither, a block map numbered out
+ * of the ranks' order. collect's scan of the nodes' totals (P30) needs one of
+ * the first two (collectives.c). */
+enum osoe_team_runs_order {
+    OSOE_TEAM_RUNS_IN_ORDER,
+    OSOE_TEAM_RUNS_REVERSED,
+    OSOE_TEAM_RUNS_UNORDERED,
+};
+
 struct osoe_team {
     const char *name;
     /* enum osoe_team_number: indexes this PE's per-team state. This PE's own
@@ -124,11 +136,13 @@ struct osoe_team {
      * `node_runs_found` says whether the walk has been made (osoe_team_node_runs);
      * `node_runs` is NULL where some node's members are not one run - a cyclic
      * or plane distribution's - and otherwise each node's run in team-rank
-     * order, `nodes` of them, this node's at `own_node_run`.
+     * order, `nodes` of them, this node's at `own_node_run`, and how they meet
+     * the node set's positions in `node_runs_order` (P30).
      */
     bool node_runs_found;
     const struct osoe_team_node_run *node_runs;
     uint32_t own_node_run;
+    enum osoe_team_runs_order node_runs_order;
     /*
      * A team of one member: SHMEM_TEAM_SHARED under §8.1's force-remote flag,
      * and any team a split makes of one PE. Its sync has nobody to wait for and
@@ -218,9 +232,10 @@ uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node);
  * team's ranks in order - each one's world rank (the progression, or
  * `world_of_rank`) and its node (job.h), O(members) node lookups - noting each
  * node's first team rank and its position in the node set, until a node is met
- * again after its run ended; then kept, O(nodes). Every lead finds the same
- * answer, from what every PE holds alike: the team's ranks and the job's rank
- * map.
+ * again after its run ended; then kept, O(nodes), with the order in which the
+ * runs meet the node set's positions (`node_runs_order`). Every lead finds the
+ * same answer, from what every PE holds alike: the team's ranks and the job's
+ * rank map.
  */
 const struct osoe_team_node_run *osoe_team_node_runs(struct osoe_team *t, const char *routine);
 

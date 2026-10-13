@@ -5417,22 +5417,38 @@ orders, a run that wraps past position *N* - 1 in two ranges, and its breakage,
 bases summed in the node set's order under a negative stride, fails. The data
 itself keeps the allgather either way.
 A scan (§9.10.10, built since phase 1 step 10) gives each PE its own place in O(1) memory.
-*(P30, the third way, is designed and modelled, not built - stage 1, 2026-10-12,
-`docs/design/collect-scan-proposal.md`, for the lead's and the author's
-decision.)* Each lead would learn only its own node's base and the total, from
-a scan of the nodes' totals among the leads - a pre-order tree over the node
-set's positions through the reductions' small rows and words, a subtree's total
-up and the totals before it with the total down; not the members' scan, which
-is every member's, deeper than P29's tree, and gives no total - and each step
-of the gather would carry a record of its two byte ranges past the receiver's
-DATA counter, the last step cut at its receiver's own share, which that lead put
-past its writer's READY counter as it entered: no lead would need another
-node's places. It takes P29's hops wherever P29's vector of totals is a small
-collective, to 128 nodes at the defaults, and saves the large class's grant
-past that; its bytes, a few words a step against eight a node at every level
-of the tree, would buy time on a real link only at about a thousand nodes.
-`allgather_model.py`'s ranged cases and arithmetic hold it, and its breakages
-fail.
+**The third way, a scan of the nodes' totals among the leads (P30)**, where
+every node is one run and the runs meet the node set's positions in order or in
+reverse - designed and modelled at stage 1 (2026-10-12,
+`docs/design/collect-scan-proposal.md`), built at stage 2 by the second cloud
+session (2026-10-13; the proposal's "Stage 2, as built"): each lead learns only
+its own node's base and the total, from a scan of the nodes' totals among the
+leads - a pre-order tree over the node set's positions at the fan-out's
+ceiling, through the reductions' small rows and counters with their bases, a
+subtree's total up and the totals before it with the total down
+(`osoe_internode_scan_node_totals`); not the members' scan, which is every
+member's, deeper than P29's tree, and gives no total - its base the totals
+before it in order and the total less them and its own in reverse; and the
+gather goes by ranges (`osoe_internode_collect_ranges`): each step carries a
+record of its two byte ranges past the receiver's DATA counter, fenced with the
+bytes, the last step cut at its receiver's own share, which that lead put past
+its writer's READY counter as it entered, and each record checked to continue
+what its receiver holds, and never to run on into its share: no lead needs
+another node's places. It takes P29's hops wherever P29's vector of totals is a
+small collective, to 128 nodes at the defaults, and saves the large class's
+grant past that; its bytes, a few words a step against eight a node at every
+level of the tree, would buy time on a real link only at about a thousand
+nodes. `allgather_model.py`'s ranged cases and arithmetic hold it, and its
+breakages fail; `lane_model.py`'s scan cases hold its tree beside the
+reductions' and the broadcasts' on the same words. The way a collect takes is
+`OSOE_COLLECTIVE_PLACES`'s where the team allows it - by default each node's
+total where every node is one run and the members' vector elsewhere; forced,
+for the tests and the measurements, the members' vector, each node's total or
+the scan - every PE alike, which the rendezvous and each node's segment check,
+and each lead publishes the way it took (`team.tree.collect_way`, layout 39)
+and its count, one under the scan (`shmem.collect-places.scan.*`, with every
+other case of P29's, and a mutant whose last step is uncut beside its control,
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-scan/`).
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads

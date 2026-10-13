@@ -317,6 +317,33 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
     unreachable("osoe_internode_collect");
 }
 
+void osoe_internode_scan_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                     uint64_t *before, uint64_t *total, const char *routine)
+{
+    (void)team;
+    (void)epoch;
+    (void)own;
+    (void)before;
+    (void)total;
+    (void)routine;
+    unreachable("osoe_internode_scan_node_totals");
+}
+
+void osoe_internode_collect_ranges(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                                   uint64_t share_start, uint64_t share_end, bool reverse,
+                                   const char *routine)
+{
+    (void)team;
+    (void)epoch;
+    (void)buffer;
+    (void)bytes;
+    (void)share_start;
+    (void)share_end;
+    (void)reverse;
+    (void)routine;
+    unreachable("osoe_internode_collect_ranges");
+}
+
 void osoe_internode_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
                          size_t count, struct osoe_element element, bool inclusive,
                          const char *routine)

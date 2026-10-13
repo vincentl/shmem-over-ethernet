@@ -75,7 +75,12 @@
  * its line, as the tree's are. READY[s] at a lead counts the entries of the
  * lead it writes to at step s, DATA[s] the steps s of the lead that writes to
  * it (internode-generic.c); READY[0]'s line also holds, past the counter, the
- * shape of the gather that lead entered, 24 bytes, put before the add. A team
+ * shape of the gather that lead entered, 24 bytes, put before the add. Under
+ * collect's scan of the nodes' totals (P30) the lines hold two things more,
+ * each put before its line's add and none moving an offset: past DATA[s]'s
+ * counter the record of what step s brought, the epoch and two byte ranges,
+ * 40 bytes; and past READY[S - 1]'s counter and the shape's room, the share of
+ * the lead that put it, 24 bytes, where its last-step writer cuts. A team
  * over N nodes takes ceil(log2 N) steps, so every team number has room for
  * ceil(log2 N) steps of the job's N nodes, which every node agrees on - with
  * the reduce-scatter's words, the parts of the layout the node count sizes, by
@@ -99,8 +104,9 @@
  * **What a team number owns here is the team's while one of this PE's teams
  * holds the number** (step D): a PE gives a number back when it destroys its
  * team, and takes it again for a later one, and as it takes it zeroes every
- * counter of the number in its own region and its grants' words
- * (osoe_internode_number_taken), before the split's sync, after which alone
+ * counter of the number in its own region, its grants' words and its gathers'
+ * lines whole, records and shares with them (osoe_internode_number_taken),
+ * before the split's sync, after which alone
  * anybody writes them for the new team. Nothing of the old team is still to
  * arrive by then: every write into a PE's slots and counters is one the PE
  * waits for before it returns from the collective, and the destroy's sync

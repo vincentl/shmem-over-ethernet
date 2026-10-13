@@ -29,9 +29,11 @@
  * "osoeup-4", carries OSOE_SMALL_COLLECTIVE_BYTES (the team redesign's step E)
  * and a word kept zero after it, for the same reason the second kept one: 56
  * bytes. The fifth, "osoeup-5", carries OSOE_COLLECTIVE_SHAPE in that word and
- * the link's three numbers after it (v0.2 step 2): 80 bytes.
+ * the link's three numbers after it (v0.2 step 2): 80 bytes. The sixth,
+ * "osoeup-6", carries OSOE_COLLECTIVE_PLACES after them and a word kept zero
+ * (P30, P31): 88 bytes.
  */
-#define UP_MAGIC   UINT64_C(0x352d7075656f736f)  /* "osoeup-5", little-endian */
+#define UP_MAGIC   UINT64_C(0x362d7075656f736f)  /* "osoeup-6", little-endian */
 #define DOWN_MAGIC UINT64_C(0x6e776f64656f736f)  /* "osoedown" */
 
 /* What every node must agree on (§6.2): a node that differs is a mismatched
@@ -62,6 +64,10 @@ struct agreement {
     uint64_t link_hop_ns;
     uint64_t link_message_ns;
     uint64_t link_bytes_per_second;
+    /* P30, P31: how collect finds its places, every lead of a team alike or
+     * they wait on different words - "osoeup-6". */
+    uint32_t collective_places;
+    uint32_t reserved;
 };
 
 struct up_header {
@@ -71,9 +77,9 @@ struct up_header {
     uint32_t progressions;          /* progressions that follow the records */
 };
 
-_Static_assert(sizeof(struct up_header) == 80 &&
+_Static_assert(sizeof(struct up_header) == 88 &&
                offsetof(struct up_header, agreement) +
-                       offsetof(struct agreement, link_bytes_per_second) == 64,
+                       offsetof(struct agreement, collective_places) == 72,
                "the up header's shape is UP_MAGIC's: a new shape takes a new magic");
 
 /* One node of a subtree, as it travels up. */
@@ -155,6 +161,11 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
                    "every node must shape a collective's tree alike", child,
                    osoe_collective_shape_name(theirs->collective_shape), b->node,
                    osoe_collective_shape_name(mine->collective_shape));
+    if (theirs->collective_places != mine->collective_places)
+        osoe_fatal("node %u (or a node below it) has OSOE_COLLECTIVE_PLACES=%s; node %u has %s: "
+                   "every node must find collect's places the same way", child,
+                   osoe_collective_places_name(theirs->collective_places), b->node,
+                   osoe_collective_places_name(mine->collective_places));
     if (theirs->link_hop_ns != mine->link_hop_ns ||
         theirs->link_message_ns != mine->link_message_ns ||
         theirs->link_bytes_per_second != mine->link_bytes_per_second)
@@ -297,7 +308,7 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
                               osoe_am_table_checksum(), b->collective_fanout, b->max_teams,
                               b->collective_pipeline, b->small_collective_bytes,
                               b->collective_shape, b->link_hop_ns, b->link_message_ns,
-                              b->link_bytes_per_second };
+                              b->link_bytes_per_second, b->collective_places, 0 };
 
     /* This node's record: its address, its ranks as progressions, its blob. */
     struct report r = { 0 };

@@ -375,14 +375,18 @@ void osoe_segment_close(struct osoe_segment *s);
  *   38  team.tree.collect_lengths, in room the tree state had: the lengths the
  *       lead's last collect of differing blocks summed between the nodes for
  *       its places, a node's total each or a member's length each (P29)
+ *   39  team.tree.collect_way, in the same room: the way that collect found its
+ *       places - the members' vector, each node's total, or the leads' scan
+ *       (P30); and the header's OSOE_COLLECTIVE_PLACES, node.collective_places,
+ *       in room before the rendezvous words, which keep their place
  *
- * None of 5 to 38 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 39 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37
  * lengthened the context pool, after which the thread records that hold the
  * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               38
+#define OSOE_SEGMENT_NEWEST_LAYOUT               39
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 

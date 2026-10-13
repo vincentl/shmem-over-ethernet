@@ -33,8 +33,9 @@ void osoe_internode_generic_fini(void);
 void osoe_internode_generic_number_taken(uint32_t number);
 
 /* internode.h's osoe_internode_reduce_enter, osoe_internode_reduce,
- * osoe_internode_broadcast and osoe_internode_collect, whose contracts these
- * meet. */
+ * osoe_internode_broadcast and osoe_internode_collect, and collect's
+ * osoe_internode_scan_node_totals and osoe_internode_collect_ranges, whose
+ * contracts these meet. */
 void osoe_internode_generic_reduce_enter(uint32_t team, uint32_t epoch, size_t count,
                                          enum osoe_reduction_operation operation,
                                          struct osoe_element element, const char *routine);
@@ -45,6 +46,13 @@ void osoe_internode_generic_broadcast(uint32_t team, uint32_t epoch, uint32_t ro
                                       void *buffer, size_t bytes, const char *routine);
 void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
                                     size_t block, const uint64_t *places, const char *routine);
+void osoe_internode_generic_scan_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                             uint64_t *before, uint64_t *total,
+                                             const char *routine);
+void osoe_internode_generic_collect_ranges(uint32_t team, uint32_t epoch, void *buffer,
+                                           size_t bytes, uint64_t share_start,
+                                           uint64_t share_end, bool reverse,
+                                           const char *routine);
 void osoe_internode_generic_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
                                  size_t count, struct osoe_element element, bool inclusive,
                                  const char *routine);

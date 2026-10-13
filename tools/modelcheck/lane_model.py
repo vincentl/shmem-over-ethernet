@@ -34,6 +34,17 @@ grant, no lane - safe for the reason one slot per position is safe at D = 1 in
 pipeline_model.py, a child reaching the team's next collective only after
 holding this one's release.
 
+**The leads' scan of collect's node totals** (P30; docs/design/
+collect-scan-proposal.md) is a small collective too, through the same small
+slots and counters with the same bases, but on a tree of its own: pre-order
+over the team's node positions, rooted at position 0, every subtree a
+contiguous range of positions (internode-generic.c, scan_place) - where the
+reductions' tree is level-order and a broadcast's is turned to its root. So a
+node's child at a position differs between a scan and the collectives around
+it, as a broadcast's does between roots; the cases with scans among small and
+large reductions and broadcasts check that its tree is safe beside theirs for
+the same reason, and the bases it advances its own tree's.
+
 Everything else is the pipeline's: D slots a row, piece k in slot k mod D; an
 arrival counter per child position and a release counter, per team; a node
 sends piece k up only once it holds release k - D; a release is copied out and
@@ -56,7 +67,7 @@ its threads). A node outside a team does not wait for it: that is how a child
 of one team comes to push while its parent is inside another's collective.
 
 Designs
-  design        as above.
+  design        as above; an order entry of kind 'q' is a leads' scan.
 Breakages
   no_grant      the first design's rule, the first model's breakage: a node's
                 lead threads share one lane, found by arithmetic rather than
@@ -89,6 +100,12 @@ Breakages
                 holds with one thread a node, fails with two leading two teams
                 at once - the one breakage that reaches the small path's DOWN
                 check (round six's H3).
+  scan_heap_bases  a leads' scan advancing its bases by the reductions' tree,
+                not its own: on five nodes at fan-out 2 the reductions' tree
+                gives node 1 a child at position 1 where the scan's gives it
+                none, so its base there runs one ahead of its counter and the
+                team's next collective waits for an arrival that never comes
+                (STUCK).
 
 Runs are SC, as pipeline_model.py's: every add is fenced after its data.
 
@@ -110,6 +127,28 @@ RSLOT = lambda n, h, j: ('rslot', n, h, j)      # node n, lane h: the release ro
 BIND = lambda n, h: ('$bind', n, h)         # ghost: the collective lane h of node n is bound to
 TURN = lambda t, n: ('$turn', t, n)         # ghost: team t's collectives node n has finished
 FIN = ('$fin',)
+
+
+def scan_tree(members, fanout):
+    """The leads' scan's tree over a team's node list `members` (P30): pre-order
+    from index 0, a place covering indices [a, b) at index a and its children
+    splitting [a + 1, b) into at most `fanout` consecutive blocks, the first ones
+    an index longer - internode-generic.c's scan_place, and allgather_model.py's
+    scan_tree. {node: (parent node or None, position, [child nodes])}."""
+    out = {members[0]: (None, 0, [])}
+
+    def walk(a, b):
+        rest = b - a - 1
+        m = min(fanout, rest)
+        start = a + 1
+        for j in range(m):
+            size = rest // m + (1 if j < rest % m else 0)
+            out[members[start]] = (members[a], j, [])
+            out[members[a]][2].append(members[start])
+            walk(start, start + size)
+            start += size
+    walk(0, len(members))
+    return out
 
 
 def tree(members, root, fanout):
@@ -152,7 +191,11 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
     for x, (team, members, root, tagbase, leads, kind) in enumerate(collectives):
         if n not in members:
             continue
-        t = tree(members, root, fanout)
+        # A leads' scan is a small collective on a tree of its own; under
+        # scan_heap_bases its bases advance by the reductions' tree instead.
+        t = scan_tree(members, fanout) if kind == 'q' else tree(members, root, fanout)
+        counted = tree(members, 0, fanout) if kind == 'q' and design == 'scan_heap_bases' else t
+        kind = 's' if kind == 'q' else kind
         parent, position, kids = t[n]
         arr = base_arr.setdefault(team, [0] * fanout)
         rel = base_rel.setdefault(team, 0)
@@ -162,9 +205,9 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
         if leads[n] == h:
             plan.append((x, team, parent, position, kids, [t[k][1] for k in kids],
                          list(arr), rel, grant, turn, tagbase, kind, count))
-        for k in kids:
-            arr[t[k][1]] += count
-        if parent is not None:
+        for k in counted[n][2]:
+            arr[counted[k][1]] += count
+        if counted[n][0] is not None:
             base_rel[team] = rel + count
             if kind == 'r':
                 base_grant[team] = grant + 1
@@ -403,7 +446,8 @@ def case(design, nodes, threads_per_node, fanout, depth, teams, order, pieces):
     [, kind])], every member's order of its collectives, which of its node's
     threads leads each there (a node not named leads with thread 0), and what it
     is: 'r' a reduction (the default), 'b' a broadcast, 's' a small reduction -
-    one piece through the team's own small slots."""
+    one piece through the team's own small slots, 'q' a leads' scan - a small
+    one on its own tree, `root` unused."""
     collectives = []
     for x, entry in enumerate(order):
         team, root, leads = entry[:3]
@@ -528,6 +572,26 @@ CASES = [
     # More pieces than the window keep the rule safe even read late: node 1
     # takes release 0 before it can send its last piece up.
     ('release_lane_late', 4, 2, 2, 1, ROTATING, [('T', 0, {}), ('T', 1, {2: 1}, 'b')], 2, True),
+    # The leads' scan of collect's node totals (P30) among the team's other
+    # collectives on the same small slots and counters: on four nodes at fan-out
+    # 2 its tree gives node 1 the child node 2 where the reductions' gives node
+    # 3, and a broadcast rooted at node 1 another again; a scan between small
+    # reductions, between a large reduction and a broadcast, and two threads of
+    # node 0 leading a scan of T and a small reduction of U at once. Five nodes,
+    # where the two trees give node 1 different numbers of children, and the
+    # bases counted by the wrong one (scan_heap_bases).
+    ('design', 4, 1, 2, 2, ROTATING,
+     [('T', 0, {}, 'q'), ('T', 0, {}, 's'), ('T', 0, {}, 'q'), ('T', 1, {}, 's')], 1, True),
+    ('design', 4, 1, 2, 2, ROTATING,
+     [('T', 0, {}), ('T', 0, {}, 'q'), ('T', 1, {}, 'b'), ('T', 0, {}, 'q')], 1, True),
+    ('design', 3, 2, 2, 2, {'T': [0, 1, 2], 'U': [0, 1]},
+     [('T', 0, {0: 0}, 'q'), ('U', 0, {0: 1}, 's'), ('T', 0, {0: 0}, 'q')], 1, True),
+    ('design', 5, 1, 2, 2, {'T': [0, 1, 2, 3, 4]},
+     [('T', 0, {}, 'q'), ('T', 0, {}, 's'), ('T', 0, {}, 'q')], 1, True),
+    ('design', 5, 1, 2, 2, {'T': [0, 1, 2, 3, 4]},
+     [('T', 0, {}, 'q'), ('T', 2, {}, 'b'), ('T', 0, {}, 'q')], 2, True),
+    ('scan_heap_bases', 5, 1, 2, 2, {'T': [0, 1, 2, 3, 4]},
+     [('T', 0, {}, 'q'), ('T', 0, {}, 's'), ('T', 0, {}, 'q')], 1, 'STUCK'),
 ]
 
 

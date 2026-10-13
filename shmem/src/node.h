@@ -31,9 +31,9 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-/* 38: team.tree.collect_lengths, the lengths a team's last collect summed
- * between its nodes for its places (v0.2, P29). */
-#define OSOE_NODE_LAYOUT 38
+/* 39: team.tree.collect_way, the way a team's last collect found its places,
+ * and the header's OSOE_COLLECTIVE_PLACES (v0.2, P30 and P31). */
+#define OSOE_NODE_LAYOUT 39
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -663,11 +663,30 @@ struct osoe_collective_state {
      * they cost, by a count.
      */
     _Atomic uint32_t collect_lengths;
+    /*
+     * Layout 39 (P30), in the same room: the way that collect found its places,
+     * an enum osoe_collect_way - the members' vector, each node's total, or the
+     * leads' scan of the nodes' totals - so that a test pins the way where the
+     * count alone cannot tell two apart, and osoe-stat shows it. Written with
+     * collect_lengths.
+     */
+    _Atomic uint32_t collect_way;
 };
 _Static_assert(sizeof(struct osoe_collective_state) == 128,
                "the tree state is 128 bytes since layout 33 - two lines on x86-64 and one on "
-               "aarch64, whose line is 128 - with room for thirteen fields more before it "
+               "aarch64, whose line is 128 - with room for twelve fields more before it "
                "grows every team block again");
+
+/* The ways a collect of differing blocks finds its places (collectives.c,
+ * collect_varying), as team.tree.collect_way says them: none yet across nodes,
+ * the members' vector, a reduction of each node's total (P29), or a scan of
+ * the nodes' totals among the leads with a gather by ranges (P30). */
+enum osoe_collect_way {
+    OSOE_COLLECT_WAY_NONE,
+    OSOE_COLLECT_WAY_MEMBERS,
+    OSOE_COLLECT_WAY_TOTALS,
+    OSOE_COLLECT_WAY_SCAN,
+};
 
 /*
  * A team's record on this node (layout 18; phase 1 step 7): what this node's
@@ -911,6 +930,11 @@ struct osoe_node_header {
     _Atomic uint64_t measured_link_hop_ns;
     _Atomic uint64_t measured_link_message_ns;
     _Atomic uint64_t measured_link_bytes_per_second;
+    /* Layout 39 (P30, P31): the lead's OSOE_COLLECTIVE_PLACES, how collect
+     * finds its places, which any PE of the node may decide for a team as its
+     * local lead there, so open_control holds the node's PEs to it. In room
+     * the line had before the rendezvous words: nothing moves. */
+    uint32_t collective_places;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)
