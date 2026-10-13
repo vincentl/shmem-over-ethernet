@@ -1,0 +1,16 @@
+median microseconds a collect, one PE a node, the median of the rounds; the exchange past 64 nodes is each node's total, its room's fallback
+nodes lengths   members    totals      scan  exchange      link
+    8 equal     1174.0    1159.5    1155.1    1012.5     990.4
+    8 large     3924.3    3927.6    3906.5    3265.4    3709.6
+    8 zeros     1158.7    1144.0    1161.5    1003.6     932.8
+   16 equal     1759.2    1788.8    1790.2    1724.5    1571.7
+   16 large     7105.8    7198.7    5750.6    5673.6    5711.6
+   16 zeros     1661.7    1663.7    1683.8    1342.9    1337.9
+   32 equal     2939.4    2927.7    2639.6    3194.6    3212.0
+   32 large     8934.4    8892.7    8916.2    8027.6    7962.8
+   32 zeros     2184.4    2193.4    2120.0    3136.4    3039.7
+
+the link each default's job measured, and the way the default takes on it (the ceiling 8, the capacity 4, the small class 1 KiB; shape_timing.py)
+    8 round 1: a hop of 155203 ns, a message cost of 5758 ns, 119310708 bytes a second: exchange
+   16 round 1: a hop of 163745 ns, a message cost of 2021 ns, 109089759 bytes a second: exchange
+   32 round 1: a hop of 151850 ns, a message cost of 0 ns, 118426996 bytes a second: exchange
