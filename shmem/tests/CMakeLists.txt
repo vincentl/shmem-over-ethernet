@@ -1588,6 +1588,35 @@ add_test(NAME shmem.refuse.heap_base_unaligned
           $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
 set_tests_properties(shmem.refuse.heap_base_unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_HEAP_BASE='0x100000000800' is not a multiple of the")
+# And one with a sign, which strtoull takes: -4096 is 2^64 - 4096, a page
+# boundary, which was refused only by the mapping, as a base that is not free
+# (D13).
+add_test(NAME shmem.refuse.heap_base_signed
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=-4096
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.refuse.heap_base_signed PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_HEAP_BASE='-4096' is not a nonzero address")
+# A base that is set but cannot be mapped is named, with the kernel's reason,
+# where the lead said only to set OSOE_HEAP_BASE (D12): one past the end of any
+# process's address space, a multiple of every page size, which the kernel
+# refuses with ENOMEM to root as to anyone - unlike 0x1000, which root may map.
+add_test(NAME shmem.refuse.heap_base_not_mapped
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=0x7fffffffffff0000
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.refuse.heap_base_not_mapped PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: it runs past")
+# OSOE_TEST_NOTICE_SECONDS, a testing hook, is refused by name when it is not a
+# whole number of seconds from 1 to 3600, where it was taken as unset and the
+# notice left at 30 s (D17).
+foreach(notice 2s 0)
+  add_test(NAME shmem.refuse.test_notice_seconds.${notice}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_NOTICE_SECONDS=${notice}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+  set_tests_properties(shmem.refuse.test_notice_seconds.${notice} PROPERTIES LABELS "tier2"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_TEST_NOTICE_SECONDS='${notice}' is not a whole number of seconds")
+endforeach()
 
 if(OSOE_INTERNODE)
   # The differential test (§8.1): one program, §8.1's four poles of the logical

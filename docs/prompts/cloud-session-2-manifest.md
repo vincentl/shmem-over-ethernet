@@ -435,3 +435,66 @@ and directory.
   10.99.0.N and the small shape's 1,280-byte MTU as tier 3 makes them, shown
   from inside a rank; netem's delay and loss not. **27 of 27** passed, in 14
   s. A substitute, not tier 3: **the VM runs them under netem**.
+
+## Part 2: the diagnostics
+
+One batch, the settings' validation, in one commit: D13, D12 and D17 of
+`docs/prompts/v0.2-open-items.md` §2. Files: `shmem/src/bootstrap.c`,
+`shmem/src/node.c`, `shmem/tests/CMakeLists.txt`, the README's two rows. Every
+new test was first run against the tree without the code change - the tests
+and the README applied, `bootstrap.c` and `node.c` as at `82f2533` - and failed,
+4 of 4; then with it, 4 of 4.
+
+### 6. D13: `OSOE_HEAP_BASE=-4096` accepted
+
+**Done.** Commit: the batch's, which adds this entry. The base is parsed by
+`strtoull`, which takes leading space and a sign and turns `-4096` into
+2^64 - 4096 - page-aligned, so it passed both checks and failed only at the
+mapping, as "no candidate heap base is free ...; set OSOE_HEAP_BASE to a free
+address". Now the first character must be a digit and the number must fit 64
+bits (`ERANGE`), or it is refused by name before anything is mapped:
+"OSOE_HEAP_BASE='-4096' is not a nonzero address: digits, in decimal or after
+0x in hexadecimal, with no sign". **Test**: `shmem.refuse.heap_base_signed`
+(tier 2, 60 s) - without the change it printed the mapping's message and
+failed; with it, passes. The README's `OSOE_HEAP_BASE` row says what is read.
+
+### 7. D12: `OSOE_HEAP_BASE=0x1000` is told to set `OSOE_HEAP_BASE`
+
+**Done.** Commit: the batch's. A lead whose base was set tries that base alone,
+and where it could not map its heap there it still said "no candidate heap base
+is free ...; set OSOE_HEAP_BASE to a free address". Now `create_own_heap` keeps
+the last refusal's `errno` and the lead names the base it was given and the
+kernel's reason, in words (`heap_refusal`: something mapped there already, the
+range past the address space or the mappings' limit, an address below
+`vm.mmap_min_addr`, or the kernel placing it elsewhere): "OSOE_HEAP_BASE=
+0x7fffffffffff0000: cannot map this node's 284504064-byte heap there: it runs
+past the end of this process's address space, or past its limit of mappings;
+set OSOE_HEAP_BASE to an address free in every PE, or leave it unset for the
+library's own candidates", with this PE's shift where `OSOE_HEAP_SHIFT` gives
+one. A PE that is not the lead adds the reason to its own message. Unset, the
+lead's message is as before. **Test**: `shmem.refuse.heap_base_not_mapped`
+(tier 2, 60 s), with a base past the end of every process's address space and
+a multiple of every page size, which the kernel refuses to root as to anyone -
+D12's own `0x1000` maps here, this sandbox's `vm.mmap_min_addr` being 4096,
+even as an unprivileged user, while the VM's 65536 refuses it. Without the
+change the test failed on the old message; with it, passes. The README's row
+says the lead names the address and the reason.
+
+### 8. D17: `OSOE_TEST_NOTICE_SECONDS` refuses no bad value by name
+
+**Done.** Commit: the batch's. `base/stall-watch.c` read the hook for itself and
+took a value outside 1 to 3600, or not a number, as no value - the notice left
+at 30 s and a test waiting in vain. Now `osoe_bootstrap_read`, which runs
+before any start-up wait, refuses it by name: "OSOE_TEST_NOTICE_SECONDS='2s' is
+not a whole number of seconds from 1 to 3600". The watch's own parse stays, now
+seeing only good values. **Tests**: `shmem.refuse.test_notice_seconds.2s` and
+`.0` (tier 2, 60 s each) - without the change the program ran to its end and
+both failed; with it, pass. The README's row no longer says the hook refuses
+nothing.
+
+**The batch's runs**: release without a warning; the static checks 13 of 13
+(`shmem.settings-documented` among them); the release suite, models aside,
+**919: 917 passed, 2 skipped** (the root refusal tests), in 5 min 15 s - the
+four new tests more; the single-node build without a warning, its five
+heap-base and notice refusals passing. **For the VM**: D12's own `0x1000`, which
+should now say "the kernel refuses an address that low (vm.mmap_min_addr)".

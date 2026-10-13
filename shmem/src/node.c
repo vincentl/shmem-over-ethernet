@@ -412,10 +412,33 @@ static int wait_count(struct osoe_node *n, const struct osoe_bootstrap *b, _Atom
     }
 }
 
+/*
+ * Why the kernel would not map a heap where it was asked to, in words: from
+ * the errno of mmap's MAP_FIXED_NOREPLACE, or 0 where a kernel without it
+ * placed the mapping elsewhere.
+ */
+static const char *heap_refusal(int refused)
+{
+    switch (refused) {
+    case 0:
+        return "the kernel placed it elsewhere";
+    case EEXIST:
+        return "something is mapped there already";
+    case ENOMEM:
+        return "it runs past the end of this process's address space, or past its limit of "
+               "mappings";
+    case EPERM:
+        return "the kernel refuses an address that low (vm.mmap_min_addr)";
+    default:
+        return strerror(refused);
+    }
+}
+
 /* Create this PE's heap object and map it. With base == 0, try the
- * candidates and return the one that worked; 0 if none did. */
+ * candidates and return the one that worked; 0 if none did, with *refused the
+ * last refusal's errno (heap_refusal). */
 static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap *b,
-                                struct osoe_pe_slot *slot, uint64_t base)
+                                struct osoe_pe_slot *slot, uint64_t base, int *refused)
 {
     /* A heap has nowhere to record its creator; a leftover with this name
      * predates the control segment this node's lead has just created, and so
@@ -453,6 +476,7 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
         void *want = (void *)(uintptr_t)(candidates[i] + shift);
         void *p = mmap(want, n->heap_bytes, PROT_READ | PROT_WRITE,
                        MAP_SHARED | MAP_FIXED_NOREPLACE, fd, 0);
+        *refused = p == MAP_FAILED ? errno : 0;
         if (p == want)
             mapped_at = candidates[i];
         else if (p != MAP_FAILED)
@@ -1623,18 +1647,32 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     if (len < 0 || (size_t)len >= sizeof me->heap_name)
         fail_rendezvous(n, "heap object name too long");
 
-    uint64_t base = create_own_heap(n, b, me, lead ? 0 : n->hdr->heap_base);
+    int refused = 0;
+    uint64_t base = create_own_heap(n, b, me, lead ? 0 : n->hdr->heap_base, &refused);
     if (!base) {
-        char msg[256];
-        if (lead)
+        char msg[384];
+        uint64_t shift = b->heap_shift * b->rank;
+        if (lead && !b->heap_base)
             snprintf(msg, sizeof msg, "no candidate heap base is free for a %llu-byte heap; "
                      "set OSOE_HEAP_BASE to a free address", (unsigned long long)n->heap_bytes);
-        else
+        else if (lead) {
+            /* The base was set, and so is the one thing tried: say what it was
+             * and why it failed, not to set it (D12). */
+            char shifted[64] = "";
+            if (shift)
+                snprintf(shifted, sizeof shifted, " plus this PE's shift %#llx (OSOE_HEAP_SHIFT)",
+                         (unsigned long long)shift);
+            snprintf(msg, sizeof msg, "OSOE_HEAP_BASE=%#llx: cannot map this node's %llu-byte "
+                     "heap there%s: %s; set OSOE_HEAP_BASE to an address free in every PE, or "
+                     "leave it unset for the library's own candidates",
+                     (unsigned long long)b->heap_base, (unsigned long long)n->heap_bytes, shifted,
+                     heap_refusal(refused));
+        } else
             snprintf(msg, sizeof msg, "cannot map this PE's heap at the node's base %#llx "
-                     "plus its shift %#llx (OSOE_HEAP_SHIFT), which the local lead chose; set "
-                     "OSOE_HEAP_BASE to an address free in every PE",
-                     (unsigned long long)n->hdr->heap_base,
-                     (unsigned long long)(b->heap_shift * b->rank));
+                     "plus its shift %#llx (OSOE_HEAP_SHIFT), which the local lead chose: %s; "
+                     "set OSOE_HEAP_BASE to an address free in every PE",
+                     (unsigned long long)n->hdr->heap_base, (unsigned long long)shift,
+                     heap_refusal(refused));
         shm_unlink(me->heap_name);
         fail_rendezvous(n, msg);
     }

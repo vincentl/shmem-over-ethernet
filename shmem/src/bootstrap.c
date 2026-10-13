@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -542,10 +543,17 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     long page = sysconf(_SC_PAGESIZE);
     const char *base = getenv("OSOE_HEAP_BASE");
     if (base) {
+        /* Decimal, or hexadecimal after 0x, as strtoull reads it - but from a
+         * digit, since strtoull also takes leading space and a sign and turns
+         * -4096 into 2^64 - 4096, which is page-aligned and would be refused
+         * only by the mapping, as a base that is not free (D13); and within
+         * 64 bits, past which it gives the largest. */
         char *end;
+        errno = 0;
         unsigned long long v = strtoull(base, &end, 0);
-        if (*base == '\0' || *end != '\0' || v == 0)
-            osoe_fatal("OSOE_HEAP_BASE='%s' is not a nonzero address", base);
+        if (*base < '0' || *base > '9' || *end != '\0' || errno == ERANGE || v == 0)
+            osoe_fatal("OSOE_HEAP_BASE='%s' is not a nonzero address: digits, in decimal or "
+                       "after 0x in hexadecimal, with no sign", base);
         if (page <= 0 || v % (unsigned long long)page != 0)
             osoe_fatal("OSOE_HEAP_BASE='%s' is not a multiple of the %ld-byte page", base, page);
         b->heap_base = v;
@@ -562,6 +570,18 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     if (shift && (osoe_parse_size(shift, &b->heap_shift) != 0 || page <= 0 ||
                   b->heap_shift % (uint64_t)page != 0))
         osoe_fatal("OSOE_HEAP_SHIFT='%s' is not a whole number of %ld-byte pages", shift, page);
+
+    /* A testing hook, which base/stall-watch.c reads for itself when a
+     * start-up wait first begins - after this - and would take a bad value as
+     * no value, the notice left at 30 s and the test waiting for it in vain:
+     * refused here by name, as a setting is (D17). */
+    uint32_t notice_s;
+    enum osoe_environment_status notice =
+        osoe_environment_u32("OSOE_TEST_NOTICE_SECONDS", &notice_s);
+    if (notice == OSOE_ENVIRONMENT_INVALID ||
+        (notice == OSOE_ENVIRONMENT_OK && (notice_s < 1 || notice_s > 3600)))
+        osoe_fatal("OSOE_TEST_NOTICE_SECONDS='%s' is not a whole number of seconds from 1 to "
+                   "3600", getenv("OSOE_TEST_NOTICE_SECONDS"));
 }
 
 void osoe_bootstrap_free(struct osoe_bootstrap *b)
