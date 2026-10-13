@@ -1,0 +1,18 @@
+mutated lines as-before: 1
+mutated lines no-hop: 1
+build control: warnings 0
+build as-before: warnings 0
+build no-hop: warnings 0
+== control 04:30:46
+100% tests passed, 0 tests failed out of 46
+== as-before 04:30:54
+96% tests passed, 2 tests failed out of 46
+	504 - shmem.collect-places.pi-link.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	505 - shmem.collect-places.pi-link.negative-stride.0-0-1-2-2 (Failed)
+PE 2: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+PE 1: the world backwards spans 3 nodes, each one run, in reverse, and its lead here took way 2 and summed 3 lengths for a collect's places under OSOE_COLLECTIVE_PLACES=link, not the leads' exchange and 3
+== no-hop 04:31:03
+98% tests passed, 1 tests failed out of 46
+	 28 - shmem.shape.places-grid (Failed)
+6210 lines of /tmp/collect-choice-check/no-hop/shmem/tests/places-grid.txt, 5940 where the C and the model differ
+DONE 04:31:16

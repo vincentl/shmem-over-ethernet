@@ -50,6 +50,8 @@ struct osoe_bootstrap {
                                          * collective through a team's own slots (§5.8) */
     uint32_t collective_shape;  /* OSOE_COLLECTIVE_SHAPE: OSOE_COLLECTIVE_SHAPE_LINK or
                                  * _FIXED (v0.2 step 2, collective-shape.h) */
+    uint32_t collective_places; /* OSOE_COLLECTIVE_PLACES: how collect finds its places,
+                                 * OSOE_COLLECTIVE_PLACES_* (P30, P31) */
     /* OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND (v0.2
      * step 2): the link a large collective's shape is chosen from, set rather
      * than measured - all three or none; 0 when none is set. */
@@ -181,6 +183,40 @@ static inline const char *osoe_collective_shape_name(uint32_t shape)
     return shape == OSOE_COLLECTIVE_SHAPE_FIXED  ? "fixed"
            : shape == OSOE_COLLECTIVE_SHAPE_TREE ? "tree"
                                                  : "link";
+}
+
+/*
+ * OSOE_COLLECTIVE_PLACES (P30, P31 of docs/prompts/v0.2-open-items.md): how a
+ * collect of differing blocks on a team spanning nodes finds its places
+ * (collectives.c, collect_varying). `link`, the default, takes the way the link
+ * makes cheapest among those the team allows (collective-shape.h,
+ * osoe_places_choose) - each node's total through the tree, its exchange or its
+ * scan where every node holds one run of the team's ranks, the members' vector
+ * elsewhere - and each node's total through the tree where no link is known;
+ * the others force one way, for the tests and the measurements, where the team
+ * allows it: `members` the members' vector,
+ * `totals` a reduction of each node's total (P29), `scan` a scan of the nodes'
+ * totals among the leads and a gather by ranges (P30), `exchange` a direct
+ * exchange of the nodes' totals among the leads (P33). A way the team does not
+ * allow falls back - `scan` to `totals` where the runs meet the node set's
+ * positions in neither order, `exchange` to `totals` where the team spans more
+ * nodes than the exchange has room for, `totals` to `members` where some node's
+ * members are not one run - as `link` does.
+ */
+#define OSOE_COLLECTIVE_PLACES_LINK     0u
+#define OSOE_COLLECTIVE_PLACES_MEMBERS  1u
+#define OSOE_COLLECTIVE_PLACES_TOTALS   2u
+#define OSOE_COLLECTIVE_PLACES_SCAN     3u
+#define OSOE_COLLECTIVE_PLACES_EXCHANGE 4u
+
+/* collect's way to its places as the setting spells it. */
+static inline const char *osoe_collective_places_name(uint32_t places)
+{
+    return places == OSOE_COLLECTIVE_PLACES_MEMBERS    ? "members"
+           : places == OSOE_COLLECTIVE_PLACES_TOTALS   ? "totals"
+           : places == OSOE_COLLECTIVE_PLACES_SCAN     ? "scan"
+           : places == OSOE_COLLECTIVE_PLACES_EXCHANGE ? "exchange"
+                                                       : "link";
 }
 
 /*

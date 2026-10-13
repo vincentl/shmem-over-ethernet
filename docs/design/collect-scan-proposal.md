@@ -11,6 +11,11 @@ nodes. From 129 nodes it saves the large class's grant, up to a hop, and its
 gain past that is bytes, which buy time on a real link only at about a thousand
 nodes and more**, a scale the project cannot run (below, "Does it pay?").*
 
+*Stage 2 was built on 2026-10-13 by the second cloud session, from the author's
+1(a) of that day (`docs/decisions/2026-10-13.md`): "Stage 2, as built", at the
+end, says what was built, where it differs from the list above, and what is a
+wire change and what a layout one.*
+
 ## What P30 changes
 
 P29 (on branch `collect-scan` at `2b4c3375`) gives every lead every node's
@@ -344,3 +349,165 @@ whole model about two and a half minutes; `selftest.py` passes.
   argument above covers and no model yet checks.
 - **The notes**: design §5.8's collect's places and §4.11, `internode.h`'s and
   `internode-generic.c`'s comments, and the README's collect row and limits.
+
+## Stage 2, as built
+
+*The second cloud session, 2026-10-13 (`docs/prompts/cloud-session-2-prompt.md`);
+its manifest, `docs/prompts/cloud-session-2-manifest.md`, has the commands and
+the evidence.* Built as stage 1 designs it - the leads' scan, the gather by
+ranges, the way chosen in `collect_varying`, the runs' order kept by the walk,
+the count, the model beside the reductions - with five points the design left
+open or the build found:
+
+- **The order travels with the gather.** The list above gives
+  `osoe_internode_collect_ranges` the share's range and the total; the
+  receiver's continuity, the cut and the end's check also need whether the runs
+  meet the positions in order or in reverse, which only the caller knows - from
+  the walk, which keeps it now (`team.h`, `node_runs_order`) - so it is an
+  argument, `reverse`. The leads' scan is
+  `osoe_internode_scan_node_totals(team, epoch, own, &before, &total, routine)`.
+- **The share's place is one offset**: past READY[*S* - 1]'s counter and the
+  shape's room, byte 32 of the line, whatever *S* is, rather than past the counter
+  where *S* > 1 and past the shape where *S* is 1; READY[0]'s line then holds
+  both on two nodes.
+- **A record is checked for one thing more**: besides its epoch, its ranges
+  within the result and their continuing what the receiver holds, the merged
+  ranges must not meet past the receiver's own share - the wrapped part below
+  its base in order, above its share's end in reverse. Continuity alone checks
+  where a range begins, and lets a last step uncut through to the end's check of
+  the whole result: the mutant below, before this check, failed every one of its
+  cases there, as "a broken invariant". With it the receiver names the writer and
+  the step where the share is run into. The model's `no_cut` fails RANGE either
+  way, its check comparing what a lead sends with the shares' bytes, which no
+  receiver knows.
+- **The way is forced by a setting, P31's**: `OSOE_COLLECTIVE_PLACES` - `link`,
+  the default, as before (each node's total where every node is one run, the
+  members' vector elsewhere), and `members`, `totals` and `scan` to force one -
+  the scan falling back to each node's total where the runs meet the positions
+  in neither order, and that to the members' vector where some node is not one
+  run. Every PE must agree, since each way waits on words of its own: the node
+  segment's header holds it for its PEs (`open_control`), and the job
+  rendezvous's agreement for the nodes.
+- **The counts**: `team.tree.collect_lengths` is 1 under the scan, its own
+  node's, and a field naming the way, `team.tree.collect_way` - 1 the members'
+  vector, 2 each node's total, 3 the scan - lets a test tell the ways apart
+  where a count cannot.
+
+**What changes on the wire and in a layout**, plainly:
+
+- **The internal region's layout does not change**: no size and no offset moves.
+  What its lines hold does: a record past DATA[*s*]'s counter (40 bytes), a share
+  past READY[*S* - 1]'s counter and the shape's room (24 bytes), and the shape's
+  layout word a third value, 2 for ranges; and the leads' scan's pieces carry a
+  `collective` of their own in their headers, bit 30 set. **That is a wire
+  change** - what a lead puts into a peer's internal region during a collect -
+  which nothing negotiates: every node of a job runs one build. A PE taking a
+  number zeroes the gather's lines whole now, records and shares with the
+  counters.
+- **The node segment's layout changes, to 39**: `team.tree.collect_way` in room
+  the tree state had, and the header's `collective_places` in room before the
+  rendezvous words, which keep their place (`ready` and `failed` at 448 and 464 on
+  x86-64, as at layout 38); `tools/stat/segment.h` follows, and osoe-stat shows
+  both (`node.collective_places`).
+- **The rendezvous's up message changes shape**, to "osoeup-6", 88 bytes,
+  carrying the setting.
+
+**The tests**, `shmem.collect-places.scan.*` at tier 2, forced by the setting:
+block maps of two, three, four, five, seven and eight nodes - seven the first
+whose last step cuts inside a range a lead received - and negative strides on
+four of them; a cyclic map, whose world and world backwards fall back to the
+members' vector and whose first rank of each node takes the scan; and a block
+map numbered out of the ranks' order (`-m 1,1,0,0,2,2`, which the launcher
+takes), falling back to each node's total - each with every byte, the way and
+the count, lengths of 0 down to a whole node's, every member 0 and one member
+alone; and the out-of-order map at the default too. Over tier 3's three links,
+the seven-node map's block and negative-stride cases and the cyclic one
+(`tier3.<link>.collect-places.scan.*`), registered, and run where netem is. The
+mutant beside its control, the last step uncut,
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-scan/`: the control passes
+all nineteen of `shmem.collect-places.*`; the mutant fails the nine scan cases
+whose teams span a node count that is not a power of two, each at the record
+that runs on into its receiver's share. `lane_model.py`'s scan cases hold the
+scan's tree beside the reductions' and a turned broadcast's on the same words,
+and its bases counted by the reductions' tree fail (`scan_heap_bases`, STUCK).
+
+## A direct exchange of the totals (P33)
+
+*Built beside P30 by the second cloud session, 2026-10-13, from the author's 1(b)
+of that day: the direct exchange "Does it pay?" names above, modelled first
+(`tools/modelcheck/exchange_model.py`).*
+
+**The way.** Where every node of a team is one run of its ranks - P29's
+condition, not P30's, the runs' order not mattering - each lead puts its node's
+total, with the collect's epoch, into its own position's slot at every other
+lead and adds one to that lead's counter, fenced after the put; a lead whose
+counter shows the other N - 1 reads its slots and holds every node's total, as
+P29's reduction would leave them, and the places follow as P29's do
+(`places_from_node_totals`, the gather by places). **One hop** where P29's tree
+takes a level each way at eight nodes and two from ten, and **N - 1 messages
+out of every lead** and as many in, where the tree's root alone takes N - 1: a
+way for few nodes, the tree beyond.
+
+**Nothing waits before writing the slots** - the reason it is one hop - so a
+lead may write collect x's total while a slower lead has yet to read x - 1's.
+Two sets of slots and a counter for each, by the exchange's parity, as the
+staged allgather's step 0 has two slots by the collective's parity:
+
+- **the slots**: a lead writing x's total has finished x - 1, which it finished
+  only with every lead's total of x - 1, which each lead put as it entered
+  x - 1, after finishing x - 2 - after reading x - 2's slots, the ones x reuses;
+- **the counters**: within a parity a lead's adds for x + 2 come only after it
+  finished x + 1, so after every lead entered x + 1 and finished its wait for x;
+  but an add for x + 1 into a counter x also counts could arrive before a slower
+  lead's for x, and x's wait would read a slot not yet written.
+
+**The gather would order it alone, but not always.** No lead finishes a gather
+before every lead has entered it - each lead's every share reaches every other
+through puts it makes - so with a gather after every exchange, one set of slots
+and one counter would hold. A collect whose every length is 0 has no gather,
+and its exchange stands alone: the model's `one_slot` (SLOT) and `one_counter`
+(VALUE) each fail there and hold with a gather after every exchange, and the
+design holds both ways on two to four leads.
+
+**Its words** (`internal-region.h`, "the exchange's words"): per team number,
+the two counters' lines, then the two sets of slots, sixteen bytes a node - the
+epoch and the total - rounded up to the line; sized by the job's node count to
+**64 nodes at most**, `OSOE_INTERNAL_EXCHANGE_NODES_MOST`, a team over more
+taking each node's total through the tree. At 64 nodes and more that is 2.25 KiB
+more a team number in every PE's region - 29.6 KiB at a thousand nodes where
+27.4 were - and 384 bytes at two to four nodes. Not more, since past a few dozen
+nodes the tree costs less on any link the project knows: at 64 nodes P29's
+tree is two levels each way at the ceiling's fan-out, and the exchange 63
+messages a lead. Each slot's epoch is checked as it is read, naming the sender
+of another collect's total; a reader clears what it read; a PE taking a number
+zeroes its exchange's counters and slots. A lead's puts begin at the next
+position on, so that no lead is every lead's first.
+
+**What changes on the wire and in a layout**: the internal region's layout -
+the exchange's words go between the scans' area and the lanes, so the lanes
+move by the words' size, which every node computes alike from the job's node
+count; and what a lead puts into a peer's region during a collect, a wire
+change, which nothing negotiates. The node segment does not change beyond
+layout 39 (P30's), `team.tree.collect_way` naming the exchange 4; nor the
+rendezvous beyond "osoeup-6".
+
+**The calls**: `osoe_internode_exchange_node_totals(team, epoch, own, totals)`
+and `osoe_internode_exchange_most_nodes()` (`internode.h`); the generic
+implementation's, AM's forwarding them, the single-node build's room 0.
+`OSOE_COLLECTIVE_PLACES=exchange` forces it where every node is one run and
+the team spans no more nodes than the room, falling back to P29's tree beyond.
+**Its tests**, `shmem.collect-places.exchange.*`, as P29's and P30's: block maps
+of two to seven nodes, negative strides, the map numbered out of the ranks'
+order - which the exchange takes, needing no order - and the cyclic map,
+falling back to the members' vector; and `zeros`, the world collecting nothing
+96 times with lengths that differ every eighth, under `OSOE_TEST_PERTURB`, at
+the default and under the exchange: the collects with no gather, where the two
+rules above have only themselves. Two mutants beside their control,
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-exchange/`, three rounds
+each: the control passes all 29 of `shmem.collect-places.*` every round; one set
+of slots fails 7 or 8 of the exchange's cases each round - every case runs a
+collect of nothing among its others - each named by a slot holding the next
+collect's epoch; one counter fails the zeros case each round, each named by a
+slot holding nothing, the add that let the lead read it the next collect's; and
+neither fails a case the exchange does not take.
+

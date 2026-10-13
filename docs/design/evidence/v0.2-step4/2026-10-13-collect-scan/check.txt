@@ -1,0 +1,48 @@
+mutated lines: 1
+build control: warnings 0
+build mutant: warnings 0
+== control 03:36:44
+shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ..................   Passed    0.20 sec
+shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ..................   Passed    0.21 sec
+shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ........   Passed    0.21 sec
+shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ........   Passed    0.28 sec
+shmem.collect-places.unordered.1-1-0-0-2-2 ......................   Passed    0.15 sec
+shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .....................   Passed    0.18 sec
+shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ...................   Passed    0.20 sec
+shmem.collect-places.scan.block.0-0-1-1 .........................   Passed    0.13 sec
+shmem.collect-places.scan.block.0-0-1-2-2 .......................   Passed    0.13 sec
+shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 .............   Passed    0.25 sec
+shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 .............   Passed    0.28 sec
+shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 ...............   Passed    0.30 sec
+shmem.collect-places.scan.negative-stride.0-0-1-1 ...............   Passed    0.12 sec
+shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 ...........   Passed    0.28 sec
+shmem.collect-places.scan.negative-stride.0-0-1-2-2 .............   Passed    0.17 sec
+shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 ...   Passed    0.23 sec
+shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ..............   Passed    0.17 sec
+shmem.collect-places.scan.unordered.1-1-0-0-2-2 .................   Passed    0.12 sec
+shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .....   Passed    0.23 sec
+100% tests passed, 0 tests failed out of 19
+== mutant 03:36:45
+shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ..................   Passed    0.23 sec
+shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ..................   Passed    0.25 sec
+shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ........   Passed    0.25 sec
+shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ........   Passed    0.29 sec
+shmem.collect-places.scan.block.0-0-1-1 .........................   Passed    0.13 sec
+shmem.collect-places.unordered.1-1-0-0-2-2 ......................   Passed    0.18 sec
+shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ...................   Passed    0.21 sec
+shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .....................   Passed    0.22 sec
+shmem.collect-places.scan.block.0-0-1-2-2 .......................***Failed    0.09 sec
+shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 .............***Failed    0.13 sec
+shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 .............***Failed    0.15 sec
+shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 ...............***Failed    0.12 sec
+shmem.collect-places.scan.negative-stride.0-0-1-1 ...............   Passed    0.12 sec
+shmem.collect-places.scan.negative-stride.0-0-1-2-2 .............***Failed    0.11 sec
+shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 ...........***Failed    0.19 sec
+shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 ...***Failed    0.13 sec
+shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .....***Failed    0.14 sec
+shmem.collect-places.scan.unordered.1-1-0-0-2-2 .................   Passed    0.12 sec
+shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ..............***Failed    0.15 sec
+53% tests passed, 9 tests failed out of 19
+osoe: PE 2: shmem_collectmem: step 1 of the gather from node 0's lead (PE 0) says epoch 4 and bytes 0 up to 40 and 0 up to 0 past the last position, and this node's lead (PE 2), in epoch 4's gather of 53 bytes, holds bytes 14 up to 53 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 3: shmem_collectmem: step 1 of the gather from node 1's lead (PE 2) says epoch 4 and bytes 14 up to 53 and 0 up to 0 past the last position, and this node's lead (PE 3), in epoch 4's gather of 53 bytes, holds bytes 40 up to 53 and 0 up to 14 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+DONE 03:36:50

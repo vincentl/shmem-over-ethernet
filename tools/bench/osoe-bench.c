@@ -8,8 +8,10 @@
  *
  * WHAT is any of latency, bandwidth, atomic, barrier, collectives and pairs;
  * all of them by default. And threads, only when named, since it initializes
- * with SHMEM_THREAD_MULTIPLE, which the others should not pay for. `quick` takes a tenth of the trips and a sixteenth of
- * the streams, for the smoke test that runs in every preset. PE 0 measures
+ * with SHMEM_THREAD_MULTIPLE, which the others should not pay for; and places,
+ * only when named, the harness's for collect's places (H24). `quick` takes a
+ * tenth of the trips and a sixteenth of the streams, for the smoke test that
+ * runs in every preset. PE 0 measures
  * against two targets - the first PE on another node, and the first other PE on
  * its own node, if there is one - while every other PE waits in a barrier, so
  * its agent serves the traffic and nothing else runs:
@@ -28,6 +30,12 @@
  *              on every node - each PE's MiB/s, and the whole job's: every
  *              byte over the slowest PE's time, what the switch and every link
  *              carried together
+ *   places     a collect of differing blocks across every PE, by whichever way
+ *              its places take - OSOE_COLLECTIVE_PLACES, which
+ *              tools/bench/collect-places.sh sets for each run (H24) - with
+ *              three patterns of lengths: every PE's 8 bytes (equal); every
+ *              PE's 0 but every sixteenth's 8 (zeros); and PE 0's 64 KiB with
+ *              every other's 8 (large): the median and fastest of each
  *   threads    PE 0 alone, with 1, 2 and 4 threads sharing the default
  *              context: each issues 8-byte puts and nonblocking gets in turn
  *              to the PE on another node, quieting after every 32 pairs, and
@@ -238,6 +246,46 @@ static void collectives(int me, int npes)
     free(trips);
 }
 
+/*
+ * Every PE runs this: collect of differing blocks across the world team, three
+ * patterns of lengths (the file's comment), each skipped alike where the
+ * result does not fit the window's half. PE 0 reports each one's median and
+ * fastest, as for the collectives, with the way the environment forces - or
+ * "link", the default's own choice among the ways (collectives.c).
+ */
+static void places(int me, int npes)
+{
+    static const char *const patterns[] = { "equal", "zeros", "large" };
+    const char *way = getenv("OSOE_COLLECTIVE_PLACES") ? getenv("OSOE_COLLECTIVE_PLACES")
+                                                       : "link";
+    unsigned char *dst = window + MAX_BYTES / 2;
+    uint64_t *trips = malloc(sizeof *trips * (size_t)trips_per_size);
+    for (int pattern = 0; pattern < 3; pattern++) {
+        size_t mine = pattern == 0 ? 8 : pattern == 1 ? (me % 16 == 0 ? 8 : 0)
+                                                      : (me == 0 ? 65536 : 8);
+        uint64_t total = pattern == 0 ? 8 * (uint64_t)npes
+                         : pattern == 1 ? 8 * (((uint64_t)npes + 15) / 16)
+                                        : 65536 + 8 * ((uint64_t)npes - 1);
+        if (total > MAX_BYTES / 2)
+            continue;
+        shmem_barrier_all();
+        for (int i = -WARMUP; i < trips_per_size; i++) {
+            uint64_t t = now_ns();
+            shmem_collectmem(SHMEM_TEAM_WORLD, dst, window, mine);
+            if (i >= 0)
+                trips[i] = now_ns() - t;
+        }
+        if (me == 0) {
+            double median, fastest;
+            summarize(trips, trips_per_size, &median, &fastest);
+            printf("places way=%s lengths=%s pes=%d bytes=%llu median_us=%.1f fastest_us=%.1f\n",
+                   way, patterns[pattern], npes, (unsigned long long)total, median, fastest);
+            fflush(stdout);
+        }
+    }
+    free(trips);
+}
+
 /* Every PE streams to the PE half the job away, all at once. */
 static void pairs(int me, int npes)
 {
@@ -319,13 +367,14 @@ static int wanted(int argc, char **argv, const char *what)
         if (strcmp(argv[i], what) == 0)
             return 1;
     }
-    return !named && strcmp(what, "threads") != 0;   /* nothing named: all but threads */
+    /* Nothing named: all but threads and places. */
+    return !named && strcmp(what, "threads") != 0 && strcmp(what, "places") != 0;
 }
 
 int main(int argc, char **argv)
 {
     static const char *const known[] = { "latency", "bandwidth", "atomic", "barrier",
-                                         "collectives", "pairs", "threads", "quick" };
+                                         "collectives", "pairs", "threads", "places", "quick" };
     /* --version alone, before shmem_init, so that it needs no launcher. */
     if (argc == 2 && strcmp(argv[1], "--version") == 0) {
         printf("osoe-bench (osoe) " OSOE_VERSION_STRING "\n");
@@ -337,7 +386,7 @@ int main(int argc, char **argv)
             k++;
         if (k == sizeof known / sizeof *known) {
             fprintf(stderr, "osoe-bench: no measurement '%s': latency, bandwidth, atomic, "
-                    "barrier, collectives, pairs, threads, quick\n", argv[i]);
+                    "barrier, collectives, pairs, threads, places, quick\n", argv[i]);
             return 2;
         }
     }
@@ -400,6 +449,8 @@ int main(int argc, char **argv)
         collectives(me, npes);
     if (wanted(argc, argv, "pairs") && npes > 1)
         pairs(me, npes);
+    if (wanted(argc, argv, "places"))
+        places(me, npes);
     if (wanted(argc, argv, "threads"))
         threads(me, remote);
 

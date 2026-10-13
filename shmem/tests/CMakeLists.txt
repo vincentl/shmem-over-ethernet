@@ -170,7 +170,12 @@ osoe_warnings(shmem_test_collective_shape)
 add_test(NAME shmem.shape.choice COMMAND shmem_test_collective_shape choice)
 add_test(NAME shmem.shape.grid
   COMMAND shmem_test_collective_shape grid ${CMAKE_CURRENT_SOURCE_DIR}/shape-grid.txt)
-set_tests_properties(shmem.shape.choice shmem.shape.grid PROPERTIES LABELS "tier1" TIMEOUT 60)
+# And collect's places' way and costs (P31), held to places-grid.txt, the model's
+# (model.shape_timing.places-grid checks the model still writes it).
+add_test(NAME shmem.shape.places-grid
+  COMMAND shmem_test_collective_shape places-grid ${CMAKE_CURRENT_SOURCE_DIR}/places-grid.txt)
+set_tests_properties(shmem.shape.choice shmem.shape.grid shmem.shape.places-grid PROPERTIES
+  LABELS "tier1" TIMEOUT 60)
 
 # Träff's circulant rounds on their own (tier 1; v0.2 step 3): every element of
 # every lead's result combined from every node exactly once, for every node
@@ -1583,6 +1588,35 @@ add_test(NAME shmem.refuse.heap_base_unaligned
           $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
 set_tests_properties(shmem.refuse.heap_base_unaligned PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "OSOE_HEAP_BASE='0x100000000800' is not a multiple of the")
+# And one with a sign, which strtoull takes: -4096 is 2^64 - 4096, a page
+# boundary, which was refused only by the mapping, as a base that is not free
+# (D13).
+add_test(NAME shmem.refuse.heap_base_signed
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=-4096
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.refuse.heap_base_signed PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "OSOE_HEAP_BASE='-4096' is not a nonzero address")
+# A base that is set but cannot be mapped is named, with the kernel's reason,
+# where the lead said only to set OSOE_HEAP_BASE (D12): one past the end of any
+# process's address space, a multiple of every page size, which the kernel
+# refuses with ENOMEM to root as to anyone - unlike 0x1000, which root may map.
+add_test(NAME shmem.refuse.heap_base_not_mapped
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_HEAP_BASE=0x7fffffffffff0000
+          $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+set_tests_properties(shmem.refuse.heap_base_not_mapped PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+  "OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: it runs past")
+# OSOE_TEST_NOTICE_SECONDS, a testing hook, is refused by name when it is not a
+# whole number of seconds from 1 to 3600, where it was taken as unset and the
+# notice left at 30 s (D17).
+foreach(notice 2s 0)
+  add_test(NAME shmem.refuse.test_notice_seconds.${notice}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_NOTICE_SECONDS=${notice}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 30 -- $<TARGET_FILE:shmem_test_rma>)
+  set_tests_properties(shmem.refuse.test_notice_seconds.${notice} PROPERTIES LABELS "tier2"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "OSOE_TEST_NOTICE_SECONDS='${notice}' is not a whole number of seconds")
+endforeach()
 
 if(OSOE_INTERNODE)
   # The differential test (§8.1): one program, §8.1's four poles of the logical
@@ -2997,9 +3031,35 @@ if(OSOE_INTERNODE)
   # (block); strided splits whose stride is negative, whose runs meet the nodes
   # in the reverse of their order, on the same maps (negative-stride); the world
   # and the world backwards on a cyclic map, and its first rank of each node
-  # (cyclic). Block maps of four uneven nodes and of five, cyclic maps of three
-  # and four; tier 3 runs one of each over its shaped links. tsan is left out of
-  # the maps for shmem.internode.*'s reason.
+  # (cyclic); and the world on a block map whose nodes are numbered out of the
+  # ranks' order (unordered). Block maps of four uneven nodes and of five,
+  # cyclic maps of three and four; tier 3 runs one of each over its shaped
+  # links. tsan is left out of the maps for shmem.internode.*'s reason.
+  #
+  # And the same forced to the leads' scan of the nodes' totals and the gather
+  # by ranges (P30), OSOE_COLLECTIVE_PLACES=scan, each told by the way its leads
+  # publish (team.tree.collect_way): block maps of two, three, four, five, seven
+  # and eight nodes - seven the first whose last step cuts inside a range a lead
+  # received - and negative strides on four of them; a cyclic map, whose world
+  # falls back to the members' vector and whose first rank of each node takes
+  # the scan; and the out-of-order map, falling back to each node's total.
+  #
+  # Under the default, the link's choice (P31) is held to the ways the team
+  # allows, and pinned where the link is the Pi's, set by hand (pi-link): each
+  # node's total itself, P29's way, forced on two maps and the out-of-order
+  # one (totals), and the members' vector forced on a block map and a cyclic
+  # one (members).
+  #
+  # And forced to the leads' exchange of the nodes' totals (P33),
+  # OSOE_COLLECTIVE_PLACES=exchange: block maps of two to seven nodes, negative
+  # strides, the out-of-order map - the exchange needs each node one run, not
+  # the runs in order - and the cyclic map, whose world falls back to the
+  # members' vector; and the world collecting nothing again and again (zeros),
+  # so that no gather follows the exchange and a lead may write the next
+  # collect's totals while another still reads this one's, under
+  # OSOE_TEST_PERTURB's yields and sleeps between the steps, at the default,
+  # under the exchange and under the leads' scan, whose small tree a collect of
+  # nothing runs back to back as well.
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     add_executable(shmem_test_collect-places test-collect-places.c
       ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -3009,20 +3069,60 @@ if(OSOE_INTERNODE)
     osoe_warnings(shmem_test_collect-places)
     foreach(case "block:0,0,0,1,1,2,2,2,2,3" "block:0,0,1,1,1,2,3,3,4,4"
                  "negative-stride:0,0,0,1,1,2,2,2,2,3" "negative-stride:0,0,1,1,1,2,3,3,4,4"
-                 "cyclic:0,1,2,0,1,2,0,1,2" "cyclic:0,1,2,3,0,1,2,3")
+                 "cyclic:0,1,2,0,1,2,0,1,2" "cyclic:0,1,2,3,0,1,2,3" "unordered:1,1,0,0,2,2"
+                 "scan:block:0,0,1,1" "scan:block:0,0,1,2,2" "scan:block:0,0,0,1,1,2,2,2,2,3"
+                 "scan:block:0,0,1,1,1,2,3,3,4,4" "scan:block:0,1,1,2,3,3,4,5,6"
+                 "scan:block:0,0,1,2,3,3,4,5,6,7,7" "scan:negative-stride:0,0,1,1"
+                 "scan:negative-stride:0,0,1,2,2" "scan:negative-stride:0,0,1,1,1,2,3,3,4,4"
+                 "scan:negative-stride:0,1,1,2,3,3,4,5,6" "scan:cyclic:0,1,2,0,1,2,0,1,2"
+                 "scan:unordered:1,1,0,0,2,2" "exchange:block:0,0,1,1"
+                 "exchange:block:0,0,1,2,2" "exchange:block:0,0,0,1,1,2,2,2,2,3"
+                 "exchange:block:0,1,1,2,3,3,4,5,6" "exchange:negative-stride:0,0,1,2,2"
+                 "exchange:negative-stride:0,0,1,1,1,2,3,3,4,4"
+                 "exchange:cyclic:0,1,2,0,1,2,0,1,2" "exchange:unordered:1,1,0,0,2,2"
+                 "totals:block:0,0,0,1,1,2,2,2,2,3" "totals:negative-stride:0,0,1,1,1,2,3,3,4,4"
+                 "totals:unordered:1,1,0,0,2,2" "members:block:0,0,1,2,2"
+                 "members:cyclic:0,1,2,0,1,2,0,1,2" "pi-link:block:0,0,0,1,1,2,2,2,2,3"
+                 "pi-link:negative-stride:0,0,1,2,2")
       string(REPLACE ":" ";" parts "${case}")
+      list(LENGTH parts fields)
+      set(forced "")
+      set(prefix "")
+      if(fields EQUAL 3)
+        list(GET parts 0 way)
+        list(REMOVE_AT parts 0)
+        set(prefix ${way}.)
+        if(way STREQUAL "pi-link")
+          # The default, the way chosen from the Pi's link set by hand: the
+          # exchange on every team of these maps (shape_timing.py places).
+          set(forced OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+              OSOE_LINK_BYTES_PER_SECOND=116000000 OSOE_TEST_PLACES_LINK_WAY=exchange)
+        else()
+          set(forced OSOE_COLLECTIVE_PLACES=${way})
+        endif()
+      endif()
       list(GET parts 0 kind)
       list(GET parts 1 map)
       string(REPLACE "," ";" ranks "${map}")
       list(LENGTH ranks count)
       string(REPLACE "," "-" label "${map}")
-      add_test(NAME shmem.collect-places.${kind}.${label}
-        COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=${map}
+      add_test(NAME shmem.collect-places.${prefix}${kind}.${label}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=${map} ${forced}
                 $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 60 --
                 $<TARGET_FILE:shmem_test_collect-places> ${kind})
-      set_tests_properties(shmem.collect-places.${kind}.${label} PROPERTIES LABELS "tier2"
-        TIMEOUT 90)
-      osoe_internode_label(shmem.collect-places.${kind}.${label})
+      set_tests_properties(shmem.collect-places.${prefix}${kind}.${label} PROPERTIES
+        LABELS "tier2" TIMEOUT 90)
+      osoe_internode_label(shmem.collect-places.${prefix}${kind}.${label})
+    endforeach()
+    foreach(way "link" "exchange" "scan")
+      set(name shmem.collect-places.${way}.zeros.0-0-1-1-2-2-3)
+      add_test(NAME ${name}
+        COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1,1,2,2,3
+                OSOE_COLLECTIVE_PLACES=${way} OSOE_TEST_PERTURB=1
+                $<TARGET_FILE:osoe-launch> -n 7 -m 0,0,1,1,2,2,3 -t 120 --
+                $<TARGET_FILE:shmem_test_collect-places> zeros)
+      set_tests_properties(${name} PROPERTIES LABELS "tier2" TIMEOUT 180)
+      osoe_internode_label(${name})
     endforeach()
   endif()
 endif()
@@ -4470,15 +4570,29 @@ if(OSOE_INTERNODE)
       osoe_tier3_test(collect.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_collect)
       # collect's places (test-collect-places.c, at tier 2 above): each node's
       # total on a block map, under a positive stride and a negative one, and
-      # the members' vector on a cyclic map, over the shaped link.
+      # the members' vector on a cyclic map, over the shaped link; and the same
+      # forced to the leads' scan (P30), on the seven-node map whose last step
+      # cuts inside a range received, and to the leads' exchange (P33).
       foreach(case "block:0,0,0,1,1,2,2,2,2,3" "negative-stride:0,0,0,1,1,2,2,2,2,3"
-                   "cyclic:0,1,2,0,1,2,0,1,2")
+                   "cyclic:0,1,2,0,1,2,0,1,2" "scan:block:0,1,1,2,3,3,4,5,6"
+                   "scan:negative-stride:0,1,1,2,3,3,4,5,6" "scan:cyclic:0,1,2,0,1,2,0,1,2"
+                   "exchange:block:0,1,1,2,3,3,4,5,6" "exchange:unordered:1,1,0,0,2,2")
         string(REPLACE ":" ";" parts "${case}")
+        list(LENGTH parts fields)
+        set(forced "")
+        set(prefix "")
+        if(fields EQUAL 3)
+          list(GET parts 0 way)
+          list(REMOVE_AT parts 0)
+          set(forced OSOE_COLLECTIVE_PLACES=${way})
+          set(prefix ${way}.)
+        endif()
         list(GET parts 0 kind)
         list(GET parts 1 map)
         string(REPLACE "," "-" label "${map}")
-        osoe_tier3_test(collect-places.${kind}.${label} ${shape} ${map}
-                        shmem_test_collect-places ENV OSOE_TEST_MAP=${map} ARGS ${kind})
+        osoe_tier3_test(collect-places.${prefix}${kind}.${label} ${shape} ${map}
+                        shmem_test_collect-places ENV OSOE_TEST_MAP=${map} ${forced}
+                        ARGS ${kind})
       endforeach()
       osoe_tier3_test(alltoall.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_alltoall)
       osoe_tier3_test(statics.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_statics)

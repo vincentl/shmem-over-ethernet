@@ -24,11 +24,14 @@ Two rules make it safe, one per counter a lead keeps per step:
 Counters are cumulative over the team's life and compared as at least: each
 collective adds exactly one to each, so collective x waits for x + 1.
 
-Checked
+Checked - each check's message begins with the name of the property it holds,
+and each breakage below names the one it must fail, which report compares
+(engine.py's Properties; the arithmetic's by judge, as the engine's results are):
   DEST     a lead writes a peer's buffer only while the peer is in the same
            collective: never during the peer's members' copy-out of the one
            before.
-  FORWARD  a share a lead sends carries this collective's value.
+  FORWARD  a share a lead sends, or copies out of a staging slot, carries this
+           collective's value.
   RESULT   on return every share of the buffer carries this collective's value,
            and it still does when the members finish copying it out.
   PLACE    (the placed cases, below) every byte of the result, [0, total), is
@@ -59,7 +62,8 @@ Designs
   ranged_scan          the same, the leads' scan itself first, through the team
                        number's small slots and words.
 Breakages
-  no_ready             a lead writes without waiting for READY (DEST, RESULT).
+  no_ready             a lead writes without waiting for READY (DEST, before
+                       RESULT would see it).
   no_data_wait         a lead forwards without waiting for DATA (FORWARD).
   short_steps          floor(log2 N) steps rather than the ceiling: on a node
                        count that is not a power of two some shares never
@@ -141,9 +145,9 @@ zeros, none - under both strides: the scan at every fan-out from 2 to 8 gives
 every lead its base in team-rank order and the total, every step's ranges are
 its shares' bytes, every record continues what its receiver holds, and every
 lead ends holding the whole result. Seven nodes is the first count whose last
-step cuts inside a range a lead received. Its breakages must fail: the scan on
-the reductions' tree, whose subtrees are not contiguous (heap_tree), no_cut,
-and wrap_as_one.
+step cuts inside a range a lead received. Its breakages must fail, each the
+property it names: the scan on the reductions' tree, whose subtrees are not
+contiguous (heap_tree, SCAN), no_cut and wrap_as_one (RANGE).
 
 Staged (proposed to the author, 2026-09-26, from the review of step 5 slice 6):
 step 0's one share goes into one of two slots at the receiver, chosen by the
@@ -174,7 +178,7 @@ Usage: allgather_model.py [substring ...]   runs the cases whose names match;
 """
 import sys
 
-from engine import DEL, assemble, explore, report, select
+from engine import DEL, assemble, explore, judge, named, report, select
 
 BUF = lambda n, k: ('buf', n, k)         # lead n's buffer: share k's value, or byte k's when placed
 READY = lambda n, s: ('ready', n, s)     # at lead n: step s's receiver has entered
@@ -244,8 +248,8 @@ def lead(design, i, nodes, collectives):
                 B += [(q, ('nd', put_slot, f'@{q}O')),
                       (f'{q}O', ('check', lambda M, L, to=to, slot=slot:
                                  None if not M[('$overwrite',)] else
-                                 f'lead {i} overwrote lead {to}\'s slot {slot} before lead {to} '
-                                 f'copied the share staged there', f'@{q}D')),
+                                 f'SLOT: lead {i} overwrote lead {to}\'s slot {slot} before '
+                                 f'lead {to} copied the share staged there', f'@{q}D')),
                       (f'{q}D', ('add', lambda L, to=to: DATA(to, 0), lambda L: 1, '_', f'@{q}A'))]
                 # This lead's own staged share, from lead i + 1: once DATA says it
                 # landed, copied into place; then on to step 1.
@@ -256,7 +260,7 @@ def lead(design, i, nodes, collectives):
                     B += [(f'{q}A', ('await', lambda M, L, x=x: M[DATA(i, 0)] >= x + 1, f'@{q}C'))]
                 B += [(f'{q}C', ('check', lambda M, L, slot=slot, x=x, mine=mine:
                                  None if M[SLOT(i, slot)] == value(x, mine) else
-                                 f'lead {i} copied share {mine} out of its slot {slot} as '
+                                 f'FORWARD: lead {i} copied share {mine} out of its slot {slot} as '
                                  f'{M[SLOT(i, slot)]}, not collective {x}\'s {value(x, mine)}',
                                  f'@{q}K')),
                       (f'{q}K', ('nd', lambda M, L, slot=slot, x=x, mine=mine: [(
@@ -272,14 +276,15 @@ def lead(design, i, nodes, collectives):
                 nx = f'@{q}W{j + 1}' if j + 1 < len(shares) else f'@{q}D'
                 B += [(f'{q}W{j}', ('check', lambda M, L, to=to, x=x:
                                     None if M[IN(to)] == x + 1 else
-                                    f'lead {i} wrote lead {to}\'s buffer in collective {x} while '
-                                    f'lead {to} was ' + (f'in collective {M[IN(to)] - 1}' if M[IN(to)]
-                                                         else 'outside it: not yet entered, or '
-                                                              'its members copying out'),
+                                    f'DEST: lead {i} wrote lead {to}\'s buffer in collective {x} '
+                                    f'while lead {to} was ' +
+                                    (f'in collective {M[IN(to)] - 1}' if M[IN(to)]
+                                     else 'outside it: not yet entered, or its members copying '
+                                          'out'),
                                     f'@{q}V{j}')),
                       (f'{q}V{j}', ('check', lambda M, L, k=k, x=x:
                                     None if M[BUF(i, k)] == value(x, k) else
-                                    f'lead {i} forwarded share {k} as {M[BUF(i, k)]}, '
+                                    f'FORWARD: lead {i} forwarded share {k} as {M[BUF(i, k)]}, '
                                     f'not collective {x}\'s {value(x, k)}', f'@{q}P{j}')),
                       (f'{q}P{j}', ('store', lambda L, to=to, k=k: BUF(to, k),
                                     lambda L, k=k, x=x: value(x, k), True, nx))]
@@ -296,7 +301,8 @@ def lead(design, i, nodes, collectives):
             nx = f'@{p}C{k + 1}' if k + 1 < nodes else nxt
             B += [(f'{p}C{k}', ('check', lambda M, L, k=k, x=x:
                                 None if M[BUF(i, k)] == value(x, k) else
-                                f'lead {i}\'s members copied share {k} as {M[BUF(i, k)]}, not '
+                                f'RESULT: lead {i}\'s members copied share {k} as {M[BUF(i, k)]}, '
+                                f'not '
                                 f'collective {x}\'s {value(x, k)}', nx))]
     B += [('DONE', ('gpost', lambda M, L: ({FIN: M[FIN] + 1}, {}), '@X')),
           ('X', ('done',))]
@@ -397,7 +403,8 @@ def placed_lead(design, i, layout, collectives):
             for b, j in mine:
                 if b >= total or layout.expected(x, b) != placed_value(x, i, j):
                     k, at = layout.owner.get(b, (None, None))
-                    return (f'lead {i} copied byte {j} of its own share to byte {b} of the result, '
+                    return (f'PLACE: lead {i} copied byte {j} of its own share to byte {b} of the '
+                            f'result, '
                             + (f'past its {total} bytes' if k is None else
                                f'which is share {k}\'s byte {at}')
                             + f': its place is byte {layout.true_base[i] + j}')
@@ -437,13 +444,13 @@ def placed_lead(design, i, layout, collectives):
                 def sendable(M, L, to=to, a=a, e=e, x=x):
                     """DEST and FORWARD, for a range."""
                     if M[IN(to)] != x + 1:
-                        return (f'lead {i} wrote lead {to}\'s buffer in collective {x} while '
+                        return (f'DEST: lead {i} wrote lead {to}\'s buffer in collective {x} while '
                                 f'lead {to} was ' +
                                 (f'in collective {M[IN(to)] - 1}' if M[IN(to)] else
                                  'outside it: not yet entered, or its members copying out'))
                     for b in range(a, e):
                         if M[BUF(i, b)] != layout.expected(x, b):
-                            return (f'lead {i} forwarded byte {b} as {M[BUF(i, b)]}, not '
+                            return (f'FORWARD: lead {i} forwarded byte {b} as {M[BUF(i, b)]}, not '
                                     f'collective {x}\'s {layout.expected(x, b)}')
                     return None
 
@@ -465,10 +472,11 @@ def placed_lead(design, i, layout, collectives):
             holding its owner's value."""
             for b in range(total):
                 if M[WRITES(i, x, b)] != 1:
-                    return (f'lead {i} returned from collective {x} with byte {b} of the result '
+                    return (f'PLACE: lead {i} returned from collective {x} with byte {b} of the '
+                            f'result '
                             f'written {M[WRITES(i, x, b)]} times in it')
                 if M[BUF(i, b)] != layout.expected(x, b):
-                    return (f'lead {i} returned from collective {x} with byte {b} holding '
+                    return (f'PLACE: lead {i} returned from collective {x} with byte {b} holding '
                             f'{M[BUF(i, b)]}, not {layout.expected(x, b)}')
             return None
 
@@ -479,7 +487,8 @@ def placed_lead(design, i, layout, collectives):
             nx = f'@{p}C{b + 1}' if b + 1 < total else nxt
             B += [(f'{p}C{b}', ('check', lambda M, L, b=b, x=x:
                                 None if M[BUF(i, b)] == layout.expected(x, b) else
-                                f'lead {i}\'s members copied byte {b} as {M[BUF(i, b)]}, not '
+                                f'RESULT: lead {i}\'s members copied byte {b} as {M[BUF(i, b)]}, '
+                                f'not '
                                 f'collective {x}\'s {layout.expected(x, b)}', nx))]
     B += [('DONE', ('gpost', lambda M, L: ({FIN: M[FIN] + 1}, {}), '@X')),
           ('X', ('done',))]
@@ -678,11 +687,12 @@ def ranged_check(lengths, stride, broken=None):
         before, scanned = leads_scan(lengths, fanout, 'heap' if broken == 'heap_tree' else
                                      'pre_order')
         if scanned != total:
-            return f'fan-out {fanout}: the scan\'s total is {scanned}, not {total}'
+            return f'SCAN: fan-out {fanout}: the scan\'s total is {scanned}, not {total}'
         for p in range(n):
             got = team_base(before[p], scanned, lengths[p], stride)
             if got != base[p]:
-                return f'fan-out {fanout}: the scan puts position {p} at byte {got}, not {base[p]}'
+                return (f'SCAN: fan-out {fanout}: the scan puts position {p} at byte {got}, not '
+                        f'{base[p]}')
     S = steps_of(n)
     held = {i: step_ranges(lengths, base, total, stride, i, 1) for i in range(n)}
     for s in range(S):
@@ -697,24 +707,25 @@ def ranged_check(lengths, stride, broken=None):
                 sent = as_one(sent, stride)
             want = step_ranges(lengths, base, total, stride, i, c)
             if sent != want:
-                return (f'step {s}: lead {i} sends {sent}, where positions {i} to '
+                return (f'RANGE: step {s}: lead {i} sends {sent}, where positions {i} to '
                         f'{(i + c - 1) % n} are {want}')
             records[to] = sent
         for to, record in records.items():
             got = taken(held[to], record, to, s, n, stride)
             if got is None:
-                return f'step {s}: lead {to}\'s record {record} does not continue {held[to]}'
+                return f'RANGE: step {s}: lead {to}\'s record {record} does not continue {held[to]}'
             held[to] = got
     for i in range(n):
         end = base[i] + lengths[i]
         whole = ((base[i], total), (0, base[i])) if stride > 0 else ((0, end), (end, total))
         if held[i] != whole:
-            return f'lead {i} ends holding {held[i]}, not the whole result, {whole}'
+            return f'PLACE: lead {i} ends holding {held[i]}, not the whole result, {whole}'
     return None
 
 
 RANGED_ARITHMETIC_NODES = range(2, 71)
-RANGED_BREAKAGES = ('heap_tree', 'no_cut', 'wrap_as_one')
+# Each breakage of the arithmetic, and the property it must fail.
+RANGED_BREAKAGES = {'heap_tree': 'SCAN', 'no_cut': 'RANGE', 'wrap_as_one': 'RANGE'}
 
 
 def ranged_arithmetic(broken=None):
@@ -824,7 +835,7 @@ def scan_steps(p, i, x, ranged, fanout):
         steps += [(f'{p}U{j}', ('await', lambda M, L, j=j, x=x: M[ARRIVALS(i, j)] >= x + 1, None)),
                   (f'{p}V{j}', ('check', lambda M, L, key=key, x=x, j=j:
                                 None if M[TAG(key)] == x + 1 else
-                                f'lead {i} took child position {j}\'s total, collective '
+                                f'VALUE: lead {i} took child position {j}\'s total, collective '
                                 f'{M[TAG(key)] - 1}\'s, in collective {x}', None)),
                   (f'{p}T{j}', ('nd', lambda M, L, key=key, j=j:
                                 [({UNREAD(key): 0}, {f'child{j}': M[key]},
@@ -841,13 +852,14 @@ def scan_steps(p, i, x, ranged, fanout):
                      f'lead {i} puts its subtree\'s total up')]
         steps += [(f'{p}UP', ('nd', put_up, None)),
                   (f'{p}UO', ('check', lambda M, L: None if not M[SCAN_OVERWRITE] else
-                              f'lead {i} overwrote a slot its parent had not read', None)),
+                              f'SLOT: lead {i} overwrote a slot its parent had not read', None)),
                   (f'{p}UA', ('add', lambda L, position=position: ARRIVALS(parent[i], position),
                               lambda L: 1, '_', None)),
                   (f'{p}DW', ('await', lambda M, L, x=x: M[RELEASES(i)] >= x + 1, None)),
                   (f'{p}DV', ('check', lambda M, L, x=x:
                               None if M[TAG(DOWN(i))] == x + 1 else
-                              f'lead {i} took its down, collective {M[TAG(DOWN(i))] - 1}\'s, in '
+                              f'VALUE: lead {i} took its down, collective '
+                              f'{M[TAG(DOWN(i))] - 1}\'s, in '
                               f'collective {x}', None)),
                   (f'{p}DT', ('nd', lambda M, L: [({UNREAD(DOWN(i)): 0},
                                                    {'before': M[DOWN(i)] // 100,
@@ -867,14 +879,14 @@ def scan_steps(p, i, x, ranged, fanout):
                      f'lead {i} puts lead {child}\'s down')]
         steps += [(f'{p}Q{j}', ('nd', put_down, None)),
                   (f'{p}QO{j}', ('check', lambda M, L: None if not M[SCAN_OVERWRITE] else
-                                 f'lead {i} overwrote a down its child had not read', None)),
+                                 f'SLOT: lead {i} overwrote a down its child had not read', None)),
                   (f'{p}QA{j}', ('add', lambda L, child=child: RELEASES(child), lambda L: 1, '_',
                                  None))]
     base, total = ranged.base[x][i], ranged.total[x]
     steps += [(f'{p}SC', ('check', lambda M, L, x=x, base=base, total=total:
                           None if (team_base(L['before'], L['total'], own, stride) == base and
                                    L['total'] == total) else
-                          f'lead {i}\'s scan gave base '
+                          f'SCAN: lead {i}\'s scan gave base '
                           f'{team_base(L["before"], L["total"], own, stride)} and total '
                           f'{L["total"]} in collective {x}, not {base} and {total}', None))]
     steps += [(f'{p}SD{name}', ('set', name, lambda L: DEL, None))
@@ -949,7 +961,7 @@ def ranged_lead(design, i, ranged, collectives, fanout):
                 steps += [(f'{q}J', ('load', lambda L: SHARE(i), 'word', None)),
                           (f'{q}JC', ('check', lambda M, L, x=x, share=share, to=to:
                                       None if share_of(L['word']) == (x + 1, share) else
-                                      f'lead {i} took lead {to}\'s share as '
+                                      f'RANGE: lead {i} took lead {to}\'s share as '
                                       f'{share_of(L["word"])}, not collective {x}\'s '
                                       f'{(x + 1, share)}', None)),
                           (f'{q}Js', ('set', 'share', lambda L: share_of(L['word'])[1], None)),
@@ -960,17 +972,18 @@ def ranged_lead(design, i, ranged, collectives, fanout):
             def sendable(M, L, to=to, x=x, s=s, want=want):
                 """RANGE, then DEST and FORWARD, for the step's ranges."""
                 if L['send'] != want:
-                    return (f'lead {i} sends {L["send"]} at step {s} of collective {x}, where '
+                    return (f'RANGE: lead {i} sends {L["send"]} at step {s} of collective {x}, '
+                            f'where '
                             f'the shares it sends are {want}')
                 if M[IN(to)] != x + 1:
-                    return (f'lead {i} wrote lead {to}\'s buffer in collective {x} while '
+                    return (f'DEST: lead {i} wrote lead {to}\'s buffer in collective {x} while '
                             f'lead {to} was ' +
                             (f'in collective {M[IN(to)] - 1}' if M[IN(to)] else
                              'outside it: not yet entered, or its members copying out'))
                 for a, e in want:
                     for b in range(a, e):
                         if M[BUF(i, b)] != ranged.expected(x, b):
-                            return (f'lead {i} forwarded byte {b} as {M[BUF(i, b)]}, not '
+                            return (f'FORWARD: lead {i} forwarded byte {b} as {M[BUF(i, b)]}, not '
                                     f'collective {x}\'s {ranged.expected(x, b)}')
                 return None
             steps += [(f'{q}C', ('check', sendable, None))]
@@ -1009,11 +1022,11 @@ def ranged_lead(design, i, ranged, collectives, fanout):
                 return taken(L['held'], (first, second), i, s, n, stride)
             steps += [(f'{q}RC', ('check', lambda M, L, x=x, s=s, record=record, writer=writer,
                                   take=take:
-                                  f'lead {i} took step {s}\'s record from lead {writer} as '
+                                  f'RANGE: lead {i} took step {s}\'s record from lead {writer} as '
                                   f'{record_of(L["word"])}, not collective {x}\'s {record}'
                                   if record_of(L['word']) != record else
                                   None if take(L) is not None else
-                                  f'lead {i}\'s record {record_of(L["word"])} from lead '
+                                  f'RANGE: lead {i}\'s record {record_of(L["word"])} from lead '
                                   f'{writer} does not continue what it holds, {L["held"]}',
                                   None)),
                       (f'{q}M', ('set', 'held', lambda L, take=take: take(L), None)),
@@ -1027,15 +1040,17 @@ def ranged_lead(design, i, ranged, collectives, fanout):
             for b in range(ranged.room):
                 writes = M[WRITES(i, x, b)]
                 if b >= total and writes:
-                    return f'lead {i}\'s byte {b}, past collective {x}\'s {total}, was written'
+                    return (f'PLACE: lead {i}\'s byte {b}, past collective {x}\'s {total}, was '
+                            f'written')
                 if b < total and writes != 1:
-                    return (f'lead {i} returned from collective {x} with byte {b} of the result '
+                    return (f'PLACE: lead {i} returned from collective {x} with byte {b} of the '
+                            f'result '
                             f'written {writes} times in it')
                 if b < total and M[BUF(i, b)] != ranged.expected(x, b):
-                    return (f'lead {i} returned from collective {x} with byte {b} holding '
+                    return (f'PLACE: lead {i} returned from collective {x} with byte {b} holding '
                             f'{M[BUF(i, b)]}, not {ranged.expected(x, b)}')
             if L['held'] != whole:
-                return (f'lead {i} returned from collective {x} holding {L["held"]}, not '
+                return (f'PLACE: lead {i} returned from collective {x} holding {L["held"]}, not '
                         f'{whole}')
             return None
         # Return: the members copy the result out, then the lead may enter the next.
@@ -1044,7 +1059,8 @@ def ranged_lead(design, i, ranged, collectives, fanout):
                   (f'{p}Hd', ('set', 'held', lambda L: DEL, None))]
         steps += [(f'{p}C{b}', ('check', lambda M, L, b=b, x=x:
                                 None if M[BUF(i, b)] == ranged.expected(x, b) else
-                                f'lead {i}\'s members copied byte {b} as {M[BUF(i, b)]}, not '
+                                f'RESULT: lead {i}\'s members copied byte {b} as {M[BUF(i, b)]}, '
+                                f'not '
                                 f'collective {x}\'s {ranged.expected(x, b)}', None))
                   for b in range(total)]
         B += [(p + 'E', ('ghost', lambda M, L, x=x: ({IN(i): x + 1}, {}), f'@{p}E1'))]
@@ -1076,26 +1092,27 @@ def ranged_case(design, lengths, stride, fanout):
     return name, threads, mem, nodes
 
 
-# (design, nodes, collectives, expect_ok)
+# (design, nodes, collectives, expect): True, or the property it must fail
 CASES = [
     ('design', 2, 2, True),
     ('design', 3, 2, True),
     ('design', 4, 2, True),
     ('design', 5, 2, True),
     ('design', 3, 3, True),
-    ('no_ready', 3, 2, False),
-    ('no_data_wait', 4, 1, False),
-    ('short_steps', 3, 1, False),
+    ('no_ready', 3, 2, 'DEST'),
+    ('no_data_wait', 4, 1, 'FORWARD'),
+    ('short_steps', 3, 1, 'RESULT'),
     ('staged', 2, 3, True),
     ('staged', 3, 3, True),
     ('staged', 4, 3, True),
     ('staged', 5, 2, True),
     ('staged_one_slot', 3, 2, True),    # N - 1 a power of two: i - 1 feeds i, so one slot holds
-    ('staged_one_slot', 4, 2, False),
-    ('staged_early_copy', 3, 1, False),
+    ('staged_one_slot', 4, 2, 'SLOT'),
+    ('staged_early_copy', 3, 1, 'FORWARD'),
 ]
 
-# (design, each position's share in bytes, the stride's sign, collectives, expect_ok).
+# (design, each position's share in bytes, the stride's sign, collectives, expect: True, or
+# the property it must fail).
 # A share of no bytes on two nodes and in every case of more. On four nodes lead
 # 3's step 1 sends positions 3 and 0, a run that wraps past position N - 1: in two
 # puts under either stride, or in one where the shares between them in team-rank
@@ -1111,11 +1128,12 @@ PLACED_CASES = [
     ('placed', (1, 0, 0, 2), 1, 2, True),
     ('placed', (2, 0, 0, 1), -1, 2, True),
     ('bases_in_node_order', (2, 0, 1), 1, 1, True),     # one order: the sum is the same
-    ('bases_in_node_order', (2, 0, 1), -1, 1, False),
+    ('bases_in_node_order', (2, 0, 1), -1, 1, 'PLACE'),
 ]
 
 # (design, each collective's shares by position, the stride's sign, the leads'
-# scan's fan-out, expect_ok). The lengths differ from one collective to the next,
+# scan's fan-out, expect: True, or the property it must fail). The lengths differ from one
+# collective to the next,
 # a zero among them. On four nodes lead 3's step 1 sends positions 3 and 0 under
 # either stride, a run wrapping past position N - 1 in two ranges - touching, so
 # one put's bytes, where the shares between them in team-rank order are empty; on
@@ -1135,10 +1153,10 @@ RANGED_CASES = [
     ('ranged_scan', ((2, 0, 1), (1, 2, 0)), -1, 2, True),
     ('ranged_scan', ((1, 0, 2, 1), (2, 1, 0, 1)), 1, 2, True),
     ('ranged_scan', ((1, 0, 2, 1), (2, 1, 0, 1)), -1, 2, True),
-    ('range_before_data', ((2, 0, 1),), 1, 2, False),
-    ('range_before_ready', ((1, 0, 2, 1), (2, 1, 0, 1)), 1, 2, False),
-    ('wrap_as_one', ((1, 0, 2, 1),), 1, 2, False),
-    ('no_cut', ((2, 0, 1),), 1, 2, False),
+    ('range_before_data', ((2, 0, 1),), 1, 2, 'RANGE'),
+    ('range_before_ready', ((1, 0, 2, 1), (2, 1, 0, 1)), 1, 2, 'RANGE'),
+    ('wrap_as_one', ((1, 0, 2, 1),), 1, 2, 'RANGE'),
+    ('no_cut', ((2, 0, 1),), 1, 2, 'RANGE'),
 ]
 
 
@@ -1156,12 +1174,18 @@ def arithmetic(want):
     for why in failures[:5]:
         print(f'    {why}')
     ok = not failures
-    for broken in RANGED_BREAKAGES:
+    for broken, expect in RANGED_BREAKAGES.items():
         _, failures = ranged_arithmetic(broken)
+        # Its first failure names the property it fails, as a check's message
+        # does (engine.py's Properties).
+        first = failures[0].split(': ', 1)[1] if failures else None
+        wrong = judge(not failures, named(first), expect)
         print(f'{name}, broken {broken}: ' +
-              (f'fails, as it must - first at {failures[0]}' if failures else
-               'PASSES - the check is blind to it   <-- UNEXPECTED'), flush=True)
-        ok &= bool(failures)
+              ('PASSES - the check is blind to it' if not failures else
+               f'fails {named(first)}' + (', as it must' if wrong is None else '') +
+               f' - first at {failures[0]}') +
+              ('' if wrong is None else '   <-- UNEXPECTED' + wrong), flush=True)
+        ok &= wrong is None
     return ok
 
 
@@ -1179,14 +1203,14 @@ def main():
             continue
         res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, n=n: M[FIN] == n)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     ok &= arithmetic(want)
     for name, threads, mem, n, expect in ranged:
         if not want(name):
             continue
         res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
                       done=lambda M, n=n: M[FIN] == n)
-        ok &= report(res, expect_ok=expect)
+        ok &= report(res, expect=expect)
     return 0 if ok else 1
 
 

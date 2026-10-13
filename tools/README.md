@@ -4,7 +4,8 @@ One directory for each program, or group of tests, that this tree builds besides
 `libosoe`: `oshcc`, which compiles a program against osoe (`wrapper/`);
 `osoe-launch`, which runs a job on one machine (`launch/`); `osoe-stat`, which
 reads a running or hung job (`stat/`); `osoe-pacer`, the stress tester
-(`pacer/`); `osoe-bench`, which times the library (`bench/`); `probe`, which
+(`pacer/`); `osoe-bench`, which times the library, and `collect-places.sh`, which
+times `collect`'s places by each way with it (`bench/`); `probe`, which
 checks a kernel (`probe/`); `echo-uring`, the bare io_uring echo the library is
 judged against (`echo-uring/`); and the model checker with the models of osoe's
 protocols (`modelcheck/`, which has a README of its own). `corpus/` is not

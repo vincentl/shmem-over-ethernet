@@ -244,6 +244,31 @@ void osoe_internode_collect(uint32_t team, uint32_t epoch, void *buffer, size_t 
     osoe_internode_generic_collect(team, epoch, buffer, bytes, block, places, routine);
 }
 
+void osoe_internode_scan_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                     uint64_t *before, uint64_t *total, const char *routine)
+{
+    osoe_internode_generic_scan_node_totals(team, epoch, own, before, total, routine);
+}
+
+void osoe_internode_collect_ranges(uint32_t team, uint32_t epoch, void *buffer, size_t bytes,
+                                   uint64_t share_start, uint64_t share_end, bool reverse,
+                                   const char *routine)
+{
+    osoe_internode_generic_collect_ranges(team, epoch, buffer, bytes, share_start, share_end,
+                                          reverse, routine);
+}
+
+void osoe_internode_exchange_node_totals(uint32_t team, uint32_t epoch, uint64_t own,
+                                         uint64_t *totals, const char *routine)
+{
+    osoe_internode_generic_exchange_node_totals(team, epoch, own, totals, routine);
+}
+
+uint32_t osoe_internode_exchange_most_nodes(void)
+{
+    return osoe_internode_generic_exchange_most_nodes();
+}
+
 void osoe_internode_scan(uint32_t team, uint32_t rank, void *dest, const void *source,
                          size_t count, struct osoe_element element, bool inclusive,
                          const char *routine)

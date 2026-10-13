@@ -5417,22 +5417,70 @@ orders, a run that wraps past position *N* - 1 in two ranges, and its breakage,
 bases summed in the node set's order under a negative stride, fails. The data
 itself keeps the allgather either way.
 A scan (§9.10.10, built since phase 1 step 10) gives each PE its own place in O(1) memory.
-*(P30, the third way, is designed and modelled, not built - stage 1, 2026-10-12,
-`docs/design/collect-scan-proposal.md`, for the lead's and the author's
-decision.)* Each lead would learn only its own node's base and the total, from
-a scan of the nodes' totals among the leads - a pre-order tree over the node
-set's positions through the reductions' small rows and words, a subtree's total
-up and the totals before it with the total down; not the members' scan, which
-is every member's, deeper than P29's tree, and gives no total - and each step
-of the gather would carry a record of its two byte ranges past the receiver's
-DATA counter, the last step cut at its receiver's own share, which that lead put
-past its writer's READY counter as it entered: no lead would need another
-node's places. It takes P29's hops wherever P29's vector of totals is a small
-collective, to 128 nodes at the defaults, and saves the large class's grant
-past that; its bytes, a few words a step against eight a node at every level
-of the tree, would buy time on a real link only at about a thousand nodes.
-`allgather_model.py`'s ranged cases and arithmetic hold it, and its breakages
-fail.
+**The third way, a scan of the nodes' totals among the leads (P30)**, where
+every node is one run and the runs meet the node set's positions in order or in
+reverse - designed and modelled at stage 1 (2026-10-12,
+`docs/design/collect-scan-proposal.md`), built at stage 2 by the second cloud
+session (2026-10-13; the proposal's "Stage 2, as built"): each lead learns only
+its own node's base and the total, from a scan of the nodes' totals among the
+leads - a pre-order tree over the node set's positions at the fan-out's
+ceiling, through the reductions' small rows and counters with their bases, a
+subtree's total up and the totals before it with the total down
+(`osoe_internode_scan_node_totals`); not the members' scan, which is every
+member's, deeper than P29's tree, and gives no total - its base the totals
+before it in order and the total less them and its own in reverse; and the
+gather goes by ranges (`osoe_internode_collect_ranges`): each step carries a
+record of its two byte ranges past the receiver's DATA counter, fenced with the
+bytes, the last step cut at its receiver's own share, which that lead put past
+its writer's READY counter as it entered, and each record checked to continue
+what its receiver holds, and never to run on into its share: no lead needs
+another node's places. It takes P29's hops wherever P29's vector of totals is a
+small collective, to 128 nodes at the defaults, and saves the large class's
+grant past that; its bytes, a few words a step against eight a node at every
+level of the tree, would buy time on a real link only at about a thousand
+nodes. `allgather_model.py`'s ranged cases and arithmetic hold it, and its
+breakages fail; `lane_model.py`'s scan cases hold its tree beside the
+reductions' and the broadcasts' on the same words. The way a collect takes is
+`OSOE_COLLECTIVE_PLACES`'s where the team allows it - by default each node's
+total where every node is one run and the members' vector elsewhere; forced,
+for the tests and the measurements, the members' vector, each node's total or
+the scan - every PE alike, which the rendezvous and each node's segment check,
+and each lead publishes the way it took (`team.tree.collect_way`, layout 39)
+and its count, one under the scan (`shmem.collect-places.scan.*`, with every
+other case of P29's, and a mutant whose last step is uncut beside its control,
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-scan/`). **A fourth, a
+direct exchange of the nodes' totals among the leads (P33**; the proposal's "A
+direct exchange of the totals", built beside P30): where every node is one run,
+each lead puts its node's total into its own position's slot at every other
+lead and adds to that lead's counter, fenced after - one hop where P29's tree
+takes a level each way, N - 1 messages out of every lead - and the places
+follow from the totals as P29's do. Nothing waits before writing the slots, so
+each team number keeps two sets and a counter for each by the exchange's
+parity: a lead writing collect x's total has finished x - 1, so every lead has
+read x - 2's slots, the ones x reuses; and one counter would let an add for
+x + 1 stand in for a slower one for x. The gather after would order both alone,
+but a collect of nothing has none (`exchange_model.py`, its breakages failing
+there and holding with a gather). Its words are sized by the job's node count
+to 64 nodes (`internal-region.h`), a team over more taking the tree;
+`OSOE_COLLECTIVE_PLACES=exchange` forces it, `team.tree.collect_way` names it,
+and `shmem.collect-places.exchange.*` holds it with every case of P29's and a
+run of collects of nothing under perturbation, beside two mutants -
+`docs/design/evidence/v0.2-step4/2026-10-13-collect-exchange/`. **The choice
+among the four (P31)**, by default (`OSOE_COLLECTIVE_PLACES=link`), as a large
+collective's shape is chosen and from the same three numbers of the link
+(`collective-shape.c`, `osoe_places_choose`; `shape_timing.py`'s
+`choose_places`, line for line, and `shmem.shape.places-grid` holding the two to
+the same answers): the members' vector wherever some node is not one run;
+otherwise the least cost of each node's total - a reduction as the data path
+runs it, its small class one piece through the ceiling's tree and a larger one
+the chooser's shape and a hop for its grant - the exchange, a hop and N - 1
+messages, within its room, and the scan, a small tree as deep and a message
+more a step of the gather, where the runs are ordered; each node's total where
+no link is known. On the Pi's link that is the exchange to 60 nodes and the scan
+beyond; on a loopback's, the exchange to 46, each node's total to 128 - where
+its vector becomes a large reduction - and the scan beyond. **Provisional**: the
+cost model's, until H24 (the VM's logical nodes, `tools/bench/collect-places.sh`,
+`osoe-bench places`) and H25 (the cluster) measure the four.
 **alltoall and alltoalls are direct puts and the team's barrier**: every block
 goes from its source PE to its dest PE, which no tree shortens, and every put
 but the last says more follows (`OSOE_TRANSPORT_MORE`). alltoall itself reads

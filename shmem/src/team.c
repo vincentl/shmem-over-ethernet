@@ -790,7 +790,8 @@ uint32_t osoe_team_node_index(const struct osoe_team *t, uint32_t node)
  * ends the walk with no runs. Otherwise every node of the set has its run - as
  * many runs as the set has nodes - and this node's holds exactly its members
  * here, which collect's own places lean on; anything else is a broken
- * invariant, and named.
+ * invariant, and named. And whether the runs meet the positions in order, in
+ * reverse or neither, which collect's scan of the nodes' totals asks (P30).
  */
 const struct osoe_team_node_run *osoe_team_node_runs(struct osoe_team *t, const char *routine)
 {
@@ -838,8 +839,16 @@ const struct osoe_team_node_run *osoe_team_node_runs(struct osoe_team *t, const 
                    "members on this one, node %u; its node set has %u nodes, and it lists %u "
                    "members here", routine, t->name, count, here, osoe.job.node, nodes,
                    t->local_members);
+    bool in_order = true, reversed = true;
+    for (uint32_t j = 0; j < count; j++) {
+        in_order &= runs[j].position == j;
+        reversed &= runs[j].position == count - 1 - j;
+    }
     t->node_runs = runs;
     t->own_node_run = own;
+    t->node_runs_order = in_order    ? OSOE_TEAM_RUNS_IN_ORDER
+                         : reversed ? OSOE_TEAM_RUNS_REVERSED
+                                    : OSOE_TEAM_RUNS_UNORDERED;
     return runs;
 }
 

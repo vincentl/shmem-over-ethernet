@@ -1,10 +1,16 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
- * collect's places (P29 of docs/prompts/v0.2-open-items.md; collectives.c,
- * collect_varying): from each node's total where every node of a team holds
- * one run of its ranks, and from the members' vector where some node does not,
- * on teams of the map the launcher was given, which OSOE_TEST_MAP gives again.
- * The first argument names the case:
+ * collect's places (P29, P30, P31 and P33 of docs/prompts/v0.2-open-items.md;
+ * collectives.c, collect_varying): where every node of a team holds one run of
+ * its ranks, from each node's total - through the tree, the leads' exchange or,
+ * where the runs meet the node set's positions in order or in reverse, the
+ * leads' scan, as the link makes cheapest by default - and from the members'
+ * vector where some node does not; or the way OSOE_COLLECTIVE_PLACES forces,
+ * where the team allows it - on teams of the map the launcher was given, which
+ * OSOE_TEST_MAP gives again. Under the default the way is the link's, which the
+ * test pins only where OSOE_TEST_PLACES_LINK_WAY names it - the links set by
+ * hand (OSOE_LINK_*) - and otherwise holds to the ways the team allows. The
+ * first argument names the case:
  *
  *   block            the world, its even ranks and the ranks past the first
  *                    node's, on a block map: each node's total;
@@ -19,17 +25,33 @@
  *   cyclic           the world and the world backwards on a cyclic map, the
  *                    members' vector; and the first rank of each node, one a
  *                    node, each node's total after all - the way is the
- *                    team's, not the map's.
+ *                    team's, not the map's;
+ *   unordered        the world on a block map whose nodes are numbered out of
+ *                    the ranks' order (-m 1,1,0,0,2,2), each node one run that
+ *                    meets the node set's positions in neither order: the scan
+ *                    forced falls back to each node's total;
+ *   zeros            the world collecting nothing, again and again - every
+ *                    member giving 0, so that no gather follows the places and
+ *                    a lead may enter the next collect while another still
+ *                    reads this one's - with lengths that differ every eighth
+ *                    time: the exchange's two sets of slots and counters
+ *                    (exchange_model.py), which a run under OSOE_TEST_PERTURB
+ *                    finds wanting where they are one, and the leads' scan's
+ *                    small tree, entered back to back.
+ *
+ * A team past the first node's that would span one node alone, on a map of two,
+ * is left out: it has no internode phase to find places for.
  *
  * Each team collects lengths that differ, some of them 0; then, for each of
  * its nodes in turn, the same with every member there giving 0 - a node whose
  * total is nothing; then every member 0; then one member alone, the last. Every
- * byte is checked at its place, and after each collect the count this node's
- * lead published of the lengths it summed between the nodes
- * (team.tree.collect_lengths): the team's nodes for each node's total, its
- * members for the members' vector. Each team is made, used and destroyed before
- * the next, so each takes the first number after the predefined three, and its
- * block is found by it.
+ * byte is checked at its place, and after each collect the way this node's lead
+ * published (team.tree.collect_way) and the count of the lengths it summed
+ * between the nodes (team.tree.collect_lengths): the team's nodes for each
+ * node's total, its members for the members' vector, one - its own node's - for
+ * the scan. Each team is made, used and destroyed before the next, so each
+ * takes the first number after the predefined three, and its block is found by
+ * it.
  */
 #include <stdbool.h>
 #include <stdint.h>
@@ -49,8 +71,17 @@ enum {
     FIRST_CREATED_NUMBER = 3,       /* after the world, SHMEM_TEAM_SHARED and the finalize team */
 };
 
+/* team.tree.collect_way's values (node.h, enum osoe_collect_way), and the
+ * test's own for a way the link chooses among those the team allows. */
+enum way { WAY_NONE, WAY_MEMBERS, WAY_TOTALS, WAY_SCAN, WAY_EXCHANGE, WAY_CHOSEN };
+static const char *const way_names[] = { "none", "the members' vector", "each node's total",
+                                         "the leads' scan", "the leads' exchange",
+                                         "one the link chooses" };
+
 static int me, npes;
 static int node_of_rank[MAX_PES];
+static const char *forced;              /* OSOE_COLLECTIVE_PLACES, or "link" */
+static const char *link_way;            /* OSOE_TEST_PLACES_LINK_WAY, or NULL */
 static unsigned char *source, *dest;    /* LONGEST and MAX_PES * LONGEST bytes, symmetric */
 
 /* A team as the test expects it. */
@@ -63,6 +94,8 @@ struct team_case {
     int rank;                       /* this PE's, or -1 */
     int nodes;                      /* how many nodes it spans */
     bool one_run;                   /* every node's members one run of team ranks */
+    bool in_order;                  /* and the runs meet the nodes in their order */
+    bool reversed;                  /* or in its reverse */
 };
 
 /* Byte i of world PE `world`'s block in collect `round`: never 0, which dest
@@ -86,13 +119,14 @@ static void read_map(void)
     }
 }
 
-/* What the map makes of a team's ranks: how many nodes it spans, and whether
- * each node's members are one run - walked as the library walks them, a node
- * met again after its run ended saying no. */
+/* What the map makes of a team's ranks: how many nodes it spans, whether each
+ * node's members are one run - walked as the library walks them, a node met
+ * again after its run ended saying no - and whether the runs meet the nodes in
+ * their order or its reverse, the node set being sorted by node. */
 static void runs_of(struct team_case *t)
 {
     bool met[MAX_PES] = { false };
-    int previous = -1;
+    int previous = -1, run_nodes[MAX_PES], runs = 0;
     t->nodes = 0;
     t->one_run = true;
     for (int r = 0; r < t->members; r++) {
@@ -105,7 +139,33 @@ static void runs_of(struct team_case *t)
             t->nodes++;
         met[node] = true;
         previous = node;
+        run_nodes[runs++] = node;
     }
+    t->in_order = t->reversed = t->one_run;
+    for (int j = 1; j < runs; j++) {
+        t->in_order &= run_nodes[j - 1] < run_nodes[j];
+        t->reversed &= run_nodes[j - 1] > run_nodes[j];
+    }
+}
+
+/* The way the library takes on `t` (collectives.c, places_way): the forced one
+ * where the team allows it, and the one it falls back to; under the default
+ * the one OSOE_TEST_PLACES_LINK_WAY names, and otherwise any the team allows
+ * (WAY_CHOSEN). */
+static enum way way_of(const struct team_case *t)
+{
+    if (t->nodes < 2)
+        return WAY_NONE;
+    if (!t->one_run || strcmp(forced, "members") == 0)
+        return WAY_MEMBERS;
+    const char *named = strcmp(forced, "link") == 0 ? link_way : forced;
+    if (!named)
+        return WAY_CHOSEN;
+    if (strcmp(named, "scan") == 0 && (t->in_order || t->reversed))
+        return WAY_SCAN;
+    if (strcmp(named, "exchange") == 0)
+        return WAY_EXCHANGE;            /* the tests' teams span a few nodes, within its room */
+    return WAY_TOTALS;
 }
 
 /* The team a triplet of world ranks makes (spec §9.4.6), and what the test
@@ -175,18 +235,29 @@ static void collect(const struct team_case *t, const struct lengths *lengths, in
                 lengths->what, total, wrong, dest[wrong]);
     CHECK(wrong == SIZE_MAX);
 
-    uint64_t summed = UINT64_MAX;
+    uint64_t summed = UINT64_MAX, way = UINT64_MAX;
     uint32_t block = osoe_test_team_block(t->number);
     CHECK(block != UINT32_MAX);
     CHECK(osoe_test_scoped_metric("team.tree.collect_lengths", OSOE_MSCOPE_TEAM, block,
                                   &summed));
-    uint64_t want = t->nodes < 2 ? 0 : t->one_run ? (uint64_t)t->nodes : (uint64_t)t->members;
-    if (summed != want)
-        fprintf(stderr, "PE %d: %s spans %d nodes, %s, and its lead here summed %llu lengths "
-                "for a collect's places, not %llu\n", me, t->name, t->nodes,
-                t->one_run ? "each one run of its ranks" : "some not one run",
-                (unsigned long long)summed, (unsigned long long)want);
-    CHECK(summed == want);
+    CHECK(osoe_test_scoped_metric("team.tree.collect_way", OSOE_MSCOPE_TEAM, block, &way));
+    enum way want_way = way_of(t);
+    if (want_way == WAY_CHOSEN && (way == WAY_TOTALS || way == WAY_EXCHANGE ||
+                                   (way == WAY_SCAN && (t->in_order || t->reversed))))
+        want_way = (enum way)way;       /* the link's choice, among those the team allows */
+    uint64_t want = want_way == WAY_NONE      ? 0
+                    : want_way == WAY_MEMBERS ? (uint64_t)t->members
+                    : want_way == WAY_SCAN    ? 1
+                                              : (uint64_t)t->nodes;
+    if (summed != want || way != (uint64_t)want_way)
+        fprintf(stderr, "PE %d: %s spans %d nodes, %s, and its lead here took way %llu and "
+                "summed %llu lengths for a collect's places under OSOE_COLLECTIVE_PLACES=%s, "
+                "not %s and %llu\n", me, t->name, t->nodes,
+                !t->one_run ? "some not one run" : t->in_order ? "each one run, in order"
+                : t->reversed ? "each one run, in reverse" : "each one run, out of order",
+                (unsigned long long)way, (unsigned long long)summed, forced,
+                way_names[want_way], (unsigned long long)want);
+    CHECK(summed == want && way == (uint64_t)want_way);
 }
 
 /* Every collect of the file's comment, on one team, by its members: the
@@ -228,6 +299,14 @@ static void split_and_collect(const char *name, int start, int stride, int size,
                               int round)
 {
     struct team_case t = split(name, start, stride, size);
+    if (t.nodes == 1 && strstr(name, "past the first node's")) {
+        /* On a map of two nodes: one node alone, nothing to find across
+         * nodes (the file's comment). */
+        if (t.rank >= 0)
+            shmem_team_destroy(t.team);
+        shmem_barrier_all();
+        return;
+    }
     if (t.one_run != one_run)
         fprintf(stderr, "PE %d: the map makes %s %s one run on each of its %d nodes; the case "
                 "wants it %s\n", me, name, t.one_run ? "is" : "is not", t.nodes,
@@ -247,6 +326,8 @@ int main(int argc, char **argv)
     read_map();
     CHECK_FATAL(argc == 2);
     const char *which = argv[1];
+    forced = getenv("OSOE_COLLECTIVE_PLACES") ? getenv("OSOE_COLLECTIVE_PLACES") : "link";
+    link_way = getenv("OSOE_TEST_PLACES_LINK_WAY");
     source = shmem_malloc(LONGEST);
     dest = shmem_malloc((size_t)MAX_PES * LONGEST);
     CHECK_FATAL(source && dest);
@@ -258,13 +339,13 @@ int main(int argc, char **argv)
         first_run++;
     struct team_case world = world_team();
     if (strcmp(which, "block") == 0) {
-        CHECK_FATAL(world.one_run && world.nodes > 2 && first_run < npes);
+        CHECK_FATAL(world.one_run && world.in_order && world.nodes > 1 && first_run < npes);
         collects_on(&world, 0);
         split_and_collect("the even ranks", 0, 2, (npes + 1) / 2, true, ROUNDS_A_TEAM);
         split_and_collect("the ranks past the first node's", first_run, 1, npes - first_run,
                           true, 2 * ROUNDS_A_TEAM);
     } else if (strcmp(which, "negative-stride") == 0) {
-        CHECK_FATAL(world.one_run && world.nodes > 2 && first_run < npes);
+        CHECK_FATAL(world.one_run && world.in_order && world.nodes > 1 && first_run < npes);
         split_and_collect("the world backwards", npes - 1, -1, npes, true, 0);
         split_and_collect("every other rank backwards", npes - 1, -2, (npes + 1) / 2, true,
                           ROUNDS_A_TEAM);
@@ -276,8 +357,20 @@ int main(int argc, char **argv)
         split_and_collect("the world backwards", npes - 1, -1, npes, false, ROUNDS_A_TEAM);
         split_and_collect("the first rank of each node", 0, 1, world.nodes, true,
                           2 * ROUNDS_A_TEAM);
+    } else if (strcmp(which, "unordered") == 0) {
+        CHECK_FATAL(world.one_run && !world.in_order && !world.reversed && world.nodes > 2);
+        collects_on(&world, 0);
+    } else if (strcmp(which, "zeros") == 0) {
+        CHECK_FATAL(world.one_run && world.nodes > 2);
+        struct lengths nothing = { .what = "every member giving 0, again" };
+        struct lengths differ = { .what = "lengths that differ, between the zeros" };
+        for (int r = 0; r < npes; r++)
+            differ.of[r] = (size_t)(r % 3) * 7 + 1;
+        for (int round = 0; round < 96; round++)
+            collect(&world, round % 8 == 7 ? &differ : &nothing, round);
     } else {
-        fprintf(stderr, "no case '%s': block, negative-stride or cyclic\n", which);
+        fprintf(stderr, "no case '%s': block, negative-stride, cyclic, unordered or zeros\n",
+                which);
         CHECK_FATAL(false);
     }
 

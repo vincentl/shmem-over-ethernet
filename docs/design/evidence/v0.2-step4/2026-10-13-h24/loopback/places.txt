@@ -1,0 +1,75 @@
+nodes=64 round=1 places way=members lengths=equal pes=64 bytes=512 median_us=2202.6 fastest_us=1648.9
+nodes=64 round=1 places way=members lengths=zeros pes=64 bytes=32 median_us=2220.6 fastest_us=1755.8
+nodes=64 round=1 places way=members lengths=large pes=64 bytes=66040 median_us=2836.0 fastest_us=1806.5
+job nodes=64 way=members round=1 status=0 seconds=4
+link nodes=64 way=members round=1 source=measured hop_ns=63082 message_ns=20973 bytes_per_second=2513252842
+nodes=64 round=1 places way=totals lengths=equal pes=64 bytes=512 median_us=2544.3 fastest_us=1811.2
+nodes=64 round=1 places way=totals lengths=zeros pes=64 bytes=32 median_us=2169.1 fastest_us=1768.6
+nodes=64 round=1 places way=totals lengths=large pes=64 bytes=66040 median_us=2863.0 fastest_us=1900.3
+job nodes=64 way=totals round=1 status=0 seconds=4
+link nodes=64 way=totals round=1 source=measured hop_ns=5145 message_ns=9079 bytes_per_second=3521389871
+nodes=64 round=1 places way=scan lengths=equal pes=64 bytes=512 median_us=4532.4 fastest_us=2559.6
+nodes=64 round=1 places way=scan lengths=zeros pes=64 bytes=32 median_us=2171.6 fastest_us=1696.6
+nodes=64 round=1 places way=scan lengths=large pes=64 bytes=66040 median_us=3749.0 fastest_us=1891.5
+job nodes=64 way=scan round=1 status=0 seconds=5
+link nodes=64 way=scan round=1 source=measured hop_ns=64958 message_ns=68675 bytes_per_second=368098090
+nodes=64 round=1 places way=exchange lengths=equal pes=64 bytes=512 median_us=9106.7 fastest_us=3720.7
+nodes=64 round=1 places way=exchange lengths=zeros pes=64 bytes=32 median_us=8677.1 fastest_us=2056.6
+nodes=64 round=1 places way=exchange lengths=large pes=64 bytes=66040 median_us=9664.3 fastest_us=2473.5
+job nodes=64 way=exchange round=1 status=0 seconds=12
+link nodes=64 way=exchange round=1 source=measured hop_ns=54020 message_ns=110230 bytes_per_second=6848543959
+nodes=64 round=1 places way=link lengths=equal pes=64 bytes=512 median_us=5021.4 fastest_us=3281.0
+nodes=64 round=1 places way=link lengths=zeros pes=64 bytes=32 median_us=2308.8 fastest_us=1659.2
+nodes=64 round=1 places way=link lengths=large pes=64 bytes=66040 median_us=2938.5 fastest_us=1985.4
+job nodes=64 way=link round=1 status=0 seconds=5
+link nodes=64 way=link round=1 source=measured hop_ns=14354 message_ns=9101 bytes_per_second=2160551214
+nodes=128 round=1 places way=members lengths=equal pes=128 bytes=1024 median_us=12293.7 fastest_us=8846.1
+nodes=128 round=1 places way=members lengths=zeros pes=128 bytes=64 median_us=12828.9 fastest_us=7392.6
+nodes=128 round=1 places way=members lengths=large pes=128 bytes=66552 median_us=13621.3 fastest_us=7784.0
+job nodes=128 way=members round=1 status=0 seconds=17
+link nodes=128 way=members round=1 source=measured hop_ns=152144 message_ns=56628 bytes_per_second=5637586201
+nodes=128 round=1 places way=totals lengths=equal pes=128 bytes=1024 median_us=11450.3 fastest_us=7141.7
+nodes=128 round=1 places way=totals lengths=zeros pes=128 bytes=64 median_us=11703.7 fastest_us=7449.3
+nodes=128 round=1 places way=totals lengths=large pes=128 bytes=66552 median_us=13863.2 fastest_us=7557.1
+job nodes=128 way=totals round=1 status=0 seconds=16
+link nodes=128 way=totals round=1 source=measured hop_ns=177831 message_ns=162358 bytes_per_second=264668585
+nodes=128 round=1 places way=scan lengths=equal pes=128 bytes=1024 median_us=10891.7 fastest_us=6422.5
+nodes=128 round=1 places way=scan lengths=zeros pes=128 bytes=64 median_us=11290.7 fastest_us=8913.1
+nodes=128 round=1 places way=scan lengths=large pes=128 bytes=66552 median_us=13363.1 fastest_us=7843.0
+job nodes=128 way=scan round=1 status=0 seconds=15
+link nodes=128 way=scan round=1 source=measured hop_ns=108749 message_ns=120739 bytes_per_second=426890858
+nodes=128 round=1 places way=exchange lengths=equal pes=128 bytes=1024 median_us=11241.9 fastest_us=6907.1
+nodes=128 round=1 places way=exchange lengths=zeros pes=128 bytes=64 median_us=11408.7 fastest_us=7637.7
+nodes=128 round=1 places way=exchange lengths=large pes=128 bytes=66552 median_us=13777.7 fastest_us=8818.2
+job nodes=128 way=exchange round=1 status=0 seconds=15
+link nodes=128 way=exchange round=1 source=measured hop_ns=61728 message_ns=151377 bytes_per_second=401142986
+nodes=128 round=1 places way=link lengths=equal pes=128 bytes=1024 median_us=11439.7 fastest_us=6622.6
+nodes=128 round=1 places way=link lengths=zeros pes=128 bytes=64 median_us=11520.8 fastest_us=6861.3
+nodes=128 round=1 places way=link lengths=large pes=128 bytes=66552 median_us=13351.4 fastest_us=7904.8
+job nodes=128 way=link round=1 status=0 seconds=16
+link nodes=128 way=link round=1 source=measured hop_ns=42603 message_ns=128051 bytes_per_second=1983455066
+nodes=254 round=1 places way=members lengths=equal pes=254 bytes=2032 median_us=29661.2 fastest_us=18574.4
+nodes=254 round=1 places way=members lengths=zeros pes=254 bytes=128 median_us=35768.1 fastest_us=22232.4
+nodes=254 round=1 places way=members lengths=large pes=254 bytes=67560 median_us=40535.7 fastest_us=23322.5
+job nodes=254 way=members round=1 status=0 seconds=52
+link nodes=254 way=members round=1 source=measured hop_ns=520849 message_ns=300493 bytes_per_second=114227150
+nodes=254 round=1 places way=totals lengths=equal pes=254 bytes=2032 median_us=35354.7 fastest_us=23168.2
+nodes=254 round=1 places way=totals lengths=zeros pes=254 bytes=128 median_us=35302.3 fastest_us=21296.7
+nodes=254 round=1 places way=totals lengths=large pes=254 bytes=67560 median_us=37865.2 fastest_us=22079.9
+job nodes=254 way=totals round=1 status=0 seconds=53
+link nodes=254 way=totals round=1 source=measured hop_ns=341580 message_ns=205691 bytes_per_second=70022916
+nodes=254 round=1 places way=scan lengths=equal pes=254 bytes=2032 median_us=28861.5 fastest_us=17698.3
+nodes=254 round=1 places way=scan lengths=zeros pes=254 bytes=128 median_us=28458.5 fastest_us=19114.1
+nodes=254 round=1 places way=scan lengths=large pes=254 bytes=67560 median_us=34604.0 fastest_us=21568.9
+job nodes=254 way=scan round=1 status=0 seconds=40
+link nodes=254 way=scan round=1 source=measured hop_ns=28791 message_ns=396566 bytes_per_second=123590646
+nodes=254 round=1 places way=exchange lengths=equal pes=254 bytes=2032 median_us=32794.4 fastest_us=19435.7
+nodes=254 round=1 places way=exchange lengths=zeros pes=254 bytes=128 median_us=28616.2 fastest_us=19220.2
+nodes=254 round=1 places way=exchange lengths=large pes=254 bytes=67560 median_us=33815.0 fastest_us=21680.2
+job nodes=254 way=exchange round=1 status=0 seconds=42
+link nodes=254 way=exchange round=1 source=measured hop_ns=5104 message_ns=237789 bytes_per_second=109777337
+nodes=254 round=1 places way=link lengths=equal pes=254 bytes=2032 median_us=30130.6 fastest_us=19117.4
+nodes=254 round=1 places way=link lengths=zeros pes=254 bytes=128 median_us=29661.6 fastest_us=18613.8
+nodes=254 round=1 places way=link lengths=large pes=254 bytes=67560 median_us=34326.6 fastest_us=19091.2
+job nodes=254 way=link round=1 status=0 seconds=40
+link nodes=254 way=link round=1 source=measured hop_ns=47791 message_ns=116978 bytes_per_second=1036718702

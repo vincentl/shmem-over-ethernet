@@ -1,0 +1,215 @@
+Internal ctest changing into directory: /tmp/collect-scan-check/mutant/build/release
+Test project /tmp/collect-scan-check/mutant/build/release
+      Start 471: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+      Start 472: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+      Start 473: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+      Start 474: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 1/19 Test #471: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ..................   Passed    0.23 sec
+      Start 475: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+ 2/19 Test #472: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ..................   Passed    0.25 sec
+      Start 476: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+ 3/19 Test #473: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ........   Passed    0.25 sec
+      Start 477: shmem.collect-places.unordered.1-1-0-0-2-2
+ 4/19 Test #474: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ........   Passed    0.29 sec
+      Start 478: shmem.collect-places.scan.block.0-0-1-1
+ 5/19 Test #478: shmem.collect-places.scan.block.0-0-1-1 .........................   Passed    0.13 sec
+      Start 479: shmem.collect-places.scan.block.0-0-1-2-2
+ 6/19 Test #477: shmem.collect-places.unordered.1-1-0-0-2-2 ......................   Passed    0.18 sec
+      Start 480: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3
+ 7/19 Test #475: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 ...................   Passed    0.21 sec
+      Start 481: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4
+ 8/19 Test #476: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .....................   Passed    0.22 sec
+      Start 482: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6
+ 9/19 Test #479: shmem.collect-places.scan.block.0-0-1-2-2 .......................***Failed    0.09 sec
+osoe: PE 2: shmem_collectmem: step 1 of the gather from node 0's lead (PE 0) says epoch 4 and bytes 0 up to 40 and 0 up to 0 past the last position, and this node's lead (PE 2), in epoch 4's gather of 53 bytes, holds bytes 14 up to 53 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 2: control segment /osoe.24036.0.1.0 (osoe-stat /osoe.24036.0.1.0, while any PE of this node is alive)
+osoe: PE 3: shmem_collectmem: step 1 of the gather from node 1's lead (PE 2) says epoch 4 and bytes 14 up to 53 and 0 up to 0 past the last position, and this node's lead (PE 3), in epoch 4's gather of 53 bytes, holds bytes 40 up to 53 and 0 up to 14 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 3: control segment /osoe.24036.0.2.0 (osoe-stat /osoe.24036.0.2.0, while any PE of this node is alive)
+osoe: PE 4: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 1: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 3 exited with status 1
+
+      Start 483: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7
+10/19 Test #481: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 .............***Failed    0.13 sec
+osoe: PE 6: shmem_collectmem: step 2 of the gather from node 2's lead (PE 5) says epoch 4 and bytes 53 up to 120 and 0 up to 14 past the last position, and this node's lead (PE 6), in epoch 4's gather of 120 bytes, holds bytes 80 up to 120 and 0 up to 53 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 6: control segment /osoe.24053.0.3.0 (osoe-stat /osoe.24053.0.3.0, while any PE of this node is alive)
+osoe: PE 7: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_collectmem
+osoe: PE 1: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_collectmem
+osoe: PE 4: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_collectmem
+osoe: PE 3: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_collectmem
+osoe: PE 9: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_collectmem
+osoe: PE 2: shmem_collectmem: step 2 of the gather from node 0's lead (PE 0) says epoch 4 and bytes 0 up to 93 and 0 up to 0 past the last position, and this node's lead (PE 2), in epoch 4's gather of 120 bytes, holds bytes 14 up to 120 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 2: control segment /osoe.24053.0.1.0 (osoe-stat /osoe.24053.0.1.0, while any PE of this node is alive)
+osoe: PE 8: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_collectmem
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 2 exited with status 1
+
+      Start 484: shmem.collect-places.scan.negative-stride.0-0-1-1
+11/19 Test #480: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 .............***Failed    0.15 sec
+osoe: PE 6: shmem_collectmem: step 1 of the gather from node 1's lead (PE 4) says epoch 2 and bytes 26 up to 65 and 0 up to 0 past the last position, and this node's lead (PE 6), in epoch 2's gather of 65 bytes, holds bytes 39 up to 65 and 0 up to 26 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 6: control segment /osoe.24042.0.2.0 (osoe-stat /osoe.24042.0.2.0, while any PE of this node is alive)
+osoe: PE 9: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 6 exited with status 1
+osoe: PE 1: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_barrier_all
+osoe: PE 7: ending: the job is aborting on behalf of PE 6; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 7 exited with status 1
+
+      Start 485: shmem.collect-places.scan.negative-stride.0-0-1-2-2
+12/19 Test #482: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 ...............***Failed    0.12 sec
+osoe: PE 7: shmem_collectmem: step 2 of the gather from node 2's lead (PE 3) says epoch 4 and bytes 40 up to 93 and 0 up to 0 past the last position, and this node's lead (PE 7), in epoch 4's gather of 119 bytes, holds bytes 80 up to 119 and 0 up to 40 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 7: control segment /osoe.24065.0.5.0 (osoe-stat /osoe.24065.0.5.0, while any PE of this node is alive)
+osoe: PE 4: shmem_collectmem: step 2 of the gather from node 0's lead (PE 0) says epoch 4 and bytes 0 up to 80 and 0 up to 0 past the last position, and this node's lead (PE 4), in epoch 4's gather of 119 bytes, holds bytes 40 up to 119 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 4: control segment /osoe.24065.0.3.0 (osoe-stat /osoe.24065.0.3.0, while any PE of this node is alive)
+osoe: PE 5: ending: the job is aborting on behalf of PE 4; this PE was waiting in shmem_collectmem
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+
+      Start 486: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4
+13/19 Test #484: shmem.collect-places.scan.negative-stride.0-0-1-1 ...............   Passed    0.12 sec
+      Start 487: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6
+14/19 Test #485: shmem.collect-places.scan.negative-stride.0-0-1-2-2 .............***Failed    0.11 sec
+osoe: PE 1: shmem_collectmem: step 1 of the gather from node 2's lead (PE 4) says epoch 2 and bytes 0 up to 13 and 39 up to 53 past the last position, and this node's lead (PE 1), in epoch 2's gather of 53 bytes, holds bytes 13 up to 53 and 53 up to 53 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 1: control segment /osoe.24144.0.0.0 (osoe-stat /osoe.24144.0.0.0, while any PE of this node is alive)
+osoe: PE 2: shmem_collectmem: step 1 of the gather from node 0's lead (PE 1) says epoch 2 and bytes 13 up to 53 and 53 up to 53 past the last position, and this node's lead (PE 2), in epoch 2's gather of 53 bytes, holds bytes 0 up to 39 and 53 up to 53 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 2: control segment /osoe.24144.0.1.0 (osoe-stat /osoe.24144.0.1.0, while any PE of this node is alive)
+osoe: PE 4: shmem_collectmem: step 1 of the gather from node 1's lead (PE 2) says epoch 2 and bytes 0 up to 39 and 53 up to 53 past the last position, and this node's lead (PE 4), in epoch 2's gather of 53 bytes, holds bytes 0 up to 13 and 39 up to 53 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 4: control segment /osoe.24144.0.2.0 (osoe-stat /osoe.24144.0.2.0, while any PE of this node is alive)
+osoe: PE 4: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_collectmem
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 2 exited with status 1
+
+      Start 488: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2
+15/19 Test #483: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 ...........***Failed    0.19 sec
+osoe: PE 8: shmem_collectmem: step 2 of the gather from node 3's lead (PE 4) says epoch 2 and bytes 26 up to 78 and 0 up to 0 past the last position, and this node's lead (PE 8), in epoch 2's gather of 78 bytes, holds bytes 39 up to 78 and 0 up to 26 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 8: control segment /osoe.24104.0.6.0 (osoe-stat /osoe.24104.0.6.0, while any PE of this node is alive)
+osoe: PE 6: shmem_collectmem: step 2 of the gather from node 1's lead (PE 2) says epoch 2 and bytes 0 up to 65 and 0 up to 0 past the last position, and this node's lead (PE 6), in epoch 2's gather of 78 bytes, holds bytes 39 up to 78 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 6: control segment /osoe.24104.0.4.0 (osoe-stat /osoe.24104.0.4.0, while any PE of this node is alive)
+osoe: PE 5: ending: the job is aborting on behalf of PE 8; this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 8; this PE was waiting in shmem_barrier_all
+osoe: PE 10: shmem_collectmem: step 2 of the gather from node 4's lead (PE 6) says epoch 2 and bytes 39 up to 78 and 0 up to 0 past the last position, and this node's lead (PE 10), in epoch 2's gather of 78 bytes, holds bytes 65 up to 78 and 0 up to 39 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 10: control segment /osoe.24104.0.7.0 (osoe-stat /osoe.24104.0.7.0, while any PE of this node is alive)
+osoe: PE 0: shmem_collectmem: step 2 of the gather from node 6's lead (PE 8) says epoch 2 and bytes 39 up to 78 and 0 up to 26 past the last position, and this node's lead (PE 0), in epoch 2's gather of 78 bytes, holds bytes 0 up to 39 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 0: control segment /osoe.24104.0.0.0 (osoe-stat /osoe.24104.0.0.0, while any PE of this node is alive)
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 10 exited with status 1
+osoe-launch: rank 9 killed by signal 15
+osoe-launch: rank 8 exited with status 1
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 7 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+
+      Start 489: shmem.collect-places.scan.unordered.1-1-0-0-2-2
+16/19 Test #486: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 ...***Failed    0.13 sec
+osoe: PE 5: shmem_collectmem: step 2 of the gather from node 1's lead (PE 4) says epoch 2 and bytes 0 up to 106 and 120 up to 120 past the last position, and this node's lead (PE 5), in epoch 2's gather of 120 bytes, holds bytes 0 up to 67 and 106 up to 120 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 5: control segment /osoe.24161.0.2.0 (osoe-stat /osoe.24161.0.2.0, while any PE of this node is alive)
+osoe: PE 9: shmem_collectmem: step 2 of the gather from node 3's lead (PE 7) says epoch 2 and bytes 0 up to 40 and 67 up to 120 past the last position, and this node's lead (PE 9), in epoch 2's gather of 120 bytes, holds bytes 0 up to 27 and 40 up to 120 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 9: control segment /osoe.24161.0.4.0 (osoe-stat /osoe.24161.0.4.0, while any PE of this node is alive)
+osoe: PE 9: ending: the job is aborting on behalf of PE 9; this PE was waiting in shmem_collectmem
+osoe: PE 7: shmem_collectmem: step 2 of the gather from node 2's lead (PE 5) says epoch 2 and bytes 0 up to 67 and 106 up to 120 past the last position, and this node's lead (PE 7), in epoch 2's gather of 120 bytes, holds bytes 0 up to 40 and 67 up to 120 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 7: control segment /osoe.24161.0.3.0 (osoe-stat /osoe.24161.0.3.0, while any PE of this node is alive)
+osoe: PE 7: ending: the job is aborting on behalf of PE 7; this PE was waiting in shmem_collectmem
+osoe: PE 4: ending: the job is aborting on behalf of PE 7; this PE was waiting in shmem_collectmem
+osoe-launch: rank 9 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+
+17/19 Test #487: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .....***Failed    0.14 sec
+osoe: PE 2: shmem_collectmem: step 2 of the gather from node 5's lead (PE 7) says epoch 2 and bytes 0 up to 39 and 79 up to 119 past the last position, and this node's lead (PE 2), in epoch 2's gather of 119 bytes, holds bytes 39 up to 119 and 119 up to 119 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 2: control segment /osoe.24201.0.1.0 (osoe-stat /osoe.24201.0.1.0, while any PE of this node is alive)
+osoe: PE 7: shmem_collectmem: step 2 of the gather from node 2's lead (PE 3) says epoch 2 and bytes 26 up to 79 and 119 up to 119 past the last position, and this node's lead (PE 7), in epoch 2's gather of 119 bytes, holds bytes 0 up to 39 and 79 up to 119 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 7: control segment /osoe.24201.0.5.0 (osoe-stat /osoe.24201.0.5.0, while any PE of this node is alive)
+osoe: PE 5: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe: PE 3: ending: the job is aborting on behalf of PE 2; this PE was waiting in shmem_collectmem
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 8 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+
+18/19 Test #489: shmem.collect-places.scan.unordered.1-1-0-0-2-2 .................   Passed    0.12 sec
+19/19 Test #488: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ..............***Failed    0.15 sec
+osoe: PE 1: shmem_collectmem: step 1 of the gather from node 0's lead (PE 0) says epoch 2 and bytes 0 up to 14 and 0 up to 0 past the last position, and this node's lead (PE 1), in epoch 2's gather of 40 bytes, holds bytes 0 up to 40 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 1: control segment /osoe.24205.0.1.0 (osoe-stat /osoe.24205.0.1.0, while any PE of this node is alive)
+osoe: PE 2: shmem_collectmem: step 1 of the gather from node 1's lead (PE 1) says epoch 2 and bytes 0 up to 40 and 0 up to 0 past the last position, and this node's lead (PE 2), in epoch 2's gather of 40 bytes, holds bytes 14 up to 40 and 0 up to 0 past the last position, which those do not continue: PEs called different collectives, or the leads disagree about the team's nodes
+osoe: PE 2: control segment /osoe.24205.0.2.0 (osoe-stat /osoe.24205.0.2.0, while any PE of this node is alive)
+osoe: PE 7: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe: PE 5: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe: PE 4: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe: PE 8: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe: PE 3: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe: PE 6: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 6 exited with status 1
+osoe-launch: rank 7 exited with status 1
+osoe-launch: rank 8 exited with status 1
+
+
+53% tests passed, 9 tests failed out of 19
+
+Label Time Summary:
+internode    =   3.22 sec*proc (19 tests)
+tier2        =   3.22 sec*proc (19 tests)
+
+Total Test time (real) =   0.93 sec
+
+The following tests FAILED:
+	479 - shmem.collect-places.scan.block.0-0-1-2-2 (Failed)
+	480 - shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 (Failed)
+	481 - shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 (Failed)
+	482 - shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 (Failed)
+	483 - shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 (Failed)
+	485 - shmem.collect-places.scan.negative-stride.0-0-1-2-2 (Failed)
+	486 - shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 (Failed)
+	487 - shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 (Failed)
+	488 - shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 (Failed)
+Errors while running CTest

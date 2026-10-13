@@ -5,6 +5,9 @@
  *
  *   test-collective-shape choice     what the Pi's link and a loopback's choose
  *   test-collective-shape grid FILE  the C against the Python model, line by line
+ *   test-collective-shape places-grid FILE
+ *                                    collect's places (P31): the way and the four
+ *                                    costs against the model's, line by line
  *
  * choice pins what the Pi cluster measured on four nodes (2026-09-26, finding
  * F2): the small class keeps the ceiling's tree; above it the star - k = 3 or
@@ -163,12 +166,62 @@ static int grid(const char *path)
     return CHECK_DONE();
 }
 
+/* collect's places' choice and costs (P31) against what
+ * tools/modelcheck/shape_timing.py writes - the team's nodes and members,
+ * whether every node is one run and the runs are in order, the exchange's
+ * room, the link, the ceiling, the capacity, the small class's bytes and
+ * whether Träff's is allowed; then the way and each way's cost - requiring the
+ * same of osoe_places_choose and osoe_places_cost. */
+static int places_grid(const char *path)
+{
+    static const char *const ways[] = { "members", "totals", "scan", "exchange" };
+    static const enum osoe_places_way numbered[] = { OSOE_PLACES_MEMBERS, OSOE_PLACES_TOTALS,
+                                                     OSOE_PLACES_SCAN, OSOE_PLACES_EXCHANGE };
+    FILE *f = fopen(path, "r");
+    CHECK_FATAL(f != NULL);
+    char line[512];
+    unsigned lines = 0, differ = 0;
+    while (fgets(line, sizeof line, f)) {
+        if (line[0] == '#' || line[0] == '\n')
+            continue;
+        char way[16];
+        unsigned nodes, members, runs, ordered, room, ceiling, capacity, small, allowed;
+        unsigned long long hop, message, bandwidth, cost[4];
+        if (sscanf(line, "%u %u %u %u %u %llu %llu %llu %u %u %u %u %15s %llu %llu %llu %llu",
+                   &nodes, &members, &runs, &ordered, &room, &hop, &message, &bandwidth,
+                   &ceiling, &capacity, &small, &allowed, way, &cost[0], &cost[1], &cost[2],
+                   &cost[3]) != 17) {
+            fprintf(stderr, "%s: cannot read: %s", path, line);
+            CHECK(0);
+            continue;
+        }
+        struct osoe_link link = { hop, message, bandwidth };
+        enum osoe_places_way chosen =
+            osoe_places_choose(nodes, members, runs != 0, ordered != 0, room, &link, ceiling,
+                               capacity, small, OSOE_INTERNAL_PIECE_BYTES, allowed != 0);
+        bool same = strcmp(ways[chosen - 1], way) == 0;
+        for (unsigned w = 0; w < 4; w++)
+            same &= osoe_places_cost(numbered[w], nodes, members, &link, ceiling, capacity, small,
+                                     OSOE_INTERNAL_PIECE_BYTES, allowed != 0) == cost[w];
+        if (!same && differ++ < 10)
+            fprintf(stderr, "%s: the C chose %s: %s", path, ways[chosen - 1], line);
+        lines++;
+    }
+    fclose(f);
+    printf("%u lines of %s, %u where the C and the model differ\n", lines, path, differ);
+    CHECK(differ == 0);
+    CHECK(lines > 1000);
+    return CHECK_DONE();
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && strcmp(argv[1], "choice") == 0)
         return choice();
     if (argc == 3 && strcmp(argv[1], "grid") == 0)
         return grid(argv[2]);
-    fprintf(stderr, "usage: %s choice | grid FILE\n", argv[0]);
+    if (argc == 3 && strcmp(argv[1], "places-grid") == 0)
+        return places_grid(argv[2]);
+    fprintf(stderr, "usage: %s choice | grid FILE | places-grid FILE\n", argv[0]);
     return 2;
 }

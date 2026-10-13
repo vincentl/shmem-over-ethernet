@@ -46,6 +46,11 @@ Usage:
   shape_timing.py grid FILE write the chooser's answers on a grid of inputs,
                             for collective-shape.c's test (shmem.shape.grid)
   shape_timing.py grid-compare FILE   check FILE is what `grid` writes now
+  shape_timing.py places    the default way of collect's places (P31) at each
+                            node count, on the Pi's link and a loopback's
+  shape_timing.py places-grid FILE, places-grid-compare FILE
+                            the same for the places' choice and costs, for
+                            shmem.shape.places-grid
 """
 import heapq
 import os
@@ -587,6 +592,112 @@ def simulate_circulant(nodes, n, s, W, h, o, B, links='sender'):
     return max(done)
 
 
+# ---- collect's places: four ways, and the choice among them (P31) ----------
+#
+# A collect of differing blocks on a team spanning nodes finds each member's
+# place one of four ways (collectives.c, collect_varying): the members' vector,
+# a reduction of 8 bytes a member; each node's total (P29), a reduction of 8
+# bytes a node; the leads' scan of the nodes' totals (P30), a small pre-order
+# tree at the ceiling - its widest message the down, 16 bytes - and a record
+# more a step of the gather after, with the share at entry; and the leads'
+# direct exchange of the totals (P33), a hop and a 16-byte message to every other
+# lead. Where each node's members are one run of the team's ranks the last
+# three apply - the scan only where the runs meet the node set's positions in
+# order or in reverse, and the exchange only on the nodes its room holds -
+# and otherwise the members' vector alone. Each way's cost, under the three
+# numbers of the link, in the closed form above: a reduction as the data path
+# runs it, its small class one piece through the ceiling's tree and a larger
+# one the chooser's shape with a hop more for its grant; the scan the same
+# small tree, a level-order tree's terms standing in for the pre-order one's,
+# which is as deep; the exchange its N - 1 messages, each a message cost and a
+# slot's bytes on the sender's link, and a hop. Provisional, all of it: H24 and
+# H25 measure the four (docs/prompts/v0.2-open-items.md), and the choice
+# follows them. collective-shape.c's osoe_places_cost and osoe_places_choose,
+# line for line; shmem.shape.places-grid holds the two to the same answers.
+
+PLACES_WAYS = ('members', 'totals', 'scan', 'exchange')
+PLACES_DOWN_BYTES = 16          # the leads' scan's down, the before and the total
+EXCHANGE_SLOT_BYTES = 16        # the exchange's slot, the epoch and the total
+
+
+def gather_steps(nodes):
+    """The allgather's steps over `nodes` nodes, ceil(log2 nodes)."""
+    steps = 0
+    while (1 << steps) < nodes:
+        steps += 1
+    return steps
+
+
+def reduction_cost(nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, circulant=True):
+    """A reduction of `n` bytes among `nodes` leads as the data path runs it:
+    the small class one piece through the ceiling's tree, and a larger one the
+    chooser's shape, Träff's where `circulant` allows it, and a hop more for the
+    grant a child waits for."""
+    if nodes <= 1 or n == 0:
+        return 0
+    if n <= small_bytes:
+        return cost('reduce', nodes, ceiling, 1, n, n, *link)
+    shape = choose_shape('reduce', nodes, n, link, ceiling, capacity, small_bytes, s, circulant)
+    return min(SATURATED, shape_cost('reduce', nodes, shape, n, link, s) + link[0])
+
+
+def places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s=PIECE,
+                circulant=True):
+    """What finding a collect's places costs one way (the section's comment),
+    nanoseconds: osoe_places_cost."""
+    h_ns, o_ns, bytes_per_second = link
+    if nodes <= 1:
+        return 0
+    if bytes_per_second == 0:
+        return SATURATED
+    if way == 'members':
+        return reduction_cost(nodes, 8 * members, link, ceiling, capacity, small_bytes, s,
+                              circulant)
+    if way == 'totals':
+        return reduction_cost(nodes, 8 * nodes, link, ceiling, capacity, small_bytes, s,
+                              circulant)
+    if way == 'scan':
+        tree = cost('reduce', nodes, ceiling, 1, PLACES_DOWN_BYTES, PLACES_DOWN_BYTES, *link)
+        return min(SATURATED, tree + (gather_steps(nodes) + 1) * o_ns)
+    t = (EXCHANGE_SLOT_BYTES * 1000000000 + bytes_per_second - 1) // bytes_per_second
+    return min(SATURATED, h_ns + (nodes - 1) * (o_ns + t))
+
+
+def choose_places(nodes, members, runs, ordered, room, link, ceiling, capacity, small_bytes,
+                  s=PIECE, circulant=True):
+    """osoe_places_choose: the way a collect's places take by default. The
+    members' vector where some node's members are not one run (`runs` false) or
+    on one node; otherwise the least cost of each node's total, the exchange -
+    on no more nodes than its `room` - and the scan - where the runs are
+    `ordered` - ties to that order."""
+    if nodes <= 1 or not runs:
+        return 'members'
+    best, least = 'totals', places_cost('totals', nodes, members, link, ceiling, capacity,
+                                        small_bytes, s, circulant)
+    for way, allowed in (('exchange', nodes <= room), ('scan', ordered)):
+        if not allowed:
+            continue
+        c = places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s, circulant)
+        if c < least:
+            best, least = way, c
+    return best
+
+
+def places_crossovers(link, members_a_node=1, ceiling=8, capacity=4, small=1024, room=64,
+                      most=1024):
+    """The default way at each node count from 2 to `most`, as runs of node
+    counts taking one way: [(first, last, way)]."""
+    runs = []
+    for nodes in range(2, most + 1):
+        way = choose_places(nodes, nodes * members_a_node, True, True, room, link, ceiling,
+                            capacity, small)
+        if runs and runs[-1][2] == way:
+            runs[-1] = (runs[-1][0], nodes, way)
+        else:
+            runs.append((nodes, nodes, way))
+    return runs
+
+
 # The links the tests pin: the Pi's, from the fit, and a loopback's.
 PI_LINK = (86000, 7000, 116000000)
 LOOPBACK_LINK = (20000, 2000, 4000000000)
@@ -846,8 +957,80 @@ def grid_lines():
     return lines
 
 
+def places_grid_lines():
+    """Every input of the places' grid, and the way and the four costs the
+    model gives it, for collective-shape.c's test (shmem.shape.places-grid)."""
+    lines = ['# nodes members runs ordered room hop_ns message_ns bytes_per_second ceiling'
+             ' capacity small circulant -> way members_ns totals_ns scan_ns exchange_ns'
+             ' (tools/modelcheck/shape_timing.py places-grid)']
+    links = [PI_LINK, LOOPBACK_LINK, (1000000, 50000, 12000000), (5000, 500, 25000000000),
+             (50000, 3000, 2700000000)]
+    for link in links:
+        for nodes in (1, 2, 3, 4, 7, 8, 9, 16, 31, 46, 47, 60, 61, 64, 65, 100, 128, 129, 200,
+                      254, 512, 1000, 4096):
+            for per_node in (1, 4, 16):
+                for runs, ordered in ((False, False), (True, False), (True, True)):
+                    for ceiling, capacity, small in ((8, 4, 1024), (4, 2, 128), (32, 8, 16384)):
+                        for circulant in (0, 1):
+                            members = nodes * per_node
+                            way = choose_places(nodes, members, runs, ordered, 64, link, ceiling,
+                                                capacity, small, circulant=bool(circulant))
+                            costs = [places_cost(w, nodes, members, link, ceiling, capacity,
+                                                 small, circulant=bool(circulant))
+                                     for w in PLACES_WAYS]
+                            lines.append(f'{nodes} {members} {int(runs)} {int(ordered)} 64 '
+                                         f'{link[0]} {link[1]} {link[2]} {ceiling} {capacity} '
+                                         f'{small} {circulant} {way} ' +
+                                         ' '.join(str(c) for c in costs))
+    return lines
+
+
+def check_places(failures):
+    """What the places' choice must say, whatever H24 and H25 move: the
+    members' vector without runs and on one node; on the Pi's link and a
+    loopback's, the exchange on few nodes, and past 128 - where each node's
+    total becomes a large reduction, with its grant - the scan where the runs
+    are ordered, each node's total where they are not; and none of the costs
+    zero past one node."""
+    for name, link in (('the Pi', PI_LINK), ('loopback', LOOPBACK_LINK)):
+        if choose_places(8, 8, False, False, 64, link, 8, 4, 1024) != 'members':
+            failures.append(f'PLACES: on {name} a team with no runs does not take the members')
+        if choose_places(1, 4, True, True, 64, link, 8, 4, 1024) != 'members':
+            failures.append(f'PLACES: on {name} a team of one node does not take the members')
+        if choose_places(4, 16, True, True, 64, link, 8, 4, 1024) != 'exchange':
+            failures.append(f'PLACES: on {name} four nodes do not take the exchange')
+        if choose_places(200, 200, True, True, 64, link, 8, 4, 1024) != 'scan':
+            failures.append(f'PLACES: on {name} 200 ordered nodes do not take the scan')
+        if choose_places(200, 200, True, False, 64, link, 8, 4, 1024) != 'totals':
+            failures.append(f'PLACES: on {name} 200 unordered nodes do not take each node\'s '
+                            'total')
+        if choose_places(100, 100, True, True, 64, link, 8, 4, 1024) == 'exchange':
+            failures.append(f'PLACES: on {name} 100 nodes take the exchange past its room')
+        for w in PLACES_WAYS:
+            if places_cost(w, 8, 8, link, 8, 4, 1024) == 0:
+                failures.append(f'PLACES: on {name} the {w} costs nothing on 8 nodes')
+
+
 def main(argv):
     mode = argv[1] if len(argv) > 1 else 'check'
+    if mode == 'places':
+        for name, link in (('the Pi', PI_LINK), ('a loopback', LOOPBACK_LINK)):
+            for per_node in (1, 16):
+                runs = places_crossovers(link, per_node)
+                print(f'{name}, {per_node} PE{"s" if per_node > 1 else ""} a node: ' +
+                      ', '.join(f'{a}-{b} {w}' for a, b, w in runs))
+        return 0
+    if mode == 'places-grid':
+        with open(argv[2], 'w') as f:
+            f.write('\n'.join(places_grid_lines()) + '\n')
+        return 0
+    if mode == 'places-grid-compare':
+        have = open(argv[2]).read().splitlines()
+        if have != places_grid_lines():
+            print(f'{argv[2]} is not what shape_timing.py places-grid writes now: regenerate it')
+            return 1
+        print(f'{argv[2]}: {len(have) - 1} lines, as the model writes them')
+        return 0
     if mode == 'fit':
         rows = pi_table()
         w, h, o, B = fit(rows)
@@ -869,6 +1052,7 @@ def main(argv):
         return 2
     rows = pi_table()
     failures = checks(rows, PI_HOP, PI_MESSAGE, PI_BANDWIDTH)
+    check_places(failures)
     print(f'design: {len(failures)} failure(s)')
     for f in failures:
         print('   ', f)
