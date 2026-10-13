@@ -510,3 +510,10 @@ exchange. `shmem.collect-places.scan.zeros.0-0-1-1-2-2-3` runs it under the
 leads' scan, which the block map's world takes and the test checks on every
 collect. Files: `shmem/tests/CMakeLists.txt`, `test-collect-places.c` (the
 case's comment). The three zeros cases, three rounds each: 9 of 9.
+
+## The end
+
+The session ends with `docs/prompts/cloud-session-2-response.md`, the short version for the
+author and the lead, committed and pushed last. Part 2's other five batches - `osoe-stat`'s,
+`fatal.c` and `abort.c`'s, start-up's messages, `osoe-launch`'s and D30's line splitting - and
+D16 in the settings' batch were not started.
