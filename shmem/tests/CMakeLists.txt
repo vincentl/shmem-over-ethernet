@@ -909,6 +909,41 @@ osoe_refusal_test(shmem.start-up.landing-bytes.partial-extent 2 0
            "osoe: PE 1: OSOE_GET_LANDING_BYTES=2000 is not a multiple of the landing zone's [0-9]+-byte extents"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
 
+# And its default, a node's 4 MiB split among its PEs, between 256 KiB and
+# 1 MiB a PE (P32; landing-default.sh), as every PE's start-up line shows it:
+# one PE a node, four and five (1 MiB, 1 MiB, 819 KiB in whole extents), eight
+# (512 KiB), sixteen and seventeen (256 KiB); a job of a node of five PEs and a
+# node of one, each node its own; and OSOE_GET_LANDING_BYTES in its place on
+# every PE. A small heap, so that seventeen PEs ask little of /dev/shm.
+foreach(case "1;" "4;" "5;" "8;" "16;" "17;" "0,0,0,0,0,1;" "0,0,1;4096")
+  list(GET case 0 shape)
+  list(GET case 1 bytes)
+  if(shape MATCHES ",")
+    set(map ${shape})
+    string(REPLACE "," "-" label "${map}")
+  else()
+    string(REPEAT "0," ${shape} map)
+    string(REGEX REPLACE ",$" "" map "${map}")
+    set(label L${shape})
+  endif()
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  if(bytes)
+    set(label set.${label})
+  endif()
+  add_test(NAME shmem.landing-default.${label}
+    COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=8m
+            sh ${CMAKE_CURRENT_SOURCE_DIR}/landing-default.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> ${map} ${bytes})
+  set_tests_properties(shmem.landing-default.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "LANDING OK")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.landing-default.${label})
+  endif()
+endforeach()
+
 # The AM layer's settings and the wire's, which a lead alone read before: the lead
 # when it laid out the segment, and the wire's after the rendezvous and on a job
 # of several nodes only, so that a job of one node accepted OSOE_WIRE_BYTES=abc

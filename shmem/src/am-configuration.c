@@ -29,7 +29,18 @@ static uint64_t env_bytes(const char *name, uint64_t dflt, uint64_t lo, uint64_t
     return v;
 }
 
-void osoe_am_configuration_read(struct osoe_am_configuration *c)
+uint64_t osoe_get_landing_default_bytes(uint32_t local_count)
+{
+    uint64_t share = OSOE_GET_LANDING_NODE_BUDGET_BYTES / (local_count ? local_count : 1);
+    share -= share % OSOE_LANDING_EXTENT_BYTES;
+    if (share < OSOE_GET_LANDING_LEAST_DEFAULT_BYTES)
+        return OSOE_GET_LANDING_LEAST_DEFAULT_BYTES;
+    if (share > OSOE_GET_LANDING_MOST_DEFAULT_BYTES)
+        return OSOE_GET_LANDING_MOST_DEFAULT_BYTES;
+    return share;
+}
+
+void osoe_am_configuration_read(struct osoe_am_configuration *c, uint32_t local_count)
 {
     c->chunk = env_bytes("OSOE_AM_CHUNK", OSOE_AM_DEFAULT_CHUNK, OSOE_AM_MIN_CHUNK,
                          OSOE_AM_MAX_CHUNK, true);
@@ -66,8 +77,10 @@ void osoe_am_configuration_read(struct osoe_am_configuration *c)
     /* Tunable for the same reason as the credits: a test reaches a full landing
      * zone only by making it small. Its extents count what is in flight since
      * phase 1 step 8 slice 2, so OSOE_GETS_IN_FLIGHT, which counted it apart,
-     * is retired and ignored. */
-    c->get_landing_bytes = env_bytes("OSOE_GET_LANDING_BYTES", OSOE_DEFAULT_GET_LANDING_BYTES,
+     * is retired and ignored. Unset, the node's budget split among its PEs,
+     * which every PE of the node counts alike (P32). */
+    c->get_landing_bytes = env_bytes("OSOE_GET_LANDING_BYTES",
+                                     osoe_get_landing_default_bytes(local_count),
                                      OSOE_MIN_GET_LANDING_BYTES, OSOE_MAX_GET_LANDING_BYTES,
                                      false);
     /* Whole extents or nothing: a size that is not one is refused by name

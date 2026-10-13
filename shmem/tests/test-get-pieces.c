@@ -16,11 +16,14 @@
  * since none of them is a nonblocking get. Every byte is checked where it
  * landed.
  *
- * And the pieces overlap: where the get is larger than the landing zone, as at
- * the default 256 KiB, its first pieces fill the zone before any is copied out,
- * so an issue finds no room - am.landing_full moves - where a get completing
- * each piece before it issues the next would never fill it (the adversarial
- * read of v0.2's blocking gets, note 4).
+ * And the pieces overlap: where the get is larger than the landing zone, as
+ * the mebibyte and three bytes are than one PE a node's default of 1 MiB, its
+ * first pieces fill the zone before any is copied out, so an issue finds no
+ * room - am.landing_full moves - where a get completing each piece before it
+ * issues the next would never fill it (the adversarial read of v0.2's blocking
+ * gets, note 4). And a get a piece's room short of the zone goes out whole: no
+ * issue finds it full - at one PE a node 960 KiB, its pieces each a run of 64
+ * extents, where the 256 KiB the default was before P32 held four of them.
  *
  * OSOE_TEST_GET_PIECES=fallback, with OSOE_MAX_CONTEXTS at its most: every
  * thread place's block lies past what a token can name, so a get of more than
@@ -69,6 +72,21 @@ static uint64_t counter(const char *name)
     }
     osoe_segment_close(&s);
     return m ? total : UINT64_MAX;
+}
+
+/* The landing zone this PE's gets share: OSOE_GET_LANDING_BYTES, or by default
+ * its node's 4 MiB split among the node's PEs - SHMEM_TEAM_SHARED's - in whole
+ * 1 KiB extents, between 256 KiB and 1 MiB (P32; am-configuration.h). */
+static size_t zone_bytes(void)
+{
+    const char *zone = getenv("OSOE_GET_LANDING_BYTES");
+    if (zone)
+        return (size_t)strtoull(zone, NULL, 10);
+    size_t share = ((size_t)4 << 20) / (size_t)shmem_team_n_pes(SHMEM_TEAM_SHARED);
+    share -= share % 1024;
+    return share < ((size_t)256 << 10) ? (size_t)256 << 10
+           : share > ((size_t)1 << 20) ? (size_t)1 << 20
+                                       : share;
 }
 
 static size_t first_wrong(const unsigned char *got, size_t len)
@@ -130,12 +148,30 @@ int main(void)
             if (one_piece == 0 && wrong == BIG && pieces == 0 && counted == 0 && no_room == 0)
                 printf("GET PIECES FALLBACK OK\n");
         } else {
-            const char *zone = getenv("OSOE_GET_LANDING_BYTES");
-            bool overfills = (zone ? strtoull(zone, NULL, 10) : 256 * 1024) < BIG;
+            bool overfills = zone_bytes() < BIG;
             CHECK(pieces >= 2);
             CHECK(!overfills || no_room >= 1);
+
+            /* A get a piece's room short of the zone: each piece a run of at
+             * most 64 extents, a word of the zone's bitmap, so its pieces fit
+             * the zone together and no issue finds it full. */
+            size_t words = zone_bytes() / 65536;
+            size_t fits = words > 1 ? (words - 1) * 65536 : 0;
+            uint64_t short_of = 0;
+            size_t fits_wrong = fits;
+            if (fits > 0 && fits <= BIG) {
+                full = counter("am.landing_full");
+                memset(mine, 0, fits);
+                shmem_getmem(mine, source, fits, 1);
+                fits_wrong = first_wrong(mine, fits);
+                short_of = counter("am.landing_full") - full;
+                printf("a get of %zu bytes into a zone of %zu: %llu issues found no room\n",
+                       fits, zone_bytes(), (unsigned long long)short_of);
+                CHECK(fits_wrong == fits);
+                CHECK(short_of == 0);
+            }
             if (one_piece == 0 && wrong == BIG && pieces >= 2 && counted == 0 &&
-                (!overfills || no_room >= 1))
+                (!overfills || no_room >= 1) && fits_wrong == fits && short_of == 0)
                 printf("GET PIECES OK\n");
         }
         free(mine);

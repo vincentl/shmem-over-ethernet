@@ -130,7 +130,8 @@ OSOE_BUILD_NOTE
 "    OSOE_GET_LANDING_BYTES bytes of each PE's landing zone for its gets'\n"
 "                           replies, a multiple of 1024 from 1024 to\n"
 "                           67107840, the same on every PE of a node;\n"
-"                           default 262144 (§4.6, §4.11)\n"
+"                           default a node's 4194304 split among its PEs,\n"
+"                           from 262144 to 1048576 a PE (§4.6, §4.11)\n"
 "    OSOE_NO_PROGRESS_TIMEOUT\n"
 "                           seconds a wait may see no progress before it ends\n"
 "                           the job; 0, the default, means never (§3.15)\n"
@@ -484,7 +485,8 @@ static void session_start(void)
      * SHMEM_DEBUG, after the rendezvous, because the two things worth knowing
      * are the ones it produces: the control segment to point osoe-stat at
      * (§3.14), and the heap base every PE agreed on (§4.1). This is the same
-     * name §3.15 prints on an abort, said once at start-up instead.
+     * name §3.15 prints on an abort, said once at start-up instead. And the
+     * landing zone the node laid out, whose default its PEs share (P32).
      */
     if (osoe.bootstrap.debug) {
         /* And the link, as the shapes will see it. One buffer, one write, as
@@ -504,12 +506,13 @@ static void session_start(void)
                          (unsigned long long)(osoe.job.link_ns / 1000));
         }
         int n = snprintf(line, sizeof line, "osoe: PE %u of %u (local %u of %u): segment "
-                         "/dev/shm%s, heap %llu bytes at %#llx, node %u of %u%s%s\n",
+                         "/dev/shm%s, heap %llu bytes at %#llx, landing zone %u bytes, node %u "
+                         "of %u%s%s\n",
                          osoe.bootstrap.rank, osoe.bootstrap.world_size, osoe.bootstrap.local_id,
                          osoe.bootstrap.local_count, osoe.node.control_name,
                          (unsigned long long)osoe.node.heap_size,
                          (unsigned long long)(uintptr_t)osoe.node.heap_of[osoe.bootstrap.local_id],
-                         osoe.job.node, osoe.job.node_count,
+                         osoe.node.landing_arena_bytes, osoe.job.node, osoe.job.node_count,
                          osoe.job.force_remote ? ", force-remote" : "", link);
         if (n > 0) {
             size_t len = (size_t)n < sizeof line ? (size_t)n : sizeof line - 1;

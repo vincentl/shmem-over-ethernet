@@ -787,7 +787,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
      * short read.
      */
     struct osoe_am_configuration am;
-    osoe_am_configuration_read(&am);
+    osoe_am_configuration_read(&am, b->local_count);
     /* Since layout 23 a zone is extents (node.h): its header and bitmap, a
      * record an extent, then the extents. A piece of a get is at most a run of
      * 64 extents in one word of the bitmap, and at most a chunk, which the
@@ -1302,17 +1302,6 @@ again:;
                  h->dir.owner_count ? h->dir.owner_count - 1 : 0, b->progress_helpers);
         fail_rendezvous(n, msg);
     }
-    /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
-     * this PE's gets would be counted against a zone of another size. */
-    struct osoe_am_configuration am;
-    osoe_am_configuration_read(&am);
-    if (h->landing_arena_bytes != am.get_landing_bytes) {
-        char msg[256];
-        snprintf(msg, sizeof msg, "OSOE_GET_LANDING_BYTES differs between PEs: the local lead "
-                 "has %u, this PE has %llu (§3.12)", h->landing_arena_bytes,
-                 (unsigned long long)am.get_landing_bytes);
-        fail_rendezvous(n, msg);
-    }
     if (h->job != b->job || h->step != b->step || h->node != b->node ||
         h->session != session || h->dir.local_count != b->local_count ||
         h->world_size != b->world_size)
@@ -1320,6 +1309,19 @@ again:;
                    "session %u; this PE expects %u of %u, session %u", n->control_name,
                    h->dir.local_count, h->world_size, h->session, b->local_count,
                    b->world_size, session);
+    /* And by its OSOE_GET_LANDING_BYTES, which sizes every PE's landing zone:
+     * this PE's gets would be counted against a zone of another size. After
+     * the node's PEs are known to be counted alike, which the default is split
+     * among (P32). */
+    struct osoe_am_configuration am;
+    osoe_am_configuration_read(&am, b->local_count);
+    if (h->landing_arena_bytes != am.get_landing_bytes) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "OSOE_GET_LANDING_BYTES differs between PEs: the local lead "
+                 "has %u, this PE has %llu (§3.12)", h->landing_arena_bytes,
+                 (unsigned long long)am.get_landing_bytes);
+        fail_rendezvous(n, msg);
+    }
     if (h->dir.slots_offset + (uint64_t)h->dir.local_count * h->dir.slot_bytes > n->control_bytes ||
         h->dir.blocks_offset + h->dir.blocks_bytes > n->control_bytes ||
         h->dir.connections_offset + h->dir.connections_bytes > n->control_bytes ||

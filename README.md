@@ -809,8 +809,8 @@ The `/dev/shm` capacity check counts the objects whole all the same.
 | What | Where | Grows with | 4 × 4 | 64 × 64 | 500 × 256 |
 |---|---|---|---|---|---|
 | A PE's heap object: the symmetric heap, then the library's internal region | in `/dev/shm`, one a PE, mapped by every PE of the node | `SHMEM_SYMMETRIC_SIZE`, then 24.6 to 29.6 KiB a team number (`OSOE_MAX_TEAMS`) and a 577 KiB lane a thread place (`OSOE_MAX_THREADS` + 1) | 272 MiB, the region 15.73 | 273 MiB, 16.60 | 273 MiB, 16.88 |
-| What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.06 GiB | 17.1 GiB | 68.5 GiB |
-| The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 287 KiB a PE - 260 KiB of it the PE's landing zone for gets (`OSOE_GET_LANDING_BYTES`), and a 128-byte context block for each context and each thread place (`OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS` + 1) - 128 bytes a peer node, and 256 bytes an owner of the node's wires: the lead's agent and each progress helper | 2.1 MiB | 18.9 MiB | 72.8 MiB, 1.5 written at start |
+| What every PE maps of its node's `/dev/shm` | address space | P heap objects, the control segment and the connection area | 1.07 GiB | 17.1 GiB | 68.5 GiB |
+| The control segment | in `/dev/shm`, one a node | about 1.0 MiB, about 27 KiB a PE and its landing zone for gets (`OSOE_GET_LANDING_BYTES`) - by default its node's 4 MiB split among the node's PEs, 1 MiB at 4 PEs a node and 256 KiB from 16, and 16 bytes an extent of 1 KiB besides - and a 128-byte context block for each context and each thread place (`OSOE_MAX_CONTEXTS`, `OSOE_MAX_THREADS` + 1) - 128 bytes a peer node, and 256 bytes an owner of the node's wires: the lead's agent and each progress helper | 5.2 MiB | 18.9 MiB | 72.8 MiB, 1.5 written at start |
 | The connection area | in `/dev/shm`, one a node | 512 KiB of buffers and 1.25 KiB of state a peer node | 1.5 MiB | 31.6 MiB | 250 MiB, 0.6 written at start |
 | The node lead's own | its private memory | about 0.8 MiB and 8.1 KB a peer node - the reply pool, and 4.6 KB of it the peer's control wire, 4 KiB its private send buffer - and 1 MiB of receive buffers as traffic comes; with progress helpers, as much again of receive buffers each, and an io_uring ring and a thread's stack | 1.8 MiB | 2.3 MiB | 5.7 MiB |
 | Every PE's own, for the other nodes | its private memory | 24 bytes a peer node, and 21 a peer node for each context in use | 135 bytes | 2.8 KB | 22.5 KB |
@@ -840,7 +840,7 @@ times these:
 | `OSOE_SMALL_COLLECTIVE_BYTES` | a team number eighteen bytes for each byte of the value, on about 9.0 KiB: 11.3 KiB at 128, 27.0 KiB at the default 1 KiB, 297 KiB at 16 KiB, a PE (at 500 nodes) |
 | `OSOE_COLLECTIVE_FANOUT` | a team number 2.5 KiB and a lane 64 KiB, a PE; the tree is at most ⌈log_k n⌉ levels deep - 3 at 500 nodes at the default 8, 5 at 4, 2 at 32 |
 | `OSOE_COLLECTIVE_PIPELINE` | a lane 144 KiB, 2.4 MiB a PE across its 17 |
-| `OSOE_GET_LANDING_BYTES` | the control segment about that much a PE |
+| `OSOE_GET_LANDING_BYTES` | the control segment about that much a PE, and 16 bytes a KiB of it; by default 4 MiB a node, from 1 MiB a PE to 256 KiB |
 | `OSOE_AM_CHUNK`, `OSOE_AM_BUFFER_BUDGET` | the connection area eight chunks a peer node at the default buffer, four at its floor; the budget then holds the default to budget / (8 × chunk) + 1 nodes, 2,049 at the defaults, and caps the job at budget / (4 × chunk) + 1, 4,097 |
 | `SHMEM_SYMMETRIC_SIZE` | the address space every PE maps P times |
 
@@ -889,8 +889,9 @@ times these:
   the default heap, though pages cost only as written - and the connection area
   checks its own, 250 MiB at 500 nodes; lower the heap, or set
   `OSOE_SHM_CAPACITY_CHECK=0`. The landing zones are a little over
-  `OSOE_GET_LANDING_BYTES` × P of the segment, 4.25 KiB of header and records a
-  zone besides: 65 MiB at 256 PEs.
+  `OSOE_GET_LANDING_BYTES` × P of the segment, 16 bytes of record a KiB of zone
+  and a quarter of a KiB of header besides: 65 MiB at 256 PEs, and by default,
+  each node's 4 MiB split among its PEs, 4.1 MiB on a node of 4 to 16 PEs.
 - **A node's team blocks** run out first at many PEs a node: three whole-job
   `shmem_team_split_2d` grids are as many as the default pool holds at 256 PEs
   a node, and a fourth fails (Limits, "Teams").
@@ -1030,32 +1031,36 @@ specification or takes a choice the specification leaves open.
   remapping them as shared memory at init, as osoe does, makes them memory its
   node-mates can map (design §4.3).
 - **A PE's gets from other nodes land in its landing zone**
-  (`OSOE_GET_LANDING_BYTES`, 256 KiB by default, in extents of 1 KiB): a get
-  takes whole extents, at least one, so 256 small gets in flight fill it as 256
-  KiB of data does, and past it a new get waits for earlier ones to land -
-  backpressure, never an error.
+  (`OSOE_GET_LANDING_BYTES`, in extents of 1 KiB; by default its node's 4 MiB
+  split among the node's PEs, no less than 256 KiB nor more than 1 MiB a PE): a
+  get takes whole extents, at least one, so 256 small gets in flight fill a zone
+  of 256 KiB as 256 KiB of data does, and past it a new get waits for earlier
+  ones to land - backpressure, never an error.
 - **A large get from another node is held by its PE's landing zone.** A get's
   pieces of up to 64 KiB - seventeen to a mebibyte - go out together, a
   blocking get's as a nonblocking get's, but no more of them than the landing
-  zone holds: four at the default 256 KiB (`OSOE_GET_LANDING_BYTES`). The zone
-  is the PE's, shared by its threads and contexts, so while one large get
-  fills it another thread's get of any size waits for a piece to land; and the
-  pieces in flight toward a node are bounded by its connection's reply credits
-  too (`OSOE_AM_CREDITS`, 64, shared by the node's PEs), from sixteen PEs of a
-  node getting at once. On the Pi cluster's gigabit a blocking get of 64 KiB
-  or more took 1.00 to 1.06 times a put and quiet of the same size, and a
-  nonblocking one 0.98 to 1.06; over the development VM's loopback, where a
-  round trip's time carries about the zone's 256 KiB, about 2.7 times at a
-  mebibyte and 3.3 at 4 MiB. On Google Cloud's link of 23 Gbit/s a blocking get
-  took 1.6 times a put and quiet at a mebibyte and 1.8 to 1.95 times from 4 MiB
-  with the default zone, and what a put did from a zone of 1 MiB, while eight
-  PEs on each node getting from the other nodes ran fastest with the default,
-  13,601 MiB/s a job against 8,786 with 16 MiB
-  (`docs/fast-link-results.md`). The zone's size for a
-  fast link is to come from a per-node budget, as the author decided on those
-  numbers, and is not built yet (`docs/decisions/2026-10-12.md`;
+  zone holds (`OSOE_GET_LANDING_BYTES`): four at 256 KiB, sixteen at 1 MiB.
+  The zone is the PE's, shared by its threads and contexts, so while one large
+  get fills it another thread's get of any size waits for a piece to land; and
+  the pieces in flight toward a node are bounded by its connection's reply
+  credits too (`OSOE_AM_CREDITS`, 64, shared by the node's PEs), from sixteen
+  PEs of a node getting at once. With a zone of 256 KiB, the default then, on
+  the Pi cluster's gigabit a blocking get of 64 KiB or more took 1.00 to 1.06
+  times a put and quiet of the same size, and a nonblocking one 0.98 to 1.06;
+  over the development VM's loopback, where a round trip's time carries about
+  256 KiB, about 2.7 times at a mebibyte and 3.3 at 4 MiB. On Google Cloud's
+  link of 23 Gbit/s a blocking get took 1.6 times a put and quiet at a
+  mebibyte and 1.8 to 1.95 times from 4 MiB with that zone, and what a put did
+  from a zone of 1 MiB, while eight PEs on each node getting from the other
+  nodes ran fastest with 256 KiB, 13,601 MiB/s a job against 8,786 with 16 MiB
+  (`docs/fast-link-results.md`). So by default a node's 4 MiB is split among
+  its PEs, no less than 256 KiB nor more than 1 MiB a PE - 1 MiB to each of one
+  to four PEs a node, 512 KiB to each of eight, 256 KiB from sixteen - as the
+  author decided on those numbers (P32; `docs/decisions/2026-10-12.md`;
   `docs/decisions/2026-10-10-blocking-gets.md`;
-  `docs/design/blocking-get-proposal.md`, (d)). A thread whose place's
+  `docs/design/blocking-get-proposal.md`, (d)), which H28 is to measure on the
+  cluster; each PE's start-up line under `SHMEM_DEBUG` names its zone. A
+  thread whose place's
   context block lies past block 4,095, the last a get's token can name - as
   the last places' do from `OSOE_MAX_CONTEXTS` 4,080 at the default
   `OSOE_MAX_THREADS` - gets a piece at a time, a round trip each.
@@ -1448,7 +1453,7 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  510 tests labelled `internode` - those of a job of more than one node, of
+  512 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
@@ -1585,7 +1590,7 @@ both are set the `SHMEM_` one controls.
 | `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 760 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. Each place, and the agent's, has a lane for the large reductions and broadcasts its thread leads and the large scans it makes, 577 KiB of address space at the default fan-out and pipeline depth, which a thread that does neither never touches: 9.6 MiB a PE at the default - but for the link's measurement as a job starts (`OSOE_LINK_HOP_NS`), which writes 64 KiB of the first lane of node 1's first PE and a page of the first lane of each of the next nodes' up to the fan-out. *Checked* among a node's PEs. |
-| `OSOE_GET_LANDING_BYTES` | `262144` | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. *Checked* among a node's PEs. |
+| `OSOE_GET_LANDING_BYTES` | a node's `4194304` over its PEs | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. Unset, the node's 4 MiB split among its PEs in whole KiB, no less than `262144` nor more than `1048576` a PE - 1 MiB to each of 1 to 4 PEs a node, 512 KiB to 8, 256 KiB from 16 - each node from its own count (P32). *Checked* among a node's PEs. |
 
 **Collectives**
 

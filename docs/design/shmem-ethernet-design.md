@@ -3330,8 +3330,11 @@ own wake word.
 *As built: nonblocking gets* (after phase 1 step 4, the author's decision on
 the strided forms, 2026-09-24). A PE's landing zone holds, after its blocking
 slot, `OSOE_GETS_IN_FLIGHT` request records (default 64) and an arena of
-`OSOE_GET_LANDING_BYTES` (default 256 KiB) that their replies share (control
-segment layout 16). A nonblocking get asks and returns: each piece - no larger
+`OSOE_GET_LANDING_BYTES` (default 256 KiB; since P32 a node's 4 MiB split among
+its PEs in whole extents, between 256 KiB and 1 MiB a PE, the author's A5 of
+2026-10-12 - a zone of 256 KiB served eight PEs a node's gets best on Google
+Cloud's link, and one PE's large gets needed 1 MiB to match a put) that their
+replies share (control segment layout 16). A nonblocking get asks and returns: each piece - no larger
 than a chunk, the wire's limit or the arena - takes a record and a range of the
 arena, writes the range into the record and then its token, with release,
 adds its bytes to `bytes_issued`, takes a reply credit and goes out. The token

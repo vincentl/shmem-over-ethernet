@@ -183,3 +183,90 @@ ThreadSanitizer alone.
 'heap-base|refuse\.heap_base'` and the gate; and as root if the VM allows it,
 `sudo ctest --test-dir build/tsan -R 'heap-base|refuse\.heap_base'` - aarch64's
 first two candidates are outside the tool's application memory too.
+
+## Part 2: what the cluster needs next
+
+### 3. P32: the landing zone from a per-node budget
+
+**Done.** Commit: the one that adds this entry. Neither a wire nor a layout
+change: the zone's size was already the lead's to lay out and every PE's to
+check (`landing_arena_bytes`, layout 23 on); only its default moves.
+
+**The rule** (the author's A5, `docs/decisions/2026-10-12.md`): unset,
+`OSOE_GET_LANDING_BYTES` is the node's budget of 4 MiB split among the node's
+PEs, rounded down to whole 1 KiB extents, and no less than 256 KiB nor more
+than 1 MiB a PE: 1 MiB to each of 1 to 4 PEs a node, 819 KiB to 5, 682 KiB to
+6, 512 KiB to 8, 273 KiB to 15, 256 KiB from 16. Each node counts its own PEs,
+so the nodes of a job may differ; the setting still replaces it, and is still
+checked among a node's PEs. The blocking get stays as built.
+
+**Files and functions**:
+
+- `shmem/src/am-configuration.h`: `OSOE_GET_LANDING_NODE_BUDGET_BYTES` (4 MiB),
+  `OSOE_GET_LANDING_LEAST_DEFAULT_BYTES` (256 KiB) and
+  `OSOE_GET_LANDING_MOST_DEFAULT_BYTES` (1 MiB) in place of
+  `OSOE_DEFAULT_GET_LANDING_BYTES`; `osoe_get_landing_default_bytes(local_count)`;
+  and `osoe_am_configuration_read` takes the node's PE count.
+- `am-configuration.c`: the default's function, and the reader's default from it.
+- The reader's four callers pass `b->local_count`: `node.c` (the lead's layout
+  and every PE's check), `connection-area.c`, `transport-am.c`'s settings check.
+- `node.c`'s check between a node's PEs: the zone's comparison moved after the
+  job's identity, `local_count` among it, so that a PE counting the node's PEs
+  otherwise is told the job differs, not that the zone does.
+- `init.c`: each PE's `SHMEM_DEBUG` start-up line names its zone - "landing
+  zone N bytes", after the heap - which is how the tests see the default, and
+  how a cluster's run records it; `SHMEM_INFO`'s text gives the default.
+- Tests: `test-am-size.c` (the rule at 1 to 256 PEs a node, and the setting
+  over it at 1 and 64), `test-get-pieces.c` (the zone the rule gives, and a get
+  a piece's room short of it going out whole), `test-context.c` (its unset
+  zone by the rule, a path no registration takes), `landing-default.sh` and its
+  eight cases, `shmem/tests/CMakeLists.txt`.
+
+**Tests that fail without it**:
+
+- `shmem.am-size`: `osoe_get_landing_default_bytes` and the reader at 1, 2, 3,
+  4, 5, 6, 8, 15, 16, 17, 64 and 256 PEs a node, and `OSOE_GET_LANDING_BYTES=4096`
+  over it at 1 and 64.
+- `shmem.landing-default.{L1,L4,L5,L8,L16,L17,0-0-0-0-0-1,set.0-0-1}`
+  (`landing-default.sh`, tier 2): a job of 1, 4, 5, 8, 16 and 17 PEs on one
+  node, one of a node of five PEs and a node of one, and `OSOE_GET_LANDING_BYTES=4096`
+  on a map of two nodes; every PE's start-up line must name the zone its own
+  line's count of its node's PEs gives - the script computes it in shell, apart
+  from the C - or the setting. A heap of 8 MiB, so that seventeen PEs ask little
+  of `/dev/shm`. 0.03 to 2.6 s each.
+- `shmem.get-pieces.0-1`, one PE a node: a get of 983,040 bytes - a piece's
+  room, 64 KiB, short of the 1 MiB zone - finds no room at no issue, where the
+  256 KiB zone before held four of its pieces.
+
+**Shown**: the change with the default as before - `osoe_get_landing_default_bytes`
+returning 256 KiB, the start-up line and the tests kept - rebuilt, `ctest -R
+'^shmem\.(landing-default|am-size|get-pieces|start-up\.landing|context|get-nbi)'`:
+7 of 38 fail - `shmem.am-size` ("1 PEs a node: a zone of 262144 bytes, not
+1048576" and seven more counts), `shmem.landing-default.{L1,L4,L5,L8,0-0-0-0-0-1}`
+("a PE of a node of 5: a zone of 262144 bytes, 838656 due"), and
+`shmem.get-pieces.0-1` ("a get of 983040 bytes into a zone of 1048576: 6 issues
+found no room"); L16, L17 and the set case pass, as they must, the rule giving
+256 KiB there too. Restored: 39 of 39 with `shmem.heap-base.candidates`, and the
+get-pieces case "a get of 983040 bytes into a zone of 1048576: 0 issues found no
+room".
+
+**What it costs**: the control segment of a node of 4 PEs grows by 3.05 MiB,
+measured from PE 0's mappings in a job of 4 nodes × 4 PEs here (1,839,104 bytes
+at 256 KiB a zone, 5,033,984 by default); the README's memory table's 4 × 4
+column follows (2.1 to 5.2 MiB, what every PE maps 1.06 to 1.07 GiB), and its
+64 × 64 and 500 × 256 columns, at 256 KiB a zone either way, do not move.
+
+**In the sandbox**: release without a warning; the static checks 13 of 13; the
+release suite, models aside, **930: 928 passed, 2 skipped** (the root refusal
+tests), in 244 s; the single-node build (`cmake -S . -B build/single-node
+-DOSOE_SINGLE_NODE=ON`) without a warning, its suite 421 of 421 in 59 s, the six
+one-node `landing-default` cases among them.
+The README's `OSOE_GET_LANDING_BYTES` rows (the settings and their costs), the
+gets' two Limits entries - the measurements kept as taken, with a zone of
+256 KiB, the default then - the memory table and the `/dev/shm` paragraph, its
+internode count (512), and design §4.6's "As built: nonblocking gets" say what
+is now true.
+
+**For the VM**: `ctest --test-dir build/release -R '^shmem\.(landing-default|am-size|get-pieces|context|get-nbi|start-up\.landing)'`,
+and the README's 4 × 4 figure with the VM's 128-byte lines. H28 measures the
+split on the cluster (B14's `gets.sh`).
