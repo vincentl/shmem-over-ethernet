@@ -3057,8 +3057,9 @@ if(OSOE_INTERNODE)
   # members' vector; and the world collecting nothing again and again (zeros),
   # so that no gather follows the exchange and a lead may write the next
   # collect's totals while another still reads this one's, under
-  # OSOE_TEST_PERTURB's yields and sleeps between the steps, at the default and
-  # under the exchange.
+  # OSOE_TEST_PERTURB's yields and sleeps between the steps, at the default,
+  # under the exchange and under the leads' scan, whose small tree a collect of
+  # nothing runs back to back as well.
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     add_executable(shmem_test_collect-places test-collect-places.c
       ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
@@ -3113,7 +3114,7 @@ if(OSOE_INTERNODE)
         LABELS "tier2" TIMEOUT 90)
       osoe_internode_label(shmem.collect-places.${prefix}${kind}.${label})
     endforeach()
-    foreach(way "link" "exchange")
+    foreach(way "link" "exchange" "scan")
       set(name shmem.collect-places.${way}.zeros.0-0-1-1-2-2-3)
       add_test(NAME ${name}
         COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MAP=0,0,1,1,2,2,3

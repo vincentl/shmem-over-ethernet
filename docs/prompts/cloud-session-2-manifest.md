@@ -498,3 +498,15 @@ nothing.
 four new tests more; the single-node build without a warning, its five
 heap-base and notice refusals passing. **For the VM**: D12's own `0x1000`, which
 should now say "the kernel refuses an address that low (vm.mmap_min_addr)".
+
+### 9. P30's tests: the collects of nothing under the scan too
+
+**Done.** Commit: the one that adds this entry. The brief asks for zero lengths
+for P30 as for P33. Every case of `shmem.collect-places.*` already collects
+with some members, each node's members in turn and every member giving 0, under
+every way; but the run of collects of nothing back to back under
+`OSOE_TEST_PERTURB`, P33's `zeros` case, ran only at the default and under the
+exchange. `shmem.collect-places.scan.zeros.0-0-1-1-2-2-3` runs it under the
+leads' scan, which the block map's world takes and the test checks on every
+collect. Files: `shmem/tests/CMakeLists.txt`, `test-collect-places.c` (the
+case's comment). The three zeros cases, three rounds each: 9 of 9.

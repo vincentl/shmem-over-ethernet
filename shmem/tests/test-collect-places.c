@@ -36,7 +36,8 @@
  *                    reads this one's - with lengths that differ every eighth
  *                    time: the exchange's two sets of slots and counters
  *                    (exchange_model.py), which a run under OSOE_TEST_PERTURB
- *                    finds wanting where they are one.
+ *                    finds wanting where they are one, and the leads' scan's
+ *                    small tree, entered back to back.
  *
  * A team past the first node's that would span one node alone, on a map of two,
  * is left out: it has no internode phase to find places for.
