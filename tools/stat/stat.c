@@ -432,6 +432,35 @@ static void print_identity(const struct osoe_segment *s)
         printf("  a PE failed during rendezvous\n");
 }
 
+/*
+ * Whether process `pid` is stopped - by SIGSTOP, a job's suspend or a debugger
+ * - by the state /proc/<pid>/status shows: a stopped PE's record still reads
+ * as waiting, its "for N s" growing like a waiting PE's, and a stopped node
+ * looked like a slow one (D6; round three's readiness report, round six's
+ * Q5-5). False where it cannot be read.
+ */
+static bool process_stopped(uint64_t pid)
+{
+    if ((int64_t)pid <= 0)
+        return false;
+    char path[64], line[128];
+    snprintf(path, sizeof path, "/proc/%" PRIu64 "/status", pid);
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return false;
+    bool stopped = false;
+    while (fgets(line, sizeof line, f))
+        if (strncmp(line, "State:", 6) == 0) {
+            const char *at = line + 6;
+            while (*at == ' ' || *at == '\t')
+                at++;
+            stopped = *at == 'T' || *at == 't';
+            break;
+        }
+    fclose(f);
+    return stopped;
+}
+
 /* One line per PE: who it is, whether it is alive, and where it is blocked. */
 static void print_pe_lines(const struct osoe_segment *s)
 {
@@ -463,7 +492,9 @@ static void print_pe_lines(const struct osoe_segment *s)
         }
         printf("%3u %5" PRIu64 " %8" PRIu64 " %-10s %6" PRIu64 " %8" PRIu64 "  %s%s\n",
                i, rank, pid, phase_name(phase), epoch, sweeps, where,
-               alive || phase == 0 || phase == 3 ? "" : "   [pid is gone]");
+               !alive && phase != 0 && phase != 3 ? "   [pid is gone]"
+               : alive && process_stopped(pid)    ? "   [stopped: SIGSTOP or a debugger]"
+                                                  : "");
     }
 }
 
@@ -711,13 +742,15 @@ static void summary_line(const struct osoe_segment *s)
 {
     char host[72] = "?";
     osoe_segment_read_str(s, "node.hostname", 0, host, sizeof host);
-    uint64_t node = 0, live = 0;
+    uint64_t node = 0, live = 0, stopped = 0;
     osoe_segment_read_name(s, "node.id", 0, &node);
     for (uint32_t i = 0; i < s->local_count; i++) {
         uint64_t pid = 0;
         osoe_segment_read_name(s, "pe.pid", i, &pid);
-        if ((int64_t)pid > 0 && !(kill((pid_t)(int64_t)pid, 0) != 0 && errno == ESRCH))
+        if ((int64_t)pid > 0 && !(kill((pid_t)(int64_t)pid, 0) != 0 && errno == ESRCH)) {
             live++;
+            stopped += process_stopped(pid);
+        }
     }
     /* Which PE of this node is blocked longest, and in what. */
     uint64_t now = osoe_segment_now_ns(), worst = 0;
@@ -739,6 +772,13 @@ static void summary_line(const struct osoe_segment *s)
         uint64_t rank = i;
         osoe_segment_read_name(s, "pe.rank", i, &rank);
         snprintf(where, sizeof where, "rank %" PRIu64 " %s (%s) %s", rank, b.routine, what, d);
+    }
+    /* A stopped PE's waits do not move, however long its record says it has
+     * waited: said beside the longest wait, which may well be its own (D6). */
+    if (stopped) {
+        size_t used = strlen(where);
+        snprintf(where + used, sizeof where - used, "%s[%" PRIu64 " PE%s stopped]",
+                 strcmp(where, "-") == 0 ? " " : "  ", stopped, stopped == 1 ? "" : "s");
     }
 
     /* The node's shape and link first: one line, before its teams'. */
@@ -809,13 +849,21 @@ static void counters_human(const struct osoe_segment *s)
         printf("%12s%u", "PE", p);
     printf("%14s\n", "total");
 
+    /* A value for every PE of the node, however many: a fixed 64 left PEs 64
+     * on out of every row and its total, under a header naming them all (D3;
+     * the review of step D's merge point, readiness). */
+    uint64_t *per = calloc(npe ? npe : 1, sizeof *per);
+    if (!per) {
+        fprintf(stderr, "osoe-stat: out of memory for %u PEs' counters\n", npe);
+        return;
+    }
     for (uint32_t i = 0; i < s->nmetrics; i++) {
         const struct osoe_metric_descriptor *m = &s->metrics[i];
         if (m->scope != OSOE_MSCOPE_THREAD)
             continue;
-        uint64_t per[64], total = 0;
+        uint64_t total = 0;
         bool any = false;
-        for (uint32_t p = 0; p < npe && p < 64; p++) {
+        for (uint32_t p = 0; p < npe; p++) {
             per[p] = pe_thread_value(s, m, p);
             if (per[p])
                 any = true;
@@ -830,11 +878,12 @@ static void counters_human(const struct osoe_segment *s)
         char name[48];
         metric_name(m, name, sizeof name);
         printf("%-40s", name);
-        for (uint32_t p = 0; p < npe && p < 64; p++)
+        for (uint32_t p = 0; p < npe; p++)
             printf("%13" PRIu64, per[p]);
         printf("%14" PRIu64 "%s\n", total,
                m->kind == OSOE_MKIND_INVARIANT && total ? "   <-- INVARIANT" : "");
     }
+    free(per);
 
     /* §3.14: the whole point of a separate kind. Say it plainly rather than
      * leaving it to be spotted in a column of forty numbers. */
@@ -1365,13 +1414,26 @@ static int list_all(int (*list)(char (*)[OSOE_SEGMENT_NAME_MAX], int),
     }
 }
 
-static int gc_one(const char *name)
+/*
+ * One control segment, if what a job left of it is collectable. Read into this
+ * process's memory (osoe_segment_open_copy): a site runs this as root over
+ * objects any local user can write (D5; round four's portability Q4). Its
+ * status counts only what it failed to do - a removal refused, or a segment it
+ * was named and could not find - and not what it rightly left alone: an
+ * object named like a segment that is none, a table it cannot read, a job
+ * still alive. One file of garbage made --gc exit 1 on every run.
+ */
+static int gc_one(const char *name, bool named)
 {
     struct osoe_segment s;
     char err[256];
-    if (osoe_segment_open(&s, name, err, sizeof err) != 0) {
+    if (osoe_segment_open_copy(&s, name, err, sizeof err) != 0) {
+        if (s.not_a_segment) {
+            printf("%s: left alone: %s\n", name, err);
+            return 0;
+        }
         fprintf(stderr, "osoe-stat: %s\n", err);
-        return 1;
+        return named ? 1 : 0;
     }
     /*
      * A failed start's tombstone (segment.h) has no slots to say who is gone,
@@ -1401,10 +1463,10 @@ static int gc_one(const char *name)
         return 0;
     }
     if (!s.table_usable) {
-        fprintf(stderr, "osoe-stat: %s has no readable metric table; not removing it\n",
-                s.name);
+        printf("%s: no readable metric table, so nothing says whose it is; left alone\n",
+               s.name);
         osoe_segment_close(&s);
-        return 1;
+        return 0;
     }
     bool any_joined = false;
     bool gone = all_pes_gone(&s, &any_joined);
@@ -1541,13 +1603,18 @@ static int gc_startup_object(const char *given)
 
 static int list_segments(void)
 {
-    char names[64][OSOE_SEGMENT_NAME_MAX];
-    int found = osoe_segment_list(names, 64);
-    int shown = found < 64 ? found : 64;
+    /* Every segment found, however many: a fixed 64 left the rest of a job of
+     * more logical nodes unlisted (D2; round four's readiness Q5-5). */
+    char (*names)[OSOE_SEGMENT_NAME_MAX];
+    int found = list_all(osoe_segment_list, &names);
+    if (found < 0) {
+        fprintf(stderr, "osoe-stat: out of memory listing the control segments\n");
+        return 1;
+    }
 
     if (opt_json)
         printf("[");
-    for (int i = 0; i < shown; i++) {
+    for (int i = 0; i < found; i++) {
         struct osoe_segment s;
         char err[256];
         if (osoe_segment_open(&s, names[i], err, sizeof err) != 0) {
@@ -1591,8 +1658,7 @@ static int list_segments(void)
         printf("]\n");
     else if (found == 0)
         printf("no osoe control segments in /dev/shm\n");
-    else if (found > shown)
-        printf("(%d more not shown)\n", found - shown);
+    free(names);
     return 0;
 }
 
@@ -1655,15 +1721,23 @@ static bool is_job_id(const char *a)
 
 static int show_job(const char *job, enum mode m)
 {
-    char names[64][OSOE_SEGMENT_NAME_MAX], prefix[64];
+    /* Every node of the job, however many logical nodes it has on this
+     * machine: a fixed 64 dropped the rest in /proc's order, which a hang's
+     * culprit could be among (D2; round four's readiness Q5-5). */
+    char (*names)[OSOE_SEGMENT_NAME_MAX], prefix[64];
     snprintf(prefix, sizeof prefix, "/osoe.%s.", job);
-    int found = osoe_segment_list(names, 64);
+    int found = list_all(osoe_segment_list, &names);
+    if (found < 0) {
+        fprintf(stderr, "osoe-stat: out of memory listing the control segments\n");
+        return 1;
+    }
     int rc = 0, shown = 0;
-    for (int k = 0; k < found && k < 64; k++)
+    for (int k = 0; k < found; k++)
         if (strncmp(names[k], prefix, strlen(prefix)) == 0) {
             rc |= show(names[k], m);
             shown++;
         }
+    free(names);
     if (!shown) {
         fprintf(stderr, "osoe-stat: job %s: no such job - no named segment and no process "
                         "of this user holds one\n", job);
@@ -1756,7 +1830,7 @@ int main(int argc, char **argv)
             for (; i < argc; i++)
                 rc |= osoe_startup_object_kind_of(argv[i]) != OSOE_STARTUP_OBJECT_NONE
                           ? gc_startup_object(argv[i])
-                          : gc_one(argv[i]);
+                          : gc_one(argv[i], true);
             return rc;
         }
         /* Only named segments: one without a name is held open by a live job,
@@ -1764,7 +1838,7 @@ int main(int argc, char **argv)
         char (*names)[OSOE_SEGMENT_NAME_MAX];
         int found = list_all(osoe_segment_list_named, &names);
         for (int k = 0; k < found; k++)
-            rc |= gc_one(names[k]);
+            rc |= gc_one(names[k], false);
         /* Then what a start leaves (segment.h): a node's job tables and
          * connection area, named only until the last of its PEs has opened
          * them. */

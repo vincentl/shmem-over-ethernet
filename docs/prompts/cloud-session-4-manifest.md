@@ -583,3 +583,97 @@ the PE was, and that the segment is named only while its name is in `/dev/shm`.
 - After the fix, on the batch's tree alone (batch 4's files set aside): the static
   checks **15 of 15**, 100 s; the release suite, models aside, **943 tests, 941
   passed, 2 skipped** (the root refusal tests), none failed, 302 s.
+
+## Batch 4: `osoe-stat`'s
+
+One commit for the six items. D8 is stopped (it needs a layout change), with its
+README sentence made.
+
+### D2: every node of a job shown, however many - done
+
+`tools/stat/stat.c`: `list_segments` and `show_job` take the whole listing
+(`list_all`, as `--gc` already did) instead of a fixed 64 names. Test
+`shmem.stat.view.many-nodes` (new, tier 2, internode; `shmem/tests/stat-views.sh`):
+66 logical nodes of one PE each. **Without**: "osoe-stat JOB showed 64 of 66 nodes"
+(the listing 64, "1 more not shown"). **With**: 66 nodes, 132 summary lines, 66
+listed.
+
+### D3: the counters view holds every PE of a node - done
+
+`stat.c`, `counters_human`: the per-PE values in an array of the node's PE count
+(`calloc`), not `uint64_t per[64]`. Test `shmem.stat.view.many-pes` (new, tier 2):
+70 PEs on one node. **Without**: "rows of 66 fields, not 72" under a header naming
+70. **With**: 72 fields a row (name, 70 values, total).
+
+### D5: `--gc` reads into its own memory; its status counts only failures - done
+
+- `tools/stat/segment.c`, `segment.h`: `osoe_segment_open_copy` - the magic by one
+  `pread` (garbage of any size costs that read), then a `pread` copy of at most the
+  first GiB (landing zones come last and `--gc` reads none of them); every bound
+  then holds against what was read. `not_a_segment` marks a refusal that was the
+  object's own content.
+- `stat.c`, `gc_one(name, named)`: uses the copy; an object that is no segment, a
+  table it cannot read, or one that shrank is "left alone" with status 0; a name
+  given on the command line that it cannot open is a failure (1), one found by the
+  listing is said on stderr and not counted (a decision: it may have gone under it).
+- Tests: `shmem.stat.gc.not-a-segment` (new, tier 2): 4 KiB of random bytes named
+  `osoe.$$.0.0.0`. **Without**: "is not an osoe control segment", "--gc exited 1".
+  **With**: "left alone: ... is not an osoe control segment", "--gc exited 0".
+  `shmem.stat.gc.shrunk-under-read` (new, tier 2, not under the sanitizers): a
+  segment a fatal keeps (`OSOE_KEEP_CONTROL_SEGMENT=1`, `shmem_test_bad_put`), cut to
+  one page the moment `osoe-stat` has it by a new `LD_PRELOAD` shim
+  (`shmem/tests/shrink-under-read.c`: after `mmap` returns, or after the first
+  `pread`). **Without**: "Bus error", "--gc exited 135" - round four's `SIGBUS`, now
+  deterministic. **With**: "no readable metric table, so nothing says whose it is;
+  left alone", "--gc exited 0". (A cut to 64 bytes did not fault the old reader:
+  the truncation zeroes the rest of the directory's page and its parse stopped at
+  "no table" - hence a page.)
+
+### D6: a stopped PE marked as stopped - done
+
+`stat.c`: `process_stopped(pid)` reads `State:` in `/proc/<pid>/status` (T or t);
+a PE line gains "   [stopped: SIGSTOP or a debugger]" and a node's summary line
+"[N PE(s) stopped]". Test `shmem.stat.view.stopped` (new, tier 2, internode): two
+nodes, rank 1 sent SIGSTOP. **Without**: "rank 1's line does not say it is
+stopped". **With**: both markers.
+
+### D7: an init hang shows where each PE waits - done
+
+The "blocked in" record says `shmem_init` and what is awaited: `shmem/src/node.c`'s
+`wait_count` (the lowest local PE not yet at the phase, by rank, begun again as it
+changes; no detail where every PE is there and the count lags), `rendezvous.c`
+(the parent around the connect and around `send_up`/`receive_down`, the awaited
+child around each accept, each child around `receive_up`), `job.c` (a non-lead
+waits on its lead's rank). `shmem/tests/test-job.c`, which compiles `job.c` and
+`rendezvous.c` alone, stubs the two calls. Review caught one path of mine that
+entered without leaving - the record nests, so it would have named `shmem_init`
+under every later wait - fixed with an explicit flag before any run counted.
+Test `shmem.stat.view.init-hang` (new, tier 2, internode): four PEs on two nodes,
+rank 3 exits before `shmem_init`. **Without**: "0 of 3 waiting PEs show where they
+wait". **With**: rank 0 "shmem_init (node 1)", rank 1 "shmem_init (PE 0)", rank 2
+"shmem_init (PE 3)" - the chain to the missing rank.
+
+### D8: each owner's last pass with its age - stopped: it needs a layout change
+
+A last-pass time is a new field of every owner record (`struct
+osoe_am_owner_metrics`, layout 36 onward) and a new metric-table row: a layout
+change the item does not name, so stopped. Made instead: the README sentence the
+review offered (its option (c)), checked by a run - an idle owner's passes went
+241 to 261 in two seconds, ten a second. Options for the author are in the
+response ("What needs the author").
+
+### Batch 4's runs
+
+- release build **0 warnings** (one link error on the way: `shmem_test_job` needed
+  the blocked record's stubs).
+- The batch's six tests: **with, 6 of 6; without (stat.c, segment.c, segment.h,
+  node.c, rendezvous.c, job.c set aside), 0 of 6**, each for the reason above.
+- Static checks (with `settings-known`): **15 of 15**, 102 s.
+- **The release suite was not run on batch 4**: the session's credit ran out here.
+  The lead's merge should run it whole.
+- README: "Looking inside a job" (stopped marking, init waits, every node and PE,
+  D8's sentence); the `--gc` paragraph (reads into its own memory, leaves alone
+  what it cannot read, status counts only failures; the epilog's safe line is
+  still the `rm`); the internode count **521** (`ctest -N -L internode`). Batch 3's
+  commit left that count at 516 where it was 518 - a slip, corrected here.
+- Wire or layout: neither.

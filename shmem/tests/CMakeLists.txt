@@ -4097,6 +4097,55 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   set_tests_properties(shmem.stat.L${count} PROPERTIES
     ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
 endforeach()
+# What osoe-stat shows of a job it reads while it runs or hangs (stat-views.sh):
+# every node of 66 logical nodes, where a fixed 64 left the rest unnamed (D2);
+# every PE of a node of 70 in each counter row, where rows held 64 (D3); a
+# stopped PE marked so, where it read as a waiting one (D6); and where each PE
+# waits in an init hang, where every "blocked in" read "-" (D7).
+# The three of more than one node in the full build alone.
+set(osoe_stat_views many-pes)
+if(OSOE_INTERNODE)
+  list(APPEND osoe_stat_views many-nodes stopped init-hang)
+endif()
+foreach(view IN LISTS osoe_stat_views)
+  add_test(NAME shmem.stat.view.${view}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/stat-views.sh ${view} $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:osoe-stat> $<TARGET_FILE:shmem_test_sleeper>
+            $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.stat.view.${view} PROPERTIES LABELS "tier2" TIMEOUT 180
+    PASS_REGULAR_EXPRESSION "STAT VIEWS OK")
+  if(NOT view STREQUAL "many-pes")
+    osoe_internode_label(shmem.stat.view.${view})
+  endif()
+endforeach()
+# osoe-stat --gc reads a segment into its own memory and counts in its status
+# only what it failed to do (D5): an object named like a segment that is none -
+# four kilobytes of garbage, made here and removed after - is left alone and
+# the run succeeds, where it exited 1.
+add_test(NAME shmem.stat.gc.not-a-segment
+  COMMAND sh -c "name=osoe.$$.0.0.0; head -c 4096 /dev/urandom > /dev/shm/$name; \"$0\" --gc /$name; status=$?; rm -f /dev/shm/$name; echo \"--gc exited $status\"; exit $status"
+          $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.stat.gc.not-a-segment PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "left alone: .* is not an osoe control segment .*--gc exited 0"
+  FAIL_REGULAR_EXPRESSION "--gc exited [1-9]")
+
+# And one its owner cuts down to a page while --gc reads it - here the moment
+# osoe-stat has it (shrink-under-read.c), a job's segment kept by a fatal: left
+# alone, where the mapped read died of SIGBUS. Not under the sanitizers, as
+# slow-message.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_library(shrink-under-read SHARED shrink-under-read.c)
+  target_link_libraries(shrink-under-read PRIVATE ${CMAKE_DL_LIBS})
+  osoe_warnings(shrink-under-read)
+  add_test(NAME shmem.stat.gc.shrunk-under-read
+    COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 \"$0\" -n 1 -t 20 -- \"$1\" 2>/dev/null & L=$!; wait $L; LD_PRELOAD=\"$3\" \"$2\" --gc /osoe.$L.0.0.0; status=$?; rm -f /dev/shm/osoe.$L.0.0.0; echo \"--gc exited $status\"; exit $status"
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_bad_put> $<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:shrink-under-read>)
+  set_tests_properties(shmem.stat.gc.shrunk-under-read PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "cut to [0-9]+ bytes after .*no readable metric table.*left alone.*--gc exited 0"
+    FAIL_REGULAR_EXPRESSION "--gc exited [1-9]")
+endif()
+
 # And with the link set by hand (v0.2 step 2): osoe-stat shows it.
 add_test(NAME shmem.stat.link
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>

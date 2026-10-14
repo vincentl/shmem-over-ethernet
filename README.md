@@ -553,7 +553,16 @@ A job that hangs shows, for every PE, the routine it is blocked in, the
 collective's epoch - how many collectives its team has begun - and for how long;
 and for a node of a job across nodes, each owner of its wires - the lead's
 agent and its progress helpers (`OSOE_PROGRESS_HELPERS`) - with the wires it
-holds, its passes, its wakes and what it has sent and applied.
+holds, its passes, its wakes and what it has sent and applied. An idle owner
+passes ten times a second, so one whose passes do not move between two looks
+(`osoe-stat -n 2 JOB`, a look every two seconds) while PEs wait toward its peers
+is the one stuck. A PE stopped by SIGSTOP or a debugger is marked
+`[stopped: SIGSTOP or a debugger]`, since its record goes on reading as a wait,
+and the summary counts a node's stopped PEs beside its longest wait; a job hung
+in its start shows each PE waiting in `shmem_init` and the PE of its node, or
+the node, it waits for. `osoe-stat` shows every node and every PE of a job on
+the machine, however many logical nodes the job has there and however many PEs
+a node has.
 The summary's walk follows a team's barriers and syncs between nodes, whose
 epochs each node's progress thread keeps; a team hung in a reduction,
 broadcast, gather or scan shows there as nothing open, and its PE lines are
@@ -1470,7 +1479,7 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  516 tests labelled `internode` - those of a job of more than one node, of
+  521 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
@@ -1750,8 +1759,12 @@ has not yet recorded itself: a start that died in that moment leaves one that
 same ids reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
 machine it runs on and removes only what its user may, so a site runs it as
 root on each node - from a timer, not from Slurm's epilog: it reads objects
-any user can write, and one written to fail its reading fails the run, which
-in an epilog drains the node. The epilog's safe line is the `rm` below.
+any user can write. It reads each into its own memory, so that one changed or
+cut short as it reads cannot fault it, leaves alone one it cannot read, and
+counts in its status only what it failed to do - a removal refused, a name it
+was given that is not there - where one file of garbage made every run fail,
+which in an epilog drains the node; but what it reads is still any user's to
+write, and the epilog's safe line is the `rm` below.
 `osoe-launch` removes its own job's leftovers itself, and
 says which it found, except a control segment `OSOE_KEEP_CONTROL_SEGMENT`
 keeps, which it leaves for `--gc`.
