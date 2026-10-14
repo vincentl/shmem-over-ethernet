@@ -209,9 +209,11 @@ static void follow(struct osoe_job *j, const struct osoe_bootstrap *b, int32_t l
 {
 again:;
     /* Nothing moves until the lead has met every other lead, so the watch is
-     * on a constant: by default this waits as long as that takes (§3.15). */
+     * on a constant: by default this waits as long as that takes (§3.15), and
+     * under a limit two hops' grace longer, so that its lead, a hop from the
+     * other nodes, speaks first (base/stall-watch.h; D15). */
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 2));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };        /* 0.2 ms, doubling to 10 ms */
     int fd;

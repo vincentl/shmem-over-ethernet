@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/random.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
@@ -207,7 +208,7 @@ static bool read_all(const struct osoe_bootstrap *b, int fd, void *bytes, size_t
                      uint64_t limit_ns, uint32_t peer)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
     uint64_t start = now_ns(), moved = 0;
     for (char *at = bytes; n > 0; ) {
         uint64_t wait_ns = OSOE_SWEEP_NS;
@@ -252,7 +253,7 @@ static bool write_all(const struct osoe_bootstrap *b, int fd, const void *bytes,
                       uint32_t peer)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
     uint64_t moved = 0;
     for (const char *at = bytes; n > 0; ) {
         ssize_t k = send(fd, at, n, MSG_NOSIGNAL | MSG_DONTWAIT);
@@ -278,13 +279,49 @@ static bool write_all(const struct osoe_bootstrap *b, int fd, const void *bytes,
 
 /* ---- listening -------------------------------------------------------- */
 
+/*
+ * What a socket that could not be had for want of descriptors means here, to
+ * follow the kernel's "Too many open files" (D14): a node's lead holds two
+ * sockets for every other node and a descriptor for every other PE of its node
+ * beside the program's own, and shmem_init has raised the soft limit to the
+ * hard one (init.c), so the hard limit is the one to raise. Nothing for any
+ * other error.
+ */
+static const char *descriptor_hint(int error, char *buf, size_t len)
+{
+    struct rlimit files;
+    if (error == EMFILE && getrlimit(RLIMIT_NOFILE, &files) == 0 &&
+        files.rlim_cur != RLIM_INFINITY) {
+        snprintf(buf, len, ": this process may hold %llu descriptors, which shmem_init raised "
+                 "to the hard limit, and a node's lead holds two sockets for every other node "
+                 "and a descriptor for every other PE of its node beside the program's own - "
+                 "raise the hard limit on open files, ulimit -Hn",
+                 (unsigned long long)files.rlim_cur);
+        return buf;
+    }
+    if (error == ENFILE)
+        return ": the system's limit on open files, fs.file-max, is reached";
+    return "";
+}
+
+/* What the end of a wait on a node that has not come says beside it (D15): a
+ * node takes part in the rendezvous once every PE of its own has called
+ * shmem_init, and that node's own end names any that has not - first, since
+ * this wait's limit is longer by a hop's grace (base/stall-watch.h). */
+#define NOT_COME " - a node comes to the rendezvous once all its PEs have called " \
+                 "shmem_init, and names any that has not"
+
 /* Bind and listen on address:port, or return false if the port is taken. */
 static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *address,
                        uint16_t port)
 {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    if (fd < 0)
-        osoe_fatal("cannot create a listening socket: %s", strerror(errno));
+    if (fd < 0) {
+        int e = errno;
+        char hint[320];
+        osoe_fatal("cannot create a listening socket: %s%s", strerror(e),
+                   descriptor_hint(e, hint, sizeof hint));
+    }
     /*
      * No SO_REUSEADDR: a candidate still in TIME_WAIT from an earlier job is
      * skipped like one in use, which is what the sequence is for, and a
@@ -519,7 +556,7 @@ int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *p
     if (!expecting)
         expecting = "another node";
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct pollfd p[1 + OSOE_LISTENER_CALLERS];
     uint32_t at[1 + OSOE_LISTENER_CALLERS];
@@ -531,7 +568,7 @@ int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *p
             osoe_sweep_expired("shmem_init");
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is "
-                           "waiting for %s to connect to its port %u",
+                           "waiting for %s to connect to its port %u" NOT_COME,
                            (unsigned long long)osoe_stall_watch_seconds(&watch), l->node,
                            expecting, l->port);
             if (osoe_stall_watch_notice_due(&watch)) {
@@ -587,8 +624,10 @@ int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *p
                 if (fd < 0) {
                     if (errno == EINTR || errno == EAGAIN || errno == ECONNABORTED)
                         continue;
-                    osoe_fatal("accepting a connection on port %u: %s", l->port,
-                               strerror(errno));
+                    int e = errno;
+                    char hint[320];
+                    osoe_fatal("accepting a connection on port %u: %s%s", l->port, strerror(e),
+                               descriptor_hint(e, hint, sizeof hint));
                 }
                 for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++)
                     if (l->callers[i].fd < 0) {
@@ -658,8 +697,12 @@ static void notice_calling(const struct osoe_bootstrap *b, const struct osoe_sta
 static int dial(const struct sockaddr_in *host, uint16_t port, struct attempt *t)
 {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    if (fd < 0)
-        osoe_fatal("cannot create a socket: %s", strerror(errno));
+    if (fd < 0) {
+        int e = errno;
+        char hint[320];
+        osoe_fatal("cannot create a socket: %s%s", strerror(e),
+                   descriptor_hint(e, hint, sizeof hint));
+    }
     struct sockaddr_in a = *host;
     a.sin_port = htons(port);
     if (connect(fd, (struct sockaddr *)&a, sizeof a) != 0) {
@@ -689,7 +732,7 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
                                enum osoe_hello_purpose purpose)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
     struct attempt tried = { "", 0 };
@@ -727,7 +770,7 @@ int osoe_listener_connect_port(const struct osoe_bootstrap *b, uint32_t session,
             osoe_sweep_expired("shmem_init");
             if (osoe_stall_watch_stalled(&watch, 0))
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has "
-                           "not answered node %u on its port %u",
+                           "not answered node %u on its port %u" NOT_COME,
                            (unsigned long long)osoe_stall_watch_seconds(&watch), node, b->node,
                            port);
             if (osoe_stall_watch_notice_due(&watch))
@@ -823,7 +866,7 @@ static void calling_sweep(const struct osoe_bootstrap *b, struct osoe_stall_watc
     if (osoe_stall_watch_stalled(watch, 0))
         osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u has "
                    "not answered node %u on any of its %u candidate ports in "
-                   "OSOE_PORT_RANGE=%u-%u",
+                   "OSOE_PORT_RANGE=%u-%u" NOT_COME,
                    (unsigned long long)osoe_stall_watch_seconds(watch), node, b->node,
                    CANDIDATES, b->port_low, b->port_high);
     if (osoe_stall_watch_notice_due(watch))
@@ -835,7 +878,7 @@ int osoe_listener_connect(const struct osoe_bootstrap *b, uint32_t session,
                           enum osoe_hello_purpose purpose)
 {
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin_noticed(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };            /* 0.2 ms, doubling to 10 ms */
     /* The most telling thing any candidate said in the last round: an answer

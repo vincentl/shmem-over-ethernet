@@ -134,6 +134,14 @@ const char *osoe_futex_requirement(void)
            "(seccomp) must allow";
 }
 
+/* Every kernel the single-node build runs on has them (Linux 2.6.25): only a
+ * filter refuses them, which the requirement's own words already say. */
+int osoe_futex_kernel_has_calls(const char *release)
+{
+    (void)release;
+    return -1;
+}
+
 uint64_t osoe_futex_timeouts(void)
 {
     return atomic_load_explicit(&timeouts, memory_order_acquire);

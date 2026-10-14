@@ -407,8 +407,15 @@ static void session_start(void)
     if (futex_error) {
         struct utsname u;
         const char *release = uname(&u) == 0 ? u.release : "unknown";
-        osoe_fatal("osoe needs %s (they fail with \"%s\"); this kernel is %s",
-                   osoe_futex_requirement(), strerror(futex_error), release);
+        /* The kernel's age only where it is old: on one that has the calls
+         * the refusal is a filter's (base/futex.h; D28). */
+        osoe_fatal("osoe needs %s (they fail with \"%s\"); this kernel is %s%s",
+                   osoe_futex_requirement(), strerror(futex_error), release,
+                   osoe_futex_kernel_has_calls(release) == 1
+                       ? ", which has them: a seccomp filter refuses them here - a container "
+                         "runtime's profile older than the calls, or a sandbox's - or an "
+                         "emulator does not pass them on"
+                       : "");
     }
     /*
      * And the atomics the node's processes will share, lock-free: told when

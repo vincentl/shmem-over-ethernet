@@ -22,6 +22,7 @@
 #include "base/environment.h"
 #include "base/epoch.h"
 #include "base/futex.h"
+#include "base/hostlist.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "base/wait-word.h"
@@ -327,6 +328,18 @@ static void abort_arrived(void *context, uint32_t pe, int32_t status, uint32_t d
 }
 
 /* Whether this node's abort is declared (progress.h): one acquire load. */
+/* The host's describe_node (progress.h): the node's entry in the step's node
+ * list - a host name under Slurm, a loopback address under osoe-launch - and
+ * its lead's rank. */
+static void describe_node(void *context, uint32_t node, char *words, size_t len)
+{
+    (void)context;
+    char entry[128] = "?";
+    if (osoe.bootstrap.node_list)
+        osoe_hostlist_entry(osoe.bootstrap.node_list, node, entry, sizeof entry);
+    snprintf(words, len, "%s, lead rank %u", entry, osoe_job_node_lead(&osoe.job, node));
+}
+
 static bool node_aborting(void *context)
 {
     (void)context;
@@ -827,7 +840,7 @@ void osoe_progress_host_start(uint32_t session)
 
     struct osoe_progress_host host = { resolve, notify, release, NULL, abort_arrived,
                                        landing_request, landed, completed, deadlock_arrived,
-                                       node_aborting };
+                                       node_aborting, describe_node };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, engine_owners, &host);
     uint64_t connections_before = 0, descriptors_before = 0, busy_before = 0;
     for (uint32_t o = 0; o < owners; o++) {

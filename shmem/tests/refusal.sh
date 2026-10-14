@@ -25,7 +25,9 @@
 # and each PATTERN, an extended regular expression, to appear in what the job
 # wrote before the launcher's timeout, so that what a rank wrote on its way
 # down under the launcher's SIGKILL does not count. A PATTERN that begins with
-# ! must appear nowhere.
+# ! must appear nowhere, and one that begins with = in the first line the
+# library wrote, the first that begins "osoe: " - the line a user reads first,
+# and the one srun -K1 leaves when it ends the rest.
 #
 # -k is what this is for. Without it the launcher ends the survivors of the
 # first failure, and a start-up that hangs looks like one that ended: the suite
@@ -82,6 +84,10 @@ while IFS= read -r pattern; do
         if printf '%s\n' "$out" | grep -Eq -e "${pattern#!}"; then
             fail "written, though it must not be: ${pattern#!}"
         fi ;;
+    '='*)
+        first=$(printf '%s\n' "$out" | grep -m 1 '^osoe: ')
+        printf '%s\n' "$first" | grep -Eq -e "${pattern#=}" ||
+            fail "the first line of the library's is not ${pattern#=}: it is \"$first\"" ;;
     *)
         printf '%s\n' "$before" | grep -Eq -e "$pattern" ||
             fail "not written before the launcher's timeout: $pattern" ;;

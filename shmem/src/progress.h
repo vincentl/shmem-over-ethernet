@@ -115,6 +115,14 @@ struct osoe_progress_host {
      * proposal's Part 3). NULL where there is no node: the engine's own tests.
      */
     bool (*aborting)(void *context);
+    /*
+     * A peer node as a message names it beside its index, which is its place
+     * in the step's node list (SLURM_NODEID): that entry of the list and its
+     * lead's rank, "127.0.0.2, lead rank 2", written into `words` (D10: a dead
+     * node was named by its index alone). NULL where there is no job: the
+     * engine's own tests, whose messages name the index alone.
+     */
+    void (*describe_node)(void *context, uint32_t node, char *words, size_t len);
 };
 
 /*

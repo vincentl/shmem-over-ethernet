@@ -665,7 +665,7 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         int fd = osoe_shm_open_ours(s->heap_name, err, sizeof err);
         if (fd < 0) {
             char msg[512];
-            snprintf(msg, sizeof msg, "local PE %u's heap: %s", i,
+            snprintf(msg, sizeof msg, "local PE %u (rank %u)'s heap: %s", i, b->gtids[i],
                      err[0] ? err : strerror(errno));
             fail_rendezvous(n, msg);
         }
@@ -673,8 +673,8 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         close(fd);
         if (p == MAP_FAILED) {
             char msg[256];
-            snprintf(msg, sizeof msg, "cannot map local PE %u's heap (%llu bytes): %s", i,
-                     (unsigned long long)s->heap_bytes, strerror(errno));
+            snprintf(msg, sizeof msg, "cannot map local PE %u (rank %u)'s heap (%llu bytes): %s",
+                     i, b->gtids[i], (unsigned long long)s->heap_bytes, strerror(errno));
             fail_rendezvous(n, msg);
         }
         /* A sibling's heap is in the sibling's own core; in this one it would
@@ -687,7 +687,7 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         fd = osoe_shm_open_ours(s->statics_name, err, sizeof err);
         if (fd < 0) {
             char msg[512];
-            snprintf(msg, sizeof msg, "local PE %u's statics: %s", i,
+            snprintf(msg, sizeof msg, "local PE %u (rank %u)'s statics: %s", i, b->gtids[i],
                      err[0] ? err : strerror(errno));
             fail_rendezvous(n, msg);
         }
@@ -695,8 +695,8 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         close(fd);
         if (p == MAP_FAILED) {
             char msg[256];
-            snprintf(msg, sizeof msg, "cannot map local PE %u's statics (%llu bytes): %s", i,
-                     (unsigned long long)n->statics_bytes, strerror(errno));
+            snprintf(msg, sizeof msg, "cannot map local PE %u (rank %u)'s statics (%llu bytes): "
+                     "%s", i, b->gtids[i], (unsigned long long)n->statics_bytes, strerror(errno));
             fail_rendezvous(n, msg);
         }
         madvise(p, n->statics_bytes, MADV_DONTDUMP);
@@ -712,7 +712,7 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
         if (n->slots[i].symmetric_size != b->symmetric_size) {
             char msg[256];
             snprintf(msg, sizeof msg, "SHMEM_SYMMETRIC_SIZE differs between PEs: local PE "
-                     "%u has %llu bytes, this PE has %llu", i,
+                     "%u (rank %u) has %llu bytes, this PE has %llu", i, b->gtids[i],
                      (unsigned long long)n->slots[i].symmetric_size,
                      (unsigned long long)b->symmetric_size);
             fail_rendezvous(n, msg);
@@ -725,16 +725,17 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
          * node-mate's internal region by this PE's size of it. */
         if (n->slots[i].heap_bytes != n->heap_bytes) {
             char msg[256];
-            snprintf(msg, sizeof msg, "local PE %u's heap object is %llu bytes and this PE's "
-                     "%llu: the PEs size the library's internal region differently", i,
+            snprintf(msg, sizeof msg, "local PE %u (rank %u)'s heap object is %llu bytes and this "
+                     "PE's %llu: the PEs size the library's internal region differently", i,
+                     b->gtids[i],
                      (unsigned long long)n->slots[i].heap_bytes,
                      (unsigned long long)n->heap_bytes);
             fail_rendezvous(n, msg);
         }
         if (n->slots[i].statics_bytes != n->statics_bytes) {
             char msg[256];
-            snprintf(msg, sizeof msg, "the PEs run different programs: local PE %u's "
-                     "symmetric statics are %llu bytes, this PE's %llu (§4.3)", i,
+            snprintf(msg, sizeof msg, "the PEs run different programs: local PE %u (rank %u)'s "
+                     "symmetric statics are %llu bytes, this PE's %llu (§4.3)", i, b->gtids[i],
                      (unsigned long long)n->slots[i].statics_bytes,
                      (unsigned long long)n->statics_bytes);
             fail_rendezvous(n, msg);

@@ -101,6 +101,7 @@ static const char *const known_settings[] = {
     "OSOE_TEST_FORGE",
     "OSOE_TEST_GETS",
     "OSOE_TEST_GET_BYTES",
+    "OSOE_TEST_GET_NBI",
     "OSOE_TEST_GET_PIECES",
     "OSOE_TEST_HEAP_BYTES",
     "OSOE_TEST_HELD_RANK",

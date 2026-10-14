@@ -1131,6 +1131,34 @@ if(OSOE_INTERNODE)
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   osoe_internode_label(shmem.start-up.node-refuses.size-mismatch
     shmem.start-up.node-refuses.own-environment-lead)
+  # With the no-progress limit set, a PE of node 0 that never calls shmem_init is
+  # named, rank and all, by node 0 in the job's first line - the one srun -K1
+  # leaves - and node 1, whose call node 0 never answers, ends two seconds later
+  # saying why a node may not come (D15; base/stall-watch.h: a wait on another
+  # node has a hop's grace beyond the limit). Before, both ended at the limit,
+  # node 1's line naming the rendezvous alone. Notices are put off past the
+  # limit, so that the first line is an end.
+  osoe_refusal_test(shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1 4 0
+    SECONDS 20
+    ENV OSOE_NO_PROGRESS_TIMEOUT=3 OSOE_TEST_NOTICE_SECONDS=60
+    LAUNCH -n 4 -m 0,0,1,1
+    PATTERNS "=osoe: PE 0: no local PE has joined for OSOE_NO_PROGRESS_TIMEOUT seconds. missing local ids: 1 [(]rank 1[)]"
+             "osoe: PE 2: no progress for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: node 0 has not answered node 1 on any of its [0-9]+ candidate ports in OSOE_PORT_RANGE=[0-9-]+ - a node comes to the rendezvous once all its PEs have called shmem_init, and names any that has not"
+    PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 1 $<TARGET_FILE:shmem_test_init>)
+  # A hard limit on descriptors too low for the mesh: sixteen logical nodes, each
+  # PE's limit 32, which a lead's two sockets for each of fifteen other nodes
+  # and its rings pass. The refusal says what the descriptors are for and which
+  # limit to raise, where it said "Too many open files" alone (D14; round four's
+  # readiness Q5-6).
+  add_test(NAME shmem.start-up.descriptors.16-nodes
+    COMMAND $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 60 --
+            sh -c "ulimit -n 32; exec \"$0\" \"$@\"" $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.start-up.descriptors.16-nodes PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+      "Too many open files: this process may hold 32 descriptors, which shmem_init raised to the hard limit, and a node's lead holds two sockets for every other node .* raise the hard limit on open files, ulimit -Hn"
+    FAIL_REGULAR_EXPRESSION "timeout after")
+  osoe_internode_label(shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1
+    shmem.start-up.descriptors.16-nodes)
 endif()
 
 # The library against its floor (§1, §8.4): in each of seven pairs, 8-byte
@@ -2089,10 +2117,11 @@ if(OSOE_INTERNODE)
   endforeach()
   # And a get whose room another node holds (the ninth review, Q5-2): PE 0's
   # zone, set to 64 KiB, filled by a nonblocking get from PE 2, which stops, and
-  # PE 0's blocking get from PE 1, live, waiting for room. Its wait names no
-  # node, whether its pieces go one at a time (8 bytes) or together (three
-  # pieces), where both named node 1 before. The routine must be the blocking
-  # get's: had the nonblocking get waited itself, it would say its own.
+  # PE 0's blocking get from PE 1, live, waiting for room. Its wait names node 2
+  # and PE 2, which owe the zone's one piece (D25), and never node 1, whether its
+  # pieces go one at a time (8 bytes) or together (three pieces), where both
+  # named node 1 once and then no node. The routine must be the blocking get's:
+  # had the nonblocking get waited itself, it would say its own.
   foreach(bytes IN ITEMS 8 150000)
     add_test(NAME shmem.get-no-progress.zone-held.${bytes}.0-1-2
       COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=10 OSOE_TEST_GET_BYTES=${bytes}
@@ -2102,10 +2131,26 @@ if(OSOE_INTERNODE)
     set_tests_properties(shmem.get-no-progress.zone-held.${bytes}.0-1-2 PROPERTIES
       LABELS "tier2" TIMEOUT 90
       PASS_REGULAR_EXPRESSION
-        "shmem_get: no progress for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
-      FAIL_REGULAR_EXPRESSION "GET RETURNED|toward node")
+        "shmem_get: no progress toward node 2 [(]PE 2[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
+      FAIL_REGULAR_EXPRESSION "GET RETURNED|toward node 1")
     osoe_internode_label(shmem.get-no-progress.zone-held.${bytes}.0-1-2)
   endforeach()
+  # A nonblocking get from a stopped node past the pieces its zone holds: the
+  # call's own wait for room names node 1 and PE 1, which owe every piece the
+  # zone holds (D25; the ninth review's Q5-8, which saw "shmem_get_nbi: no
+  # progress for 10 s ... the landing zone's released extents has stayed at 0").
+  # 256 KiB through a zone of 64 KiB, as the review's default zone was then.
+  add_test(NAME shmem.get-no-progress.nonblocking.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=10 OSOE_TEST_GET_BYTES=262144
+            OSOE_GET_LANDING_BYTES=65536 OSOE_TEST_GET_NBI=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_get-no-progress>)
+  set_tests_properties(shmem.get-no-progress.nonblocking.0-1 PROPERTIES
+    LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+      "shmem_get_nbi: no progress toward node 1 [(]PE 1[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
+    FAIL_REGULAR_EXPRESSION "GET RETURNED")
+  osoe_internode_label(shmem.get-no-progress.nonblocking.0-1)
 endif()
 
 # A loud failure ends the job without joining a collective (§3.15; review round
@@ -2366,6 +2411,9 @@ if(OSOE_INTERNODE)
   # object exists (§1; review round two, portability F3). deny-futex2 makes the
   # three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of
   # SIGABRT in the rendezvous and left their heaps and control segment behind.
+  # The kernels this suite runs on have the calls, so the refusal names the
+  # filter that it is and not the kernel's age (D28; round four's Q6: a
+  # sandbox's refusal was reported as an old kernel).
   # And the probe, under the same filter, fails its named-object futex checks.
   add_executable(deny-futex2 deny-futex2.c)
   osoe_warnings(deny-futex2)
@@ -2373,7 +2421,8 @@ if(OSOE_INTERNODE)
     COMMAND deny-futex2 $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
             $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.refuse.old-kernel PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "needs Linux 6.7 or later, for the futex2 calls .*this kernel is"
+    PASS_REGULAR_EXPRESSION
+      "needs Linux 6.7 or later, for the futex2 calls .*this kernel is [^ ]+, which has them: a seccomp filter refuses them here"
     FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
   add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
   set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
@@ -2388,7 +2437,7 @@ if(OSOE_INTERNODE)
             $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.refuse.no-shared-futex2 PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION
-      "needs Linux 6.7 or later, for the futex2 calls \\(they fail with \"Operation not permitted\"\\)"
+      "needs Linux 6.7 or later, for the futex2 calls \\(they fail with \"Operation not permitted\"\\). this kernel is [^ ]+, which has them: a seccomp filter refuses them here"
     FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
   # Labelled internode because the single-node build has no futex2 to deny (it waits
   # with the classic futex), so the refusals these three check cannot happen there.
@@ -4315,6 +4364,18 @@ foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;
     osoe_internode_label(shmem.dead-pe.${label})
   endif()
 endforeach()
+# A dead node is named by its host - its entry in the step's node list, a
+# loopback address here - and its lead's rank beside its index, which is its
+# place in that list (D10: "node 0 ended its control wire without its goodbye"
+# named the index alone): node 0's lead dies, and node 1 says so.
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.dead-pe.lead.0-0-1-1.named
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_dead-pe> 4 0,0,1,1 0)
+  set_tests_properties(shmem.dead-pe.lead.0-0-1-1.named PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "node 1: node 0 [(]127[.]0[.]0[.]1, lead rank 0[)] .*DEAD PE OK")
+  osoe_internode_label(shmem.dead-pe.lead.0-0-1-1.named)
+endif()
 # And on a kernel without pidfd_open - before Linux 5.3, which the single-node
 # build's floor of 4.17 admits - where liveness watches by pid: the death
 # found all the same, and the lead saying once that it watches so (the v0.2
@@ -4329,7 +4390,8 @@ foreach(case "sibling;3" "lead;0")
             $<TARGET_FILE:shmem_test_dead-pe> 4 0,0,0,0 ${dies})
   set_tests_properties(shmem.dead-pe.no-pidfd.${who}.L4 PROPERTIES LABELS "tier2" TIMEOUT 90
     ENVIRONMENT "WRAP=$<TARGET_FILE:deny-pidfd>"
-    PASS_REGULAR_EXPRESSION "watching local PEs by pid instead.*DEAD PE OK")
+    PASS_REGULAR_EXPRESSION
+      "cannot open a pidfd for local PE [0-9]+ [(]rank [0-9]+, pid [0-9]+[)]: .*watching local PEs by pid instead.*DEAD PE OK")
 endforeach()
 # internode: dead-pe-init.sh launches a job of two nodes
 if(OSOE_INTERNODE)
@@ -4469,11 +4531,13 @@ osoe_refusal_test(shmem.refuse.bad_size 2 0
   PATTERNS "osoe: PE 0: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
            "osoe: PE 1: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
-# The PEs compare their sizes, and each that finds a difference says so; one
-# that is already told another failed ends with that instead.
+# The PEs compare their sizes, and each that finds a difference says so,
+# naming the other PE by its local id and its rank (D11: start-up's messages
+# gave local ids alone); one that is already told another failed ends with that
+# instead.
 osoe_refusal_test(shmem.refuse.size_mismatch 3 0
   LAUNCH -n 3 -e 2:SHMEM_SYMMETRIC_SIZE=2m
-  PATTERNS "osoe: PE [012]: SHMEM_SYMMETRIC_SIZE differs between PEs"
+  PATTERNS "osoe: PE [012]: SHMEM_SYMMETRIC_SIZE differs between PEs: local PE [012] [(]rank [012][)] has [0-9]+ bytes"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
 # The deprecated SMA_ spelling (spec §8, Annex F) must be honoured the same
 # way, down to the same validation (conformance review F3): before F3's fix,

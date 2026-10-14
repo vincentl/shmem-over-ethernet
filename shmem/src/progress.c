@@ -63,6 +63,23 @@ static uint32_t control_peer(const struct osoe_progress *p, uint32_t slot)
     return slot < p->node ? slot : slot + 1;
 }
 
+/* Node `node` as the messages of its death name it: "node 1 (127.0.0.2, lead
+ * rank 2)" - its index, which is its place in the step's node list, with that
+ * entry and its lead's rank, from the host (progress.h's describe_node; D10) -
+ * or "node 1" where the host cannot say. */
+static const char *node_words(const struct osoe_progress *p, uint32_t node, char *buf,
+                              size_t len)
+{
+    char words[160] = "";
+    if (p->host.describe_node)
+        p->host.describe_node(p->host.context, node, words, sizeof words);
+    if (words[0])
+        snprintf(buf, len, "node %u (%s)", node, words);
+    else
+        snprintf(buf, len, "node %u", node);
+    return buf;
+}
+
 /* The control plane's messages and nothing else go on a control wire, and
  * nothing of theirs on a data wire (the progress helpers proposal's §3.1); an
  * abortive goodbye goes on every wire. */
@@ -874,23 +891,28 @@ static bool receive_wire(struct osoe_progress_owner *o, struct osoe_wire *w,
      * of stream is a peer that died, and the job ends here naming it rather
      * than waiting for something that node will never send (§3.15, §6.4).
      */
+    char who[192];
     if (w->error == -ETIMEDOUT)
-        osoe_fatal("node %u: node %u stopped answering: its kernel acknowledged neither "
+        osoe_fatal("node %u: %s stopped answering: its kernel acknowledged neither "
                    "keepalive probes nor retransmissions (§3.15). The host has vanished, or "
-                   "the network between is down", node, peer);
+                   "the network between is down", node,
+                   node_words(o->engine, peer, who, sizeof who));
     if (w->error)
-        osoe_fatal("node %u: the %s to node %u failed: %s", node, name, peer,
-                   strerror(-w->error));
+        osoe_fatal("node %u: the %s to %s failed: %s", node, name,
+                   node_words(o->engine, peer, who, sizeof who), strerror(-w->error));
     if (osoe_wire_ended(w)) {
         if (!osoe_am_parser_between_segments(parser))
-            osoe_fatal("node %u: node %u's stream ended in the middle of a segment: its "
-                       "lead has exited or died mid-send", node, peer);
+            osoe_fatal("node %u: %s's stream ended in the middle of a segment: its "
+                       "lead has exited or died mid-send", node,
+                       node_words(o->engine, peer, who, sizeof who));
         if (!*peer_goodbye && w->send_error)
-            osoe_fatal("node %u: node %u reset its %s without its goodbye (%s): its lead has "
-                       "exited or died (§6.4)", node, peer, name, strerror(-w->send_error));
+            osoe_fatal("node %u: %s reset its %s without its goodbye (%s): its lead has "
+                       "exited or died (§6.4)", node, node_words(o->engine, peer, who, sizeof who),
+                       name, strerror(-w->send_error));
         if (!*peer_goodbye)
-            osoe_fatal("node %u: node %u ended its %s without its goodbye: its lead has "
-                       "exited or died (§6.4)", node, peer, name);
+            osoe_fatal("node %u: %s ended its %s without its goodbye: its lead has "
+                       "exited or died (§6.4)", node,
+                       node_words(o->engine, peer, who, sizeof who), name);
     }
     return moved;
 }
@@ -2064,22 +2086,25 @@ void osoe_progress_check_silent(struct osoe_progress_owner *o, uint32_t budget_m
         if (w->error || w->send_error || osoe_wire_ended(w))
             continue;               /* already failed or ended: judged elsewhere */
         uint32_t silent = osoe_wire_silent_ms(w);
+        char who[192];
         if (silent >= budget_ms)
-            osoe_fatal("node %u: node %u stopped answering: its kernel has acknowledged "
+            osoe_fatal("node %u: %s stopped answering: its kernel has acknowledged "
                        "nothing sent to it for %u s (§3.15). The host has vanished, or the "
-                       "network between is down", o->engine->node, peer_of(o, i),
-                       silent / 1000);
+                       "network between is down", o->engine->node,
+                       node_words(o->engine, peer_of(o, i), who, sizeof who), silent / 1000);
     }
     for (uint32_t slot = 0; slot < o->controls; slot++) {
         struct osoe_wire *w = &o->control_wire[slot];
         if (w->error || w->send_error || osoe_wire_ended(w))
             continue;
         uint32_t silent = osoe_wire_silent_ms(w);
+        char who[192];
         if (silent >= budget_ms)
-            osoe_fatal("node %u: node %u stopped answering: its kernel has acknowledged "
+            osoe_fatal("node %u: %s stopped answering: its kernel has acknowledged "
                        "nothing sent to it for %u s (§3.15). The host has vanished, or the "
                        "network between is down", o->engine->node,
-                       control_peer(o->engine, slot), silent / 1000);
+                       node_words(o->engine, control_peer(o->engine, slot), who, sizeof who),
+                       silent / 1000);
     }
 }
 

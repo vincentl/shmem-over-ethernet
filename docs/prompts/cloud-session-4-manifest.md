@@ -228,3 +228,241 @@ section's tables.
 - The static checks with `settings-known`, after that, on the batch's tree alone:
   **15 of 15** in 101 s - `main`'s 13, `shmem.settings-known` and
   `shmem.version.info.every-variable` (in `version\.`).
+
+**D27, the sysctl's own branches, shown by hand** (after batch 1's commit, with
+nothing else running; the sysctl put back to 0 at once): with
+`kernel.io_uring_disabled=2`, a two-node job of `shmem_test_init` said "(it fails
+with "Operation not permitted", refused by the kernel.io_uring_disabled sysctl,
+which is 2 here)"; at 1, as user 65534 (`setpriv --reuid=65534 --regid=65534
+--clear-groups`), "refused by the kernel.io_uring_disabled sysctl, which is 1 here
+and admits only CAP_SYS_ADMIN and the group kernel.io_uring_group names, neither of
+which this process has"; at 1 as root, which holds `CAP_SYS_ADMIN`, the job ran
+(exit 0). No test can set the sysctl, so these stay a record.
+
+## Batch 2: start-up's messages
+
+One commit for the six items: the one that adds this section.
+
+### D10: a dead node named by its host and its lead's rank - done
+
+**The item** (RD; round four's readiness Q5-6, "Messages that could say more"): a
+dead or vanished node was named by its index alone ("node 1 ended its connection
+without its goodbye"), and the README never said that node N is the step's node N,
+`SLURM_NODEID`. Confirmed open: `progress.c`'s death messages took `peer` alone.
+
+**What changed.**
+
+- `shmem/src/progress.h`: the host's table gains `describe_node(context, node,
+  words, len)`, last, so that the engine's own tests' positional tables stay valid
+  (each now gives it `NULL`): "A peer node as a message names it beside its index".
+- `shmem/src/progress-host.c`: `describe_node` writes the node's entry in the
+  step's node list (`osoe_hostlist_entry` of `osoe.bootstrap.node_list`: a host
+  name under Slurm, a loopback address under `osoe-launch`) and its lead's rank
+  (`osoe_job_node_lead`): "127.0.0.2, lead rank 2".
+- `shmem/src/progress.c`: `node_words(engine, node, buf, len)` makes "node 1
+  (127.0.0.2, lead rank 2)", or "node 1" where the host gives nothing; the seven
+  death messages use it - a peer that stopped answering (keepalive, and both of
+  `osoe_progress_check_silent`'s), a failed wire, a stream ended mid-segment, a
+  reset and an end without the goodbye.
+- `shmem/tests/test-barrier-am.c`, `test-progress.c`, `test-owners.c`: the new
+  field's `NULL` in their host tables, which `-Wmissing-field-initializers` asked
+  for.
+
+**Wire or layout**: neither (the host table is process-private).
+
+**Test**: `shmem.dead-pe.lead.0-0-1-1.named` (tier 2, internode, 90 s): node 0's
+lead dies (`dead-pe.sh`, map `0,0,1,1`) and node 1 must say "node 1: node 0
+(127.0.0.1, lead rank 0) ...". Without the change: "node 1: node 0 ended its
+control wire without its goodbye: its lead has exited or died (§6.4)", failing;
+with it, "node 1: node 0 (127.0.0.1, lead rank 0) ended its control wire without
+its goodbye".
+
+**README**: "When a job fails or hangs" quotes the new line and says what a node's
+number is: its place in the step's node list, Slurm's `SLURM_NODEID`, or
+`osoe-launch`'s logical node, whose entry is a loopback address.
+
+### D11: start-up's messages name a rank beside a local id - done
+
+**The item** (RD: "start-up messages give local ids, not ranks"). Confirmed partly
+open: round four had made the join's notices name ranks ("local id 2 (rank 2)"),
+but `node.c`'s agreement check and sibling mapping, and `liveness.c`'s pidfd
+notice, still named "local PE N" alone.
+
+**What changed**: `shmem/src/node.c` - `check_agreement`'s three messages (the
+symmetric size, the heap object, the statics) and `map_siblings`'s four (a
+sibling's heap or statics that cannot be opened or mapped) say "local PE N (rank
+R)"; `shmem/src/liveness.c` - "cannot open a pidfd for local PE N (rank R, pid
+P)". The settings' agreement messages, "OSOE_MAX_CONTEXTS differs between PEs: the
+local lead has 64, this PE has 128", name the lead by its role and were left: the
+line's own "PE N:" is the rank of the PE that saw it.
+
+**Wire or layout**: neither.
+
+**Tests**: `shmem.refuse.size_mismatch` now requires "SHMEM_SYMMETRIC_SIZE differs
+between PEs: local PE [012] (rank [012]) has N bytes"; `shmem.dead-pe.no-pidfd.*`
+require "cannot open a pidfd for local PE N (rank R, pid P)". Without the change
+all three fail - "SHMEM_SYMMETRIC_SIZE differs between PEs: local PE 0 has
+268435456 bytes, this PE has 2097152", and "(pid 18266)" alone.
+
+**A trap met on the way**, recorded so that the next session does not meet it: a
+`;` in a `PASS_REGULAR_EXPRESSION` splits it into a list of two, either of which
+passes the test. The first forms of the two pidfd expressions (`[^;]*; watching`)
+and of D28's below (`\); this kernel`) passed without the change for that reason;
+they now use `.` where the `;` was, and fail without it. The same holds of a
+refusal test's PATTERNS: the existing `shmem.start-up.never-calls-init.no-progress-timeout`
+splits its "seconds; missing local ids" in two, which still means what it says;
+D15's new case uses `.`.
+
+### D14: a descriptor limit too low names the hard limit to raise - done
+
+**The item** (round four's readiness Q5-6): "accepting a connection on port 18438:
+Too many open files", no word of `ulimit -Hn`, which the README names. Confirmed
+open: `listener.c`'s three socket and accept failures gave `strerror` alone.
+
+**What changed** (`shmem/src/listener.c`): `descriptor_hint(error, buf, len)` -
+for `EMFILE`, ": this process may hold N descriptors, which shmem_init raised to
+the hard limit, and a node's lead holds two sockets for every other node and a
+descriptor for every other PE of its node beside the program's own - raise the
+hard limit on open files, ulimit -Hn"; for `ENFILE`, the system's `fs.file-max`;
+nothing otherwise - after "cannot create a listening socket", "accepting a
+connection on port P" and "cannot create a socket".
+
+**Wire or layout**: neither.
+
+**Test**: `shmem.start-up.descriptors.16-nodes` (tier 2, internode, 90 s): sixteen
+logical nodes, each PE under `sh -c "ulimit -n 32; exec ..."`. Without the change
+the job ends "cannot create a socket: Too many open files"; with it, the hint, its
+limit 32. (At 40 the job runs; at 32, 24 and 20 it is refused alike.)
+
+**README**: the Limits' "descriptors for the network" says a node that runs out ends
+naming its limit and that the hard one is to raise.
+
+### D15: under the no-progress limit, the node with the missing PE speaks first - done
+
+**The item** (round four's readiness Q5-6, its run A15): with
+`OSOE_NO_PROGRESS_TIMEOUT` set, a PE that never calls `shmem_init` can make another
+node's first line about the rendezvous rather than the missing rank. Confirmed
+open, and seen in this session's run without the change: map `0,0,1,1`, rank 1
+never calling, the limit 3 s - node 0's lead "no local PE has joined for
+OSOE_NO_PROGRESS_TIMEOUT seconds; missing local ids: 1 (rank 1)" and node 1's PE 3
+"no progress for 3 s (OSOE_NO_PROGRESS_TIMEOUT): this node's lead has not finished
+the job rendezvous" in the same second: whichever came first, under `srun -K1` the
+only line left.
+
+**What changed.**
+
+- `base/stall-watch.h`: `OSOE_STALL_WATCH_HOP_GRACE_NS` (2 s) and
+  `osoe_stall_watch_limit_beyond(limit, hops)`: the limit and two seconds a hop,
+  or 0 (never) as before.
+- `shmem/src/listener.c`: the five waits on another node - `read_all`,
+  `write_all`, `osoe_listener_accept`, `osoe_listener_connect_port`,
+  `osoe_listener_connect` - take one hop's grace; their three ends on a node that
+  never came say "- a node comes to the rendezvous once all its PEs have called
+  shmem_init, and names any that has not" (`NOT_COME`).
+- `shmem/src/job.c`: a PE's wait for its lead's job tables (`follow`) takes two
+  hops' grace, so that its lead, a hop from the others, speaks before it.
+- A node's own waits - the join's, `node.c` - keep the limit itself.
+- Design §3.15 says so, "As built (D15)".
+
+**Wire or layout**: neither. **A behaviour change** the item did not name in
+these words: with the limit set, a wait on another node at start-up now ends 2 s
+(4 s for a non-lead) later than the limit; the README's row says so.
+
+**Test**: `shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1` (tier 2,
+internode, `osoe_refusal_test`, 20 s): map `0,0,1,1`, rank 1 exits before
+`shmem_init`, the limit 3 s, notices put off to 60 s; every rank must end by
+itself, the job's first line of the library's must be node 0's naming "missing
+local ids: 1 (rank 1)", and node 1's lead must say "node 0 has not answered node 1
+on any of its 32 candidate ports in OSOE_PORT_RANGE=... - a node comes to the
+rendezvous once all its PEs have called shmem_init, and names any that has not".
+`refusal.sh` learns the first-line form: a PATTERN beginning with `=` must match
+the first line that begins "osoe: ". With the change: node 0's line at 3 s, node
+1's at 5 s, the run 5.1 s. Without it the test fails (node 1's line lacks the
+cause).
+
+**README**: the `OSOE_NO_PROGRESS_TIMEOUT` row, and "A start that waits" in "When a
+job fails or hangs".
+
+### D25: a stalled get names the node that owes the zone's bytes - done
+
+**The item** (R9 Q5-8): a 256 KiB `shmem_getmem_nbi` toward a stopped node waits
+inside the call, its fifth piece finding the zone full, and ends "shmem_get_nbi:
+no progress for 10 s ... the landing zone's released extents has stayed at 0";
+`osoe-stat` shows "nonblocking gets, 262144 bytes in flight" and no "waiting
+toward" line. Confirmed open in `make_room` (`transport-internode.c`): a wait for
+room that is not a blocking get's own named no node, since the ninth review's Q5-2
+found the get's own target blamed.
+
+**What changed** (`shmem/src/transport-internode.c`).
+
+- `issue_target`, a process-private array beside `copy_destination`, one
+  `_Atomic uint32_t` an extent: the PE each piece was asked of, stored (release)
+  by `issue_record`, which now takes the PE, before the record goes `ISSUED`.
+- `zone_owed_by(&pe)`: over the zone's records, those `ISSUED` (loaded acquire) -
+  unanswered; a landed piece owes nothing - and their targets (acquire): the one
+  node that owes them all and, where one PE does, that PE; otherwise none. O(the
+  zone's extents), at a wait's start and its turns.
+- `make_room`: a wait that is not a blocking get's own names that node and PE
+  (`am_wait_begin`, the reply kind osoe-stat shows as a node waited toward), and
+  is begun again when the answer changes; where several nodes owe, or none, it
+  names none, as before.
+- Not a protocol change: nothing waits on `issue_target`; its two orders are
+  named per §3.16 (release, acquire), and it is freed with `copy_destination`.
+
+**Wire or layout**: neither (process-private memory).
+
+**Tests**: `shmem.get-no-progress.nonblocking.0-1` (new, tier 2, internode): 256
+KiB nonblocking from PE 1, which stops, through a zone of 64 KiB, the limit 10 s;
+`test-get-no-progress.c` gains `OSOE_TEST_GET_NBI=1` (listed in
+`unknown-settings.c`). Without the change: "shmem_get_nbi: no progress for 10 s
+(OSOE_NO_PROGRESS_TIMEOUT): the landing zone's released extents has stayed at 0";
+with it, "shmem_get_nbi: no progress toward node 1 (PE 1) for 10 s ...".
+`shmem.get-no-progress.zone-held.{8,150000}.0-1-2`, Q5-2's: the zone held by a
+nonblocking get from PE 2, which stops - the blocking get's wait now names node 2
+and PE 2, which owe it, and still never node 1, which Q5-2 forbade; without the
+change both fail (they named no node).
+
+**README**: the gets' Limits entry says where one node owes every piece the wait
+names it, in `osoe-stat` and in the no-progress line.
+
+### D28: a sandbox's refusal of futex2 named as a filter, not an old kernel - done
+
+**The item** (round four's portability Q6): "osoe needs Linux 6.7 or later, for the
+futex2 calls (they fail with "Function not implemented"); this kernel is
+6.12.95+deb13-cloud-arm64" under Rosetta; "name the kernel's age only when the
+release is below 6.7, and a filter otherwise". Confirmed open in `init.c`.
+
+**What changed**: `base/futex.h` declares `osoe_futex_kernel_has_calls(release)`;
+`futex-futex2.c` reads uname's "major.minor" - 1 from 6.7, 0 below, -1 unreadable;
+`futex-classic.c` gives -1 (every kernel the single-node build runs on has the
+classic calls, and its requirement's words already name a sandbox).
+`shmem/src/init.c`'s refusal adds, where the kernel has the calls, ", which has
+them: a seccomp filter refuses them here - a container runtime's profile older
+than the calls, or a sandbox's - or an emulator does not pass them on".
+
+**Wire or layout**: neither.
+
+**Tests**: `shmem.refuse.old-kernel` (`deny-futex2`, `ENOSYS`) and
+`shmem.refuse.no-shared-futex2` (`EPERM` on the shared calls) now require ",
+which has them: a seccomp filter refuses them here" after the release. Without the
+change both fail ("... (they fail with "Function not implemented"); this kernel is
+6.18.44-fc-v114"). The old-kernel branch itself, a release below 6.7, cannot run
+here: the full build needs 6.7.
+
+**README**: the probe's paragraph in "Building" says the refusal names the
+kernel's age only where it is older than 6.7, and a filter otherwise.
+
+### Batch 2's runs
+
+- release, rebuilt: **0 warnings** (the first build warned three times, the engine
+  tests' tables missing the new field; given `NULL`, none).
+- The batch's tests (`ctest --test-dir build/release -j4 -R
+  '^(shmem\.(dead-pe|refuse\.(size_mismatch|old-kernel|no-shared-futex2)|get-no-progress|start-up\.(never-calls-init|descriptors|node-refuses)|stopped-node)|env\.probe\.old-kernel)'`):
+  **30 of 30** with the change; without it (the library's files and the three
+  engine tests set aside, the tests kept) **19 of 30** - the eight new or changed
+  above, and, once their `;` was gone, `shmem.refuse.no-shared-futex2` and both
+  `shmem.dead-pe.no-pidfd.*`.
+- The README's descriptive internode count: 512 to 516 (four new internode tests).
+- The static checks: **15 of 15**, 101 s.
+- The release suite, models aside: **940 tests, 938 passed, 2 skipped** (the root
+  refusal tests), none failed, 300 s.
