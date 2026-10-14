@@ -54,6 +54,15 @@ add_test(NAME shmem.settings-documented
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsDocumented.cmake)
 set_tests_properties(shmem.settings-documented PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# And every OSOE_ name the tree reads or sets - the test suite's own among
+# them - is in the list the library's notice of an unknown name goes by, which
+# holds no other (unknown-settings.c, CheckSettingsKnown.cmake; D16): a name
+# missing from it would be called unknown in every job that sets it.
+add_test(NAME shmem.settings-known
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsKnown.cmake)
+set_tests_properties(shmem.settings-known PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # Every source file carries the license line, as the README says, but the
 # specification's four examples: 82 evidence programs went without it until the
 # review of v0.2 step 4's merge point (readiness Q5-1), since nothing checked
@@ -2391,7 +2400,11 @@ endif()
 # io_uring refused in each place shmem_init's check enters it (deny-io-uring.c):
 # the probe fails its check of shmem_init's, naming the place; a job of two
 # nodes is refused by name before anything is made, the sysctl named only where
-# it can be the cause; and a job of one node, which opens no ring, runs - in
+# it can be the cause - and at creation, where it can, not where it reads that
+# it allows the ring, as it does wherever this suite runs: deny-io-uring's
+# refusal is a seccomp filter's, which the message names instead (D27; round
+# four's Q1: a container's filter was reported as the sysctl); and a job of one
+# node, which opens no ring, runs - in
 # both builds, the single-node build having none to open. Before Part 6's
 # adversarial reads the check missed `enable` and `enter`, and a job ended after
 # its PEs had left shmem_init.
@@ -2414,8 +2427,8 @@ if(OSOE_INTERNODE)
       COMMAND deny-io-uring ${where} $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 --
               $<TARGET_FILE:shmem_test_init>)
     if(where STREQUAL "setup")
-      set(osoe_hint " .*which usually means the kernel.io_uring_disabled sysctl is set")
-      set(osoe_not "left behind")
+      set(osoe_hint " .*, refused not by the kernel.io_uring_disabled sysctl, [0-9]+ here, which allows it, but by a seccomp filter")
+      set(osoe_not "left behind|sysctl is set|refused by the kernel.io_uring_disabled")
     else()
       set(osoe_hint "")
       set(osoe_not "left behind|io_uring_disabled|submission failed|cannot enable")
@@ -3985,6 +3998,17 @@ foreach(pool 1 3)
             $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
   set_tests_properties(shmem.context.pool-${pool}.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
+# A full pool is said once a PE, naming OSOE_MAX_CONTEXTS (D24): the program
+# finds it full twice on each PE - its creations to exhaustion, then one more -
+# so two PEs write two lines, where a line a call would write four or more and
+# none, as before, nothing (count-lines.sh).
+add_test(NAME shmem.context.pool-3.said-once.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=3
+          sh ${CMAKE_CURRENT_SOURCE_DIR}/count-lines.sh 2
+          "osoe: PE [01]: shmem_ctx_create: no context free: OSOE_MAX_CONTEXTS is 3, the contexts a PE may have at once"
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
+set_tests_properties(shmem.context.pool-3.said-once.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "COUNT OK")
 
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
@@ -4384,6 +4408,44 @@ set_tests_properties(shmem.version.start-up shmem.version.info shmem.version.sta
   shmem.version.info.sma shmem.debug.SHMEM_DEBUG shmem.debug.SMA_DEBUG PROPERTIES
   LABELS "tier2" TIMEOUT 90
   FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
+# SHMEM_INFO's text names every variable of the README's tables of settings
+# (D29; info-every-variable.sh): the transport's buffers and the testing hooks
+# were missing, 19 of 47.
+add_test(NAME shmem.version.info.every-variable
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/info-every-variable.sh ${PROJECT_SOURCE_DIR}/README.md
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.version.info.every-variable PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "INFO NAMES EVERY VARIABLE")
+
+# An OSOE_ name osoe does not read is said, once for the job, by rank 0 - with
+# the known name a letter or two away where there is one - and a known one is
+# not (D16; unknown-settings.h): the misspelt OSOE_DEADLOCK_SECOND=0 left the
+# deadlock detector on without a word. shmem_test_init starts the library three
+# times, and the line is said once. The list of known names is held to the
+# tree by shmem.settings-known.
+add_test(NAME shmem.settings.unknown.near
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECOND=0
+          sh ${CMAKE_CURRENT_SOURCE_DIR}/count-lines.sh 1
+          "^osoe: PE 0: OSOE_DEADLOCK_SECOND is not a variable osoe reads, and changes nothing: did you mean OSOE_DEADLOCK_SECONDS[?]$"
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.settings.unknown.near PROPERTIES PASS_REGULAR_EXPRESSION "COUNT OK"
+  FAIL_REGULAR_EXPRESSION "PE 1: OSOE_DEADLOCK_SECOND")
+add_test(NAME shmem.settings.unknown.far
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_FROBNICATE=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.settings.unknown.far PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "osoe: PE 0: OSOE_FROBNICATE is not a variable osoe reads, and changes nothing [(]SHMEM_INFO=1 lists the ones it reads[)]"
+  FAIL_REGULAR_EXPRESSION "did you mean|exited with status [1-9]|killed by signal|timeout after|left behind")
+add_test(NAME shmem.settings.unknown.known
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=10 OSOE_CC=cc OSOE_TEST_MAP=0
+          OSOE_BOOTSTRAP_TIMEOUT=5
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.settings.unknown.known PROPERTIES
+  PASS_REGULAR_EXPRESSION "OSOE_BOOTSTRAP_TIMEOUT is retired and ignored"
+  FAIL_REGULAR_EXPRESSION "is not a variable osoe reads|exited with status [1-9]|killed by signal|timeout after|left behind")
+set_tests_properties(shmem.settings.unknown.near shmem.settings.unknown.far
+  shmem.settings.unknown.known PROPERTIES LABELS "tier2" TIMEOUT 90)
 
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher

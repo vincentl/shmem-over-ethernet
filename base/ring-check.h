@@ -25,6 +25,18 @@ int osoe_ring_check(const char **facility);
 extern const char osoe_ring_check_creating[];
 
 /*
+ * Whether the kernel.io_uring_disabled sysctl (Linux 6.6) refuses this process
+ * a ring: 1 where it does - at 2 every process, at 1 a process without
+ * CAP_SYS_ADMIN outside the group kernel.io_uring_group names - 0 where it
+ * does not, and -1 where it cannot be read; its value in *value but at -1.
+ * Creation refused with EPERM is the sysctl's or a seccomp filter's - a
+ * container runtime's default profile refuses io_uring so - and the message
+ * that reports it says which by this, where it named the sysctl in a container
+ * whose sysctl read 0 (round four's Q1; D27).
+ */
+int osoe_ring_sysctl_refuses(int *value);
+
+/*
  * The locked-memory limit this process has (RLIMIT_MEMLOCK, `ulimit -l`), in
  * KiB, or -1 where it has none, which the messages call "unlimited", as
  * `ulimit -l` does. io_uring charges against it each send by reference - the

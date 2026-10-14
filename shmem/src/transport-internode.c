@@ -241,16 +241,37 @@ const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *w
         return NULL;
     struct utsname u;
     const char *release = uname(&u) == 0 ? u.release : "unknown";
-    /* EPERM at creation is the sysctl; ENOMEM, on Linux 6.14 and later, can be
-     * the locked-memory limit, which io_uring then charges its rings to
-     * (base/ring-check.h) - under `ulimit -l 0` on the Pi's 6.18 the check fails
-     * so, and the kernel says no more. */
-    char cause[160] = "";
+    /* EPERM at creation is the kernel.io_uring_disabled sysctl or a seccomp
+     * filter, and the sysctl itself says which (base/ring-check.h; D27): named
+     * only where it refuses this process, the filter where it does not. ENOMEM,
+     * on Linux 6.14 and later, can be the locked-memory limit, which io_uring
+     * then charges its rings to (base/ring-check.h) - under `ulimit -l 0` on the
+     * Pi's 6.18 the check fails so, and the kernel says no more. */
+    char cause[256] = "";
     long long kib = osoe_locked_memory_kib();
-    if (ring_error == EPERM && facility == osoe_ring_check_creating)
-        snprintf(cause, sizeof cause,
-                 ", which usually means the kernel.io_uring_disabled sysctl is set");
-    else if (ring_error == ENOMEM && kib >= 0)
+    int disabled = 0;
+    if (ring_error == EPERM && facility == osoe_ring_check_creating) {
+        switch (osoe_ring_sysctl_refuses(&disabled)) {
+        case 1:
+            snprintf(cause, sizeof cause,
+                     ", refused by the kernel.io_uring_disabled sysctl, which is %d here%s",
+                     disabled, disabled == 1 ? " and admits only CAP_SYS_ADMIN and the group "
+                                               "kernel.io_uring_group names, neither of which "
+                                               "this process has"
+                                             : "");
+            break;
+        case 0:
+            snprintf(cause, sizeof cause,
+                     ", refused not by the kernel.io_uring_disabled sysctl, %d here, which "
+                     "allows it, but by a seccomp filter, as a container runtime's default "
+                     "profile refuses io_uring", disabled);
+            break;
+        default:
+            snprintf(cause, sizeof cause,
+                     ", refused by the kernel.io_uring_disabled sysctl or by a seccomp filter "
+                     "(the sysctl cannot be read here)");
+        }
+    } else if (ring_error == ENOMEM && kib >= 0)
         snprintf(cause, sizeof cause,
                  ", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, "
                  "%lld KiB here", kib);

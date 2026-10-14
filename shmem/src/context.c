@@ -66,6 +66,10 @@ static pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const long known_options = SHMEM_CTX_SERIALIZED | SHMEM_CTX_PRIVATE | SHMEM_CTX_NOSTORE;
 
+/* Whether this process has said that its pool was full (create), under
+ * pool_mutex. */
+static bool said_full;
+
 void osoe_context_start(void)
 {
     pool_count = osoe.bootstrap.max_contexts;
@@ -170,6 +174,14 @@ static unsigned transport_options(long options)
  * does not define is a program bug, named. A team's num_contexts is recorded
  * at its split and not reserved against: §9.5.2 lets a creation fail
  * regardless of it.
+ *
+ * A full pool is said once a process, naming OSOE_MAX_CONTEXTS, the variable
+ * that raises it (D24; the ninth review's Q5-8: 63 creations succeeded and the
+ * 64th failed without a word, where a split that finds no team number names
+ * OSOE_MAX_TEAMS). Once, and not each time: a program may probe for contexts
+ * by creating them until one fails, which §9.5 makes no error, and a line a
+ * probe would repeat itself; the first says which variable to raise, as the
+ * zero-copy send's notice of the locked-memory limit says it once a process.
  */
 static int create(const char *routine, shmem_team_t team, const struct osoe_team *descriptor,
                   long options, shmem_ctx_t *ctx)
@@ -182,10 +194,12 @@ static int create(const char *routine, shmem_team_t team, const struct osoe_team
     *ctx = SHMEM_CTX_INVALID;
     pthread_mutex_lock(&pool_mutex);
     int status = 1;
+    bool full = true;
     for (uint32_t i = 1; i < pool_count; i++) {
         struct osoe_context *c = &pool[i];
         if (c->live)
             continue;
+        full = false;
         struct osoe_transport_context *transport =
             osoe_transport_context_create(transport_options(options));
         if (transport) {
@@ -197,7 +211,14 @@ static int create(const char *routine, shmem_team_t team, const struct osoe_team
         }
         break;
     }
+    bool say = full && !said_full;
+    said_full = said_full || full;
     pthread_mutex_unlock(&pool_mutex);
+    if (say)
+        osoe_notice("%s: no context free: OSOE_MAX_CONTEXTS is %u, the contexts a PE may have "
+                    "at once, the default one included (design §4.11); the call returns "
+                    "nonzero, as spec §9.5 lets it, and this PE says so this once",
+                    routine, pool_count);
     return status;
 }
 

@@ -15,7 +15,9 @@ cmake_minimum_required(VERSION 3.25)
 # Over the library (shmem/src, base) and the tools (tools), every .c, .h, .sh,
 # .in, .py and .cmake file but the test suite's own - files under a tests/
 # directory or named test-*, and tools/launch/tier3.sh, the tier-3 tests'
-# wrapper, whose OSOE_TEST_READY names a file it gives the test programs - it
+# wrapper, whose OSOE_TEST_READY names a file it gives the test programs, and
+# shmem/src/unknown-settings.c, whose list of every name the tree reads holds
+# the test suite's too (CheckSettingsKnown.cmake checks it) - it
 # collects every OSOE_ name read: a quoted literal ("OSOE_...", 'OSOE_...'), a
 # shell variable ($OSOE_..., ${OSOE_...}), and the launcher's names, which
 # bootstrap.c makes from launcher_name("...") with the OSOE_ prefix (or
@@ -32,6 +34,7 @@ foreach(path IN LISTS sources)
   file(RELATIVE_PATH where "${SOURCE_DIR}" "${path}")
   get_filename_component(base "${path}" NAME)
   if(where MATCHES "(^|/)tests/" OR base MATCHES "^test-" OR where STREQUAL "tools/launch/tier3.sh"
+     OR where STREQUAL "shmem/src/unknown-settings.c"
      OR NOT base MATCHES "\\.(c|h|sh|in|py|cmake)$")
     continue()
   endif()

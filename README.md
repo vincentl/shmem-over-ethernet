@@ -313,8 +313,9 @@ few more).
 io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 (`kernel.io_uring_disabled` is 2), and container runtimes' default seccomp
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
-`EPERM`, for which the message names the sysctl even though it reads 0 inside
-the container, and Podman with `ENOSYS`. There jobs on one node run, but about
+`EPERM`, which the message tells from the sysctl's own refusal by reading the
+sysctl - naming a seccomp filter where the sysctl allows io_uring, as it does
+inside such a container - and Podman with `ENOSYS`. There jobs on one node run, but about
 425 of the test suite's 871 tests fail at `shmem_init` or at opening a ring -
 all of them among the 470 labelled `internode` but `env.probe`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
@@ -1563,7 +1564,12 @@ naming the variable and both nodes, the nodes already connected to it end with
 it, and a node not yet connected says what it waits for until the launcher ends
 it ("How a job starts"); one marked *checked among a node's PEs* is compared
 only there, and one marked *checked between nodes* only between them.
-`SHMEM_INFO` prints most of this list from the library itself. In
+`SHMEM_INFO` prints every variable of this section's tables from the library
+itself. An `OSOE_` name the library does not read changes nothing, and the
+job's rank 0 says so once, naming the one it reads a letter or two away where
+there is one - `OSOE_DEADLOCK_SECOND is not a variable osoe reads, and changes
+nothing: did you mean OSOE_DEADLOCK_SECONDS?` - from a list of every name osoe
+and its tests read, which a test, `shmem.settings-known`, holds to the tree. In
 the single-node build the settings only a job of more than one node uses - the
 connections', the wire's, keepalive's, the helpers', the collectives' shape and
 the link's - are still checked as values, as the full build checks them in a job
@@ -1588,7 +1594,7 @@ both are set the `SHMEM_` one controls.
 |---|---|---|
 | `OSOE_MAX_TEAMS` | `256` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 25 KiB of address space at the other variables' defaults on a few nodes - counters and the slots of its small collectives, which only a team's leads touch, and the same for its scans, which every member of a team that scans does - 28.1 KiB at 64 nodes and 29.6 KiB at a thousand, collect's exchange's slots growing with the nodes to 64. *Checked*. |
 | `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 760 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
-| `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
+| `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. A creation that finds none free returns nonzero, as the specification lets it, and the PE says so once, naming this variable. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. Each place, and the agent's, has a lane for the large reductions and broadcasts its thread leads and the large scans it makes, 577 KiB of address space at the default fan-out and pipeline depth, which a thread that does neither never touches: 9.6 MiB a PE at the default - but for the link's measurement as a job starts (`OSOE_LINK_HOP_NS`), which writes 64 KiB of the first lane of node 1's first PE and a page of the first lane of each of the next nodes' up to the fan-out. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | a node's `4194304` over its PEs | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. Unset, the node's 4 MiB split among its PEs in whole KiB, no less than `262144` nor more than `1048576` a PE - 1 MiB to each of 1 to 4 PEs a node, 512 KiB to 8, 256 KiB from 16 - each node from its own count (P32). *Checked* among a node's PEs. |
 
