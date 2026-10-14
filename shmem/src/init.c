@@ -26,6 +26,7 @@
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "barrier.h"
+#include "blocked.h"
 #include "context.h"
 #include "deadlock.h"
 #include "export.h"
@@ -317,7 +318,7 @@ static void exit_without_finalize(void)
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
                      "shmem_finalize; ending the job (spec §4, §9.1.4)\n",
                      osoe.bootstrap.rank);
-    if (n > 0) {
+    if (n > 0 && osoe_fatal_first_word()) {
         ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
                                                                           : sizeof msg - 1);
         (void)ignored;
@@ -656,6 +657,9 @@ OSOE_API void pshmem_finalize(void)
         pthread_mutex_unlock(&lifecycle);
         return;
     }
+    /* So that an end this PE's agent or helper says while this thread is here,
+     * in no wait the record names, says "in shmem_finalize" (D19). */
+    osoe_blocked_finalizing(true);
     if (refcount == 1) {
         osoe_lock_warn_held();
         /* Every context the program left goes, with its implicit quiet, while
@@ -674,6 +678,7 @@ OSOE_API void pshmem_finalize(void)
          * is, the answer is the one a shmem_init would give. */
         atomic_store_explicit(&thread_level, OSOE_INIT_LEVEL, memory_order_release);
     }
+    osoe_blocked_finalizing(false);
     pthread_mutex_unlock(&lifecycle);
 }
 

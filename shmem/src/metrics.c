@@ -8,6 +8,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -762,4 +763,25 @@ void osoe_blocked_leave(void)
 const char *osoe_blocked_routine(void)
 {
     return atomic_load_explicit(&waiting_in, memory_order_acquire);
+}
+
+/* blocked.h's finalizing word: the process's one thread in shmem_finalize
+ * stores it, and any thread that ends the process loads it. */
+static atomic_bool finalizing;
+
+void osoe_blocked_finalizing(bool on)
+{
+    atomic_store_explicit(&finalizing, on, memory_order_release);
+}
+
+const char *osoe_blocked_where(char *buf, size_t len)
+{
+    const char *routine = osoe_blocked_routine();
+    if (routine)
+        snprintf(buf, len, "waiting in %s", routine);
+    else if (atomic_load_explicit(&finalizing, memory_order_acquire))
+        snprintf(buf, len, "in shmem_finalize");
+    else
+        snprintf(buf, len, "not waiting in the library");
+    return buf;
 }

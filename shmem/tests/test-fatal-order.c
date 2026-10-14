@@ -85,9 +85,10 @@ bool osoe_metrics_thread_unpooled(void)
     return false;
 }
 
-const char *osoe_blocked_routine(void)
+const char *osoe_blocked_where(char *buf, size_t len)
 {
-    return "shmem_barrier_all";
+    snprintf(buf, len, "waiting in shmem_barrier_all");
+    return buf;
 }
 
 static void publish(void *context)

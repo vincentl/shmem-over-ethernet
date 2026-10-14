@@ -577,8 +577,14 @@ computing for ever, is what `osoe-stat` is for.
   line naming the PE of its node that saw the job end, or the node it lost -
   "node 0 (pi1, lead rank 0) ended its control wire without its goodbye" of a
   node whose lead ended, the node by its number, its entry in the step's node
-  list and its lead's rank - and, from a lead with progress helpers, a helper's
-  "ended its connection" line beside it. A node's number is its place in the
+  list and its lead's rank - or "ending: the job is aborting on behalf of PE
+  N", saying where it was: waiting in a routine, in `shmem_finalize`, or not
+  waiting in the library. Each process says its end once, in the first line any
+  of its threads writes - a lead with progress helpers wrote its agent's line
+  and a helper's, and a PE its agent's and its own thread's - and names its
+  control segment for `osoe-stat` only where the name is still in `/dev/shm`
+  (`OSOE_KEEP_CONTROL_SEGMENT`, or a start that failed), since a running job's
+  segment goes with its PEs. A node's number is its place in the
   step's node list, from 0: Slurm's `SLURM_NODEID`, or `osoe-launch`'s logical
   node (`-m`), whose entry is a loopback address. A status
   given to `shmem_global_exit` comes through as it is. Under `srun -K1` a task

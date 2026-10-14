@@ -466,3 +466,120 @@ kernel's age only where it is older than 6.7, and a filter otherwise.
 - The static checks: **15 of 15**, 101 s.
 - The release suite, models aside: **940 tests, 938 passed, 2 skipped** (the root
   refusal tests), none failed, 300 s.
+
+## Batch 3: `fatal.c`'s and `abort.c`'s
+
+One commit for the five items: the one that adds this section. They are one
+change seen from five sides, so the evidence is shared.
+
+### D18, D20, D21: an end said once a process - done
+
+**The items.** D18 (v0.2 step 4's readiness Q5-3): at two helpers each surviving
+lead wrote a death twice, its agent's "control wire" line and its helper's
+"connection" line, each with its own control segment line, "four lines a node where
+there were two". D20 (RD): "one death printed ten lines on one node and one fatal
+three times". D21 (R9 Q5-4, corrected by the round-nine fact-check's item 13): a
+non-lead at no helpers wrote both its agent's "ending: the job is aborting on
+behalf of PE 0" and its own thread's "...: the job is aborting on behalf of PE 0;
+this PE cannot make progress" - two writers, `abort.c` and `fatal.c`, "and no guard
+of once a process". Confirmed open: four writers of an end, none guarded.
+
+**What changed.**
+
+- `shmem/src/fatal.h`, `fatal.c`: `osoe_fatal_first_word()`, true for the first
+  caller in the process and false after (`atomic_exchange_explicit` on
+  `end_said`, seq_cst). A fatal writes its line only where it has the first word;
+  everything else it does - the publish, the last word, the abort, `_exit` - it
+  does as before.
+- The other three writers take the same word before they write: `abort.c`'s
+  "ending: the job is aborting on behalf of PE N", `liveness.c`'s "local PE N
+  (rank R, pid P) has ended without finalizing" (the cause, said first, and the
+  agent's own "ending" after it silent), and `init.c`'s "the process exited without
+  calling shmem_finalize".
+- `liveness.c`'s line now ends "; this PE was waiting in R" too, as the
+  "ending" line it silences did: the first suite run with the guard failed seven
+  tests that read where the lead had waited from that "ending" line
+  (`shmem.unswept-wait`, "shmem_quiet: the job is aborting on behalf of PE 1|waiting
+  in shmem_quiet" not found; the six `shmem.death-in-wait.*`, "0 of 1 survivors
+  named shmem_barrier_all") - the lead's own liveness line had taken the first word.
+  With the cause line saying where, all seven pass.
+- The first writer is the one that says the cause where there is one: the PE that
+  saw it writes before it declares the abort that ends the others (fatal.h).
+
+**Wire or layout**: neither.
+
+### D19: "in shmem_finalize", not "not waiting in the library" - done
+
+**The item** (v0.2 step 4's readiness Q5-3, its second bullet): a fatal the agent
+raises in `shmem_finalize` - the deaf helper's, the frozen helper's under
+`OSOE_NO_PROGRESS_TIMEOUT` - ended "...; this PE was not waiting in the library",
+the PE being in `shmem_finalize` in no wait the blocked record names; the fix "this
+PE was in shmem_finalize". Confirmed open.
+
+**What changed.**
+
+- `shmem/src/blocked.h`, `metrics.c` (where the record's process-local word lives):
+  `osoe_blocked_finalizing(bool)`, a process-wide `finalizing` word stored release
+  and loaded acquire; and `osoe_blocked_where(buf, len)`: "waiting in R" while a
+  wait is recorded, "in shmem_finalize" while finalizing in none, "not waiting in
+  the library" otherwise.
+- `shmem/src/init.c`, `pshmem_finalize`: the word set on entry, under the
+  lifecycle mutex, and cleared before it is let go.
+- `fatal.c` and `abort.c` take their "this PE was ..." from `osoe_blocked_where`,
+  where each composed it alike; `shmem/tests/test-fatal-order.c`, which compiles
+  `fatal.c` alone, stubs it.
+
+### D22: no `osoe-stat` advice on a segment the job's end takes with it - done
+
+**The item** (RD): "every fatal suggests `osoe-stat` on a segment gone by then".
+Confirmed: every fatal after start-up wrote "control segment /osoe... (osoe-stat
+/osoe..., while any PE of this node is alive)", though by default the name is gone
+after the join and the segment goes with the node's PEs, which the fatal ends
+within a sweep.
+
+**What changed** (`fatal.c`): `segment_named(name)` - whether `/dev/shm<name>`
+still exists - and the control segment line only then, as "control segment
+/osoe.J.S.N.0, its name still in /dev/shm (osoe-stat /osoe.J.S.N.0; osoe-stat --gc
+removes it once its PEs are gone)": under `OSOE_KEEP_CONTROL_SEGMENT`, or in a start
+that fails before the node's PEs have opened it.
+
+### Batch 3's tests
+
+- `shmem.dead-pe.lead.0-0-1-1-2-2.helpers-{0,2}.one-line` (new, tier 2, internode):
+  six PEs on three nodes, node 2's lead (rank 4) dies (`dead-pe.sh`), at no helpers
+  and at two; `dead-pe.sh` learns `ONE_LINE`, which requires every rank to have
+  written one line of the library's at most; and no line may name a control
+  segment. **Without the change** both fail, "ranks that wrote more than one line:
+  0 2 5" - ranks 0 and 2, the leads, the death and the segment line; rank 5,
+  node 2's other PE, the liveness line and its agent's "ending". **With it**: one
+  line each.
+- `shmem.helpers.deaf.0-1`: now requires "...has not answered...this PE was in
+  shmem_finalize". Without the change it fails, the line ending "this PE was not
+  waiting in the library".
+- `shmem.fatal.kept-segment-named` (new, tier 2): `OSOE_KEEP_CONTROL_SEGMENT=1`, one
+  PE of `shmem_test_bad_put`, whose put is refused: the fatal names its segment
+  "its name still in /dev/shm", and `osoe-stat --gc` then removes it. Without the
+  change it fails on the new wording ("(osoe-stat ..., while any PE of this node is
+  alive)"); it guards that the advice stays where it can help.
+- `shmem.fatal-order` passes both ways, as a stub change must.
+- With the change: the batch's tests and their neighbours (`-R
+  '^shmem\.(dead-pe|fatal|helpers\.deaf|refuse|exit|global-exit\.fatal|job\.disagree)'`)
+  **72 of 72**; without it, of the five above, **1 of 5**.
+
+**README**: "When a job fails or hangs" says each process says its end once, where
+the PE was, and that the segment is named only while its name is in `/dev/shm`.
+
+### Batch 3's runs
+
+- release, rebuilt: **0 warnings** (one link error on the way: `test-fatal-order.c`
+  compiles `fatal.c` alone, and needed `osoe_blocked_where`'s stub).
+- **The first release suite with the guard: 943 tests, 932 passed, 2 skipped, 9
+  failed.** Seven were the guard's - the liveness line's missing "where", fixed as
+  told under D18 - and two, `shmem.static-link` and `shmem.strict-c11`, were mine:
+  they compile the library's sources when they run, and I was editing batch 4's
+  `job.c` while they did, with a brace missing (an `else` taking only the first of
+  three statements, which the strict build caught). The lesson for any session
+  here: no source edits while a suite runs.
+- After the fix, on the batch's tree alone (batch 4's files set aside): the static
+  checks **15 of 15**, 100 s; the release suite, models aside, **943 tests, 941
+  passed, 2 skipped** (the root refusal tests), none failed, 302 s.

@@ -1893,13 +1893,15 @@ endif()
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
 # shmem_finalize naming it, found by its turns: nothing waits for time to pass.
+# The end says the PE was in shmem_finalize, where it said "not waiting in the
+# library" (D19).
 if(OSOE_INTERNODE)
   add_test(NAME shmem.helpers.deaf.0-1
     COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_DEAF_HELPER=1
             $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_barrier>)
   set_tests_properties(shmem.helpers.deaf.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
-      "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered")
+      "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered[^\n]*this PE was in shmem_finalize")
   osoe_internode_label(shmem.helpers.deaf.0-1)
   # An ending node's agent waits for its helpers' abortive goodbyes before its
   # process ends (abort_owners_model.py's no_wait): under OSOE_TEST_ABORT_DELAY_MS
@@ -4376,6 +4378,31 @@ if(OSOE_INTERNODE)
     PASS_REGULAR_EXPRESSION "node 1: node 0 [(]127[.]0[.]0[.]1, lead rank 0[)] .*DEAD PE OK")
   osoe_internode_label(shmem.dead-pe.lead.0-0-1-1.named)
 endif()
+# An end said once a process (D18, D20, D21; fatal.h's first word): node 2's
+# lead dies, and every other PE writes one line at most - its lead the death of
+# node 2, and no helper's line beside its agent's, at two helpers as at none -
+# and no fatal after start-up advises osoe-stat on a segment the job's end
+# takes with it (D22), which every fatal did, two lines where one was due.
+if(OSOE_INTERNODE)
+  foreach(helpers 0 2)
+    add_test(NAME shmem.dead-pe.lead.0-0-1-1-2-2.helpers-${helpers}.one-line
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=${helpers} ONE_LINE=1
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_dead-pe> 6 0,0,1,1,2,2 4)
+    set_tests_properties(shmem.dead-pe.lead.0-0-1-1-2-2.helpers-${helpers}.one-line PROPERTIES
+      LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "DEAD PE OK"
+      FAIL_REGULAR_EXPRESSION "control segment /osoe")
+    osoe_internode_label(shmem.dead-pe.lead.0-0-1-1-2-2.helpers-${helpers}.one-line)
+  endforeach()
+endif()
+# And where the control segment's name is kept (OSOE_KEEP_CONTROL_SEGMENT), a
+# fatal still says it, its name in /dev/shm for osoe-stat, which removes it.
+add_test(NAME shmem.fatal.kept-segment-named
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 \"$0\" -n 1 -t 20 -- \"$1\" & L=$!; wait $L; \"$2\" --gc /osoe.$L.0.0.0"
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_bad_put> $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.fatal.kept-segment-named PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+    "control segment /osoe[.][0-9]+[.]0[.]0[.]0, its name still in /dev/shm [(]osoe-stat /osoe.*/osoe[.][0-9]+[.]0[.]0[.]0: removed")
 # And on a kernel without pidfd_open - before Linux 5.3, which the single-node
 # build's floor of 4.17 admits - where liveness watches by pid: the death
 # found all the same, and the lead saying once that it watches so (the v0.2

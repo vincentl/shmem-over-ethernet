@@ -15,6 +15,7 @@
 #define OSOE_BLOCKED_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "node.h"
@@ -29,6 +30,18 @@ void osoe_blocked_leave(void);
  * which names it when an abort ends the process (abort.c). `routine` must
  * have static storage - every caller passes a routine's name. */
 const char *osoe_blocked_routine(void);
+
+/* Whether this process's thread is in shmem_finalize, said by that thread as it
+ * enters and leaves (init.c) and read by whichever thread ends the process
+ * (D19): a PE in shmem_finalize but in no wait the record names - its lead
+ * stopping its helpers while its agent ends the job - was said to be "not
+ * waiting in the library". */
+void osoe_blocked_finalizing(bool finalizing);
+
+/* Where this PE's thread was, for the line of its end: "waiting in R" while a
+ * wait is recorded, "in shmem_finalize" while it finalizes in none, and "not
+ * waiting in the library" otherwise (fatal.c, abort.c). */
+const char *osoe_blocked_where(char *buf, size_t len);
 
 /* CLOCK_MONOTONIC nanoseconds, for the record and for the wait histograms.
  * Taken only on paths that are already about to sleep (§3.14 cost rules). */

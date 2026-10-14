@@ -93,11 +93,15 @@ static void ended(uint32_t i)
     if (atomic_load_explicit(&s->phase, memory_order_acquire) == OSOE_PHASE_FINALIZED ||
         osoe_abort_pending())
         return;
-    char msg[256];
+    /* The cause, said first and once for this process (fatal.h's first word),
+     * and where this PE was, which the agent's own "ending" that follows - and
+     * stays silent - would have said. */
+    char msg[384], where[128];
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: local PE %u (rank %u, pid %d) has "
-                     "ended without finalizing; ending the job (§3.15)\n",
-                     osoe.bootstrap.rank, i, s->rank, s->pid);
-    if (n > 0) {
+                     "ended without finalizing; ending the job (§3.15); this PE was %s\n",
+                     osoe.bootstrap.rank, i, s->rank, s->pid,
+                     osoe_blocked_where(where, sizeof where));
+    if (n > 0 && osoe_fatal_first_word()) {
         ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
                                                                           : sizeof msg - 1);
         (void)ignored;
