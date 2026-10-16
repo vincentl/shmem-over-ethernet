@@ -2,8 +2,11 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <liburing.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/resource.h>
+#include <unistd.h>
 
 #include "base/ring-check.h"
 
@@ -75,4 +78,71 @@ long long osoe_locked_memory_kib(void)
     if (getrlimit(RLIMIT_MEMLOCK, &limit) != 0 || limit.rlim_cur == RLIM_INFINITY)
         return -1;
     return (long long)(limit.rlim_cur / 1024);
+}
+
+/* A number a /proc/sys file holds: 0, or -1 where it cannot be read. */
+static int read_number(const char *path, long *out)
+{
+    FILE *f = fopen(path, "re");
+    if (!f)
+        return -1;
+    int read = fscanf(f, "%ld", out);
+    fclose(f);
+    return read == 1 ? 0 : -1;
+}
+
+/* Whether this process holds CAP_SYS_ADMIN, bit 21 of the effective set
+ * /proc/self/status shows - no libcap: liburing is the one library the
+ * budget allows beside libc. */
+static bool holds_system_administration(void)
+{
+    FILE *f = fopen("/proc/self/status", "re");
+    if (!f)
+        return false;
+    char line[256];
+    unsigned long long effective = 0;
+    bool found = false;
+    while (!found && fgets(line, sizeof line, f))
+        found = sscanf(line, "CapEff: %llx", &effective) == 1;
+    fclose(f);
+    return found && (effective >> 21 & 1);
+}
+
+/* Whether this process is in `group`, as its effective group or a
+ * supplementary one - the kernel's in_group_p, which the sysctl at 1 asks. */
+static bool in_group(gid_t group)
+{
+    if (getegid() == group)
+        return true;
+    int count = getgroups(0, NULL);
+    if (count <= 0)
+        return false;
+    gid_t *groups = malloc((size_t)count * sizeof *groups);
+    if (!groups)
+        return false;
+    count = getgroups(count, groups);
+    bool member = false;
+    for (int i = 0; i < count && !member; i++)
+        member = groups[i] == group;
+    free(groups);
+    return member;
+}
+
+int osoe_ring_sysctl_refuses(int *value)
+{
+    long disabled = 0;
+    if (read_number("/proc/sys/kernel/io_uring_disabled", &disabled) != 0)
+        return -1;
+    *value = (int)disabled;
+    if (disabled == 0)
+        return 0;
+    if (disabled != 1)
+        return 1;
+    if (holds_system_administration())
+        return 0;
+    /* -1, the default, names no group, which then admits no one. */
+    long group = -1;
+    if (read_number("/proc/sys/kernel/io_uring_group", &group) != 0)
+        return -1;
+    return group >= 0 && in_group((gid_t)group) ? 0 : 1;
 }

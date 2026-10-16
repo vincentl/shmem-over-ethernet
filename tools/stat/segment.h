@@ -239,6 +239,11 @@ struct osoe_segment {
     /* Who owns the object, as the kernel says: --gc removes a name the
      * segment holds only if it is owned the same (stat.c). */
     uid_t owner;
+    /* Read into this process's memory (osoe_segment_open_copy), not mapped. */
+    bool copied;
+    /* The open's refusal was the object's own content - its magic, or too
+     * small to hold a directory - not a failure to find or read it. */
+    bool not_a_segment;
 };
 
 /*
@@ -254,6 +259,16 @@ struct osoe_segment {
  * then the caller prints the directory and says what it found.
  */
 int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen);
+
+/*
+ * The same, reading the object into this process's own memory (pread) rather
+ * than mapping it, for osoe-stat --gc, which a site runs as root over objects
+ * any local user can write: one its owner truncates during the read cannot
+ * fault the reader (SIGBUS), and one it rewrites cannot change a field between
+ * its check and its use (D5; round four's portability Q4). A snapshot: for a
+ * look at a live job, osoe_segment_open's mapping, which moves with the job.
+ */
+int osoe_segment_open_copy(struct osoe_segment *s, const char *name, char *err, size_t errlen);
 void osoe_segment_close(struct osoe_segment *s);
 
 /*

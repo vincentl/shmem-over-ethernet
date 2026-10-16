@@ -123,6 +123,16 @@ struct pending_piece {
 static void **copy_destination;
 
 /*
+ * The PE each piece in the zone was asked of, by its first extent, as
+ * copy_destination is: written by the issuer before its record goes ISSUED,
+ * so that a get waiting for room can say which node owes every byte of it
+ * where one node does (zone_owed_by; D25: a nonblocking get stalled on a
+ * stopped node named none). Diagnostic only - nothing waits on it - and atomic
+ * since a waiting thread reads the extents other threads issue.
+ */
+static _Atomic uint32_t *issue_target;
+
+/*
  * OSOE_CHECK_QUIET (phase 1 step 8 slice 3; docs/decisions/2026-09-26-evening.md
  * item 12), as transport-am.c read it: every wait on a shared context checks,
  * at its return, what it promised - every node it covers has acknowledged
@@ -241,16 +251,37 @@ const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *w
         return NULL;
     struct utsname u;
     const char *release = uname(&u) == 0 ? u.release : "unknown";
-    /* EPERM at creation is the sysctl; ENOMEM, on Linux 6.14 and later, can be
-     * the locked-memory limit, which io_uring then charges its rings to
-     * (base/ring-check.h) - under `ulimit -l 0` on the Pi's 6.18 the check fails
-     * so, and the kernel says no more. */
-    char cause[160] = "";
+    /* EPERM at creation is the kernel.io_uring_disabled sysctl or a seccomp
+     * filter, and the sysctl itself says which (base/ring-check.h; D27): named
+     * only where it refuses this process, the filter where it does not. ENOMEM,
+     * on Linux 6.14 and later, can be the locked-memory limit, which io_uring
+     * then charges its rings to (base/ring-check.h) - under `ulimit -l 0` on the
+     * Pi's 6.18 the check fails so, and the kernel says no more. */
+    char cause[256] = "";
     long long kib = osoe_locked_memory_kib();
-    if (ring_error == EPERM && facility == osoe_ring_check_creating)
-        snprintf(cause, sizeof cause,
-                 ", which usually means the kernel.io_uring_disabled sysctl is set");
-    else if (ring_error == ENOMEM && kib >= 0)
+    int disabled = 0;
+    if (ring_error == EPERM && facility == osoe_ring_check_creating) {
+        switch (osoe_ring_sysctl_refuses(&disabled)) {
+        case 1:
+            snprintf(cause, sizeof cause,
+                     ", refused by the kernel.io_uring_disabled sysctl, which is %d here%s",
+                     disabled, disabled == 1 ? " and admits only CAP_SYS_ADMIN and the group "
+                                               "kernel.io_uring_group names, neither of which "
+                                               "this process has"
+                                             : "");
+            break;
+        case 0:
+            snprintf(cause, sizeof cause,
+                     ", refused not by the kernel.io_uring_disabled sysctl, %d here, which "
+                     "allows it, but by a seccomp filter, as a container runtime's default "
+                     "profile refuses io_uring", disabled);
+            break;
+        default:
+            snprintf(cause, sizeof cause,
+                     ", refused by the kernel.io_uring_disabled sysctl or by a seccomp filter "
+                     "(the sysctl cannot be read here)");
+        }
+    } else if (ring_error == ENOMEM && kib >= 0)
         snprintf(cause, sizeof cause,
                  ", which on Linux 6.14 and later can be the locked-memory limit, ulimit -l, "
                  "%lld KiB here", kib);
@@ -270,7 +301,8 @@ void osoe_internode_backend_start(uint32_t session, bool check)
     osoe_am.lead = osoe.bootstrap.local_id == 0;
     check_quiet = check;
     copy_destination = calloc(osoe.node.landing_requests, sizeof *copy_destination);
-    if (!copy_destination)
+    issue_target = calloc(osoe.node.landing_requests, sizeof *issue_target);
+    if (!copy_destination || !issue_target)
         osoe_fatal("out of memory for %u landing extents", osoe.node.landing_requests);
     if (check_quiet) {
         issue_stamp = calloc(osoe.node.landing_requests, sizeof *issue_stamp);
@@ -301,6 +333,8 @@ void osoe_internode_backend_stop(void)
     osoe_progress_host_stop();
     free(copy_destination);
     copy_destination = NULL;
+    free(issue_target);
+    issue_target = NULL;
     free(issue_stamp);
     issue_stamp = NULL;
     check_quiet = false;
@@ -839,6 +873,37 @@ static uint64_t bytes_in_flight(struct osoe_context_block *block)
 }
 
 /*
+ * The node every piece the zone holds unanswered was asked of, if one node
+ * owes them all, and in *pe its PE if one PE does, else -1; UINT32_MAX where
+ * none is unanswered or several nodes owe them. Landed pieces are not counted:
+ * their room comes back as this PE copies them out, owing no node anything.
+ * O(the zone's extents), at a wait's start and its turns.
+ */
+static uint32_t zone_owed_by(int *pe)
+{
+    struct osoe_landing_record *records = my_records();
+    uint32_t node = UINT32_MAX, target = UINT32_MAX;
+    bool several_pes = false;
+    for (uint32_t e = 0; e < osoe.node.landing_requests; e++) {
+        if (atomic_load_explicit(&records[e].state, memory_order_acquire) !=
+            OSOE_LANDING_ISSUED)
+            continue;
+        uint32_t t = atomic_load_explicit(&issue_target[e], memory_order_acquire);
+        uint32_t n = osoe_node_of(&osoe.job, t);
+        if (node == UINT32_MAX) {
+            node = n;
+            target = t;
+        } else if (n != node) {
+            return UINT32_MAX;
+        } else if (t != target) {
+            several_pes = true;
+        }
+    }
+    *pe = node == UINT32_MAX || several_pes ? -1 : (int)target;
+    return node;
+}
+
+/*
  * A run of `count` extents for a piece, waiting if the zone has none: an
  * issue that finds no room first copies out every landed piece it can claim,
  * of any context - an early completion those contexts' waits then find done,
@@ -861,6 +926,8 @@ static uint32_t make_room(uint32_t count, const char *routine,
     osoe_progress_host_wake_all();          /* what this PE held back may be what lands */
     struct am_wait w;
     bool waiting = false, named = false;
+    uint32_t owing_node = UINT32_MAX;
+    int owing_named_pe = -1;
     for (;;) {
         uint32_t seen = osoe_wait_word_load(freed);
         first = claim_run(count);
@@ -885,16 +952,31 @@ static uint32_t make_room(uint32_t count, const char *routine,
             am_wait_end();
             waiting = false;
         }
+        /* Otherwise, where one node owes every unanswered piece the zone
+         * holds - this PE's other gets', or its other threads' - the wait names
+         * it, and its PE where one PE does (D25), and is begun again when that
+         * changes; where several do, or none, it names none. */
+        int owing_pe = -1;
+        uint32_t owing = held ? UINT32_MAX : zone_owed_by(&owing_pe);
+        if (waiting && !named && (owing != owing_node || owing_pe != owing_named_pe)) {
+            am_wait_end();
+            waiting = false;
+        }
         if (!waiting) {
             if (held)
                 am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_REPLY,
                               "the landing zone's released extents", peer, pe, seen);
+            else if (owing != UINT32_MAX)
+                am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_REPLY,
+                              "the landing zone's released extents", owing, owing_pe, seen);
             else
                 am_wait_begin_detail(&w, routine, OSOE_BLOCKED_DETAIL_GETS_IN_FLIGHT,
                                      zone_bytes_held(), "the landing zone's released extents",
                                      UINT32_MAX, -1, seen);
             waiting = true;
             named = held;
+            owing_node = owing;
+            owing_named_pe = owing_pe;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_wait_sleeps();
@@ -1015,8 +1097,9 @@ static void arm(struct osoe_thread_record *slot, uint64_t token)
 }
 
 /* Publish a piece's record, its fields before its state (node.h). */
-static void issue_record(uint32_t extent, uint64_t token, uint32_t length)
+static void issue_record(uint32_t extent, uint64_t token, uint32_t length, int pe)
 {
+    atomic_store_explicit(&issue_target[extent], (uint32_t)pe, memory_order_release);
     struct osoe_landing_record *r = &my_records()[extent];
     atomic_store_explicit(&r->token, token, memory_order_release);
     atomic_store_explicit(&r->length, length, memory_order_release);
@@ -1112,7 +1195,7 @@ static void remote_get(int pe, enum osoe_region region, uint64_t offset, void *d
         uint32_t extent = make_room(count, "shmem_get", NULL, UINT32_MAX, -1);
         uint64_t token = make_token(false, thread, extent);
         arm(slot, token);
-        issue_record(extent, token, n);
+        issue_record(extent, token, n, pe);
         take_credit(connection, peer, pe, "shmem_get");
         struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,
                                          .origin_pe = osoe.bootstrap.rank,
@@ -1381,7 +1464,7 @@ static void issue_get_pieces(struct osoe_transport_context *c, int pe,
             pending_add(c, extent, token);
         /* Published before the request goes out: the send's reservation and
          * commit order it before any reply can exist (as arm() for a slot). */
-        issue_record(extent, token, n);
+        issue_record(extent, token, n, pe);
 
         take_credit(connection, peer, pe, routine);
         struct osoe_am_get_request m = { .target_pe = (uint32_t)pe,

@@ -89,6 +89,7 @@ add_library(osoe
   src/symmetric.c
   src/team.c
   src/transport-local.c
+  src/unknown-settings.c
   src/region-wait.c
   src/wait.c
   src/watch.c

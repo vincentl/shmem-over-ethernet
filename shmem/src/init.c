@@ -26,6 +26,7 @@
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "barrier.h"
+#include "blocked.h"
 #include "context.h"
 #include "deadlock.h"
 #include "export.h"
@@ -39,6 +40,7 @@
 #include "state.h"
 #include "team.h"
 #include "transport.h"
+#include "unknown-settings.h"
 
 struct osoe_state osoe;
 
@@ -170,6 +172,14 @@ OSOE_BUILD_NOTE
 "                           where it costs less; tree chooses among the\n"
 "                           trees alone; under both a scan keeps 0.1.0's 4\n"
 "                           and 2; fixed keeps the two above for every call\n"
+"    OSOE_COLLECTIVE_PLACES link, the default, members, totals, scan or\n"
+"                           exchange, the same on every node: how a collect of\n"
+"                           differing blocks across nodes finds each PE's\n"
+"                           place; link takes the cheapest on the link of\n"
+"                           each node's total, the leads' scan and their\n"
+"                           exchange (on up to 16 nodes) where every node's\n"
+"                           PEs are one run of ranks, and every PE's length\n"
+"                           otherwise; the others force one way (§5.5)\n"
 "    OSOE_LINK_HOP_NS, OSOE_LINK_MESSAGE_NS, OSOE_LINK_BYTES_PER_SECOND\n"
 "                           the link's hop and message cost in nanoseconds\n"
 "                           and its bandwidth, all three or none, the same on\n"
@@ -206,6 +216,60 @@ OSOE_BUILD_NOTE
 "                           is watched before it ends as deadlocked, naming\n"
 "                           where each PE waits: 1 to 86400, or 0 for never;\n"
 "                           default 10 (§3.15)\n"
+"\n"
+"  The transport's buffers, which a program rarely needs to change:\n"
+"    OSOE_AM_CHUNK          the largest message on a connection, a power of\n"
+"                           two from 1024 to 1048576; default 65536 (§3.4)\n"
+"    OSOE_AM_BUFFER         bytes of each connection's buffer, a power of two\n"
+"                           from twice the chunk to 1 GiB; default four\n"
+"                           chunks, 262144 (§3.4)\n"
+"    OSOE_AM_BUFFER_BUDGET  bytes a node may spend on its connections'\n"
+"                           buffers together, from twice the chunk to\n"
+"                           68719476736; a buffer is halved, down to twice\n"
+"                           the chunk, until they fit; default 1073741824\n"
+"    OSOE_AM_CREDITS        a connection's flow-control credits, 1 to 65536;\n"
+"                           default 64\n"
+"    OSOE_AM_HUGEPAGES      1: has no effect yet - Linux refuses huge pages\n"
+"                           for the buffers' /dev/shm object - and warns;\n"
+"                           default 0\n"
+"    OSOE_WIRE_BYTES, OSOE_WIRE_BUFFERS\n"
+"                           the size, 64 to 1048576 bytes, and the number, a\n"
+"                           power of two from 2 to 32768, of the buffers\n"
+"                           io_uring receives into, shared by the connections\n"
+"                           of each owner of a node's wires; default 16384\n"
+"                           and 64 (§3.3)\n"
+"    OSOE_WIRE_ZERO_COPY, OSOE_WIRE_ZERO_COPY_BYTES\n"
+"                           on sends a connection buffer by reference\n"
+"                           (IORING_OP_SEND_ZC) wherever a send carries at\n"
+"                           least the bytes given, from 1 up; off, the\n"
+"                           default, copies; default bytes 16384 (§3.3)\n"
+"\n"
+"  For testing:\n"
+"    OSOE_FORCE_REMOTE      1: shmem_ptr answers NULL for node-mates and\n"
+"                           SHMEM_TEAM_SHARED is the calling PE alone; needs\n"
+"                           two logical nodes or more\n"
+"    OSOE_CHECK_QUIET       1: every quiet on a context threads share checks\n"
+"                           what it completed, and ends the job naming what it\n"
+"                           did not\n"
+"    OSOE_TEST_PERTURB      1: short sleeps and yields at a shared context's\n"
+"                           choice points, to widen races\n"
+"    OSOE_TEST_NOTICE_SECONDS\n"
+"                           seconds before a start-up wait's first notice, 1\n"
+"                           to 3600, in place of 30 (§3.15)\n"
+"    OSOE_TEST_DEAF_HELPER  a progress helper's number: that helper never\n"
+"                           answers the lead's request to stop (§3.12)\n"
+"    OSOE_TEST_ABORT_DELAY_MS\n"
+"                           0 to 5000: a node acts on a peer's abortive\n"
+"                           goodbye that late, and a helper begins its abort\n"
+"                           that long after its node's (§3.15)\n"
+"    OSOE_WIRE_UNSENT_BYTES about the most the kernel may hold unsent on a\n"
+"                           data wire, up to 1073741824, or 0 for the\n"
+"                           system's own; by default the link's bandwidth\n"
+"                           times 128 µs, at least 16384, set at the end of\n"
+"                           init (§3.3)\n"
+"    OSOE_WIRE_SPLIT, OSOE_WIRE_SEED\n"
+"                           a rate per 10000 at which sends and receives are\n"
+"                           cut short, and the seed that repeats its pattern\n"
 "\n"
 "  The bootstrap variables - PROCID, LOCALID, GTIDS, STEP_NUM_TASKS, NODEID,\n"
 "  STEP_NUM_NODES, STEP_NODELIST, JOB_ID and STEP_ID - are srun's, with SLURM_\n"
@@ -254,7 +318,7 @@ static void exit_without_finalize(void)
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
                      "shmem_finalize; ending the job (spec §4, §9.1.4)\n",
                      osoe.bootstrap.rank);
-    if (n > 0) {
+    if (n > 0 && osoe_fatal_first_word()) {
         ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
                                                                           : sizeof msg - 1);
         (void)ignored;
@@ -291,6 +355,10 @@ static void session_start(void)
                 osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
     if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
+    /* A misspelt OSOE_ name changes nothing, and a line says so, once for the
+     * job (unknown-settings.h). */
+    if (osoe.bootstrap.rank == 0)
+        osoe_unknown_settings_notice();
     /*
      * §6.2: init raises the soft RLIMIT_NOFILE to the hard limit, before any
      * socket or pidfd is opened. Slurm passes on the submitting shell's
@@ -340,8 +408,15 @@ static void session_start(void)
     if (futex_error) {
         struct utsname u;
         const char *release = uname(&u) == 0 ? u.release : "unknown";
-        osoe_fatal("osoe needs %s (they fail with \"%s\"); this kernel is %s",
-                   osoe_futex_requirement(), strerror(futex_error), release);
+        /* The kernel's age only where it is old: on one that has the calls
+         * the refusal is a filter's (base/futex.h; D28). */
+        osoe_fatal("osoe needs %s (they fail with \"%s\"); this kernel is %s%s",
+                   osoe_futex_requirement(), strerror(futex_error), release,
+                   osoe_futex_kernel_has_calls(release) == 1
+                       ? ", which has them: a seccomp filter refuses them here - a container "
+                         "runtime's profile older than the calls, or a sandbox's - or an "
+                         "emulator does not pass them on"
+                       : "");
     }
     /*
      * And the atomics the node's processes will share, lock-free: told when
@@ -582,6 +657,9 @@ OSOE_API void pshmem_finalize(void)
         pthread_mutex_unlock(&lifecycle);
         return;
     }
+    /* So that an end this PE's agent or helper says while this thread is here,
+     * in no wait the record names, says "in shmem_finalize" (D19). */
+    osoe_blocked_finalizing(true);
     if (refcount == 1) {
         osoe_lock_warn_held();
         /* Every context the program left goes, with its implicit quiet, while
@@ -600,6 +678,7 @@ OSOE_API void pshmem_finalize(void)
          * is, the answer is the one a shmem_init would give. */
         atomic_store_explicit(&thread_level, OSOE_INIT_LEVEL, memory_order_release);
     }
+    osoe_blocked_finalizing(false);
     pthread_mutex_unlock(&lifecycle);
 }
 

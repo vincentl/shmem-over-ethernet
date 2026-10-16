@@ -24,6 +24,7 @@
 #include "shm-object.h"
 #include "am-configuration.h"
 
+#include "blocked.h"
 #include "metrics.h"
 #include "internal-region.h"
 #include "node.h"
@@ -378,6 +379,16 @@ static void describe_missing(struct osoe_node *n, const struct osoe_bootstrap *b
             off += (size_t)snprintf(buf + off, len - off, " %u (rank %u)", i, b->gtids[i]);
 }
 
+/* The world rank of the lowest local PE not yet at `phase`, or UINT32_MAX. */
+static uint32_t first_missing_rank(const struct osoe_node *n, const struct osoe_bootstrap *b,
+                                   enum osoe_phase phase)
+{
+    for (uint32_t i = 0; i < b->local_count; i++)
+        if (atomic_load_explicit(&n->slots[i].phase, memory_order_acquire) < phase)
+            return b->gtids[i];
+    return UINT32_MAX;
+}
+
 /*
  * Wait for a rendezvous count to reach its target: 0 then, -1 once it has
  * stopped moving for the no-progress limit (§3.15), which by default is never.
@@ -411,11 +422,23 @@ static int wait_count(struct osoe_node *n, const struct osoe_bootstrap *b, _Atom
         osoe_stall_watch_begin_noticed(&watch, start, b->no_progress_ns);
     else
         osoe_stall_watch_begin(&watch, start, b->no_progress_ns);
+    /* The "blocked in" record says shmem_init and the PE waited for - the
+     * lowest local PE not there yet, by rank - begun again as it changes, so
+     * that osoe-stat shows an init hang where every PE read "-" (D7; round
+     * three's readiness report). Nothing else reads it: the deadlock
+     * detector counts waits by osoe_wait_sleeps, which start-up never calls.
+     * Every enter is left on the way out: the record nests (metrics.c), and
+     * one left open would name shmem_init under every later wait. */
+    bool recorded = false;
+    uint32_t recorded_rank = UINT32_MAX;
     for (;;) {
         uint32_t v = atomic_load_explicit(word, memory_order_acquire);
         check_failed(n);
-        if (v == target)
+        if (v == target) {
+            if (recorded)
+                osoe_blocked_leave();
             return 0;
+        }
         if (b->local_id != 0 && lead_ended(n)) {
             char msg[256];
             snprintf(msg, sizeof msg, "the local lead, rank %u (pid %d), has ended while this "
@@ -423,8 +446,11 @@ static int wait_count(struct osoe_node *n, const struct osoe_bootstrap *b, _Atom
                      doing);
             fail_rendezvous(n, msg);
         }
-        if (osoe_stall_watch_stalled(&watch, v))
+        if (osoe_stall_watch_stalled(&watch, v)) {
+            if (recorded)
+                osoe_blocked_leave();
             return -1;
+        }
         if (osoe_stall_watch_notice_due(&watch)) {
             char missing[256];
             describe_missing(n, b, phase, missing, sizeof missing);
@@ -432,6 +458,19 @@ static int wait_count(struct osoe_node *n, const struct osoe_bootstrap *b, _Atom
                         "have; still waiting for local id%s", b->node,
                         (unsigned long long)osoe_stall_watch_waited_seconds(&watch), doing, v,
                         target, missing);
+        }
+        /* No PE at all where every local PE is at `phase` and the count
+         * has yet to say so. */
+        uint32_t missing_rank = first_missing_rank(n, b, phase);
+        if (!recorded || missing_rank != recorded_rank) {
+            if (recorded)
+                osoe_blocked_leave();
+            if (missing_rank == UINT32_MAX)
+                osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_NONE, 0);
+            else
+                osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_PE, missing_rank);
+            recorded = true;
+            recorded_rank = missing_rank;
         }
         struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
         osoe_futex_wait(word, v, &sweep, OSOE_FUTEX_SHARED);
@@ -665,7 +704,7 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         int fd = osoe_shm_open_ours(s->heap_name, err, sizeof err);
         if (fd < 0) {
             char msg[512];
-            snprintf(msg, sizeof msg, "local PE %u's heap: %s", i,
+            snprintf(msg, sizeof msg, "local PE %u (rank %u)'s heap: %s", i, b->gtids[i],
                      err[0] ? err : strerror(errno));
             fail_rendezvous(n, msg);
         }
@@ -673,8 +712,8 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         close(fd);
         if (p == MAP_FAILED) {
             char msg[256];
-            snprintf(msg, sizeof msg, "cannot map local PE %u's heap (%llu bytes): %s", i,
-                     (unsigned long long)s->heap_bytes, strerror(errno));
+            snprintf(msg, sizeof msg, "cannot map local PE %u (rank %u)'s heap (%llu bytes): %s",
+                     i, b->gtids[i], (unsigned long long)s->heap_bytes, strerror(errno));
             fail_rendezvous(n, msg);
         }
         /* A sibling's heap is in the sibling's own core; in this one it would
@@ -687,7 +726,7 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         fd = osoe_shm_open_ours(s->statics_name, err, sizeof err);
         if (fd < 0) {
             char msg[512];
-            snprintf(msg, sizeof msg, "local PE %u's statics: %s", i,
+            snprintf(msg, sizeof msg, "local PE %u (rank %u)'s statics: %s", i, b->gtids[i],
                      err[0] ? err : strerror(errno));
             fail_rendezvous(n, msg);
         }
@@ -695,8 +734,8 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         close(fd);
         if (p == MAP_FAILED) {
             char msg[256];
-            snprintf(msg, sizeof msg, "cannot map local PE %u's statics (%llu bytes): %s", i,
-                     (unsigned long long)n->statics_bytes, strerror(errno));
+            snprintf(msg, sizeof msg, "cannot map local PE %u (rank %u)'s statics (%llu bytes): "
+                     "%s", i, b->gtids[i], (unsigned long long)n->statics_bytes, strerror(errno));
             fail_rendezvous(n, msg);
         }
         madvise(p, n->statics_bytes, MADV_DONTDUMP);
@@ -712,7 +751,7 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
         if (n->slots[i].symmetric_size != b->symmetric_size) {
             char msg[256];
             snprintf(msg, sizeof msg, "SHMEM_SYMMETRIC_SIZE differs between PEs: local PE "
-                     "%u has %llu bytes, this PE has %llu", i,
+                     "%u (rank %u) has %llu bytes, this PE has %llu", i, b->gtids[i],
                      (unsigned long long)n->slots[i].symmetric_size,
                      (unsigned long long)b->symmetric_size);
             fail_rendezvous(n, msg);
@@ -725,16 +764,17 @@ static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
          * node-mate's internal region by this PE's size of it. */
         if (n->slots[i].heap_bytes != n->heap_bytes) {
             char msg[256];
-            snprintf(msg, sizeof msg, "local PE %u's heap object is %llu bytes and this PE's "
-                     "%llu: the PEs size the library's internal region differently", i,
+            snprintf(msg, sizeof msg, "local PE %u (rank %u)'s heap object is %llu bytes and this "
+                     "PE's %llu: the PEs size the library's internal region differently", i,
+                     b->gtids[i],
                      (unsigned long long)n->slots[i].heap_bytes,
                      (unsigned long long)n->heap_bytes);
             fail_rendezvous(n, msg);
         }
         if (n->slots[i].statics_bytes != n->statics_bytes) {
             char msg[256];
-            snprintf(msg, sizeof msg, "the PEs run different programs: local PE %u's "
-                     "symmetric statics are %llu bytes, this PE's %llu (§4.3)", i,
+            snprintf(msg, sizeof msg, "the PEs run different programs: local PE %u (rank %u)'s "
+                     "symmetric statics are %llu bytes, this PE's %llu (§4.3)", i, b->gtids[i],
                      (unsigned long long)n->slots[i].statics_bytes,
                      (unsigned long long)n->statics_bytes);
             fail_rendezvous(n, msg);

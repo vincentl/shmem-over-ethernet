@@ -253,7 +253,43 @@ static bool match_name(void *ctx, const char *name, const char *path)
     return true;
 }
 
+/* The first `bytes` of `fd` read into fresh memory, NULL if there is none; *got
+ * says how many were there, fewer where the object shrank under the read. */
+static unsigned char *read_whole(int fd, size_t bytes, size_t *got)
+{
+    unsigned char *copy = malloc(bytes ? bytes : 1);
+    *got = 0;
+    if (!copy)
+        return NULL;
+    while (*got < bytes) {
+        ssize_t n = pread(fd, copy + *got, bytes - *got, (off_t)*got);
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            break;
+        *got += (size_t)n;
+    }
+    return copy;
+}
+
+static int segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen,
+                        bool copy);
+
+/* The most osoe_segment_open_copy reads of an object (segment_open). */
+#define OSOE_SEGMENT_COPY_MOST (UINT64_C(1) << 30)
+
 int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen)
+{
+    return segment_open(s, name, err, errlen, false);
+}
+
+int osoe_segment_open_copy(struct osoe_segment *s, const char *name, char *err, size_t errlen)
+{
+    return segment_open(s, name, err, errlen, true);
+}
+
+static int segment_open(struct osoe_segment *s, const char *name, char *err, size_t errlen,
+                        bool copy)
 {
     memset(s, 0, sizeof *s);
     int fd;
@@ -317,16 +353,55 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
     s->owner = st.st_uid;
     if ((uint64_t)st.st_size < sizeof(struct osoe_segment_directory)) {
         close(fd);
+        s->not_a_segment = true;
         return fail(err, errlen, "/dev/shm%s is %lld bytes: too small to hold a directory",
                     s->name, (long long)st.st_size);
     }
-    void *p = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-    close(fd);
-    if (p == MAP_FAILED)
-        return fail(err, errlen, "cannot map /dev/shm%s: %s", s->name, strerror(errno));
+    void *p;
+    size_t bytes = (size_t)st.st_size;
+    if (copy) {
+        /* The magic first: anyone may make an object of any size by a
+         * segment's name, and one that is no segment costs this read alone. */
+        uint64_t magic = 0;
+        ssize_t n;
+        do
+            n = pread(fd, &magic, sizeof magic, 0);
+        while (n < 0 && errno == EINTR);
+        if (n == (ssize_t)sizeof magic && magic != OSOE_SEGMENT_MAGIC) {
+            close(fd);
+            s->not_a_segment = true;
+            return fail(err, errlen, "/dev/shm%s is not an osoe control segment "
+                        "(magic %#llx)", s->name, (unsigned long long)magic);
+        }
+        /* Then no more than OSOE_SEGMENT_COPY_MOST of it. The directory, the
+         * team blocks, the slots and the metric table come first, and they are
+         * all --gc reads; past the copy a field reads as absent, as past any
+         * segment's end. A segment's landing zones, which can make it larger,
+         * follow. */
+        if ((uint64_t)bytes > OSOE_SEGMENT_COPY_MOST)
+            bytes = (size_t)OSOE_SEGMENT_COPY_MOST;
+        size_t got;
+        p = read_whole(fd, bytes, &got);
+        close(fd);
+        if (!p)
+            return fail(err, errlen, "cannot read /dev/shm%s: out of memory", s->name);
+        if (got < sizeof(struct osoe_segment_directory)) {
+            free(p);
+            s->not_a_segment = true;
+            return fail(err, errlen, "/dev/shm%s shrank to %zu bytes while it was read: too "
+                        "small to hold a directory", s->name, got);
+        }
+        bytes = got;                    /* what was there: every read below is bounded by it */
+        s->copied = true;
+    } else {
+        p = mmap(NULL, bytes, PROT_READ, MAP_SHARED, fd, 0);
+        close(fd);
+        if (p == MAP_FAILED)
+            return fail(err, errlen, "cannot map /dev/shm%s: %s", s->name, strerror(errno));
+    }
 
     s->map = p;
-    s->bytes = (size_t)st.st_size;
+    s->bytes = bytes;
     s->dir = (const struct osoe_segment_directory *)p;
 
     if (s->dir->magic != OSOE_SEGMENT_MAGIC) {
@@ -334,6 +409,7 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
         char shown[OSOE_SEGMENT_NAME_MAX];
         memcpy(shown, s->name, sizeof shown);
         osoe_segment_close(s);              /* nothing below may touch the mapping */
+        s->not_a_segment = true;
         return fail(err, errlen, "/dev/shm%s is not an osoe control segment "
                     "(magic %#llx)", shown, magic);
     }
@@ -400,9 +476,12 @@ int osoe_segment_open(struct osoe_segment *s, const char *name, char *err, size_
 
 void osoe_segment_close(struct osoe_segment *s)
 {
-    if (s->map)
+    if (s->map && s->copied)
+        free((void *)(uintptr_t)s->map);
+    else if (s->map)
         munmap((void *)(uintptr_t)s->map, s->bytes);
     s->map = NULL;
+    s->copied = false;
     s->dir = NULL;
     s->metrics = NULL;
     s->nmetrics = 0;

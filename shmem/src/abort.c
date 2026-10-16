@@ -14,6 +14,7 @@
 #include "agent.h"
 #include "base/deadline.h"
 #include "blocked.h"
+#include "fatal.h"
 #include "liveness.h"
 #include "state.h"
 
@@ -180,14 +181,14 @@ _Noreturn void osoe_abort_end(void)
      * this PE was - the routine its thread waits in, which the development
      * watchdog named before it was retired (§3.15) - and leave as a fatal
      * does: flushing, then _exit, running no handler. */
-    const char *routine = osoe_blocked_routine();
-    char msg[200];
+    char where[128], msg[256];
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: ending: the job is aborting on behalf "
-                     "of PE %u; this PE was %s%s\n", osoe.bootstrap.rank, pe,
-                     routine ? "waiting in " : "not waiting in the library",
-                     routine ? routine : "");
+                     "of PE %u; this PE was %s\n", osoe.bootstrap.rank, pe,
+                     osoe_blocked_where(where, sizeof where));
     fflush(NULL);
-    if (n > 0) {
+    /* Unless this process has said its end already - its own thread's fatal on
+     * the same abort, say (fatal.h's first word). */
+    if (n > 0 && osoe_fatal_first_word()) {
         ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
                                                                           : sizeof msg - 1);
         (void)ignored;

@@ -18,6 +18,7 @@
 #include "base/futex.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
+#include "blocked.h"
 #include "fatal.h"
 #include "job.h"
 #include "internode-backend.h"
@@ -209,9 +210,11 @@ static void follow(struct osoe_job *j, const struct osoe_bootstrap *b, int32_t l
 {
 again:;
     /* Nothing moves until the lead has met every other lead, so the watch is
-     * on a constant: by default this waits as long as that takes (§3.15). */
+     * on a constant: by default this waits as long as that takes (§3.15), and
+     * under a limit two hops' grace longer, so that its lead, a hop from the
+     * other nodes, speaks first (base/stall-watch.h; D15). */
     struct osoe_stall_watch watch;
-    osoe_stall_watch_begin(&watch, 0, b->no_progress_ns);
+    osoe_stall_watch_begin(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 2));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     struct timespec back = { 0, 200000 };        /* 0.2 ms, doubling to 10 ms */
     int fd;
@@ -345,10 +348,16 @@ void osoe_job_join(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t 
 
     snprintf(j->name, sizeof j->name, "/osoe.%llu.%u.%u.job.%u",
              (unsigned long long)b->job, b->step, b->node, session);
-    if (b->local_id == 0)
+    if (b->local_id == 0) {
         lead(j, b, session);
-    else
+    } else {
+        /* In the "blocked in" record as shmem_init and the lead's rank, which
+         * this PE waits on, so that osoe-stat shows an init hang where it read
+         * "-" (D7). */
+        osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_PE, b->gtids[0]);
         follow(j, b, lead_pid);
+        osoe_blocked_leave();
+    }
     struct osoe_job_header *h = j->map;
     bind_tables(j, h);
 

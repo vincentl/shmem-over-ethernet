@@ -304,7 +304,9 @@ sees - it is not installed - as the Pi cluster's runbook does: `srun -N4
 --ntasks-per-node=1 build/release/tools/probe/probe`. If a futex check fails, no
 job will run there: the full build needs the futex2 calls of Linux 6.7 for a job
 of any size, and the single-node build the classic futex calls, which only a
-sandbox denies. If only io_uring checks fail - the kernel's `kernel.io_uring_disabled`
+sandbox denies - and `shmem_init` refuses the job, naming the kernel's age
+where it is older than 6.7 and a filter where it is not: a container's seccomp
+profile older than the calls, a sandbox, or an emulator. If only io_uring checks fail - the kernel's `kernel.io_uring_disabled`
 sysctl is set, say - a job on one node still runs, since it opens no ring; a job
 of more than one node is refused at `shmem_init`, naming the facility that is
 missing, for the io_uring facilities `shmem_init` checks (`env.probe` tests a
@@ -313,8 +315,9 @@ few more).
 io_uring is off by default on RHEL 10 and its rebuilds, and on Rocky Linux 9.8
 (`kernel.io_uring_disabled` is 2), and container runtimes' default seccomp
 profiles refuse it: Docker 25 and later and containerd 2.0 and later with
-`EPERM`, for which the message names the sysctl even though it reads 0 inside
-the container, and Podman with `ENOSYS`. There jobs on one node run, but about
+`EPERM`, which the message tells from the sysctl's own refusal by reading the
+sysctl - naming a seccomp filter where the sysctl allows io_uring, as it does
+inside such a container - and Podman with `ENOSYS`. There jobs on one node run, but about
 425 of the test suite's 871 tests fail at `shmem_init` or at opening a ring -
 all of them among the 470 labelled `internode` but `env.probe`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
@@ -550,7 +553,16 @@ A job that hangs shows, for every PE, the routine it is blocked in, the
 collective's epoch - how many collectives its team has begun - and for how long;
 and for a node of a job across nodes, each owner of its wires - the lead's
 agent and its progress helpers (`OSOE_PROGRESS_HELPERS`) - with the wires it
-holds, its passes, its wakes and what it has sent and applied.
+holds, its passes, its wakes and what it has sent and applied. An idle owner
+passes ten times a second, so one whose passes do not move between two looks
+(`osoe-stat -n 2 JOB`, a look every two seconds) while PEs wait toward its peers
+is the one stuck. A PE stopped by SIGSTOP or a debugger is marked
+`[stopped: SIGSTOP or a debugger]`, since its record goes on reading as a wait,
+and the summary counts a node's stopped PEs beside its longest wait; a job hung
+in its start shows each PE waiting in `shmem_init` and the PE of its node, or
+the node, it waits for. `osoe-stat` shows every node and every PE of a job on
+the machine, however many logical nodes the job has there and however many PEs
+a node has.
 The summary's walk follows a team's barriers and syncs between nodes, whose
 epochs each node's progress thread keeps; a team hung in a reduction,
 broadcast, gather or scan shows there as nothing open, and its PE lines are
@@ -572,16 +584,27 @@ computing for ever, is what `osoe-stat` is for.
   `OSOE_NO_PROGRESS_TIMEOUT` ended. The PE that saw the cause writes a line on
   standard error saying why, and it comes first; each of the others writes a
   line naming the PE of its node that saw the job end, or the node it lost -
-  "ended its control wire without its goodbye" of a node whose lead ended -
-  and, from a lead with progress helpers, a helper's "ended its connection"
-  line beside it. A status
+  "node 0 (pi1, lead rank 0) ended its control wire without its goodbye" of a
+  node whose lead ended, the node by its number, its entry in the step's node
+  list and its lead's rank - or "ending: the job is aborting on behalf of PE
+  N", saying where it was: waiting in a routine, in `shmem_finalize`, or not
+  waiting in the library. Each process says its end once, in the first line any
+  of its threads writes - a lead with progress helpers wrote its agent's line
+  and a helper's, and a PE its agent's and its own thread's - and names its
+  control segment for `osoe-stat` only where the name is still in `/dev/shm`
+  (`OSOE_KEEP_CONTROL_SEGMENT`, or a start that failed), since a running job's
+  segment goes with its PEs. A node's number is its place in the
+  step's node list, from 0: Slurm's `SLURM_NODEID`, or `osoe-launch`'s logical
+  node (`-m`), whose entry is a loopback address. A status
   given to `shmem_global_exit` comes through as it is. Under `srun -K1` a task
   Slurm killed, once another had ended badly, counts 143 (128 plus SIGTERM):
   look for the first message, not the highest status.
 - **A start that waits** for its nodes says what for after 30 s, one line a
   node ("How a job starts", below). A task that died before `shmem_init` is waited for until the
   launcher ends the step, or `OSOE_NO_PROGRESS_TIMEOUT`, if it is set, ends the
-  wait.
+  wait: the task's own node first, naming its rank, and the nodes that wait on
+  that node two seconds later, saying that a node comes to the rendezvous once
+  all its PEs have called `shmem_init`.
 - **A job that hangs**: `osoe-stat JOB` on each of its nodes, and for a job of
   more than one node `osoe-stat --summary JOB` too, above. A deadlock the library can prove ends the job by itself
   after `OSOE_DEADLOCK_SECONDS` (Limits, "Failures").
@@ -1035,7 +1058,9 @@ specification or takes a choice the specification leaves open.
   split among the node's PEs, no less than 256 KiB nor more than 1 MiB a PE): a
   get takes whole extents, at least one, so 256 small gets in flight fill a zone
   of 256 KiB as 256 KiB of data does, and past it a new get waits for earlier
-  ones to land - backpressure, never an error.
+  ones to land - backpressure, never an error. Where one node owes every piece
+  the zone holds unanswered, the wait names it, and its PE where one PE does -
+  in `osoe-stat`, and in the line `OSOE_NO_PROGRESS_TIMEOUT` ends it with.
 - **A large get from another node is held by its PE's landing zone.** A get's
   pieces of up to 64 KiB - seventeen to a mebibyte - go out together, a
   blocking get's as a nonblocking get's, but no more of them than the landing
@@ -1084,7 +1109,8 @@ specification or takes a choice the specification leaves open.
   holds two sockets for every other node - its control wire and its data wire -
   and a descriptor for every other PE of its node, beside the program's own, so
   the hard limit on open files (`ulimit -Hn`) must leave room for them;
-  `shmem_init` raises the soft limit to it. On Linux 6.14 and later io_uring
+  `shmem_init` raises the soft limit to it, and a node that runs out at start
+  ends naming the limit it had and that it is the hard limit to raise. On Linux 6.14 and later io_uring
   also charges a node's rings to its user's locked memory, every process of the
   user on the host together, against each one's `ulimit -l`, whose soft limit
   `shmem_init` raises to the hard one too, zero copy or not: a ring the hard
@@ -1453,7 +1479,7 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  512 tests labelled `internode` - those of a job of more than one node, of
+  521 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
@@ -1563,7 +1589,12 @@ naming the variable and both nodes, the nodes already connected to it end with
 it, and a node not yet connected says what it waits for until the launcher ends
 it ("How a job starts"); one marked *checked among a node's PEs* is compared
 only there, and one marked *checked between nodes* only between them.
-`SHMEM_INFO` prints most of this list from the library itself. In
+`SHMEM_INFO` prints every variable of this section's tables from the library
+itself. An `OSOE_` name the library does not read changes nothing, and the
+job's rank 0 says so once, naming the one it reads a letter or two away where
+there is one - `OSOE_DEADLOCK_SECOND is not a variable osoe reads, and changes
+nothing: did you mean OSOE_DEADLOCK_SECONDS?` - from a list of every name osoe
+and its tests read, which a test, `shmem.settings-known`, holds to the tree. In
 the single-node build the settings only a job of more than one node uses - the
 connections', the wire's, keepalive's, the helpers', the collectives' shape and
 the link's - are still checked as values, as the full build checks them in a job
@@ -1588,7 +1619,7 @@ both are set the `SHMEM_` one controls.
 |---|---|---|
 | `OSOE_MAX_TEAMS` | `256` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 25 KiB of address space at the other variables' defaults on a few nodes - counters and the slots of its small collectives, which only a team's leads touch, and the same for its scans, which every member of a team that scans does - 28.1 KiB at 64 nodes and 29.6 KiB at a thousand, collect's exchange's slots growing with the nodes to 64. *Checked*. |
 | `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 760 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
-| `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. *Checked* among a node's PEs. |
+| `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. A creation that finds none free returns nonzero, as the specification lets it, and the PE says so once, naming this variable. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. Each place, and the agent's, has a lane for the large reductions and broadcasts its thread leads and the large scans it makes, 577 KiB of address space at the default fan-out and pipeline depth, which a thread that does neither never touches: 9.6 MiB a PE at the default - but for the link's measurement as a job starts (`OSOE_LINK_HOP_NS`), which writes 64 KiB of the first lane of node 1's first PE and a page of the first lane of each of the next nodes' up to the fan-out. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | a node's `4194304` over its PEs | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. Unset, the node's 4 MiB split among its PEs in whole KiB, no less than `262144` nor more than `1048576` a PE - 1 MiB to each of 1 to 4 PEs a node, 512 KiB to 8, 256 KiB from 16 - each node from its own count (P32). *Checked* among a node's PEs. |
 
@@ -1607,7 +1638,7 @@ both are set the `SHMEM_` one controls.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A program's own waits and collectives are not timed. |
+| `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A start-up wait on another node has two seconds more, and a PE's wait on its lead in the rendezvous four, so that a node whose own PE never calls `shmem_init` ends first, naming the PE's rank. A program's own waits and collectives are not timed. |
 | `OSOE_KEEPALIVE` | `60,10,6`, or `0` where every node has a loopback address | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - `osoe-launch`'s logical nodes - has neither: with no link between its nodes to cut, and a kernel that closes a dead node's connections itself and answers for a stopped one, a probe can find nothing there, and an overloaded machine's receive backlog drops them. Nodes with addresses of their own keep both, tier 3's namespaces on one machine among them. `SHMEM_DEBUG` says which a node chose. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
@@ -1728,8 +1759,12 @@ has not yet recorded itself: a start that died in that moment leaves one that
 same ids reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
 machine it runs on and removes only what its user may, so a site runs it as
 root on each node - from a timer, not from Slurm's epilog: it reads objects
-any user can write, and one written to fail its reading fails the run, which
-in an epilog drains the node. The epilog's safe line is the `rm` below.
+any user can write. It reads each into its own memory, so that one changed or
+cut short as it reads cannot fault it, leaves alone one it cannot read, and
+counts in its status only what it failed to do - a removal refused, a name it
+was given that is not there - where one file of garbage made every run fail,
+which in an epilog drains the node; but what it reads is still any user's to
+write, and the epilog's safe line is the `rm` below.
 `osoe-launch` removes its own job's leftovers itself, and
 says which it found, except a control segment `OSOE_KEEP_CONTROL_SEGMENT`
 keeps, which it leaves for `--gc`.

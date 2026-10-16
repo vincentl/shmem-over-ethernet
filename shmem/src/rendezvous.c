@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "am.h"
+#include "blocked.h"
 #include "fatal.h"
 #include "internode-backend.h"
 #include "job.h"
@@ -336,11 +337,17 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
     osoe_listener_open(&l, b, session, address);
     int up = -1;
     uint32_t parent = 0;
+    /* Each wait on another node here is in the PE's "blocked in" record as
+     * shmem_init and the node, so that osoe-stat shows an init hang where it
+     * read "-" (D7): the parent while it is called and heard from, each child
+     * while it is awaited. */
     if (b->node != 0) {
         parent = (b->node - 1) / OSOE_RENDEZVOUS_FANOUT;
         struct sockaddr_in there;
         osoe_listener_node_address(b, parent, &there);
+        osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_NODE, parent);
         up = osoe_listener_connect(b, session, &there, parent, OSOE_HELLO_RENDEZVOUS);
+        osoe_blocked_leave();
     }
 
     const uint32_t first_child = b->node * OSOE_RENDEZVOUS_FANOUT + 1;
@@ -363,9 +370,13 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
         char expecting[160];
         snprintf(expecting, sizeof expecting, "node%s %s, its child%s in the rendezvous tree,",
                  missing == 1 ? "" : "s", nodes, missing == 1 ? "" : "ren");
-        uint32_t peer;
+        uint32_t peer, awaited = first_child;
+        while (child_fd[awaited - first_child] >= 0)
+            awaited++;
+        osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_NODE, awaited);
         int fd = osoe_listener_accept(&l, OSOE_HELLO_PURPOSE(OSOE_HELLO_RENDEZVOUS), &peer,
                                       NULL, expecting);
+        osoe_blocked_leave();
         /* The hello agreed on the node count, so only a second lead with one
          * node id can be a child this lead is not waiting for. */
         if (peer < first_child || peer >= first_child + children ||
@@ -378,14 +389,19 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
     osoe_listener_close(&l);
     /* Each child reports once its own subtree has, so a lead waits for its
      * subtree and never for a node outside it. */
-    for (uint32_t i = 0; i < children; i++)
+    for (uint32_t i = 0; i < children; i++) {
+        osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_NODE, first_child + i);
         receive_up(b, child_fd[i], first_child + i, &mine, &r);
+        osoe_blocked_leave();
+    }
 
     if (b->node == 0) {
         build(b, &r, out);
     } else {
+        osoe_blocked_enter("shmem_init", OSOE_BLOCKED_DETAIL_NODE, parent);
         send_up(b, up, parent, &mine, &r);
         receive_down(b, up, parent, out);
+        osoe_blocked_leave();
         close(up);
     }
     free(r.records);

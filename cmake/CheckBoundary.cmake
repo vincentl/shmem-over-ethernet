@@ -59,13 +59,14 @@ set(OSOE_API
 # The runtime: initialization's machinery and the agent (§6, §3.12), and the
 # library's own services - fatal, abort, liveness, the sweep, the deadlock
 # detector, metrics, the blocked record, waiting on a word of one's own region,
-# the test hook that perturbs a protocol's steps - which the API and the
-# backends both build on. Above the boundary, like the API.
+# the test hook that perturbs a protocol's steps, the notice of an OSOE_ name
+# osoe does not read - which the API and the backends both build on. Above the
+# boundary, like the API.
 set(OSOE_RUNTIME
   abort.c agent.c allocator.c blocked.c bootstrap.c deadlock.c fatal.c liveness.c metrics.c
-  perturb.c region-wait.c sweep.c
+  perturb.c region-wait.c sweep.c unknown-settings.c
   abort.h agent.h allocator.h blocked.h bootstrap.h deadlock.h fatal.h liveness.h
-  metrics.h perturb.h region-wait.h state.h)
+  metrics.h perturb.h region-wait.h state.h unknown-settings.h)
 
 # The AM backend (§3): the files a second backend replaces. No file above may
 # reach any of them.

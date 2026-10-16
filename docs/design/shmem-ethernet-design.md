@@ -2113,7 +2113,13 @@ applies to the init waits too. Every wait still sweeps (§4.10) — the abort wo
 and local liveness are checked every `OSOE_SWEEP_NS` — so a dead sibling still
 ends a wait promptly; what goes is only the fatal deadline. (`base/stall-watch.h`
 is the one helper; §3.10's absolute futex deadlines are clock instants for one
-sweep-length sleep, and stay.)
+sweep-length sleep, and stay.) *As built (D15, 2026-10-14):* a start-up wait on
+another node - a lead's in the rendezvous - has the limit and two seconds more,
+and a PE's wait on its own lead's rendezvous the limit and four
+(`osoe_stall_watch_limit_beyond`), so that a PE that never calls `shmem_init`
+is named, with its rank, by its own node before another node's wait on that
+node ends naming the rendezvous - with every limit alike either could speak
+first, and under `srun -K1` the first line is the only one left.
 
 **A start-up wait says what it waits for** (the round-three review's R8 and
 N1; the author's D2, 2026-10-02). A job whose start had gone wrong - a peer

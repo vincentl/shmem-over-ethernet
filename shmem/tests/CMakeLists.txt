@@ -54,6 +54,15 @@ add_test(NAME shmem.settings-documented
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsDocumented.cmake)
 set_tests_properties(shmem.settings-documented PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# And every OSOE_ name the tree reads or sets - the test suite's own among
+# them - is in the list the library's notice of an unknown name goes by, which
+# holds no other (unknown-settings.c, CheckSettingsKnown.cmake; D16): a name
+# missing from it would be called unknown in every job that sets it.
+add_test(NAME shmem.settings-known
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsKnown.cmake)
+set_tests_properties(shmem.settings-known PROPERTIES LABELS "tier1" TIMEOUT 30)
+
 # Every source file carries the license line, as the README says, but the
 # specification's four examples: 82 evidence programs went without it until the
 # review of v0.2 step 4's merge point (readiness Q5-1), since nothing checked
@@ -1122,6 +1131,34 @@ if(OSOE_INTERNODE)
     PROGRAM $<TARGET_FILE:shmem_test_init>)
   osoe_internode_label(shmem.start-up.node-refuses.size-mismatch
     shmem.start-up.node-refuses.own-environment-lead)
+  # With the no-progress limit set, a PE of node 0 that never calls shmem_init is
+  # named, rank and all, by node 0 in the job's first line - the one srun -K1
+  # leaves - and node 1, whose call node 0 never answers, ends two seconds later
+  # saying why a node may not come (D15; base/stall-watch.h: a wait on another
+  # node has a hop's grace beyond the limit). Before, both ended at the limit,
+  # node 1's line naming the rendezvous alone. Notices are put off past the
+  # limit, so that the first line is an end.
+  osoe_refusal_test(shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1 4 0
+    SECONDS 20
+    ENV OSOE_NO_PROGRESS_TIMEOUT=3 OSOE_TEST_NOTICE_SECONDS=60
+    LAUNCH -n 4 -m 0,0,1,1
+    PATTERNS "=osoe: PE 0: no local PE has joined for OSOE_NO_PROGRESS_TIMEOUT seconds. missing local ids: 1 [(]rank 1[)]"
+             "osoe: PE 2: no progress for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: node 0 has not answered node 1 on any of its [0-9]+ candidate ports in OSOE_PORT_RANGE=[0-9-]+ - a node comes to the rendezvous once all its PEs have called shmem_init, and names any that has not"
+    PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-before-init.sh 1 $<TARGET_FILE:shmem_test_init>)
+  # A hard limit on descriptors too low for the mesh: sixteen logical nodes, each
+  # PE's limit 32, which a lead's two sockets for each of fifteen other nodes
+  # and its rings pass. The refusal says what the descriptors are for and which
+  # limit to raise, where it said "Too many open files" alone (D14; round four's
+  # readiness Q5-6).
+  add_test(NAME shmem.start-up.descriptors.16-nodes
+    COMMAND $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 60 --
+            sh -c "ulimit -n 32; exec \"$0\" \"$@\"" $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.start-up.descriptors.16-nodes PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+      "Too many open files: this process may hold 32 descriptors, which shmem_init raised to the hard limit, and a node's lead holds two sockets for every other node .* raise the hard limit on open files, ulimit -Hn"
+    FAIL_REGULAR_EXPRESSION "timeout after")
+  osoe_internode_label(shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1
+    shmem.start-up.descriptors.16-nodes)
 endif()
 
 # The library against its floor (§1, §8.4): in each of seven pairs, 8-byte
@@ -1856,13 +1893,15 @@ endif()
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
 # shmem_finalize naming it, found by its turns: nothing waits for time to pass.
+# The end says the PE was in shmem_finalize, where it said "not waiting in the
+# library" (D19).
 if(OSOE_INTERNODE)
   add_test(NAME shmem.helpers.deaf.0-1
     COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=2 OSOE_TEST_DEAF_HELPER=1
             $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 -- $<TARGET_FILE:shmem_test_barrier>)
   set_tests_properties(shmem.helpers.deaf.0-1 PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION
-      "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered")
+      "progress helper 1 of node [01] has gone round its loop [0-9]+ times since it was asked to stop, and has not answered[^\n]*this PE was in shmem_finalize")
   osoe_internode_label(shmem.helpers.deaf.0-1)
   # An ending node's agent waits for its helpers' abortive goodbyes before its
   # process ends (abort_owners_model.py's no_wait): under OSOE_TEST_ABORT_DELAY_MS
@@ -2080,10 +2119,11 @@ if(OSOE_INTERNODE)
   endforeach()
   # And a get whose room another node holds (the ninth review, Q5-2): PE 0's
   # zone, set to 64 KiB, filled by a nonblocking get from PE 2, which stops, and
-  # PE 0's blocking get from PE 1, live, waiting for room. Its wait names no
-  # node, whether its pieces go one at a time (8 bytes) or together (three
-  # pieces), where both named node 1 before. The routine must be the blocking
-  # get's: had the nonblocking get waited itself, it would say its own.
+  # PE 0's blocking get from PE 1, live, waiting for room. Its wait names node 2
+  # and PE 2, which owe the zone's one piece (D25), and never node 1, whether its
+  # pieces go one at a time (8 bytes) or together (three pieces), where both
+  # named node 1 once and then no node. The routine must be the blocking get's:
+  # had the nonblocking get waited itself, it would say its own.
   foreach(bytes IN ITEMS 8 150000)
     add_test(NAME shmem.get-no-progress.zone-held.${bytes}.0-1-2
       COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=10 OSOE_TEST_GET_BYTES=${bytes}
@@ -2093,10 +2133,26 @@ if(OSOE_INTERNODE)
     set_tests_properties(shmem.get-no-progress.zone-held.${bytes}.0-1-2 PROPERTIES
       LABELS "tier2" TIMEOUT 90
       PASS_REGULAR_EXPRESSION
-        "shmem_get: no progress for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
-      FAIL_REGULAR_EXPRESSION "GET RETURNED|toward node")
+        "shmem_get: no progress toward node 2 [(]PE 2[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
+      FAIL_REGULAR_EXPRESSION "GET RETURNED|toward node 1")
     osoe_internode_label(shmem.get-no-progress.zone-held.${bytes}.0-1-2)
   endforeach()
+  # A nonblocking get from a stopped node past the pieces its zone holds: the
+  # call's own wait for room names node 1 and PE 1, which owe every piece the
+  # zone holds (D25; the ninth review's Q5-8, which saw "shmem_get_nbi: no
+  # progress for 10 s ... the landing zone's released extents has stayed at 0").
+  # 256 KiB through a zone of 64 KiB, as the review's default zone was then.
+  add_test(NAME shmem.get-no-progress.nonblocking.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_NO_PROGRESS_TIMEOUT=10 OSOE_TEST_GET_BYTES=262144
+            OSOE_GET_LANDING_BYTES=65536 OSOE_TEST_GET_NBI=1
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 60 --
+            $<TARGET_FILE:shmem_test_get-no-progress>)
+  set_tests_properties(shmem.get-no-progress.nonblocking.0-1 PROPERTIES
+    LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION
+      "shmem_get_nbi: no progress toward node 1 [(]PE 1[)] for [0-9]+ s [(]OSOE_NO_PROGRESS_TIMEOUT[)]: the landing zone's released extents has stayed at"
+    FAIL_REGULAR_EXPRESSION "GET RETURNED")
+  osoe_internode_label(shmem.get-no-progress.nonblocking.0-1)
 endif()
 
 # A loud failure ends the job without joining a collective (§3.15; review round
@@ -2357,6 +2413,9 @@ if(OSOE_INTERNODE)
   # object exists (§1; review round two, portability F3). deny-futex2 makes the
   # three calls fail with ENOSYS, as such a kernel does. Before, both PEs died of
   # SIGABRT in the rendezvous and left their heaps and control segment behind.
+  # The kernels this suite runs on have the calls, so the refusal names the
+  # filter that it is and not the kernel's age (D28; round four's Q6: a
+  # sandbox's refusal was reported as an old kernel).
   # And the probe, under the same filter, fails its named-object futex checks.
   add_executable(deny-futex2 deny-futex2.c)
   osoe_warnings(deny-futex2)
@@ -2364,7 +2423,8 @@ if(OSOE_INTERNODE)
     COMMAND deny-futex2 $<TARGET_FILE:osoe-launch> -n 2 -t 30 --
             $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.refuse.old-kernel PROPERTIES LABELS "tier2" TIMEOUT 60
-    PASS_REGULAR_EXPRESSION "needs Linux 6.7 or later, for the futex2 calls .*this kernel is"
+    PASS_REGULAR_EXPRESSION
+      "needs Linux 6.7 or later, for the futex2 calls .*this kernel is [^ ]+, which has them: a seccomp filter refuses them here"
     FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
   add_test(NAME env.probe.old-kernel COMMAND deny-futex2 $<TARGET_FILE:probe>)
   set_tests_properties(env.probe.old-kernel PROPERTIES LABELS "env" TIMEOUT 60
@@ -2379,7 +2439,7 @@ if(OSOE_INTERNODE)
             $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.refuse.no-shared-futex2 PROPERTIES LABELS "tier2" TIMEOUT 60
     PASS_REGULAR_EXPRESSION
-      "needs Linux 6.7 or later, for the futex2 calls \\(they fail with \"Operation not permitted\"\\)"
+      "needs Linux 6.7 or later, for the futex2 calls \\(they fail with \"Operation not permitted\"\\). this kernel is [^ ]+, which has them: a seccomp filter refuses them here"
     FAIL_REGULAR_EXPRESSION "left behind|futex_wake failed|futex_wait failed")
   # Labelled internode because the single-node build has no futex2 to deny (it waits
   # with the classic futex), so the refusals these three check cannot happen there.
@@ -2391,7 +2451,11 @@ endif()
 # io_uring refused in each place shmem_init's check enters it (deny-io-uring.c):
 # the probe fails its check of shmem_init's, naming the place; a job of two
 # nodes is refused by name before anything is made, the sysctl named only where
-# it can be the cause; and a job of one node, which opens no ring, runs - in
+# it can be the cause - and at creation, where it can, not where it reads that
+# it allows the ring, as it does wherever this suite runs: deny-io-uring's
+# refusal is a seccomp filter's, which the message names instead (D27; round
+# four's Q1: a container's filter was reported as the sysctl); and a job of one
+# node, which opens no ring, runs - in
 # both builds, the single-node build having none to open. Before Part 6's
 # adversarial reads the check missed `enable` and `enter`, and a job ended after
 # its PEs had left shmem_init.
@@ -2414,8 +2478,8 @@ if(OSOE_INTERNODE)
       COMMAND deny-io-uring ${where} $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 30 --
               $<TARGET_FILE:shmem_test_init>)
     if(where STREQUAL "setup")
-      set(osoe_hint " .*which usually means the kernel.io_uring_disabled sysctl is set")
-      set(osoe_not "left behind")
+      set(osoe_hint " .*, refused not by the kernel.io_uring_disabled sysctl, [0-9]+ here, which allows it, but by a seccomp filter")
+      set(osoe_not "left behind|sysctl is set|refused by the kernel.io_uring_disabled")
     else()
       set(osoe_hint "")
       set(osoe_not "left behind|io_uring_disabled|submission failed|cannot enable")
@@ -3985,6 +4049,17 @@ foreach(pool 1 3)
             $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
   set_tests_properties(shmem.context.pool-${pool}.L2 PROPERTIES LABELS "tier2" TIMEOUT 90)
 endforeach()
+# A full pool is said once a PE, naming OSOE_MAX_CONTEXTS (D24): the program
+# finds it full twice on each PE - its creations to exhaustion, then one more -
+# so two PEs write two lines, where a line a call would write four or more and
+# none, as before, nothing (count-lines.sh).
+add_test(NAME shmem.context.pool-3.said-once.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=3
+          sh ${CMAKE_CURRENT_SOURCE_DIR}/count-lines.sh 2
+          "osoe: PE [01]: shmem_ctx_create: no context free: OSOE_MAX_CONTEXTS is 3, the contexts a PE may have at once"
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_context>)
+set_tests_properties(shmem.context.pool-3.said-once.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "COUNT OK")
 
 # The multiple-element waits (§9.11.2-§9.11.14). It reads the waiter's published
 # §4.9 watch word to check the unmasked-span refinement, which is the one place
@@ -4022,6 +4097,62 @@ foreach(count IN LISTS OSOE_LAUNCH_COUNTS)
   set_tests_properties(shmem.stat.L${count} PROPERTIES
     ENVIRONMENT "OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>")
 endforeach()
+# What osoe-stat shows of a job it reads while it runs or hangs (stat-views.sh):
+# every node of 66 logical nodes, where a fixed 64 left the rest unnamed (D2);
+# every PE of a node of 70 in each counter row, where rows held 64 (D3); a
+# stopped PE marked so, where it read as a waiting one (D6); and where each PE
+# waits in an init hang, where every "blocked in" read "-" (D7).
+# The three of more than one node in the full build alone.
+set(osoe_stat_views many-pes)
+if(OSOE_INTERNODE)
+  list(APPEND osoe_stat_views many-nodes stopped init-hang)
+endif()
+foreach(view IN LISTS osoe_stat_views)
+  # Sixty-six nodes or seventy PEs under a sanitizer outgrow the VM's 8 GiB -
+  # the kernel killed the 66 nodes' rank 0 under tsan beside the suite's other
+  # tests (the merge's verification, 2026-10-16) - so the sanitizers run the
+  # small views alone.
+  if(view MATCHES "^many-" AND CMAKE_C_FLAGS MATCHES "sanitize=")
+    continue()
+  endif()
+  add_test(NAME shmem.stat.view.${view}
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/stat-views.sh ${view} $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:osoe-stat> $<TARGET_FILE:shmem_test_sleeper>
+            $<TARGET_FILE:shmem_test_init>)
+  set_tests_properties(shmem.stat.view.${view} PROPERTIES LABELS "tier2" TIMEOUT 180
+    PASS_REGULAR_EXPRESSION "STAT VIEWS OK")
+  if(NOT view STREQUAL "many-pes")
+    osoe_internode_label(shmem.stat.view.${view})
+  endif()
+endforeach()
+# osoe-stat --gc reads a segment into its own memory and counts in its status
+# only what it failed to do (D5): an object named like a segment that is none -
+# four kilobytes of garbage, made here and removed after - is left alone and
+# the run succeeds, where it exited 1.
+add_test(NAME shmem.stat.gc.not-a-segment
+  COMMAND sh -c "name=osoe.$$.0.0.0; head -c 4096 /dev/urandom > /dev/shm/$name; \"$0\" --gc /$name; status=$?; rm -f /dev/shm/$name; echo \"--gc exited $status\"; exit $status"
+          $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.stat.gc.not-a-segment PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "left alone: .* is not an osoe control segment .*--gc exited 0"
+  FAIL_REGULAR_EXPRESSION "--gc exited [1-9]")
+
+# And one its owner cuts down to a page while --gc reads it - here the moment
+# osoe-stat has it (shrink-under-read.c), a job's segment kept by a fatal: left
+# alone, where the mapped read died of SIGBUS. Not under the sanitizers, as
+# slow-message.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_library(shrink-under-read SHARED shrink-under-read.c)
+  target_link_libraries(shrink-under-read PRIVATE ${CMAKE_DL_LIBS})
+  osoe_warnings(shrink-under-read)
+  add_test(NAME shmem.stat.gc.shrunk-under-read
+    COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 \"$0\" -n 1 -t 20 -- \"$1\" 2>/dev/null & L=$!; wait $L; LD_PRELOAD=\"$3\" \"$2\" --gc /osoe.$L.0.0.0; status=$?; rm -f /dev/shm/osoe.$L.0.0.0; echo \"--gc exited $status\"; exit $status"
+            $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_bad_put> $<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:shrink-under-read>)
+  set_tests_properties(shmem.stat.gc.shrunk-under-read PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "cut to [0-9]+ bytes after .*no readable metric table.*left alone.*--gc exited 0"
+    FAIL_REGULAR_EXPRESSION "--gc exited [1-9]")
+endif()
+
 # And with the link set by hand (v0.2 step 2): osoe-stat shows it.
 add_test(NAME shmem.stat.link
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
@@ -4291,6 +4422,43 @@ foreach(case "sibling.L2;0,0;1" "lead.L2;0,0;0" "sibling.L4;0,0,0,0;3" "lead.L4;
     osoe_internode_label(shmem.dead-pe.${label})
   endif()
 endforeach()
+# A dead node is named by its host - its entry in the step's node list, a
+# loopback address here - and its lead's rank beside its index, which is its
+# place in that list (D10: "node 0 ended its control wire without its goodbye"
+# named the index alone): node 0's lead dies, and node 1 says so.
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.dead-pe.lead.0-0-1-1.named
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_dead-pe> 4 0,0,1,1 0)
+  set_tests_properties(shmem.dead-pe.lead.0-0-1-1.named PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "node 1: node 0 [(]127[.]0[.]0[.]1, lead rank 0[)] .*DEAD PE OK")
+  osoe_internode_label(shmem.dead-pe.lead.0-0-1-1.named)
+endif()
+# An end said once a process (D18, D20, D21; fatal.h's first word): node 2's
+# lead dies, and every other PE writes one line at most - its lead the death of
+# node 2, and no helper's line beside its agent's, at two helpers as at none -
+# and no fatal after start-up advises osoe-stat on a segment the job's end
+# takes with it (D22), which every fatal did, two lines where one was due.
+if(OSOE_INTERNODE)
+  foreach(helpers 0 2)
+    add_test(NAME shmem.dead-pe.lead.0-0-1-1-2-2.helpers-${helpers}.one-line
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=${helpers} ONE_LINE=1
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_dead-pe> 6 0,0,1,1,2,2 4)
+    set_tests_properties(shmem.dead-pe.lead.0-0-1-1-2-2.helpers-${helpers}.one-line PROPERTIES
+      LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "DEAD PE OK"
+      FAIL_REGULAR_EXPRESSION "control segment /osoe")
+    osoe_internode_label(shmem.dead-pe.lead.0-0-1-1-2-2.helpers-${helpers}.one-line)
+  endforeach()
+endif()
+# And where the control segment's name is kept (OSOE_KEEP_CONTROL_SEGMENT), a
+# fatal still says it, its name in /dev/shm for osoe-stat, which removes it.
+add_test(NAME shmem.fatal.kept-segment-named
+  COMMAND sh -c "OSOE_KEEP_CONTROL_SEGMENT=1 \"$0\" -n 1 -t 20 -- \"$1\" & L=$!; wait $L; \"$2\" --gc /osoe.$L.0.0.0"
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_bad_put> $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.fatal.kept-segment-named PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+    "control segment /osoe[.][0-9]+[.]0[.]0[.]0, its name still in /dev/shm [(]osoe-stat /osoe.*/osoe[.][0-9]+[.]0[.]0[.]0: removed")
 # And on a kernel without pidfd_open - before Linux 5.3, which the single-node
 # build's floor of 4.17 admits - where liveness watches by pid: the death
 # found all the same, and the lead saying once that it watches so (the v0.2
@@ -4305,7 +4473,8 @@ foreach(case "sibling;3" "lead;0")
             $<TARGET_FILE:shmem_test_dead-pe> 4 0,0,0,0 ${dies})
   set_tests_properties(shmem.dead-pe.no-pidfd.${who}.L4 PROPERTIES LABELS "tier2" TIMEOUT 90
     ENVIRONMENT "WRAP=$<TARGET_FILE:deny-pidfd>"
-    PASS_REGULAR_EXPRESSION "watching local PEs by pid instead.*DEAD PE OK")
+    PASS_REGULAR_EXPRESSION
+      "cannot open a pidfd for local PE [0-9]+ [(]rank [0-9]+, pid [0-9]+[)]: .*watching local PEs by pid instead.*DEAD PE OK")
 endforeach()
 # internode: dead-pe-init.sh launches a job of two nodes
 if(OSOE_INTERNODE)
@@ -4384,6 +4553,44 @@ set_tests_properties(shmem.version.start-up shmem.version.info shmem.version.sta
   shmem.version.info.sma shmem.debug.SHMEM_DEBUG shmem.debug.SMA_DEBUG PROPERTIES
   LABELS "tier2" TIMEOUT 90
   FAIL_REGULAR_EXPRESSION "exited with status [1-9]|killed by signal|timeout after|left behind")
+# SHMEM_INFO's text names every variable of the README's tables of settings
+# (D29; info-every-variable.sh): the transport's buffers and the testing hooks
+# were missing, 19 of 47.
+add_test(NAME shmem.version.info.every-variable
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/info-every-variable.sh ${PROJECT_SOURCE_DIR}/README.md
+          $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.version.info.every-variable PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "INFO NAMES EVERY VARIABLE")
+
+# An OSOE_ name osoe does not read is said, once for the job, by rank 0 - with
+# the known name a letter or two away where there is one - and a known one is
+# not (D16; unknown-settings.h): the misspelt OSOE_DEADLOCK_SECOND=0 left the
+# deadlock detector on without a word. shmem_test_init starts the library three
+# times, and the line is said once. The list of known names is held to the
+# tree by shmem.settings-known.
+add_test(NAME shmem.settings.unknown.near
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECOND=0
+          sh ${CMAKE_CURRENT_SOURCE_DIR}/count-lines.sh 1
+          "^osoe: PE 0: OSOE_DEADLOCK_SECOND is not a variable osoe reads, and changes nothing: did you mean OSOE_DEADLOCK_SECONDS[?]$"
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.settings.unknown.near PROPERTIES PASS_REGULAR_EXPRESSION "COUNT OK"
+  FAIL_REGULAR_EXPRESSION "PE 1: OSOE_DEADLOCK_SECOND")
+add_test(NAME shmem.settings.unknown.far
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_FROBNICATE=1
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.settings.unknown.far PROPERTIES
+  PASS_REGULAR_EXPRESSION
+    "osoe: PE 0: OSOE_FROBNICATE is not a variable osoe reads, and changes nothing [(]SHMEM_INFO=1 lists the ones it reads[)]"
+  FAIL_REGULAR_EXPRESSION "did you mean|exited with status [1-9]|killed by signal|timeout after|left behind")
+add_test(NAME shmem.settings.unknown.known
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=10 OSOE_CC=cc OSOE_TEST_MAP=0
+          OSOE_BOOTSTRAP_TIMEOUT=5
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.settings.unknown.known PROPERTIES
+  PASS_REGULAR_EXPRESSION "OSOE_BOOTSTRAP_TIMEOUT is retired and ignored"
+  FAIL_REGULAR_EXPRESSION "is not a variable osoe reads|exited with status [1-9]|killed by signal|timeout after|left behind")
+set_tests_properties(shmem.settings.unknown.near shmem.settings.unknown.far
+  shmem.settings.unknown.known PROPERTIES LABELS "tier2" TIMEOUT 90)
 
 # Init must refuse what it cannot run, saying why.
 add_test(NAME shmem.refuse.no_launcher
@@ -4407,11 +4614,13 @@ osoe_refusal_test(shmem.refuse.bad_size 2 0
   PATTERNS "osoe: PE 0: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
            "osoe: PE 1: SHMEM_SYMMETRIC_SIZE='12q' is invalid"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
-# The PEs compare their sizes, and each that finds a difference says so; one
-# that is already told another failed ends with that instead.
+# The PEs compare their sizes, and each that finds a difference says so,
+# naming the other PE by its local id and its rank (D11: start-up's messages
+# gave local ids alone); one that is already told another failed ends with that
+# instead.
 osoe_refusal_test(shmem.refuse.size_mismatch 3 0
   LAUNCH -n 3 -e 2:SHMEM_SYMMETRIC_SIZE=2m
-  PATTERNS "osoe: PE [012]: SHMEM_SYMMETRIC_SIZE differs between PEs"
+  PATTERNS "osoe: PE [012]: SHMEM_SYMMETRIC_SIZE differs between PEs: local PE [012] [(]rank [012][)] has [0-9]+ bytes"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
 # The deprecated SMA_ spelling (spec §8, Annex F) must be honoured the same
 # way, down to the same validation (conformance review F3): before F3's fix,

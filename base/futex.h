@@ -80,6 +80,15 @@ int osoe_futex_check(void);
  * <this> (they fail with ...)". */
 const char *osoe_futex_requirement(void);
 
+/*
+ * Whether a kernel of `release` - uname's, "6.18.44-fc-v114" - has the calls
+ * osoe_futex_check checks for: 1 it has, 0 it has not, -1 the release cannot be
+ * read. A refusal on a kernel that has them is a filter's - a seccomp profile
+ * older than the calls, a sandbox such as gVisor, an emulator - and init's
+ * message says so rather than calling the kernel old (round four's Q6; D28).
+ */
+int osoe_futex_kernel_has_calls(const char *release);
+
 /* Process-wide count of waits that ended at their deadline. */
 uint64_t osoe_futex_timeouts(void);
 

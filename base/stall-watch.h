@@ -61,4 +61,20 @@ bool osoe_stall_watch_stalled(struct osoe_stall_watch *w, uint64_t value);
 /* How long the word has been unchanged, in whole seconds, for a message. */
 uint64_t osoe_stall_watch_seconds(const struct osoe_stall_watch *w);
 
+/*
+ * The limit of a start-up wait on another node: the configured one, and two
+ * seconds more for each hop between - one for a lead's wait in the rendezvous,
+ * two for its node-mates', which wait on their lead's - where a limit is set
+ * at all (D15). A node waits for its own PEs to call shmem_init under the
+ * limit itself, so a PE that never calls is named, rank and all, by its own
+ * node before another node's wait on that node ends blaming the rendezvous:
+ * with every limit alike either could end first, and the job's first line -
+ * the one srun -K1 leaves - could be the one that names no rank.
+ */
+#define OSOE_STALL_WATCH_HOP_GRACE_NS UINT64_C(2000000000)
+static inline uint64_t osoe_stall_watch_limit_beyond(uint64_t limit_ns, unsigned hops)
+{
+    return limit_ns ? limit_ns + hops * OSOE_STALL_WATCH_HOP_GRACE_NS : 0;
+}
+
 #endif /* OSOE_BASE_STALL_WATCH_H */

@@ -24,7 +24,13 @@
  * node: it named node 1, which owed it nothing (the ninth review, Q5-2). The
  * zone is set to 64 KiB (OSOE_GET_LANDING_BYTES), which the nonblocking get's
  * one piece of 63 KiB and a byte fills to its last extent; were it two pieces,
- * the nonblocking get would wait itself, under its own routine's name.
+ * the nonblocking get would wait itself, under its own routine's name. The
+ * room is node 2's to give back, and since D25 the wait names it, and PE 2.
+ *
+ * OSOE_TEST_GET_NBI=1 makes PE 0's get from PE 1 a nonblocking one: past the
+ * pieces the zone holds, its issue waits for room inside the call, and that
+ * wait must name node 1 and PE 1, which owe every piece the zone holds (D25;
+ * the ninth review's Q5-8: it named no node).
  */
 #define _GNU_SOURCE
 #include <signal.h>
@@ -69,7 +75,13 @@ int main(void)
     if (stopped == 2)                       /* never lands: node 2 is stopped */
         shmem_getmem_nbi(into, held, filling, 2);
     *out = 0;
-    shmem_getmem(out, v, bytes, 1);         /* node 1 stopped, or PE 0's zone held: never returns */
+    const char *nonblocking = getenv("OSOE_TEST_GET_NBI");
+    if (nonblocking && *nonblocking == '1') {
+        shmem_getmem_nbi(out, v, bytes, 1); /* past the zone's pieces: never returns */
+        shmem_quiet();
+    } else {
+        shmem_getmem(out, v, bytes, 1);     /* node 1 stopped, or PE 0's zone held: never returns */
+    }
     printf("GET RETURNED %ld toward a stopped node\n", *out);
     fflush(stdout);
     free(out);

@@ -116,7 +116,7 @@ int main(void)
     static struct osoe_progress_connection connections[MAX_NODES];
     static uint64_t busy[(MAX_NODES + 63) / 64];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, NULL, NULL,
-                                       NULL, NULL, NULL };
+                                       NULL, NULL, NULL, NULL };
     /* One owner, the lead's agent, holding every wire (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;

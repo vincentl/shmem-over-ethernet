@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Loud failure (§3.15). The library's error path is to print what went wrong,
- * naming the PE and, once it exists, the control segment an investigator
- * points osoe-stat at (§3.14), and to terminate the process.
+ * naming the PE and, while its name is in /dev/shm, the control segment an
+ * investigator points osoe-stat at (§3.14), and to terminate the process.
  */
 #ifndef OSOE_FATAL_H
 #define OSOE_FATAL_H
+
+#include <stdbool.h>
 
 _Noreturn void osoe_fatal(const char *fmt, ...)
     __attribute__((format(printf, 1, 2)));
@@ -41,5 +43,17 @@ void osoe_fatal_last_word(void (*tell)(void *), void *context);
  * nothing: no wait gives up because time has passed.
  */
 void osoe_notice(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
+/*
+ * Whether the line of this process's end is this caller's to write: true for
+ * the first caller in the process, false after (D18, D20, D21). An end has
+ * several writers - a fatal on any thread, a progress helper's among them, the
+ * agent's "ending" on another PE's abort (abort.c), a local PE's death seen
+ * (liveness.c), an exit without shmem_finalize (init.c) - and a lead with
+ * helpers wrote one death twice, a non-lead the abort twice; the first says
+ * it, the cause where there is one, and a later writer ends the process all
+ * the same, silently.
+ */
+bool osoe_fatal_first_word(void);
 
 #endif /* OSOE_FATAL_H */

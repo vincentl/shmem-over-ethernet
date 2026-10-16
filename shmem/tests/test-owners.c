@@ -263,7 +263,7 @@ int main(void)
     static struct osoe_reply descriptors[MAX_OWNERS][DESCRIPTORS];
     static struct osoe_am_connection_metrics metrics[MAX_NODES];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
-                                       NULL, completed, NULL, NULL };
+                                       NULL, completed, NULL, NULL, NULL };
     osoe_progress_init(&engine, &area, owners, &host);
     for (uint32_t o = 0; o < owner_count; o++)
         osoe_progress_attach(&engine, o, &rings[o], &wires[osoe_ring_first(o, peers, helpers)],

@@ -24,6 +24,7 @@
 #include <unistd.h>
 
 #include "base/hostlist.h"
+#include "blocked.h"
 #include "bootstrap.h"
 #include "check.h"
 #include "job.h"
@@ -60,6 +61,20 @@ void osoe_transport_advertise(void *blob);
 void osoe_transport_advertise(void *blob)
 {
     (void)blob;
+}
+
+/* The "blocked in" record (blocked.h), which job.c and rendezvous.c keep while
+ * a lead waits for its peers (D7): this test has no control segment to keep it
+ * in, so it records nothing. */
+void osoe_blocked_enter(const char *routine, enum osoe_blocked_detail kind, uint64_t detail)
+{
+    (void)routine;
+    (void)kind;
+    (void)detail;
+}
+
+void osoe_blocked_leave(void)
+{
 }
 
 _Noreturn void osoe_fatal(const char *fmt, ...);

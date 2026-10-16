@@ -112,3 +112,11 @@ const char *osoe_futex_requirement(void)
 {
     return "Linux 6.7 or later, for the futex2 calls";
 }
+
+int osoe_futex_kernel_has_calls(const char *release)
+{
+    unsigned major = 0, minor = 0;
+    if (!release || sscanf(release, "%u.%u", &major, &minor) != 2)
+        return -1;
+    return major > 6 || (major == 6 && minor >= 7);
+}

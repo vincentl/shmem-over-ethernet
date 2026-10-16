@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "abort.h"
@@ -26,6 +27,29 @@
  */
 static void (*last_word)(void *);
 static void *last_word_context;
+
+/* fatal.h's first word: set by the first writer of this process's end. */
+static atomic_bool end_said;
+
+bool osoe_fatal_first_word(void)
+{
+    return !atomic_exchange_explicit(&end_said, true, memory_order_seq_cst);
+}
+
+/*
+ * Whether `name`, a control segment's, is still in /dev/shm, where osoe-stat
+ * can read it after its PEs are gone (D22): by default every name goes once
+ * the node's PEs have it open, so a fatal after start-up advised osoe-stat on
+ * a segment its job's end would take with it; OSOE_KEEP_CONTROL_SEGMENT keeps
+ * the name, as does a start that fails before the node joins.
+ */
+static bool segment_named(const char *name)
+{
+    char path[128];
+    struct stat st;
+    snprintf(path, sizeof path, "/dev/shm%s", name);
+    return stat(path, &st) == 0;
+}
 
 void osoe_fatal_last_word(void (*tell)(void *), void *context)
 {
@@ -48,17 +72,20 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
      * step 4's Part 3, N3). A fatal on any other thread is that thread's own,
      * and names its routine where it has one. */
     if (osoe_agent_is_this_thread() || osoe_metrics_thread_unpooled()) {
-        const char *routine = osoe_blocked_routine();
+        char where[128];
         size_t used = strlen(msg);
-        snprintf(msg + used, sizeof msg - used, "; this PE was %s%s",
-                 routine ? "waiting in " : "not waiting in the library",
-                 routine ? routine : "");
+        snprintf(msg + used, sizeof msg - used, "; this PE was %s",
+                 osoe_blocked_where(where, sizeof where));
     }
 
     int n;
-    if (osoe.bootstrap.have_rank && osoe.node.control_name[0])
+    if (!osoe_fatal_first_word())
+        n = 0;                          /* this process's end is said already */
+    else if (osoe.bootstrap.have_rank && osoe.node.control_name[0] &&
+             segment_named(osoe.node.control_name))
         n = snprintf(out, sizeof out, "osoe: PE %u: %s\nosoe: PE %u: control segment "
-                     "%s (osoe-stat %s, while any PE of this node is alive)\n",
+                     "%s, its name still in /dev/shm (osoe-stat %s; osoe-stat --gc removes "
+                     "it once its PEs are gone)\n",
                      osoe.bootstrap.rank, msg, osoe.bootstrap.rank, osoe.node.control_name,
                      osoe.node.control_name);
     else if (osoe.bootstrap.have_rank)
