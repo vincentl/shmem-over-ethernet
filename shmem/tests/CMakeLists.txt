@@ -4111,11 +4111,12 @@ endforeach()
 # every node of 66 logical nodes, where a fixed 64 left the rest unnamed (D2);
 # every PE of a node of 70 in each counter row, where rows held 64 (D3); a
 # stopped PE marked so, where it read as a waiting one (D6); and where each PE
-# waits in an init hang, where every "blocked in" read "-" (D7).
-# The three of more than one node in the full build alone.
+# waits in an init hang, where every "blocked in" read "-" (D7); and the age
+# of each owner's last pass, which a stopped node's agent shows (D8).
+# The four of more than one node in the full build alone.
 set(osoe_stat_views many-pes)
 if(OSOE_INTERNODE)
-  list(APPEND osoe_stat_views many-nodes stopped init-hang)
+  list(APPEND osoe_stat_views many-nodes stopped init-hang last-pass)
 endif()
 foreach(view IN LISTS osoe_stat_views)
   # Sixty-six nodes or seventy PEs under a sanitizer outgrow the VM's 8 GiB -

@@ -1462,7 +1462,10 @@ at every helper count, a control wire and a data wire (§3.1,
   peer and waiting for no helper, as it did with no helpers.
 - **Each owner's counters are a record of its own** in the node segment
   (layout 36, the owner scope), which `osoe-stat` shows owner by owner and
-  every reader sums.
+  every reader sums; and since layout 40 the instant its last pass ended, on
+  the coarse monotonic clock, whose age `osoe-stat` shows beside its passes:
+  an idle owner passes ten times a second, so an old one is an owner stuck in
+  a pass or not running (D8).
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address

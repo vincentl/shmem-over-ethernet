@@ -581,11 +581,13 @@ static void owner_name(uint32_t owner, char *buf, size_t len)
 }
 
 /* One row of the owner table below: what one owner's record holds, or what the
- * node's owners hold together. `tid` is 0 until the owner's thread runs. */
+ * node's owners hold together. `tid` is 0 until the owner's thread runs, and
+ * `last_pass_ns` until its first pass ends, or in a segment from before layout
+ * 40, which has no such field; the node's row leaves it 0. */
 struct owner_row {
     int64_t tid;
     uint64_t data_wires, control_wires, passes, wakes, segments_sent, control_segments_sent,
-             segments_applied, messages_applied, completions;
+             segments_applied, messages_applied, completions, last_pass_ns;
 };
 
 static void read_owner_row(const struct osoe_segment *s, uint32_t owner, struct owner_row *row)
@@ -604,6 +606,7 @@ static void read_owner_row(const struct osoe_segment *s, uint32_t owner, struct 
     osoe_segment_read_name(s, "transport.am.segments_applied", owner, &row->segments_applied);
     osoe_segment_read_name(s, "transport.am.messages_applied", owner, &row->messages_applied);
     osoe_segment_read_name(s, "transport.am.completions", owner, &row->completions);
+    osoe_segment_read_name(s, "transport.am.last_pass_ns", owner, &row->last_pass_ns);
 }
 
 static void add_owner_row(struct owner_row *total, const struct owner_row *row)
@@ -620,15 +623,29 @@ static void add_owner_row(struct owner_row *total, const struct owner_row *row)
 }
 
 /* The first three columns are text because the node's line leaves two of them
- * blank, and an owner whose thread has not run has no tid to show. */
+ * blank, and an owner whose thread has not run has no tid to show; the last
+ * for the same reason, the age of the owner's last pass. */
 static void print_owner_row(const char *owner, const char *who, const char *tid,
-                            const struct owner_row *row)
+                            const struct owner_row *row, const char *last_pass)
 {
     printf("%5s %-9s %7s %6" PRIu64 " %6" PRIu64 " %9" PRIu64 " %9" PRIu64 " %9" PRIu64
-           " %9" PRIu64 " %9" PRIu64 " %9" PRIu64 " %11" PRIu64 "\n", owner, who, tid,
+           " %9" PRIu64 " %9" PRIu64 " %9" PRIu64 " %11" PRIu64 " %10s\n", owner, who, tid,
            row->data_wires, row->control_wires, row->passes, row->wakes, row->segments_sent,
            row->control_segments_sent, row->segments_applied, row->messages_applied,
-           row->completions);
+           row->completions, last_pass);
+}
+
+/* How long ago an owner's last pass ended (layout 40; D8), or "-" for an owner
+ * that has not passed yet or a segment from before the field. The instant is
+ * the coarse clock's (progress.c), never ahead of this one on the machine
+ * that wrote it; one that is ahead was written under another clock - a time
+ * namespace's - and has no age here. */
+static void last_pass_age(char *buf, size_t len, uint64_t now, uint64_t last_pass_ns)
+{
+    if (last_pass_ns == 0 || last_pass_ns > now)
+        snprintf(buf, len, "-");
+    else
+        print_duration(buf, len, now - last_pass_ns);
 }
 
 /*
@@ -638,9 +655,12 @@ static void print_owner_row(const char *owner, const char *who, const char *tid,
  * Printed after the connections, because once "which peer" is answered the
  * next question about a node that is slow or hung is "which thread moves its
  * traffic": a `tid` of `-` is an owner whose thread has not started, and
- * `passes` that stand still while the others' climb are one that is asleep or
- * holds no wires. With more than one owner a `node` line adds them up, which is
- * what the node's counters were, one record in its header, before layout 36.
+ * `last pass` how long ago its last pass ended (layout 40; D8). An idle owner
+ * passes ten times a second, so a last pass much older than a tenth of a
+ * second is an owner stuck in a pass, or not running, while one look says so -
+ * where before it took two, to see its `passes` stand still. With more than
+ * one owner a `node` line adds them up, which is what the node's counters
+ * were, one record in its header, before layout 36.
  *
  * Nothing is printed for a job of one node, which has no connections and so no
  * owners, nor for a segment from before layout 36, which has no owner section:
@@ -650,23 +670,25 @@ static void print_owner_lines(const struct osoe_segment *s)
 {
     if (s->owner_count == 0)
         return;
-    printf("\n%5s %-9s %7s %6s %6s %9s %9s %9s %9s %9s %9s %11s\n", "owner", "who", "tid",
+    printf("\n%5s %-9s %7s %6s %6s %9s %9s %9s %9s %9s %9s %11s %10s\n", "owner", "who", "tid",
            "dwires", "cwires", "passes", "wakes", "seg sent", "ctrl sent", "seg appl",
-           "msg appl", "completions");
+           "msg appl", "completions", "last pass");
+    uint64_t now = osoe_segment_now_ns();
     struct owner_row total = { 0 };
     for (uint32_t o = 0; o < s->owner_count; o++) {
         struct owner_row row;
-        char number[16], who[32], tid[24] = "-";
+        char number[16], who[32], tid[24] = "-", last_pass[32];
         read_owner_row(s, o, &row);
         snprintf(number, sizeof number, "%u", o);
         owner_name(o, who, sizeof who);
         if (row.tid > 0)
             snprintf(tid, sizeof tid, "%" PRId64, row.tid);
-        print_owner_row(number, who, tid, &row);
+        last_pass_age(last_pass, sizeof last_pass, now, row.last_pass_ns);
+        print_owner_row(number, who, tid, &row, last_pass);
         add_owner_row(&total, &row);
     }
     if (s->owner_count > 1)
-        print_owner_row("", "node", "", &total);
+        print_owner_row("", "node", "", &total, "");
 }
 
 /* ---- the summary view -------------------------------------------------- */

@@ -550,32 +550,31 @@ srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
 ```
 
 A job that hangs shows, for every PE, the routine it is blocked in, the
-collective's epoch - how many collectives its team has begun - and for how long;
-and for a node of a job across nodes, each owner of its wires - the lead's
-agent and its progress helpers (`OSOE_PROGRESS_HELPERS`) - with the wires it
-holds, its passes, its wakes and what it has sent and applied. An idle owner
-passes ten times a second, so one whose passes do not move between two looks
-(`osoe-stat -n 2 JOB`, a look every two seconds) while PEs wait toward its peers
-is the one stuck. A PE stopped by SIGSTOP or a debugger is marked
-`[stopped: SIGSTOP or a debugger]`, since its record goes on reading as a wait,
-and the summary counts a node's stopped PEs beside its longest wait; a job hung
-in its start shows each PE waiting in `shmem_init` and the PE of its node, or
-the node, it waits for. `osoe-stat` shows every node and every PE of a job on
-the machine, however many logical nodes the job has there and however many PEs
-a node has.
-The summary's walk follows a team's barriers and syncs between nodes, whose
-epochs each node's progress thread keeps; a team hung in a reduction,
-broadcast, gather or scan shows there as nothing open, and its PE lines are
-where to look. A job of one node - every job of the single-node build - has no
-tree between nodes to walk: its summary says so, and the PE lines of
-`osoe-stat JOB` name the PE that is not waiting.
-The summary names a team you made by its number and its first member's world
-rank - `4@r1` - since teams with no PE in common may share a number, and a
-blocked PE by its world rank.
-A job that deadlocks - every PE waiting in the library, with nothing in flight
-between its nodes - ends by itself after `OSOE_DEADLOCK_SECONDS` and prints the
-same, node by node (below); a hang the library cannot prove, such as a PE
-computing for ever, is what `osoe-stat` is for.
+collective's epoch - how many collectives its team has begun - and for how
+long; and for a node of a job across nodes, each owner of its wires - the
+lead's agent and its progress helpers (`OSOE_PROGRESS_HELPERS`) - with the
+wires it holds, its passes and how long ago the last one ended, its wakes and
+what it has sent and applied. An idle owner passes ten times a second, so one
+whose last pass is more than a fraction of a second old while PEs wait toward
+its peers is the one stuck - in a pass, or not running at all. A PE stopped by
+SIGSTOP or a debugger is marked `[stopped: SIGSTOP or a debugger]`, since its
+record goes on reading as a wait, and the summary counts a node's stopped PEs
+beside its longest wait; a job hung in its start shows each PE waiting in
+`shmem_init` and the PE of its node, or the node, it waits for. `osoe-stat`
+shows every node and every PE of a job on the machine, however many logical
+nodes the job has there and however many PEs a node has. The summary's walk
+follows a team's barriers and syncs between nodes, whose epochs each node's
+progress thread keeps; a team hung in a reduction, broadcast, gather or scan
+shows there as nothing open, and its PE lines are where to look. A job of one
+node - every job of the single-node build - has no tree between nodes to walk:
+its summary says so, and the PE lines of `osoe-stat JOB` name the PE that is
+not waiting. The summary names a team you made by its number and its first
+member's world rank - `4@r1` - since teams with no PE in common may share a
+number, and a blocked PE by its world rank. A job that deadlocks - every PE
+waiting in the library, with nothing in flight between its nodes - ends by
+itself after `OSOE_DEADLOCK_SECONDS` and prints the same, node by node (below);
+a hang the library cannot prove, such as a PE computing for ever, is what
+`osoe-stat` is for.
 
 ### When a job fails or hangs
 
@@ -1479,7 +1478,7 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  521 tests labelled `internode` - those of a job of more than one node, of
+  522 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
