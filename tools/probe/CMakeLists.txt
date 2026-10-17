@@ -28,4 +28,10 @@ if(NOT OSOE_SINGLE_NODE)
   add_test(NAME env.probe.zero-copy-line
     COMMAND sh -c "$<TARGET_FILE:probe> | grep -q '^info opcode SEND_ZC, for OSOE_WIRE_ZERO_COPY=on: \\(supported\\|missing\\)$'")
   set_tests_properties(env.probe.zero-copy-line PROPERTIES LABELS "env" TIMEOUT 60)
+  # The full build's probe links liburing, so the test carries `internode` as
+  # every test of the full build's alone does (cmake/OsoeInternode.cmake) - and
+  # `ctest -L internode` runs what the single-node build lacks but its
+  # configure check. Labelled `env` alone, it was a second exception, which the
+  # README did not name, from 2026-10-12 (B7) to 2026-10-17.
+  osoe_internode_label(env.probe.zero-copy-line)
 endif()

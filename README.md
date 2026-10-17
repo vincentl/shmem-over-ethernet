@@ -268,16 +268,17 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - about 870,
-checks of the build itself and jobs of a few processes. On four cores of an idle
-virtual machine it took about eleven minutes, one for the build and ten for the
-tests. Both may run four at a time, as this project's own runs do (`cmake
---build --preset release -j4`, `ctest --preset release -j4`). The 40 tests of
-the model checker (`tools/modelcheck`, which needs Python 3; 39 since `model.wire` was retired) took 62 minutes in
-a development VM one at a time on 2026-10-11, the longest of them,
-`model.reservation`, 14 of those, and check the design, which does not vary with the machine. They
-want memory more than cores: the largest, `model.abort`, holds 3 GiB at its
-peak, the next 2.5 GiB and the one after 1.7 GiB, so run them two at a time on a
+That builds one file at a time and runs the tests one at a time - about 950,
+checks of the build itself and jobs of a few processes. On four cores of an
+idle virtual machine it took about thirteen minutes, one for the build and
+twelve for the tests (2026-10-17). Both may run four at a time, as this
+project's own runs do (`cmake --build --preset release -j4`, `ctest --preset
+release -j4`). The 41 tests of the model checker (`tools/modelcheck`, which
+needs Python 3) took 62 minutes in a development VM one at a time on
+2026-10-11, when they were 40, the longest of them, `model.reservation`, 14 of
+those, and check the design, which does not vary with the machine. They want
+memory more than cores: the largest, `model.abort`, holds 3 GiB at its peak,
+the next 2.5 GiB and the one after 1.7 GiB, so run them two at a time on a
 machine of 8 GiB and one at a time on 4 GiB - four at once ran the development
 VM, of 8 GiB, out of memory.
 They have a label of their own, `model`, which the `release` preset leaves out
@@ -318,16 +319,16 @@ profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, which the message tells from the sysctl's own refusal by reading the
 sysctl - naming a seccomp filter where the sysctl allows io_uring, as it does
 inside such a container - and Podman with `ENOSYS`. There jobs on one node run, but about
-425 of the test suite's 871 tests fail at `shmem_init` or at opening a ring -
-all of them among the 470 labelled `internode` but `env.probe`, which need more
+480 of the test suite's 951 tests fail at `shmem_init` or at opening a ring -
+all of them among the 523 labelled `internode` but `env.probe`, which need more
 than one node or test the internode backend's own files, io_uring or futex2
 (`ctest -L internode`); the single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
-even a job of one PE is refused at start-up, naming the sizes, and about 680 of
-the suite's 871 tests fail, with io_uring refused as well. Give the container a
+even a job of one PE is refused at start-up, naming the sizes, and about 760 of
+the suite's 951 tests fail, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -1424,8 +1425,8 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 870 tests in
-  release, and the model checker's 39 tests beside them, which run in that build
+  run before every merge, on the exact tree that merges: about 950 tests in
+  release, and the model checker's 41 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
@@ -1446,7 +1447,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 251 of the 470 tests labelled `internode`, `shmem.internode`'s
+  leaves out 292 of the 523 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1478,11 +1479,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  522 tests labelled `internode` - those of a job of more than one node, of
+  523 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 400 of the full build's 871 tests in
+  development VM with liburing hidden: 427 of the full build's 951 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.

@@ -8169,9 +8169,11 @@ git. Four properties are deliberate:
 step. Tests carry ctest labels: `env` for `tools/probe`, and tier labels
 (`tier1`, …, §8.2) as the suites arrive, so `ctest --preset debug -L tier1` runs
 what CI can run anywhere. The model checker's tests (`tools/modelcheck`, which
-needs Python 3) carry `model` beside `tier1`. They take about an hour (40 tests
-in 62 minutes in the development VM on 2026-10-11, the longest
-`model.reservation` at 14; 39 since `model.wire` was retired) and run in
+needs Python 3) carry `model` beside `tier1`, all but `model.circulant`, which
+has `model` alone. They take about an hour (40 tests in 62 minutes in the
+development VM on 2026-10-11, the longest `model.reservation` at 14; 41 now,
+`model.wire` retired and `model.exchange` and `model.shape_timing.places-grid`
+added on 2026-10-13) and run in
 the release build only, so the `release` test preset leaves that label out and
 the `models` preset runs it alone: `ctest --preset models`, or `cmake --workflow
 --preset models` from a clean tree. The project's own verification is the four

@@ -174,6 +174,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **`parallel_print` has two routes to the same lines**, the library's fcollect and the tool's own dissemination by `shmem_putmem_signal`; the `print` exercise runs every case by both. Claude, [2026-09-27-evening](2026-09-27-evening.md) item 5.
 - **The two-byte waits are written by a put**, the contract they were deprecated with: 1.5 wants a waited word written by an AMO, and none takes `short`. Claude, [2026-09-27-evening](2026-09-27-evening.md) item 7.
 - **`osoe-pacer-counted`** counts every call of every routine the library declares through a shim generated from the preprocessed `pshmem.h`, Annex F's routines under their unprefixed names; `--coverage` writes the count and what was never called. Claude, [2026-09-27-afternoon](2026-09-27-afternoon.md) item 6.
+- **Each owner's last pass, with its age, in `osoe-stat`**: a field in every owner record (layout 40), stored at the end of each pass, rather than `osoe-stat` reading the passes twice or the README's sentence alone - D8's (a), the fourth cloud session's recommendation. Author, [2026-10-17](2026-10-17.md), "The author's answers after cloud session 4".
 
 ## License and release
 

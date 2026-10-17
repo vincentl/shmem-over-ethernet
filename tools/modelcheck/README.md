@@ -36,10 +36,12 @@ were run. Develop new models here.
 
 **Where they run.** Every model is a ctest in the release preset only: a model
 is Python and gives the same verdict whichever preset built the library. They
-carry the label `model` beside `tier1`, and take about an hour (40 tests in
-62 minutes in the development VM, 2026-10-11, the longest `model.reservation`
-at 14; 39 since `model.wire` was retired with the wire it checked), so the
-`release` test preset leaves that label out and the `models` preset runs it
+carry the label `model` beside `tier1` - all but `model.circulant`, which has
+`model` alone - and take about an hour (40 tests in 62 minutes in the
+development VM, 2026-10-11, the longest `model.reservation` at 14; 41 now,
+`model.wire` retired with the wire it checked and `model.exchange` and
+`model.shape_timing.places-grid` added on 2026-10-13), so the `release` test
+preset leaves that label out and the `models` preset runs it
 alone (`ctest --preset models`). Without Python 3 none is registered. The
 six of §4.11's `SHMEM_THREAD_MULTIPLE` designs (`get_completion` but for its
 phase-1 case, `dirty_set`, `watch_list`, `landing_extent`, `copy_out_claim`,
