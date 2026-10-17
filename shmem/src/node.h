@@ -31,9 +31,10 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-/* 39: team.tree.collect_way, the way a team's last collect found its places,
- * and the header's OSOE_COLLECTIVE_PLACES (v0.2, P30 and P31). */
-#define OSOE_NODE_LAYOUT 39
+/* 40: transport.am.last_pass_ns, each owner's last pass (D8). 39:
+ * team.tree.collect_way, the way a team's last collect found its places, and
+ * the header's OSOE_COLLECTIVE_PLACES (v0.2, P30 and P31). */
+#define OSOE_NODE_LAYOUT 40
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -534,6 +535,11 @@ struct osoe_am_owner_metrics {
      * timeout or a socket's completion did not - how often the node's PEs, or
      * the agent, woke it. */
     _Atomic uint64_t wakes;
+    /* Layout 40: when the owner's last pass ended, an instant on
+     * CLOCK_MONOTONIC_COARSE (progress.c), 0 before its first. An idle owner
+     * passes ten times a second, so a last pass older than that is an owner
+     * stuck in one, or not running: osoe-stat shows its age (D8). */
+    _Atomic uint64_t last_pass_ns;
 };
 
 /*

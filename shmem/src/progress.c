@@ -9,6 +9,7 @@
 #include <stdbit.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "base/futex.h"
 #include "base/ring-check.h"
@@ -1763,6 +1764,18 @@ static bool release_local(struct osoe_progress *p)
  * whichever owner meets it first. */
 static _Atomic bool zero_copy_refusal_said;
 
+/* When a pass ended, for its owner's record (node.h, layout 40; D8). The
+ * coarse clock is CLOCK_MONOTONIC at the last tick, which the vDSO reads
+ * without the counter, so a pass pays a few nanoseconds for it; and an instant
+ * read from it is never ahead of the CLOCK_MONOTONIC osoe-stat subtracts it
+ * from, so the age it shows is at most a tick (1 to 4 ms) too long. */
+static uint64_t pass_end_ns(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+    return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
+}
+
 /* The ring's counts since the last pass, into the owner's record (§3.14). */
 static void publish_ring(struct osoe_progress_owner *o)
 {
@@ -1879,6 +1892,7 @@ bool osoe_progress_poll(struct osoe_progress_owner *o)
     publish_ring(o);
     osoe_counter_word_add(&o->metrics->passes, 1);
     osoe_counter_word_add(&o->metrics->send_visits, visits);
+    atomic_store_explicit(&o->metrics->last_pass_ns, pass_end_ns(), memory_order_release);
     return moved;
 }
 

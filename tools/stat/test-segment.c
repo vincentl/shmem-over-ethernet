@@ -81,6 +81,7 @@ enum {
     AM_TID                   = 56,      /* i32 */
     AM_DATA_WIRES            = 60,      /* u32 */
     AM_CONTROL_WIRES         = 64,      /* u32 */
+    AM_LAST_PASS             = 72,      /* u64, an instant (layout 40) */
 };
 
 /*
@@ -95,11 +96,14 @@ static const struct {
     int32_t tid;
     uint32_t data_wires, control_wires;
     uint64_t passes, wakes, segments_sent, control_segments_sent, segments_applied,
-             messages_applied, completions;
+             messages_applied, completions, last_pass_ns;
 } synthetic_owners[OWNER_COUNT] = {
-    { 4001, 0, 3, 1000, 100, 10, 11, 12, 13, 14 },
-    { 4002, 2, 0, 2000, 200, 20, 0, 22, 23, 24 },
-    { 0, 1, 0, 3000, 300, 30, 0, 32, 33, 34 },
+    /* The agent's last pass the instant 1, as long ago as the machine has been
+     * up; helper 1's ahead of the reader's clock, as one written under another
+     * would be; helper 2, whose thread has not run, has not passed. */
+    { 4001, 0, 3, 1000, 100, 10, 11, 12, 13, 14, 1 },
+    { 4002, 2, 0, 2000, 200, 20, 0, 22, 23, 24, UINT64_MAX },
+    { 0, 1, 0, 3000, 300, 30, 0, 32, 33, 34, 0 },
 };
 
 /* PE 0's watch word: 8 bytes at heap offset 0x40, in the encoding segment.h
@@ -223,6 +227,8 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
              OSOE_MSCOPE_OWNER, 8, AM_MESSAGES_APPLIED),
         desc("transport.am.completions", "", OSOE_MTYPE_U64, OSOE_MKIND_COUNTER,
              OSOE_MSCOPE_OWNER, 8, AM_COMPLETIONS),
+        desc("transport.am.last_pass_ns", "ns", OSOE_MTYPE_U64, OSOE_MKIND_STATE,
+             OSOE_MSCOPE_OWNER, 8, AM_LAST_PASS),
     };
     uint32_t n = (uint32_t)(sizeof table / sizeof table[0]);
 
@@ -335,6 +341,7 @@ static void *build(const char *name, enum damage damage, size_t *bytes)
         *(int32_t *)(record + AM_TID) = synthetic_owners[o].tid;
         *(uint32_t *)(record + AM_DATA_WIRES) = synthetic_owners[o].data_wires;
         *(uint32_t *)(record + AM_CONTROL_WIRES) = synthetic_owners[o].control_wires;
+        *(uint64_t *)(record + AM_LAST_PASS) = synthetic_owners[o].last_pass_ns;
     }
 
     *bytes = total;
@@ -553,6 +560,18 @@ static bool ends_with(const char *text, const char *suffix)
     return length >= tail && strcmp(text + length - tail, suffix) == 0;
 }
 
+/* Whether some line of `text`, as next_line sees it, opens with `prefix` and
+ * ends with `suffix`: a row whose last column is an age, which the tool takes
+ * from its own clock. */
+static bool has_line_from_to(const char *text, const char *prefix, const char *suffix)
+{
+    char line[512];
+    for (const char *rest = text; next_line(&rest, line, sizeof line);)
+        if (strncmp(line, prefix, strlen(prefix)) == 0 && ends_with(line, suffix))
+            return true;
+    return false;
+}
+
 /* The dump's section that opens with the line `header` (with the newlines
  * round it, so that "owner 1" is not found in "owner 10"), up to the blank line
  * that ends it. */
@@ -578,7 +597,8 @@ static bool dump_section(const char *out, const char *header, char *section, siz
  * thread; and the default view again with one owner, a job with no helpers.
  * The node's line is the owners' sums: 3 data and 3 control wires, 6000
  * passes, 600 wakes, 60 segments sent, 11 control segments sent, 66 segments
- * and 69 messages applied, 72 completions.
+ * and 69 messages applied, 72 completions; and no last pass, which is not
+ * summed. The agent's last pass has an age in seconds, and the helpers' none.
  */
 static void check_owner_views(const char *file, void *map)
 {
@@ -587,10 +607,10 @@ static void check_owner_views(const char *file, void *map)
 
     CHECK(run_stat("-c", file, out, sizeof out) == 0);
     CHECK(has_line(out, "owner who tid dwires cwires passes wakes seg sent ctrl sent seg appl "
-                        "msg appl completions"));
-    CHECK(has_line(out, "0 agent 4001 0 3 1000 100 10 11 12 13 14"));
-    CHECK(has_line(out, "1 helper 1 4002 2 0 2000 200 20 0 22 23 24"));
-    CHECK(has_line(out, "2 helper 2 - 1 0 3000 300 30 0 32 33 34"));       /* no thread yet */
+                        "msg appl completions last pass"));
+    CHECK(has_line_from_to(out, "0 agent 4001 0 3 1000 100 10 11 12 13 14 ", " s"));
+    CHECK(has_line(out, "1 helper 1 4002 2 0 2000 200 20 0 22 23 24 -"));     /* clock ahead */
+    CHECK(has_line(out, "2 helper 2 - 1 0 3000 300 30 0 32 33 34 -"));     /* no thread yet */
     CHECK(has_line(out, "node 3 3 6000 600 60 11 66 69 72"));
     /* After the PE lines and before the counters. */
     const char *pes = strstr(out, "blocked in"), *owners = strstr(out, "completions"),
@@ -619,6 +639,10 @@ static void check_owner_views(const char *file, void *map)
         CHECK(has_line(section, want));
         snprintf(want, sizeof want, "transport.am.control_wires %u",
                  synthetic_owners[o].control_wires);
+        CHECK(has_line(section, want));
+        /* An instant, as the record holds it: an age only in the table. */
+        snprintf(want, sizeof want, "transport.am.last_pass_ns %" PRIu64,
+                 synthetic_owners[o].last_pass_ns);
         CHECK(has_line(section, want));
     }
     /* Not in the node's section, where they were before layout 36. */
@@ -679,7 +703,7 @@ static void check_owner_views(const char *file, void *map)
      */
     ((struct osoe_segment_directory *)map)->owner_count = 1;
     CHECK(run_stat("-c", file, out, sizeof out) == 0);
-    CHECK(has_line(out, "0 agent 4001 0 3 1000 100 10 11 12 13 14"));
+    CHECK(has_line_from_to(out, "0 agent 4001 0 3 1000 100 10 11 12 13 14 ", " s"));
     bool others = false;
     for (const char *rest = out; next_line(&rest, row, sizeof row);)
         others = others || strncmp(row, "node ", 5) == 0 || strstr(row, "helper") != NULL;

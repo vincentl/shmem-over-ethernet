@@ -20,6 +20,11 @@
 #   init-hang   two nodes of two PEs, rank 3 never calling shmem_init: every PE
 #               that has a record - node 0's two and node 1's lead - must show
 #               where it waits in shmem_init, where each read "-" (D7).
+#   last-pass   two nodes of one PE, node 1's stopped by SIGSTOP for two seconds:
+#               its agent's last pass must be that old, and node 0's agent's,
+#               which passes ten times a second, under a second; where a look
+#               showed passes alone, and only a second look told one standing
+#               still (D8).
 set -u
 MODE=$1 LAUNCHER=$2 STAT=$3 SLEEPER=$4 INIT=$5
 here=$(cd "$(dirname "$0")" && pwd)
@@ -106,6 +111,29 @@ init-hang)
     printf '%s\n' "$view"
     echo "stat-views.sh: $waiting PE lines show where they wait in shmem_init"
     [ "$waiting" -eq 3 ] || fail "$waiting of 3 waiting PEs show where they wait"
+    ;;
+last-pass)
+    "$LAUNCHER" -n 2 -m 0,1 -t 120 -- "$SLEEPER" > "$out" 2>&1 &
+    job=$!
+    await 2 '^running '
+    stopped_pid=$("$STAT" "/osoe.$job.0.1.0" | awk '$1 == "0" && $2 == "1" { print $3; exit }')
+    [ -n "$stopped_pid" ] || fail "no PE line for rank 1 in node 1's segment"
+    kill -STOP "$stopped_pid"
+    sleep 2
+    # The agent's row ends with its last pass's age, a number and its unit, or
+    # "-": in seconds here, or "none".
+    age='$2 == "agent" { if ($NF == "-") { print "none"; exit }
+                         split("s ms us ns", unit); split("1 1e-3 1e-6 1e-9", scale)
+                         for (i = 1; i <= 4; i++) if ($NF == unit[i]) print $(NF - 1) * scale[i]
+                         exit }'
+    stuck=$("$STAT" "/osoe.$job.0.1.0" | awk "$age")
+    running=$("$STAT" "/osoe.$job.0.0.0" | awk "$age")
+    echo "stat-views.sh: node 1 stopped for 2 s; its agent's last pass ${stuck:-?} s ago," \
+         "node 0's ${running:-?} s ago"
+    awk -v s="${stuck:-none}" 'BEGIN { exit !(s != "none" && s >= 1.5) }' ||
+        fail "the stopped node's agent's last pass is ${stuck:-not shown}, not 2 s old"
+    awk -v s="${running:-none}" 'BEGIN { exit !(s != "none" && s < 1) }' ||
+        fail "the running node's agent's last pass is ${running:-not shown}, not under 1 s"
     ;;
 *)
     fail "no mode $MODE"

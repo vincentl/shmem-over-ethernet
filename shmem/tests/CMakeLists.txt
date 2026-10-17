@@ -63,6 +63,16 @@ add_test(NAME shmem.settings-known
           -P ${PROJECT_SOURCE_DIR}/cmake/CheckSettingsKnown.cmake)
 set_tests_properties(shmem.settings-known PROPERTIES LABELS "tier1" TIMEOUT 30)
 
+# Every test's PASS and SKIP expression is one expression, as ctest holds it: a
+# `;` splits a quoted one into a list, any half of which passes the test, and
+# six tests passed on the wrong half before this checked it
+# (CheckPassExpressions.cmake). It reads the build's tests through ctest itself.
+add_test(NAME shmem.pass-expressions
+  COMMAND ${CMAKE_COMMAND} -DCTEST=${CMAKE_CTEST_COMMAND} -DBUILD_DIR=${PROJECT_BINARY_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckPassExpressions.cmake)
+set_tests_properties(shmem.pass-expressions PROPERTIES LABELS "tier1" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "PASS EXPRESSIONS OK")
+
 # Every source file carries the license line, as the README says, but the
 # specification's four examples: 82 evidence programs went without it until the
 # review of v0.2 step 4's merge point (readiness Q5-1), since nothing checked
@@ -2642,7 +2652,7 @@ add_test(NAME shmem.typed-rma.ibput-misuse
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_IBPUT_MISUSE=1
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_typed-rma>)
 set_tests_properties(shmem.typed-rma.ibput-misuse PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "shmem_long_ibput: dst 1, sst 2 below bsize 2; spec")
+  PASS_REGULAR_EXPRESSION "shmem_long_ibput: dst 1, sst 2 below bsize 2. spec")
 
 # Nonblocking gets (§4.6, as built; test-get-nbi.c): on one node, where every
 # get is applied before it returns; and across nodes with the landing records
@@ -2897,7 +2907,7 @@ add_test(NAME shmem.alltoall.stride
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_ALLTOALL_STRIDE=0
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_alltoall>)
 set_tests_properties(shmem.alltoall.stride PROPERTIES LABELS "tier2" TIMEOUT 60
-  PASS_REGULAR_EXPRESSION "shmem_long_alltoalls: strides 0 and 1; both must be at least 1")
+  PASS_REGULAR_EXPRESSION "shmem_long_alltoalls: strides 0 and 1. both must be at least 1")
 add_test(NAME shmem.collect.partial
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_PARTIAL=1
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_collect>)
@@ -3423,7 +3433,7 @@ add_test(NAME shmem.team-split.stale-handle.L2
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=stale-handle SHMEM_SYMMETRIC_SIZE=16m
           $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
 set_tests_properties(shmem.team-split.stale-handle.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
-  PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed; the number names another team since"
+  PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed. the number names another team since"
   FAIL_REGULAR_EXPRESSION "CHECK[(]")
 if(OSOE_INTERNODE)
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
@@ -4101,11 +4111,12 @@ endforeach()
 # every node of 66 logical nodes, where a fixed 64 left the rest unnamed (D2);
 # every PE of a node of 70 in each counter row, where rows held 64 (D3); a
 # stopped PE marked so, where it read as a waiting one (D6); and where each PE
-# waits in an init hang, where every "blocked in" read "-" (D7).
-# The three of more than one node in the full build alone.
+# waits in an init hang, where every "blocked in" read "-" (D7); and the age
+# of each owner's last pass, which a stopped node's agent shows (D8).
+# The four of more than one node in the full build alone.
 set(osoe_stat_views many-pes)
 if(OSOE_INTERNODE)
-  list(APPEND osoe_stat_views many-nodes stopped init-hang)
+  list(APPEND osoe_stat_views many-nodes stopped init-hang last-pass)
 endif()
 foreach(view IN LISTS osoe_stat_views)
   # Sixty-six nodes or seventy PEs under a sanitizer outgrow the VM's 8 GiB -

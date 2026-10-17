@@ -97,7 +97,7 @@ build() {   # preset
 static() {
     echo "== static checks $(date +%H:%M:%S)" >> "$OUT"
     ctest --test-dir build/release -j"$JOBS" --output-on-failure \
-        -R '^shmem\.(memory-orders|strict-c11|boundary|static-link|exports|settings-documented|license-lines|single-node\.configure|version\.)' \
+        -R '^shmem\.(memory-orders|strict-c11|boundary|static-link|exports|settings-documented|settings-known|pass-expressions|license-lines|single-node\.configure|version\.)' \
         > "$D/static.full" 2>&1
     grep -E "tests passed|\(Failed\)" "$D/static.full" >> "$OUT"
 }

@@ -478,6 +478,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
        OSOE_MKIND_COUNTER, ""),
     /* Layout 36: the owner's waits its wake word ended (node.h). */
     OWNER("transport.am.wakes", wakes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    /* Layout 40: when the owner's last pass ended, an instant (node.h). */
+    OWNER("transport.am.last_pass_ns", last_pass_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "ns"),
 };
 
 enum {

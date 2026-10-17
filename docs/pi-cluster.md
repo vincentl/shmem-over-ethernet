@@ -80,8 +80,8 @@ srun -N1 -n1 -c4 ctest --test-dir build/release -L tier2 -E '^model\.' -j4 --tim
 A compute node therefore needs no compiler and no headers.
 
 The models (`model.*`) are left out: they check designs, not this machine,
-and take the better part of an hour on a Pi. Tier 1's label carries three of
-them too; on the head node add `-E '^model\.'` there as well, or budget 25
+and take the better part of an hour on a Pi. Tier 1's label carries all of
+them but `model.circulant` too; on the head node add `-E '^model\.'` there as well, or budget 25
 minutes for them (the second session ran them: 732 s for `tree_barrier`). The floor pins (`shmem.floor`) and
 `echo-uring`'s were set on the VM's CPU and may fail on a Pi. That is a finding
 to keep, not a reason to stop.

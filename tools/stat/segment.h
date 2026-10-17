@@ -395,14 +395,16 @@ void osoe_segment_close(struct osoe_segment *s);
  *       or their exchange (P33); and the header's OSOE_COLLECTIVE_PLACES,
  *       node.collective_places, in room before the rendezvous words, which keep
  *       their place
+ *   40  transport.am.last_pass_ns, appended to each owner's record: when its
+ *       last pass ended, whose age osoe-stat's owner table shows (D8)
  *
- * None of 5 to 39 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 40 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37
  * lengthened the context pool, after which the thread records that hold the
  * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               39
+#define OSOE_SEGMENT_NEWEST_LAYOUT               40
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 
