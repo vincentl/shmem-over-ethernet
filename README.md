@@ -529,7 +529,10 @@ expires, or if the job leaves shared memory behind, and its exit status is
 `srun`'s: the highest exit code of any rank - so a job ended by
 `shmem_global_exit(7)` exits 7 - or 128 plus the signal for a rank killed by
 a signal the launcher did not send itself, and 1 for a timeout or shared
-memory left behind when no rank reported more (`--help` says the same).
+memory left behind when no rank reported more (`--help` says the same). A
+timeout names the job by its id - the launcher's process id, which `osoe-stat`
+takes - and, before ending it, prints where it waits: `osoe-stat --summary`'s
+view, from the `osoe-stat` installed beside the launcher.
 `-e RANK:NAME=VALUE` sets a variable for one rank only. `-k` leaves the surviving processes alone when one
 fails, instead of terminating them, so that what ends the job is the library's
 own reaction rather than the launcher's.

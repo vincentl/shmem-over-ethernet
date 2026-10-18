@@ -15,6 +15,7 @@
 
 #include "abort.h"
 #include "base/deadline.h"
+#include "base/print-line.h"
 #include "blocked.h"
 #include "fatal.h"
 #include "liveness.h"
@@ -130,9 +131,9 @@ static int open_watch(uint32_t i, pid_t pid)
      * on every PE of the node, it is one line a start, not one a PE. */
     if (!said_no_pidfd && (errno != ENOSYS || osoe.bootstrap.local_id == 0)) {
         said_no_pidfd = true;
-        fprintf(stderr, "osoe: PE %u: cannot open a pidfd for local PE %u (rank %u, pid %d): "
-                "%s; watching local PEs by pid instead (§3.15)\n", osoe.bootstrap.rank, i,
-                osoe.bootstrap.gtids[i], (int)pid, strerror(errno));
+        osoe_print_line("osoe: PE %u: cannot open a pidfd for local PE %u (rank %u, pid %d): "
+                        "%s; watching local PEs by pid instead (§3.15)\n", osoe.bootstrap.rank, i,
+                        osoe.bootstrap.gtids[i], (int)pid, strerror(errno));
     }
     return PID;
 }

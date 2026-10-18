@@ -9,6 +9,7 @@
 #include "internode.h"
 #include "base/environment.h"
 #include "base/hostlist.h"
+#include "base/print-line.h"
 #include "base/size.h"
 #include "bootstrap.h"
 #include "node.h"
@@ -219,12 +220,12 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    getenv("OSOE_NO_PROGRESS_TIMEOUT"));
     b->no_progress_ns = (uint64_t)no_progress_s * UINT64_C(1000000000);
     if (getenv("OSOE_BOOTSTRAP_TIMEOUT") && b->local_id == 0 && b->rank == 0)
-        fprintf(stderr, "osoe: OSOE_BOOTSTRAP_TIMEOUT is retired and ignored; "
+        osoe_print_line("osoe: OSOE_BOOTSTRAP_TIMEOUT is retired and ignored; "
                         "OSOE_NO_PROGRESS_TIMEOUT bounds a wait that stops making "
                         "progress, and by default nothing does\n");
     if ((getenv("OSOE_WATCHDOG") || getenv("OSOE_LIVENESS")) && b->local_id == 0 &&
         b->rank == 0)
-        fprintf(stderr, "osoe: OSOE_WATCHDOG and OSOE_LIVENESS are retired and ignored; "
+        osoe_print_line("osoe: OSOE_WATCHDOG and OSOE_LIVENESS are retired and ignored; "
                         "a lead's agent watches the node's other PEs with pidfds, and each "
                         "other agent its lead, in every build (design §3.15)\n");
 

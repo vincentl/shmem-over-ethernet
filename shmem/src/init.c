@@ -23,6 +23,7 @@
 #include "base/deadline.h"
 #include "base/futex.h"
 #include "base/lock-free.h"
+#include "base/print-line.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "barrier.h"
@@ -99,7 +100,7 @@ static _Atomic int thread_level = OSOE_INIT_LEVEL;
 
 static void print_info(void)
 {
-    fprintf(stderr,
+    osoe_print_line(
 OSOE_NAME_AND_VERSION " environment variables\n"
 "\n"
 OSOE_BUILD_NOTE
@@ -351,8 +352,8 @@ static void session_start(void)
      * which library it was and how to ask it for help.
      */
     if (osoe.bootstrap.print_version)
-        fprintf(stderr, "osoe: PE %u: " OSOE_NAME_AND_VERSION ", OpenSHMEM %d.%d\n",
-                osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
+        osoe_print_line("osoe: PE %u: " OSOE_NAME_AND_VERSION ", OpenSHMEM %d.%d\n",
+                        osoe.bootstrap.rank, SHMEM_MAJOR_VERSION, SHMEM_MINOR_VERSION);
     if (osoe.bootstrap.print_info && osoe.bootstrap.local_id == 0)
         print_info();
     /* A misspelt OSOE_ name changes nothing, and a line says so, once for the

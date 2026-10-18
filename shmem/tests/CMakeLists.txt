@@ -73,6 +73,16 @@ add_test(NAME shmem.pass-expressions
 set_tests_properties(shmem.pass-expressions PROPERTIES LABELS "tier1" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "PASS EXPRESSIONS OK")
 
+# Every line the library prints to stderr is written whole, through
+# osoe_print_line or osoe_notice: glibc 2.37 and later write a fprintf(stderr,
+# ...) 128 bytes at a time, which another PE's output splits (base/print-line.h,
+# CheckWholeLines.cmake; D30).
+add_test(NAME shmem.whole-lines
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckWholeLines.cmake)
+set_tests_properties(shmem.whole-lines PROPERTIES LABELS "tier1" TIMEOUT 30
+  PASS_REGULAR_EXPRESSION "WHOLE LINES OK")
+
 # Every source file carries the license line, as the README says, but the
 # specification's four examples: 82 evidence programs went without it until the
 # review of v0.2 step 4's merge point (readiness Q5-1), since nothing checked
@@ -2242,6 +2252,16 @@ foreach(mode term int kill)
   set_tests_properties(shmem.launcher-signals.${mode}.one-node PROPERTIES LABELS "tier2"
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_launcher_signals_${mode}}")
 endforeach()
+
+# A job the launcher's timeout ends is named, and where it waits said first:
+# the job's id, and osoe-stat --summary's view of it from the build tree's
+# tools/stat (launch.c, show_summary; D23). The exit status is the timeout's.
+add_test(NAME shmem.launcher.timeout-summary
+  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -t 3 -- $<TARGET_FILE:shmem_test_sleeper>)
+set_tests_properties(shmem.launcher.timeout-summary PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+    "osoe-launch: timeout after 3 s. killing 2 process[(]es[)] of job [0-9]+.*where job [0-9]+ waits, by osoe-stat --summary [0-9]+:.*node 0 .* world "
+  FAIL_REGULAR_EXPRESSION "there is none beside this launcher")
 
 # internode: each of these launches a job of several nodes, here or in its script
 if(OSOE_INTERNODE)

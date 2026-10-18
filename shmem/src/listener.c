@@ -19,6 +19,7 @@
 
 #include "base/deadline.h"
 #include "base/hostlist.h"
+#include "base/print-line.h"
 #include "base/siphash.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
@@ -530,7 +531,7 @@ static int caller_confirmed(struct osoe_listener *l, struct osoe_listener_caller
     /* A caller that cannot prove the secret is not counted, and nothing it
      * claimed is acted on: whatever it is, it is not a lead of this job. */
     if (b->secured && c->confirmation.proof != proof(b, CONFIRM_TAG, &c->hello, c->answer.nonce)) {
-        fprintf(stderr, "osoe: node %u refused a caller claiming to be node %u of this "
+        osoe_print_line("osoe: node %u refused a caller claiming to be node %u of this "
                         "job: it does not know OSOE_JOB_SECRET\n", l->node, c->hello.from_node);
         caller_drop(c);
         return -1;
@@ -844,9 +845,9 @@ void osoe_listener_own_address(const struct osoe_bootstrap *b, struct sockaddr_i
     out->sin_addr = local.sin_addr;
     inet_ntop(AF_INET, &local.sin_addr, local_ip, sizeof local_ip);
     if (b->debug)
-        fprintf(stderr, "osoe: node %u: %s resolves here to %s, a loopback address; "
-                "listening at %s, this host's address toward node %u\n", b->node, host,
-                self_ip, local_ip, other);
+        osoe_print_line("osoe: node %u: %s resolves here to %s, a loopback address; "
+                        "listening at %s, this host's address toward node %u\n", b->node, host,
+                        self_ip, local_ip, other);
 }
 
 /*

@@ -5,8 +5,8 @@ above them, among them futex waits and wakes (`futex.h`) with the deadlines they
 take, the epoch counters a collective's members wait on, the stall watch behind
 the rule that no wait gives up merely because time has passed, memory fences,
 the check that the kernel has the io_uring the library needs (`ring-check.c`,
-the full build's alone), the parsers for
-what a job starts from - its settings, Slurm's host lists and the logical node
+the full build's alone), a line to stderr written whole (`print-line.h`), the
+parsers for what a job starts from - its settings, Slurm's host lists and the logical node
 map - and SipHash, with which a caller proves it knows a job's secret without
 sending it.
 
@@ -20,4 +20,4 @@ the classic `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET` in the single-node build
 (`futex-classic.c`) - then `wait-word.h` and
 `epoch.h`, which use it; every header opens with a comment saying what its piece
 is for and which section of the design notes it follows. `tests/` holds a test
-program for nine of the pieces.
+program for ten of the pieces.
