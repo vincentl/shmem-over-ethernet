@@ -5155,6 +5155,25 @@ if(OSOE_INTERNODE)
   endif()
 endif()
 
+# No PE's wait spins (T14; test-no-spin.c): PE 0 asleep outside the library
+# for three seconds, the others waiting for it in a barrier must use under 2 ms
+# of CPU a second each on average - a spin before each sleep used six, and
+# passed every other test of both builds. At 8 and 32 PEs on one node, so in
+# both builds; not under a sanitizer, whose sweeps cost more; the 32 alone.
+add_executable(shmem_test_no-spin test-no-spin.c)
+target_link_libraries(shmem_test_no-spin PRIVATE osoe)
+osoe_warnings(shmem_test_no-spin)
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  foreach(count 8 32)
+    add_test(NAME shmem.no-spin.L${count}
+      COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n ${count} -t 60 -- $<TARGET_FILE:shmem_test_no-spin>)
+    set_tests_properties(shmem.no-spin.L${count} PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "NO SPIN OK" FAIL_REGULAR_EXPRESSION "SPINNING|CHECK[(]")
+  endforeach()
+  set_tests_properties(shmem.no-spin.L32 PROPERTIES RUN_SERIAL TRUE)
+endif()
+
 # Past 16 logical nodes (T18): the global exit and a proved deadlock at 32, one
 # PE a node, where every test of either stopped at four - so that the changes of
 # step 4's Parts 2 and 3, made at a few nodes, are held to where a deadlock's
