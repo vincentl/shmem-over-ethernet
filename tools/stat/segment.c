@@ -720,6 +720,9 @@ void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf
     case OSOE_SEGMENT_DETAIL_STATICS_OFFSET:
         snprintf(buf, len, "statics offset %#" PRIx64, d);
         break;
+    case OSOE_SEGMENT_DETAIL_TEAM_NUMBER:
+        snprintf(buf, len, "pending team number %" PRIu64, d);
+        break;
     default:                         snprintf(buf, len, "+%#" PRIx64, d); break;
     }
 }

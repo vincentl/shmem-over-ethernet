@@ -397,14 +397,15 @@ void osoe_segment_close(struct osoe_segment *s);
  *       their place
  *   40  transport.am.last_pass_ns, appended to each owner's record: when its
  *       last pass ended, whose age osoe-stat's owner table shows (D8)
+ *   41  a blocked record's detail kind for a split's pending team number (D4)
  *
- * None of 5 to 40 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 41 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37
  * lengthened the context pool, after which the thread records that hold the
  * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               40
+#define OSOE_SEGMENT_NEWEST_LAYOUT               41
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 
@@ -505,6 +506,7 @@ enum osoe_segment_detail {
     OSOE_SEGMENT_DETAIL_REPLY,
     OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT,   /* layout 16: bytes of nonblocking gets */
     OSOE_SEGMENT_DETAIL_STATICS_OFFSET,   /* layout 17: an offset into the statics */
+    OSOE_SEGMENT_DETAIL_TEAM_NUMBER,      /* layout 41: a pending team number (D4) */
 };
 
 /* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40",
