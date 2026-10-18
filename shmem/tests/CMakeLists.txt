@@ -2253,6 +2253,16 @@ foreach(mode term int kill)
     TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_launcher_signals_${mode}}")
 endforeach()
 
+# A job the launcher's timeout ends is named, and where it waits said first:
+# the job's id, and osoe-stat --summary's view of it from the build tree's
+# tools/stat (launch.c, show_summary; D23). The exit status is the timeout's.
+add_test(NAME shmem.launcher.timeout-summary
+  COMMAND $<TARGET_FILE:osoe-launch> -n 2 -t 3 -- $<TARGET_FILE:shmem_test_sleeper>)
+set_tests_properties(shmem.launcher.timeout-summary PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+    "osoe-launch: timeout after 3 s. killing 2 process[(]es[)] of job [0-9]+.*where job [0-9]+ waits, by osoe-stat --summary [0-9]+:.*node 0 .* world "
+  FAIL_REGULAR_EXPRESSION "there is none beside this launcher")
+
 # internode: each of these launches a job of several nodes, here or in its script
 if(OSOE_INTERNODE)
   foreach(sig KILL TERM)

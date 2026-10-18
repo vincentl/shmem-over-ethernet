@@ -114,7 +114,11 @@ static void usage(FILE *out, int status)
                      "  -e RANK:NAME=VALUE  set or override one variable for one rank\n"
                      "  -N PREFIX       start logical node i's ranks in network namespace\n"
                      "                  PREFIX<i> (tier 3, as root; tools/launch/tier3.sh)\n"
-                     "  -H HOST_LIST    the host list those namespaces' addresses make\n");
+                     "  -H HOST_LIST    the host list those namespaces' addresses make\n"
+                     "\n"
+                     "The job's id, which osoe-stat takes, is this launcher's process id; a\n"
+                     "timeout says it, with osoe-stat --summary's view of where the job waits\n"
+                     "when osoe-stat is installed beside the launcher.\n");
         fprintf(out, "\nExit status, as srun's: the highest exit code of any rank; 128 plus "
                      "the signal for a\nrank killed by a signal the launcher did not send "
                      "itself; 1 for a timeout or\nshared memory left behind when no rank "
@@ -141,6 +145,57 @@ static double now(void)
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
+
+/*
+ * Where a job that ran out of time waits, said before it is ended (D23): the
+ * summary `osoe-stat --summary JOB` prints - each node's teams and where each
+ * PE waits - from the osoe-stat beside this launcher, in the same directory as
+ * installed or in the build tree's tools/stat, onto stderr, for ten seconds at
+ * most. Where there is none, the line that says how to look. Reaped here, by
+ * its pid: the loop's waitpid(-1) must find only ranks.
+ */
+static void show_summary(const char *job)
+{
+    char self[PATH_MAX], tool[PATH_MAX + 32];
+    bool found = false;
+    ssize_t len = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (len > 0) {
+        self[len] = '\0';
+        char *slash = strrchr(self, '/');
+        if (slash) {
+            *slash = '\0';
+            static const char *const places[] = { "%s/osoe-stat", "%s/../stat/osoe-stat" };
+            for (size_t i = 0; i < sizeof places / sizeof places[0] && !found; i++) {
+                snprintf(tool, sizeof tool, places[i], self);
+                found = access(tool, X_OK) == 0;
+            }
+        }
+    }
+    if (!found) {
+        fprintf(stderr, "osoe-launch: osoe-stat %s shows where each PE waits; there is none "
+                        "beside this launcher to run before the job ends\n", job);
+        return;
+    }
+    fprintf(stderr, "osoe-launch: where job %s waits, by osoe-stat --summary %s:\n", job, job);
+    pid_t pid = fork();
+    if (pid == 0) {
+        sigset_t none;
+        sigemptyset(&none);
+        sigprocmask(SIG_SETMASK, &none, NULL);
+        dup2(STDERR_FILENO, STDOUT_FILENO);
+        execl(tool, "osoe-stat", "--summary", job, (char *)NULL);
+        _exit(127);
+    }
+    if (pid < 0)
+        return;
+    for (int i = 0; i < 1000; i++) {
+        if (waitpid(pid, NULL, WNOHANG) == pid)
+            return;
+        nanosleep(&(struct timespec){ 0, 10 * 1000 * 1000 }, NULL);
+    }
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
 }
 
 static void setenv_or_die(const char *name, const char *value)
@@ -546,9 +601,10 @@ int main(int argc, char **argv)
         if (!timed_out && t >= deadline) {
             timed_out = true;
             failed = true;
-            fprintf(stderr, "osoe-launch: timeout after %ld s; killing %ld process(es); -t "
-                    "sets the timeout\n",
-                    timeout, remaining);
+            fprintf(stderr, "osoe-launch: timeout after %ld s; killing %ld process(es) of job %s; "
+                    "-t sets the timeout\n",
+                    timeout, remaining, job);
+            show_summary(job);
             for (long j = 0; j < n; j++)
                 if (!done[j]) {
                     kill(pids[j], SIGKILL);
@@ -572,8 +628,8 @@ int main(int argc, char **argv)
         if ((sig == SIGTERM || sig == SIGINT) && !interrupted) {
             interrupted = sig;
             failed = true;
-            fprintf(stderr, "osoe-launch: %s received; forwarded to %ld process(es)\n",
-                    sig == SIGTERM ? "SIGTERM" : "SIGINT", remaining);
+            fprintf(stderr, "osoe-launch: %s received; forwarded to %ld process(es) of job %s\n",
+                    sig == SIGTERM ? "SIGTERM" : "SIGINT", remaining, job);
             for (long j = 0; j < n; j++)
                 if (!done[j]) {
                     kill(pids[j], sig);
