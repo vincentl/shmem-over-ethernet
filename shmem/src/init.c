@@ -260,6 +260,8 @@ OSOE_BUILD_NOTE
 "    OSOE_TEST_DEADLOCK_DROPS\n"
 "                           0 to 16: a node other than the root drops that\n"
 "                           many of the deadlock detector's probes (§3.15)\n"
+"    OSOE_TEST_ARCHITECTURE other: the node claims the other of x86-64's and\n"
+"                           aarch64's architecture in the rendezvous (§6.2)\n"
 "    OSOE_TEST_DEAF_HELPER  a progress helper's number: that helper never\n"
 "                           answers the lead's request to stop (§3.12)\n"
 "    OSOE_TEST_ABORT_DELAY_MS\n"

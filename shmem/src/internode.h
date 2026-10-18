@@ -81,9 +81,9 @@
  *     rule 3), because floating sum and product are not associative;
  *   - integer sum and product wrap modulo 2^(8 x width), as two's complement;
  *   - a floating element as wide as long double is this platform's long
- *     double, whatever its format - which every node of the job must share:
- *     nothing checks it, and x86-64's extended format against aarch64's
- *     quadruple one would reduce to garbage;
+ *     double, whatever its format - which every node of the job must share,
+ *     as the rendezvous checks (rendezvous.c, architecture_word; P21): x86-64's
+ *     extended format against aarch64's quadruple one would reduce to garbage;
  *   - the buffer is the backend's only between the call and its return: nothing
  *     reads it by reference afterwards (§5.5's hazard), because the lead
  *     releases its members, and they may reuse their dest, as soon as it returns.

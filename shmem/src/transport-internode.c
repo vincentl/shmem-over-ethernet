@@ -53,6 +53,7 @@
 #include "perturb.h"
 #include "progress.h"
 #include "progress-host.h"
+#include "ring.h"
 #include "state.h"
 #include "wire-settings.h"
 #include "transport.h"
@@ -273,6 +274,10 @@ static void context_leave(struct osoe_transport_context *c)
 const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *why,
                                          size_t len)
 {
+    /* The rings' size first: a job past their ceiling cannot run whatever
+     * this kernel has (ring.h; P17). */
+    if (b->node_count > 1 && osoe_ring_refuses(b->node_count, b->progress_helpers, why, len))
+        return why;
     const char *facility;
     int ring_error = b->node_count > 1 ? osoe_ring_check(&facility) : 0;
     if (!ring_error)

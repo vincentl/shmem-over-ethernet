@@ -6876,7 +6876,9 @@ waiting on its socket names it ("the rendezvous lost node 9, its child…").
 arithmetic progressions in local-id order (one under block, one under cyclic;
 `rank-map.h`) and its blob; and the values every node must agree on — the job's
 size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT`,
-`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE`, `OSOE_SMALL_COLLECTIVE_BYTES` —
+`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE`, `OSOE_SMALL_COLLECTIVE_BYTES`, the
+collectives' shape and places, the link set by hand, and the architecture - byte
+order, `long`'s size, `long double`'s size and format (P21, "osoeup-7") —
 which each parent checks against
 its own, so a disagreement is refused by the
 lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the

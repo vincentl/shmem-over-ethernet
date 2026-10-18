@@ -911,8 +911,13 @@ struct osoe_node_header {
     int32_t creator_pid;            /* the lead, for reclaiming a leftover (shm-object.h) */
     /* Layout 28: the launch these ids belong to (bootstrap.h), so that a
      * node-mate tells a leftover of another launch by the same names from
-     * this one's segment (open_control). */
-    uint64_t launch;
+     * this one's segment (open_control). Atomic since P13: a node-mate reads
+     * it while a lead may be writing it, having seen `failed` from another
+     * node-mate rather than the lead's `ready`, so it is a single-writer
+     * publication of its own (§3.16) - a release store by its writer, an
+     * acquire load by its readers - where a plain field was a race by the
+     * letter, if harmless in effect (round four's correctness F5). */
+    _Atomic uint64_t launch;
     /* Layout 19: the lead's OSOE_COLLECTIVE_FANOUT and OSOE_COLLECTIVE_PIPELINE.
      * They size every PE's internal region (internal-region.h), and a team's
      * local lead - any of the node's PEs once teams are created (§5.2) - runs

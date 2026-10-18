@@ -107,6 +107,18 @@ int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *p
                          enum osoe_hello_purpose *purpose, const char *expecting);
 
 /*
+ * As osoe_listener_accept, with whom it waits for written by `describe` into a
+ * buffer only when its notice or its no-progress fatal is due: the mesh's list
+ * of the lower nodes still to call costs two lookups a node to write, and
+ * written before every one of a node's 2(n - 1) accepts it cost 67 million at
+ * 4,097 nodes (the step 4 review's S7; P16).
+ */
+int osoe_listener_accept_described(struct osoe_listener *l, uint32_t purposes, uint32_t *peer,
+                                   enum osoe_hello_purpose *purpose,
+                                   void (*describe)(const void *context, char *text, size_t len),
+                                   const void *context);
+
+/*
  * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors
  * SLURM_STEP_NODELIST (§6.1), resolved to IPv4, with no port. Fatal naming the
  * entry if the list or the name is bad.

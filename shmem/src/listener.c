@@ -550,12 +550,25 @@ static int caller_confirmed(struct osoe_listener *l, struct osoe_listener_caller
     return fd;
 }
 
+static void describe_fixed(const void *context, char *text, size_t len)
+{
+    snprintf(text, len, "%s", (const char *)context);
+}
+
 int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *peer,
                          enum osoe_hello_purpose *purpose, const char *expecting)
 {
+    return osoe_listener_accept_described(l, purposes, peer, purpose, describe_fixed,
+                                          expecting ? expecting : "another node");
+}
+
+int osoe_listener_accept_described(struct osoe_listener *l, uint32_t purposes, uint32_t *peer,
+                                   enum osoe_hello_purpose *purpose,
+                                   void (*describe)(const void *context, char *text, size_t len),
+                                   const void *context)
+{
     const struct osoe_bootstrap *b = l->bootstrap;
-    if (!expecting)
-        expecting = "another node";
+    char expecting[200];
     struct osoe_stall_watch watch;
     osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
@@ -567,12 +580,16 @@ int osoe_listener_accept(struct osoe_listener *l, uint32_t purposes, uint32_t *p
         if (osoe_deadline_expired(&sweep)) {
             sweep = osoe_deadline_in(OSOE_SWEEP_NS);
             osoe_sweep_expired("shmem_init");
-            if (osoe_stall_watch_stalled(&watch, 0))
+            bool stalled = osoe_stall_watch_stalled(&watch, 0);
+            bool notice = !stalled && osoe_stall_watch_notice_due(&watch);
+            if (stalled || notice)
+                describe(context, expecting, sizeof expecting);
+            if (stalled)
                 osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is "
                            "waiting for %s to connect to its port %u" NOT_COME,
                            (unsigned long long)osoe_stall_watch_seconds(&watch), l->node,
                            expecting, l->port);
-            if (osoe_stall_watch_notice_due(&watch)) {
+            if (notice) {
                 uint32_t part = 0;
                 for (uint32_t i = 0; i < OSOE_LISTENER_CALLERS; i++)
                     part += l->callers[i].fd >= 0;

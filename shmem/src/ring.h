@@ -88,6 +88,23 @@ struct osoe_ring {
  * checked against (wire.c). */
 #define OSOE_RING_COMPLETIONS_MOST UINT32_C(65536)
 
+/* The most submissions io_uring gives a ring (the kernel's IORING_MAX_ENTRIES).
+ * osoe_ring_open asks for two a wire and one, rounded up to a power of two, so
+ * a ring holds 16,383 wires at most: owner 0's, which carries every control
+ * wire and, at no helpers, every data wire too, holds 2(n - 1) - past 8,192
+ * nodes, more - and with helpers n - 1, past 16,384 (P17). */
+#define OSOE_RING_SUBMISSIONS_MOST UINT32_C(32768)
+
+/*
+ * Whether each node of a job of `node_count` nodes at `helpers` progress helpers
+ * can make its rings: NULL if it can, or why not, written into `why`, naming the
+ * node counts it can and OSOE_PROGRESS_HELPERS. The backend's check asks it
+ * before anything is created (osoe_internode_backend_check), so a job past the
+ * ceiling is refused by name rather than by io_uring's EINVAL at the end of
+ * the mesh, "cannot create an io_uring for 16384 connections".
+ */
+const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, char *why, size_t len);
+
 /*
  * Create the ring for `wire_count` wires with `buffer_count` provided buffers
  * of `buffer_bytes` each, disabled until osoe_ring_enable. Its first

@@ -370,6 +370,12 @@ if(OSOE_INTERNODE)
       LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
     osoe_internode_label(shmem.wire.misuse.${case})
   endforeach()
+  # The rings' ceiling refused by name before anything is made, not by
+  # io_uring's EINVAL at the mesh's end (ring.h, osoe_ring_refuses; P17).
+  add_test(NAME shmem.wire.ring-ceiling COMMAND shmem_test_wire ring-ceiling)
+  set_tests_properties(shmem.wire.ring-ceiling PROPERTIES LABELS "tier1" TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "RING CEILING OK")
+  osoe_internode_label(shmem.wire.ring-ceiling)
 
   # The wire between two processes (tier 2). Two logical nodes, one PE each, so
   # each process is a node lead - the only role that touches a wire (§3.12). It
@@ -600,8 +606,17 @@ if(OSOE_INTERNODE)
     PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 256"
              "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
     PROGRAM $<TARGET_FILE:shmem_test_job>)
+
+  # And the architecture (P21): byte order, long's size and long double's size
+  # and format, which x86-64 and aarch64 do not share. Node 1's lead claims the
+  # other's (OSOE_TEST_ARCHITECTURE=other), so the refusal runs on one machine.
+  osoe_refusal_test(shmem.job.disagree.architecture 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_TEST_ARCHITECTURE=other
+    PATTERNS "node 1 [(]or a node below it[)] has long double in .*; node 0 has long double in .*: every node of a job must be of one architecture"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
   osoe_internode_label(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
-    shmem.job.disagree.max-teams)
+    shmem.job.disagree.max-teams shmem.job.disagree.architecture)
 endif()
 
 # Between the PEs of one node too: the lead sizes the team blocks, the rows of

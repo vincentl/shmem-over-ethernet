@@ -176,6 +176,47 @@ static void attach_purpose(struct osoe_wire *w, struct osoe_ring *r, uint32_t in
         w->zero_copy = false;
 }
 
+/* What the mesh's accept still waits for, for the notice of a wait that lasts
+ * or its no-progress fatal: the lower nodes still to call, the first few of
+ * them and how many in all. Written only when one is due
+ * (osoe_listener_accept_described; P16): written before every accept, it cost
+ * two lookups a lower node, 2(n - 1) times. */
+struct mesh_waiting {
+    struct osoe_wire *wires;
+    struct osoe_ring *const *rings;
+    uint32_t peers, helpers, node;
+};
+
+static bool lacks_a_wire(const struct mesh_waiting *m, uint32_t peer)
+{
+    static const enum osoe_hello_purpose purposes[2] = { OSOE_HELLO_CONTROL_WIRE,
+                                                         OSOE_HELLO_DATA_WIRE };
+    for (uint32_t k = 0; k < 2; k++) {
+        struct osoe_ring *ring;
+        uint32_t ring_index;
+        if (wire_of(m->wires, m->rings, peer, purposes[k], m->peers, m->helpers, &ring,
+                    &ring_index)->fd < 0)
+            return true;
+    }
+    return false;
+}
+
+static void describe_missing(const void *context, char *text, size_t len)
+{
+    const struct mesh_waiting *m = context;
+    uint32_t missing = 0, named = 0;
+    for (uint32_t peer = 0; peer < m->node; peer++)
+        missing += lacks_a_wire(m, peer);
+    int used = snprintf(text, len, "%u lower node%s of the mesh (", missing,
+                        missing == 1 ? "" : "s");
+    for (uint32_t peer = 0; peer < m->node && used > 0 && (size_t)used < len - 24; peer++)
+        if (lacks_a_wire(m, peer) && named++ < 8)
+            used += snprintf(text + used, len - (size_t)used, "%s%u",
+                             named == 1 ? "node " : ", ", peer);
+    if (used > 0 && (size_t)used < len - 8)
+        snprintf(text + used, len - (size_t)used, "%s)", named > 8 ? ", ..." : "");
+}
+
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
                      const struct osoe_bootstrap *b, uint32_t session,
                      const struct osoe_mesh *mesh)
@@ -195,37 +236,13 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
         osoe_listener_open(&own, b, session, NULL);
     const enum osoe_hello_purpose purposes[2] = { OSOE_HELLO_CONTROL_WIRE,
                                                   OSOE_HELLO_DATA_WIRE };
+    const struct mesh_waiting waiting = { wires, rings, peers, helpers, b->node };
     for (uint32_t accepted = 0; accepted < 2 * b->node; accepted++) {
-        /* For the notice of a wait that lasts: the lower nodes still to call,
-         * the first few of them and how many in all. */
-        char expecting[160];
-        uint32_t missing = 0, named = 0;
-        bool lacks[b->node ? b->node : 1];
-        for (uint32_t peer = 0; peer < b->node; peer++) {
-            struct osoe_ring *ring;
-            uint32_t ring_index;
-            lacks[peer] = false;
-            for (uint32_t k = 0; k < 2; k++)
-                if (wire_of(wires, rings, peer, purposes[k], peers, helpers, &ring,
-                            &ring_index)->fd < 0)
-                    lacks[peer] = true;
-            missing += lacks[peer];
-        }
-        int used = snprintf(expecting, sizeof expecting, "%u lower node%s of the mesh (",
-                            missing, missing == 1 ? "" : "s");
-        for (uint32_t peer = 0; peer < b->node && used > 0 &&
-                                (size_t)used < sizeof expecting - 24; peer++)
-            if (lacks[peer] && named++ < 8)
-                used += snprintf(expecting + used, sizeof expecting - (size_t)used, "%s%u",
-                                 named == 1 ? "node " : ", ", peer);
-        if (used > 0 && (size_t)used < sizeof expecting - 8)
-            snprintf(expecting + used, sizeof expecting - (size_t)used, "%s)",
-                     named > 8 ? ", ..." : "");
         uint32_t peer;
         enum osoe_hello_purpose purpose;
-        int fd = osoe_listener_accept(l, OSOE_HELLO_PURPOSE(OSOE_HELLO_CONTROL_WIRE) |
-                                             OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE),
-                                      &peer, &purpose, expecting);
+        int fd = osoe_listener_accept_described(l, OSOE_HELLO_PURPOSE(OSOE_HELLO_CONTROL_WIRE) |
+                                                       OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE),
+                                                &peer, &purpose, describe_missing, &waiting);
         if (peer >= b->node)
             osoe_fatal("node %u was connected to by node %u, which is not a lower node",
                        b->node, peer);

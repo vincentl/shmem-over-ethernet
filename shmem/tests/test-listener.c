@@ -16,6 +16,10 @@
  * of hellos: a stranger's hello claiming another launch is not acted on before
  * its proof, and a stranger that says hello and then nothing does not keep the
  * lead from counting the real peer (listener.h).
+ *
+ * And P16: a described accept writes whom it waits for only when its notice is
+ * due - not at all for a caller that comes at once, and for one that comes
+ * after the first notice's second (OSOE_TEST_NOTICE_SECONDS=1, set below).
  */
 #include "listener.c"
 
@@ -37,6 +41,24 @@ _Noreturn void osoe_fatal(const char *fmt, ...)
 static struct osoe_listener lead;
 static int accepted = -1;
 static uint32_t accepted_node = UINT32_MAX;
+
+/* osoe_listener_accept_described's description, counted (P16). */
+static unsigned described;
+
+static void describe_counted(const void *context, char *text, size_t len)
+{
+    (void)context;
+    described++;
+    snprintf(text, len, "1 lower node of the mesh (node 1)");
+}
+
+static void *accept_described(void *unused)
+{
+    (void)unused;
+    accepted = osoe_listener_accept_described(&lead, OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE),
+                                              &accepted_node, NULL, describe_counted, NULL);
+    return NULL;
+}
 
 static void *accept_one(void *unused)
 {
@@ -100,6 +122,9 @@ static void real_peer_joins(const struct osoe_bootstrap *node1, const struct soc
 
 int main(void)
 {
+    /* Read once, before the first wait (base/stall-watch.c): case 5's notice a
+     * second into its wait rather than thirty. */
+    setenv("OSOE_TEST_NOTICE_SECONDS", "1", 1);
     struct sockaddr_in loopback = { .sin_family = AF_INET,
                                     .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
     struct osoe_bootstrap node0 = { .world_size = 2, .node_count = 2, .node = 0, .job = 4242,
@@ -165,6 +190,18 @@ int main(void)
     CHECK(a.verdict == ACCEPTED);
     real_peer_joins(&node1, &loopback, t);
     close(silent);
+
+    /* 5. P16: whom a described accept waits for is written for its notice and
+     * not before - none for a peer that calls at once, and at least one for a
+     * peer that calls after the first notice, a second into the wait. */
+    described = 0;
+    CHECK_FATAL(pthread_create(&t, NULL, accept_described, NULL) == 0);
+    real_peer_joins(&node1, &loopback, t);
+    CHECK(described == 0);
+    CHECK_FATAL(pthread_create(&t, NULL, accept_described, NULL) == 0);
+    nanosleep(&(struct timespec){ 1, 600 * 1000 * 1000 }, NULL);
+    real_peer_joins(&node1, &loopback, t);
+    CHECK(described >= 1);
 
     osoe_listener_close(&lead);
     return CHECK_DONE();
