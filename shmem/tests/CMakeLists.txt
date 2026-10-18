@@ -3627,6 +3627,22 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(multiple 0,0,1,1 OSOE_GET_LANDING_BYTES=8192)
   osoe_tier2_map_test(multiple 0,1,2,0,1,0 OSOE_GET_LANDING_BYTES=8192)
 endif()
+# And at the default landing zone, where each thread's blocking get of 20 KiB
+# is one piece and takes the slot, and at OSOE_MAX_CONTEXTS=4080, where a PE's
+# threads take both of a get's paths at once - the fallback past the 4,095th
+# block and the pieces - where every registration above shrank the zone and
+# shmem.get-pieces.fallback has one thread (T21; round nine's conformance C2).
+# One PE a node, so under tsan too, as 0,1 is above.
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.multiple.default-zone.0-1
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 120 -- $<TARGET_FILE:shmem_test_multiple>)
+  add_test(NAME shmem.multiple.both-paths.0-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MAX_CONTEXTS=4080
+            $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 120 -- $<TARGET_FILE:shmem_test_multiple>)
+  set_tests_properties(shmem.multiple.default-zone.0-1 shmem.multiple.both-paths.0-1 PROPERTIES
+    LABELS "tier2" TIMEOUT 180)
+  osoe_internode_label(shmem.multiple.default-zone.0-1 shmem.multiple.both-paths.0-1)
+endif()
 add_test(NAME shmem.multiple.exhaust
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_MULTIPLE=exhaust OSOE_MAX_THREADS=2
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_multiple>)
