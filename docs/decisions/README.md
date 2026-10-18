@@ -104,6 +104,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **A program's own deadlock ends the job once it is proved**: each PE counts its threads asleep in library waits, counted at the sleep and never across a post; a node's lead samples in two halves with a pass of its engine between; the root runs two collections `OSOE_DEADLOCK_SECONDS` apart, every node quiet and unmoved. A thread the library cannot see, or a stopped process, is never judged deadlocked. Author ("build it"), built by Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 2.
 - **A vanished node with data in flight is found within keepalive's budget**: once a keepalive interval the lead reads `TCP_INFO`, and a peer whose kernel has acknowledged nothing for the whole budget while segments wait ends the job, naming it; a stopped peer's kernel still acknowledges, so it is waited for. Claude, found by tier 3, [2026-09-28-overnight](2026-09-28-overnight.md) item 4. Off with keepalive where every node has a loopback address: [2026-10-10](2026-10-10.md) item 1.
 - **Every agent asks for a short scheduler slice, and may run on any CPU of its node's tasks where asked** (`OSOE_AGENT_CPUS=node`; the default, `task`, keeps it on its PE's CPUs) - the union of the bindings the PEs publish; the PEs' own threads keep theirs, and nothing of the system's configuration changes. Author (the question) and Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 3.
+- **AM's handler checksum leaves the rendezvous through a backend entry**, the backend's agreement word compared where the checksum is (P27); **a team block claim moves to a word by local id after a failed swap**, highest-free-first kept, built and timed at a cluster (P9). Author, [2026-10-18](2026-10-18.md), "The author's answers on the stopped items".
 
 ## Settings and defaults
 
@@ -127,6 +128,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Dependencies.** The full build: the distribution's liburing 2.6 or later, never a bundled copy; CMake 3.25 or later. Design §1. The single-node build: no liburing and no pkg-config - a C11 compiler, CMake 3.25, and the classic futex of any kernel since 4.17's `MAP_FIXED_NOREPLACE`. Author, [2026-10-05-v0.2](2026-10-05-v0.2.md) items 2 to 4; built in [2026-10-06-single-node-build](2026-10-06-single-node-build.md). Python 3 is optional: the model checker and the stress tester's counting build use it, and where CMake does not find it they are left out. Claude, on the plan's recommendation (`docs/prompts/done/phase1-release-fixes-plan.md` §4.5), built in [2026-10-02-release-fixes](2026-10-02-release-fixes.md) Part 1 item 6.
 - **Builds.** Two from one tree, chosen when configuring (`OSOE_SINGLE_NODE`): the full build, the default, and the single-node build, which differ by files - `base/futex-classic.c` for `base/futex-futex2.c`, `transport-single-node.c` for the internode backend's twelve - never by a branch at run time; both check the same settings as values and lay a one-node job out alike; every test of a job of more than one node, of the internode backend's own files, or of io_uring and futex2, carries the label `internode`, which the single-node build does not register; `osoe-launch` is installed in both; the single-node build says `(single-node build)` after the version wherever the version is printed. Claude, from the author's items 2 to 4, [2026-10-06-single-node-build](2026-10-06-single-node-build.md).
 - **Names.** The library is `libosoe` with hidden visibility; `OSOE_`/`osoe_` are internal, `SHMEM_` belongs to the specification. Design §1.
+- **`fixed` promises the same bits in every run of a version**, not 0.1.0's: separate launches compared, the README's 0.1.0 sentence weakened (T23). Author, [2026-10-18](2026-10-18.md), "The author's answers on the stopped items".
 
 ## How work is done
 
@@ -143,6 +145,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **The VM is shared.** Long runs take the lock, measurements never overlap another session's, and runs are killed by PID. [2026-09-26-day](2026-09-26-day.md).
 - **Slurm stays installed in the VM,** and fixtures come from real Slurm and the Pi cluster. [2026-09-24-overnight](2026-09-24-overnight.md) items 5-6.
 - **Disk.** Merged worktrees are removed; uncommitted work is archived first. Author, [2026-09-26-overnight](2026-09-26-overnight.md) item 7.
+- **The circulant protocol's grant fields tested in the C**, not the model brought to it (T40); **multi-node tests print the measured link** rather than pin one (T19). Author, [2026-10-18](2026-10-18.md), "The author's answers on the stopped items".
 
 ## Tools
 
