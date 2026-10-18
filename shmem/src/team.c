@@ -1239,7 +1239,7 @@ static void wait_pending(const char *routine, uint32_t number, uint32_t holder)
     if (atomic_load_explicit(word, memory_order_acquire) != holder)
         return;
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
-    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_NONE, number);
+    osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_TEAM_NUMBER, number);
     do {
         osoe_wait_sleeps();
         osoe_futex_wait(word, holder, &sweep, OSOE_FUTEX_PRIVATE);

@@ -31,10 +31,12 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-/* 40: transport.am.last_pass_ns, each owner's last pass (D8). 39:
+/* 41: OSOE_BLOCKED_DETAIL_TEAM_NUMBER, a split waiting on another thread's
+ * pending team number (D4). 40: transport.am.last_pass_ns, each owner's last
+ * pass (D8). 39:
  * team.tree.collect_way, the way a team's last collect found its places, and
  * the header's OSOE_COLLECTIVE_PLACES (v0.2, P30 and P31). */
-#define OSOE_NODE_LAYOUT 40
+#define OSOE_NODE_LAYOUT 41
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -75,6 +77,10 @@ enum osoe_blocked_detail {
      * detail being the offset into them, as OSOE_BLOCKED_DETAIL_OFFSET's is
      * into the heap. */
     OSOE_BLOCKED_DETAIL_STATICS_OFFSET,
+    /* Layout 41: a split waiting for another thread of its PE to settle a team
+     * number that thread holds pending (team.c, wait_pending; D4), the detail
+     * being the number - shown until then as a bare value. */
+    OSOE_BLOCKED_DETAIL_TEAM_NUMBER,
 };
 
 /*
