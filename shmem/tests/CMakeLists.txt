@@ -5142,6 +5142,51 @@ if(OSOE_INTERNODE)
   endif()
 endif()
 
+# Past 16 logical nodes (T18): the global exit and a proved deadlock at 32, one
+# PE a node, where every test of either stopped at four - so that the changes of
+# step 4's Parts 2 and 3, made at a few nodes, are held to where a deadlock's
+# report and an abort's flood cross many. Not under a sanitizer, whose memory
+# jobs of more than 16 nodes outgrow (as the shapes' 64 do), and run alone.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  set(map "0")
+  foreach(node RANGE 1 31)
+    string(APPEND map ",${node}")
+  endforeach()
+  add_test(NAME shmem.global-exit.32-nodes
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 32 ${map} 7 7)
+  set_tests_properties(shmem.global-exit.32-nodes PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  add_test(NAME shmem.deadlock.waits.32-nodes
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 32 -m ${map} -t 120 --
+            $<TARGET_FILE:shmem_test_deadlock> waits)
+  set_tests_properties(shmem.deadlock.waits.32-nodes PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION
+      "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+  osoe_internode_label(shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes)
+endif()
+
+# Wide nodes (T43): the barrier, the heap, puts and gets, atomics, the lock, the
+# scans, teams and the reductions at 32 PEs on one node, and the barrier and the
+# reductions at 64, where the suite's jobs that move data stopped at 15. One
+# node, so in both builds; not under a sanitizer, whose memory 32 PEs and more
+# outgrow (asan's 55 MB a PE), and run alone.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  foreach(case barrier.32 malloc.32 rma.32 amo.32 lock.32 scan.32 team.32 reduce.32
+               barrier.64 reduce.64)
+    string(REPLACE "." ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 count)
+    add_test(NAME shmem.${name}.L${count}
+      COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n ${count} -t 240 -- $<TARGET_FILE:shmem_test_${name}>)
+    set_tests_properties(shmem.${name}.L${count} PROPERTIES LABELS "tier2" TIMEOUT 300
+      RUN_SERIAL TRUE)
+  endforeach()
+endif()
+
 # The jobs of 32 to 70 PEs on one machine run one at a time and alone, each
 # taking every core. Since shmem_init raises the locked-memory limit
 # (docs/decisions/2026-10-11.md) they run whole on a Pi node, where they were
@@ -5152,7 +5197,7 @@ endif()
 # registers none of them.
 foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33
              shmem.shape.chosen.pi.64 shmem.shape.chosen.loopback.64
-             shmem.reply-pool.overflow)
+             shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes)
   if(TEST ${test})
     set_tests_properties(${test} PROPERTIES RUN_SERIAL TRUE)
   endif()

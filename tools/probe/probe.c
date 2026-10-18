@@ -32,7 +32,9 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -132,6 +134,11 @@ static void probe_shared_futex(void)
  * the live object, not a copy. The library removes every name during init; if
  * this fails, a running job cannot be read from outside at all.
  */
+/* --slow-reopen: the child below waits 200 ms before it opens the object, so
+ * that a parent that stored its second value on a timer rather than on the
+ * child's word would be seen to (T34; env.probe.slow-reopen). */
+static bool slow_reopen;
+
 static void probe_unlinked_reopen(void)
 {
     char name[64];
@@ -145,12 +152,24 @@ static void probe_unlinked_reopen(void)
     atomic_store_explicit(w, 1, memory_order_release);
     shm_unlink(name);                               /* from here it has no name */
     pid_t parent = getpid();
+    /* The child's word that it has read the first value: the parent stores
+     * the second only then. On a timer of 50 ms, a child slower than that to
+     * its first load read the second and failed the check - 1 run in 8 beside
+     * eight busy loops (round four's correctness F4; T34). */
+    int ready[2];
+    if (pipe(ready) != 0) {
+        CHECK("unlinked shm object reopened via /proc", 0, "pipe: %s", strerror(errno));
+        return;
+    }
 
     pid_t pid = fork();
     if (pid == 0) {
         /* Forget everything inherited: this stands for an unrelated process. */
         munmap((void *)w, 4096);
         close(fd);
+        close(ready[0]);
+        if (slow_reopen)
+            usleep(200000);
         char path[64];
         snprintf(path, sizeof path, "/proc/%d/fd/%d", (int)parent, fd);
         int rfd = open(path, O_RDONLY);
@@ -159,12 +178,20 @@ static void probe_unlinked_reopen(void)
         const _Atomic uint32_t *r = mmap(NULL, 4096, PROT_READ, MAP_SHARED, rfd, 0);
         if (r == MAP_FAILED || atomic_load_explicit(r, memory_order_acquire) != 1)
             _exit(4);
+        char word = 1;
+        if (write(ready[1], &word, 1) != 1)
+            _exit(4);
         /* Live, not a copy: the parent's next store is seen here. */
         for (int i = 0; i < 200 && atomic_load_explicit(r, memory_order_acquire) != 2; i++)
             usleep(10000);
         _exit(atomic_load_explicit(r, memory_order_acquire) == 2 ? 0 : 5);
     }
-    usleep(50000);
+    close(ready[1]);
+    struct pollfd heard = { .fd = ready[0], .events = POLLIN };
+    char word;
+    if (poll(&heard, 1, 10000) == 1 && read(ready[0], &word, 1) < 0)
+        word = 0;                   /* nothing to act on: the child's exit says why */
+    close(ready[0]);
     atomic_store_explicit(w, 2, memory_order_release);
     int status;
     waitpid(pid, &status, 0);
@@ -175,8 +202,14 @@ static void probe_unlinked_reopen(void)
     close(fd);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--slow-reopen") == 0) {
+        slow_reopen = true;
+    } else if (argc > 1) {
+        fprintf(stderr, "usage: probe [--slow-reopen]\n");
+        return 2;
+    }
     /* A line at a time, so that what was checked survives a crash when stdout
      * is a pipe, as under srun. */
     setvbuf(stdout, NULL, _IOLBF, 0);

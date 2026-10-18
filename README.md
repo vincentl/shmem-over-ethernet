@@ -694,7 +694,9 @@ build tree.
   and the deprecated active-set collectives, which run PE by PE - while the
   connection mesh is linear in it, two connections to each of a node's n - 1
   peers ("Scaling with nodes", below); within a node, linear or better in the
-  PEs there - tested with at most 15 PEs on a node, and timed with 4 on the Pi
+  PEs there - tested with up to 64 PEs on a node (the barrier and the
+  reductions; the heap, puts and gets, atomics, the lock, the scans and teams
+  at 32), and timed with 4 on the Pi
   cluster, 16 on the Google Cloud one and, for the barrier alone, up to 32 on
   one four-core virtual machine (design §5.3): a node's barrier arrival is one
   cache line that all its PEs add to, and in a reduction the node's lead PE

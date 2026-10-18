@@ -21,6 +21,12 @@ osoe_warnings(probe)
 # builds register it, each probing what its own library needs.
 add_test(NAME env.probe COMMAND probe)
 set_tests_properties(env.probe PROPERTIES LABELS "env" TIMEOUT 60)
+# And its reopen check with the child 200 ms slow to its first load: the
+# parent's second value waits for the child's word, where on a timer of 50 ms a
+# slow child read it first and the check failed (T34).
+add_test(NAME env.probe.slow-reopen COMMAND probe --slow-reopen)
+set_tests_properties(env.probe.slow-reopen PROPERTIES LABELS "env" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "ok +unlinked shm object reopened via /proc")
 
 # The full build's probe says whether the kernel has the zero-copy send's
 # opcode, which OSOE_WIRE_ZERO_COPY=on needs and nothing else does.
