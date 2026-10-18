@@ -2617,6 +2617,15 @@ foreach(case "3.1M|3250586" "1000|1000")
 endforeach()
 
 osoe_tier2_test(init)
+# Forty sessions of one job across two nodes (P19): each session's lead listens
+# on the candidate port its last session's connections still hold in TIME_WAIT,
+# where before SO_REUSEADDR the 33rd found none of its 32 candidates free.
+if(OSOE_INTERNODE)
+  add_test(NAME shmem.init.40-sessions.0-1
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 180 -- $<TARGET_FILE:shmem_test_init> 40)
+  set_tests_properties(shmem.init.40-sessions.0-1 PROPERTIES LABELS "tier2" TIMEOUT 240)
+  osoe_internode_label(shmem.init.40-sessions.0-1)
+endif()
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
 osoe_tier2_test(malloc)

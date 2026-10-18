@@ -435,6 +435,10 @@ thread does all of the node's networking once the job has started - finds the
 others over TCP, on a port it derives from the job, step and node ids
 (`OSOE_PORT_RANGE`, default 17000-26999), and then connects to each on a port
 the kernel chooses, so TCP must be open between the nodes, not only that range.
+A program may finalize and initialize again as often as it likes: a session's
+lead listens on its port though the last session's connections still hold it
+(`SO_REUSEADDR`), where the 33rd session within a minute once found every one
+of its candidate ports taken.
 Every node must resolve the names in the step's node list, each name to an
 address at which the other nodes reach that node: a lead listens at the address
 its own host resolves its name to - or, where that is a loopback address, as

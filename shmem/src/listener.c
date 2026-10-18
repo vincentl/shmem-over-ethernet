@@ -324,11 +324,18 @@ static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *addres
                    descriptor_hint(e, hint, sizeof hint));
     }
     /*
-     * No SO_REUSEADDR: a candidate still in TIME_WAIT from an earlier job is
-     * skipped like one in use, which is what the sequence is for, and a
-     * listener that could share a port with a stranger's would receive its
-     * connections.
+     * SO_REUSEADDR (P19): a candidate whose connections an earlier session left
+     * in TIME_WAIT is listened on all the same. Without it a program that
+     * finalized and initialized again found none of its 32 candidates free at
+     * the 33rd session within a minute, its own earlier sessions holding them
+     * (round four's portability Q7), though the specification lets it
+     * initialize again. On Linux it shares no port with a live listener - a
+     * second gets EADDRINUSE, measured (the release review's portability N4) -
+     * so a stranger's connections cannot reach this one.
      */
+    int reuse = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse) != 0)
+        osoe_fatal("cannot set SO_REUSEADDR on a listening socket: %s", strerror(errno));
     struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons(port),
                              .sin_addr.s_addr = htonl(INADDR_ANY) };
     if (address)
