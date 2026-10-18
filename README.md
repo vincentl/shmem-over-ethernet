@@ -435,6 +435,10 @@ thread does all of the node's networking once the job has started - finds the
 others over TCP, on a port it derives from the job, step and node ids
 (`OSOE_PORT_RANGE`, default 17000-26999), and then connects to each on a port
 the kernel chooses, so TCP must be open between the nodes, not only that range.
+A program may finalize and initialize again as often as it likes: a session's
+lead listens on its port though the last session's connections still hold it
+(`SO_REUSEADDR`), where the 33rd session within a minute once found every one
+of its candidate ports taken.
 Every node must resolve the names in the step's node list, each name to an
 address at which the other nodes reach that node: a lead listens at the address
 its own host resolves its name to - or, where that is a loopback address, as
@@ -1163,6 +1167,14 @@ specification or takes a choice the specification leaves open.
   shim, since Rosetta passes the classic futex through: 343 of its 349 tests,
   each failure the emulator's or the cross build's. Natively on x86-64 it has
   run on Debian 13's kernel alone.
+- **Every node and every PE of a job must run the same osoe.** The nodes say
+  hello with the library's version, and a node of another is not taken; the
+  PEs of a node meet in its control segment, laid out by the version that made
+  it. A job that mixes versions - a site upgrading its nodes one at a time, a
+  rank started with another `LD_LIBRARY_PATH` - waits until its time limit, its
+  notices saying for whom, rather than ending by name: 0.1.0's PEs can do no
+  better. From layout 37 on, the control segment's rendezvous words keep their
+  place, so a later osoe's PEs meeting this one's are refused by the layout.
 - **Every node of a job must have the same architecture**, and the rendezvous
   refuses a job that mixes them, naming both. Beside the job's size, the heap's
   size, the build's table of message handlers, the collectives' fan-out, team
