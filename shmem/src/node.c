@@ -39,7 +39,20 @@
  */
 _Static_assert(sizeof(struct osoe_metric_descriptor) == 64, "frozen by §3.14");
 _Static_assert(sizeof(struct osoe_segment_directory) == 312,
-               "frozen by §3.14: append only. 136 at layouts 6 and 7; 160 at layout 12, "
+               "frozen by §3.14: append only. 136 at layouts 6 and 7;
+
+/* And a PE of another osoe, whatever its layout, finds `ready` and `failed`
+ * where layout 37 put them - 512 and 528 bytes in on a line of 128, 448 and 464
+ * on a line of 64 - so that it waits for the one and is refused by the layout
+ * it then reads (open_control), rather than waiting on a word moved under it:
+ * layout 32 moved them, and a PE of 0.1.0 beside a lead of 0.2 waited until the
+ * launcher's timeout (round nine's portability P9-3; P14). The connection area
+ * pins its own the same way (connection-area.c). A layout that must move them
+ * changes the magic. */
+_Static_assert(offsetof(struct osoe_node_header, ready) == (OSOE_CACHELINE == 128 ? 512 : 448) &&
+               offsetof(struct osoe_node_header, failed) ==
+                       (OSOE_CACHELINE == 128 ? 528 : 464),
+               "the control segment's ready and failed stay where layout 37 put them"); 160 at layout 12, "
                "with the connections section; 208 at layout 18, with the team blocks and "
                "the published epochs; 232 at layout 21, with the context pools; 256 at "
                "layout 23, with the thread records; 288 at layout 29, with the team "

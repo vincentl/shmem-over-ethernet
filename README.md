@@ -1167,6 +1167,14 @@ specification or takes a choice the specification leaves open.
   shim, since Rosetta passes the classic futex through: 343 of its 349 tests,
   each failure the emulator's or the cross build's. Natively on x86-64 it has
   run on Debian 13's kernel alone.
+- **Every node and every PE of a job must run the same osoe.** The nodes say
+  hello with the library's version, and a node of another is not taken; the
+  PEs of a node meet in its control segment, laid out by the version that made
+  it. A job that mixes versions - a site upgrading its nodes one at a time, a
+  rank started with another `LD_LIBRARY_PATH` - waits until its time limit, its
+  notices saying for whom, rather than ending by name: 0.1.0's PEs can do no
+  better. From layout 37 on, the control segment's rendezvous words keep their
+  place, so a later osoe's PEs meeting this one's are refused by the layout.
 - **Every node of a job must have the same architecture**, and the rendezvous
   refuses a job that mixes them, naming both. Beside the job's size, the heap's
   size, the build's table of message handlers, the collectives' fan-out, team
