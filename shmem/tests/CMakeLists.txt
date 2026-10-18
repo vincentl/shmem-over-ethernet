@@ -5178,13 +5178,16 @@ endif()
 # node, so in both builds; not under a sanitizer, whose memory 32 PEs and more
 # outgrow (asan's 55 MB a PE), and run alone.
 if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
-  foreach(case barrier.32 malloc.32 rma.32 amo.32 lock.32 scan.32 team.32 reduce.32
-               barrier.64 reduce.64)
+  # name.count.heap: rma's largest band is 1 MiB a PE, 32 MiB of each PE's heap
+  # at 32 PEs.
+  foreach(case barrier.32.16m malloc.32.16m rma.32.48m amo.32.16m lock.32.16m scan.32.16m
+               team.32.16m reduce.32.16m barrier.64.16m reduce.64.16m)
     string(REPLACE "." ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 count)
+    list(GET parts 2 heap)
     add_test(NAME shmem.${name}.L${count}
-      COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16m
+      COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=${heap}
               $<TARGET_FILE:osoe-launch> -n ${count} -t 240 -- $<TARGET_FILE:shmem_test_${name}>)
     set_tests_properties(shmem.${name}.L${count} PROPERTIES LABELS "tier2" TIMEOUT 300
       RUN_SERIAL TRUE)

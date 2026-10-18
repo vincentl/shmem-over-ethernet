@@ -227,7 +227,11 @@ void osoe_internode_backend_context_close(struct osoe_transport_context *c)
  * A thread that finds another of its PE's threads in the context's waits waits
  * for it as every library wait does (P26): counted for the deadlock detector
  * (base/sweep.h), its "blocked in" record offered, and sweeping every
- * OSOE_SWEEP_NS - the mutex slept on a sweep interval at a time. A plain lock
+ * OSOE_SWEEP_NS - the mutex slept on a sweep interval at a time, by
+ * pthread_mutex_timedlock on CLOCK_REALTIME, whose lock ThreadSanitizer sees:
+ * it does not intercept pthread_mutex_clocklock, and called the unlock that
+ * followed one unlocking an unlocked mutex. A step of the realtime clock back
+ * lengthens one sleep by as much; a step forward ends it early. A plain lock
  * slept uncounted and unswept: a deadlock behind it could never be proved, and
  * an abort was seen only once the holder let go. It gives up by no rule of its
  * own: the holder's wait keeps §3.15's no-progress rule, and ends the job if
@@ -241,12 +245,12 @@ static void context_enter(struct osoe_transport_context *c, const char *routine)
         osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_NONE, 0);
         for (;;) {
             struct timespec until;
-            clock_gettime(CLOCK_MONOTONIC, &until);
+            clock_gettime(CLOCK_REALTIME, &until);
             uint64_t ns = (uint64_t)until.tv_nsec + OSOE_SWEEP_NS;
             until.tv_sec += (time_t)(ns / UINT64_C(1000000000));
             until.tv_nsec = (long)(ns % UINT64_C(1000000000));
             osoe_wait_sleeps();
-            int r = pthread_mutex_clocklock(&c->mutex, CLOCK_MONOTONIC, &until);
+            int r = pthread_mutex_timedlock(&c->mutex, &until);
             if (r == 0)
                 break;
             if (r != ETIMEDOUT)
