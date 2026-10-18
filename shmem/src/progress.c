@@ -1150,6 +1150,26 @@ static void finalize(struct osoe_progress_owner *o, uint32_t i,
     c->owe_ack = false;         /* this segment's `ack` pays any debt */
 }
 
+/* The abort's hold (OSOE_TEST_HOLD_GOODBYE, progress-host.c; T33): this
+ * node's abortive goodbye to one node waits half a second from the abort's
+ * start, so that the node hears a third node's goodbye first - the relay the
+ * global exit's kept stream is for (shmem.global-exit.kills.held-other-node),
+ * which timing alone gave its test one run in five. */
+#define ABORT_HOLD_NS (UINT64_C(500) * 1000 * 1000)
+
+static uint64_t monotonic_ns(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
+}
+
+static bool goodbye_held(const struct osoe_progress_owner *o, uint32_t slot)
+{
+    return o->engine->abort_hold && slot == o->engine->abort_held_slot &&
+           monotonic_ns() < o->abort_held_until_ns;
+}
+
 /*
  * The abort's visit (osoe_progress_abort): finish the segment on the wire, then
  * send the abortive goodbye and end the stream. Returns whether anything moved.
@@ -1184,6 +1204,8 @@ static bool flush_aborting(struct osoe_progress_owner *o, uint32_t i,
         }
         moved = true;
     }
+    if (goodbye_held(o, slot_of(o, i)))
+        return moved;
     size_t n = osoe_wire_send(w, o->abort_segment + c->abort_sent,
                               o->abort_segment_bytes - c->abort_sent);
     c->abort_sent += (uint32_t)n;
@@ -1500,6 +1522,8 @@ static bool flush_control_aborting(struct osoe_progress_owner *o, uint32_t slot)
         }
         moved = true;
     }
+    if (goodbye_held(o, slot))
+        return moved;
     size_t n = osoe_wire_send(w, o->abort_segment + c->abort_sent,
                               o->abort_segment_bytes - c->abort_sent);
     c->abort_sent += (uint32_t)n;
@@ -1978,6 +2002,7 @@ void osoe_progress_abort(struct osoe_progress_owner *o, uint32_t pe, int32_t sta
         return;
     o->aborting = true;
     o->abort_keeps_stream = keep_stream;
+    o->abort_held_until_ns = o->engine->abort_hold ? monotonic_ns() + ABORT_HOLD_NS : 0;
     /* One segment for every peer: a header, and one message whose fixed part is
      * the abort. Its seq and ack are the ones nothing checks at the end of a
      * stream; the goodbye flag is what the peer's end of stream is judged by. */

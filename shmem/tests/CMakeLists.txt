@@ -4457,10 +4457,13 @@ if(OSOE_INTERNODE)
     add_test(NAME shmem.global-exit.kills.held-other-node.0-0-1-1
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-other-node)
-    # Three nodes, the held PE on one that may hear of the exit from the third
+    # Three nodes, the held PE on one that hears of the exit from the third
     # first: a lead told so used to end its stream to the caller's node at once,
     # which took it for its node's end, and the launcher killed its PEs - eight
     # runs in forty (the same read). Ranks 1 and 2 are node 2, rank 3 node 1.
+    # Node 0 holds its goodbye to node 2 half a second (OSOE_TEST_HOLD_GOODBYE),
+    # so node 2 always hears node 1's relay first: left to timing, the defect
+    # put back failed one run in five (round four's correctness F3; T33).
     add_test(NAME shmem.global-exit.kills.held-other-node.0-2-2-1
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_global-exit> 4 0,2,2,1 7 7 0 held-other-node)
@@ -4469,7 +4472,8 @@ if(OSOE_INTERNODE)
       PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
                  PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     set_tests_properties(shmem.global-exit.kills.held-other-node.0-2-2-1
-      PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2"
+      PROPERTIES LABELS "tier2" TIMEOUT 90
+                 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2;OSOE_TEST_HOLD_GOODBYE=0:2"
                  PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     osoe_internode_label(shmem.global-exit.kills.held-stdout.0-0-1-1
       shmem.global-exit.kills.held-other-node.0-0-1-1

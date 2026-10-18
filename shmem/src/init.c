@@ -264,6 +264,8 @@ OSOE_BUILD_NOTE
 "                           aarch64's architecture in the rendezvous (§6.2)\n"
 "    OSOE_TEST_DEAF_HELPER  a progress helper's number: that helper never\n"
 "                           answers the lead's request to stop (§3.12)\n"
+"    OSOE_TEST_HOLD_GOODBYE FROM:TO, two nodes: node FROM's abortive goodbye\n"
+"                           to node TO held half a second (§3.15)\n"
 "    OSOE_TEST_ABORT_DELAY_MS\n"
 "                           0 to 5000: a node acts on a peer's abortive\n"
 "                           goodbye that late, and a helper begins its abort\n"
