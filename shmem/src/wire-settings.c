@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "base/environment.h"
+#include "base/print-line.h"
 #include "fatal.h"
 #include "wire-settings.h"
 
@@ -77,8 +78,8 @@ void osoe_wire_settings_read(struct osoe_wire_settings *s, const struct osoe_boo
     /* Said whenever injection is on, so a failure names what to reproduce it
      * with; off by default, so a normal run says nothing. */
     if (announce && s->split != 0)
-        fprintf(stderr, "osoe: wire split %u per myriad, OSOE_WIRE_SEED=%llu\n", s->split,
-                (unsigned long long)s->seed);
+        osoe_print_line("osoe: wire split %u per myriad, OSOE_WIRE_SEED=%llu\n", s->split,
+                        (unsigned long long)s->seed);
 }
 
 void osoe_wire_settings_check(const struct osoe_bootstrap *b)

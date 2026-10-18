@@ -17,6 +17,7 @@
 #include "base/deadline.h"
 #include "base/environment.h"
 #include "base/futex.h"
+#include "base/print-line.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "connection-area.h"
@@ -239,10 +240,10 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
          * so a line from each said nothing more, and was 128,000 lines at 500
          * nodes of 256 PEs. */
         if (b->local_id == 0)
-            fprintf(stderr, "osoe: connection buffers reduced from %llu to %llu bytes to "
+            osoe_print_line("osoe: connection buffers reduced from %llu to %llu bytes to "
                             "fit OSOE_AM_BUFFER_BUDGET=%llu over %u nodes\n",
-                    (unsigned long long)config.buffer, (unsigned long long)buffer,
-                    (unsigned long long)config.budget, nodes);
+                            (unsigned long long)config.buffer, (unsigned long long)buffer,
+                            (unsigned long long)config.budget, nodes);
         break;
     case OSOE_AM_SIZE_NO_ROOM:
         osoe_fatal("%u nodes need %llu bytes of connection buffers at the smallest "
@@ -371,9 +372,9 @@ again:;
         flags |= MAP_HUGETLB;
     void *p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, flags, fd, 0);
     if (p == MAP_FAILED && config.hugepages) {
-        fprintf(stderr, "osoe: OSOE_AM_HUGEPAGES=1 but the connection area could not "
+        osoe_print_line("osoe: OSOE_AM_HUGEPAGES=1 but the connection area could not "
                         "be mapped with huge pages (%s); using ordinary pages\n",
-                strerror(errno));
+                        strerror(errno));
         p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     }
     if (p == MAP_FAILED) {

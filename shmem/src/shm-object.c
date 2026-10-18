@@ -11,6 +11,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
+#include "base/print-line.h"
 #include "fatal.h"
 #include "shm-object.h"
 
@@ -82,8 +83,8 @@ int osoe_shm_create(const char *name, long owner_offset, char *err, size_t errle
                      (int)pid, strerror(errno));
             return -1;
         }
-        fprintf(stderr, "osoe: reclaimed /dev/shm%s, left behind by %s\n", name,
-                pid > 0 ? "a process that is gone" : "a job that died while creating it");
+        osoe_print_line("osoe: reclaimed /dev/shm%s, left behind by %s\n", name,
+                        pid > 0 ? "a process that is gone" : "a job that died while creating it");
     }
     snprintf(err, errlen, "cannot create /dev/shm%s: it keeps reappearing", name);
     return -1;
@@ -116,7 +117,7 @@ void osoe_shm_short(bool warning_only, const char *message)
 {
     if (!warning_only)
         osoe_fatal("%s", message);
-    fprintf(stderr, "osoe: %s; continuing, since OSOE_SHM_CAPACITY_CHECK=0\n", message);
+    osoe_print_line("osoe: %s; continuing, since OSOE_SHM_CAPACITY_CHECK=0\n", message);
 }
 
 bool osoe_shm_room(uint64_t wanted, uint64_t *free_bytes)

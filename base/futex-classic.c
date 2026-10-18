@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "base/futex.h"
+#include "base/print-line.h"
 
 /*
  * futex.h over the classic futex(2): FUTEX_WAIT_BITSET and FUTEX_WAKE_BITSET,
@@ -78,7 +79,7 @@ int osoe_futex_wait_bitset(_Atomic uint32_t *word, uint32_t expected, uint32_t b
         atomic_fetch_add_explicit(&timeouts, 1, memory_order_seq_cst);
         return ETIMEDOUT;
     default:
-        fprintf(stderr, "osoe: futex wait failed: %s\n", strerror(errno));
+        osoe_print_line("osoe: futex wait failed: %s\n", strerror(errno));
         abort();
     }
 }
@@ -97,7 +98,7 @@ void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
     long r = syscall(SYS_futex, (void *)word, operation(FUTEX_WAKE_BITSET, scope), n, NULL, NULL,
                      (unsigned long)bitset);
     if (r < 0) {
-        fprintf(stderr, "osoe: futex wake failed: %s\n", strerror(errno));
+        osoe_print_line("osoe: futex wake failed: %s\n", strerror(errno));
         abort();
     }
 }

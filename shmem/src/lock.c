@@ -66,6 +66,7 @@
 #include <pshmem.h>
 #include <shmem.h>
 
+#include "base/print-line.h"
 #include "blocked.h"
 #include "export.h"
 #include "fatal.h"
@@ -272,9 +273,9 @@ OSOE_API void pshmem_clear_lock(long *lock)
 void osoe_lock_warn_held(void)
 {
     if (held_count)
-        fprintf(stderr, "osoe: PE %u: shmem_finalize while holding %zu lock%s; a PE waiting "
-                "for one never reaches the barrier this finalize waits in (spec §9.13)\n",
-                osoe.bootstrap.rank, held_count, held_count == 1 ? "" : "s");
+        osoe_print_line("osoe: PE %u: shmem_finalize while holding %zu lock%s; a PE waiting "
+                        "for one never reaches the barrier this finalize waits in (spec §9.13)\n",
+                        osoe.bootstrap.rank, held_count, held_count == 1 ? "" : "s");
 }
 
 void osoe_lock_session_end(void)

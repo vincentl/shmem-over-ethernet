@@ -73,6 +73,16 @@ add_test(NAME shmem.pass-expressions
 set_tests_properties(shmem.pass-expressions PROPERTIES LABELS "tier1" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "PASS EXPRESSIONS OK")
 
+# Every line the library prints to stderr is written whole, through
+# osoe_print_line or osoe_notice: glibc 2.37 and later write a fprintf(stderr,
+# ...) 128 bytes at a time, which another PE's output splits (base/print-line.h,
+# CheckWholeLines.cmake; D30).
+add_test(NAME shmem.whole-lines
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -P ${PROJECT_SOURCE_DIR}/cmake/CheckWholeLines.cmake)
+set_tests_properties(shmem.whole-lines PROPERTIES LABELS "tier1" TIMEOUT 30
+  PASS_REGULAR_EXPRESSION "WHOLE LINES OK")
+
 # Every source file carries the license line, as the README says, but the
 # specification's four examples: 82 evidence programs went without it until the
 # review of v0.2 step 4's merge point (readiness Q5-1), since nothing checked

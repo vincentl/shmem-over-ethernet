@@ -18,6 +18,7 @@
 
 #include "base/deadline.h"
 #include "base/futex.h"
+#include "base/print-line.h"
 #include "base/stall-watch.h"
 #include "abort.h"
 #include "fatal.h"
@@ -1121,7 +1122,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
                  (unsigned long long)((wanted + (1u << 20) - 1) >> 20));
         if (!b->shm_capacity_warning_only)
             fail_rendezvous(n, msg);
-        fprintf(stderr, "osoe: %s; continuing, since OSOE_SHM_CAPACITY_CHECK=0\n", msg);
+        osoe_print_line("osoe: %s; continuing, since OSOE_SHM_CAPACITY_CHECK=0\n", msg);
     }
 }
 

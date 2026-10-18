@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "base/futex.h"
+#include "base/print-line.h"
 
 /*
  * futex.h over the futex2 calls, futex_wait and futex_wake (Linux 6.7): the
@@ -60,7 +61,7 @@ int osoe_futex_wait_bitset(_Atomic uint32_t *word, uint32_t expected, uint32_t b
         atomic_fetch_add_explicit(&timeouts, 1, memory_order_seq_cst);
         return ETIMEDOUT;
     default:
-        fprintf(stderr, "osoe: futex_wait failed: %s\n", strerror(errno));
+        osoe_print_line("osoe: futex_wait failed: %s\n", strerror(errno));
         abort();
     }
 }
@@ -78,7 +79,7 @@ void osoe_futex_wake_bitset(_Atomic uint32_t *word, int n, uint32_t bitset,
     long r = syscall(__NR_futex_wake, (void *)word, (unsigned long)bitset,
                      n, flags_for(scope));
     if (r < 0) {
-        fprintf(stderr, "osoe: futex_wake failed: %s\n", strerror(errno));
+        osoe_print_line("osoe: futex_wake failed: %s\n", strerror(errno));
         abort();
     }
 }

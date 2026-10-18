@@ -23,6 +23,7 @@
 #include "base/epoch.h"
 #include "base/futex.h"
 #include "base/hostlist.h"
+#include "base/print-line.h"
 #include "base/stall-watch.h"
 #include "base/sweep.h"
 #include "base/wait-word.h"
@@ -520,11 +521,11 @@ static void say_unsent(void)
     unsent_said = asked;
     uint32_t bytes = unsent_bytes(asked);
     if (bytes)
-        fprintf(stderr, "osoe: node %u limits the unsent bytes of each of its %u connections "
+        osoe_print_line("osoe: node %u limits the unsent bytes of each of its %u connections "
                         "to %u%s\n", osoe.bootstrap.node, limited, bytes,
-                unsent_by_hand ? " (OSOE_WIRE_UNSENT_BYTES)" : "");
+                        unsent_by_hand ? " (OSOE_WIRE_UNSENT_BYTES)" : "");
     else
-        fprintf(stderr, "osoe: node %u leaves the unsent bytes of its %u connections to the "
+        osoe_print_line("osoe: node %u leaves the unsent bytes of its %u connections to the "
                         "system (OSOE_WIRE_UNSENT_BYTES=0)\n", osoe.bootstrap.node, limited);
 }
 
@@ -545,11 +546,11 @@ static void silent_check_start(const struct osoe_bootstrap *b)
     if (b->keepalive_off) {
         silent_budget_ms = 0;
         if (b->debug)
-            fprintf(stderr, "osoe: node %u sets no TCP keepalive and makes no silent-peer "
+            osoe_print_line("osoe: node %u sets no TCP keepalive and makes no silent-peer "
                             "check: %s\n", b->node,
-                    b->keepalive_set ? "OSOE_KEEPALIVE=0"
-                                     : "every node has a loopback address (OSOE_KEEPALIVE "
-                                       "sets them)");
+                            b->keepalive_set ? "OSOE_KEEPALIVE=0"
+                                             : "every node has a loopback address (OSOE_KEEPALIVE "
+                                               "sets them)");
         return;
     }
     uint32_t idle = b->keepalive_idle_s ? b->keepalive_idle_s : OSOE_DEFAULT_KEEPALIVE_IDLE_S;
@@ -559,10 +560,10 @@ static void silent_check_start(const struct osoe_bootstrap *b)
     silent_budget_ms = (idle + interval * count) * 1000;
     silent_interval_ns = (uint64_t)interval * 1000000000;
     if (b->debug)
-        fprintf(stderr, "osoe: node %u probes its connections with TCP keepalive at %u,%u,%u, "
+        osoe_print_line("osoe: node %u probes its connections with TCP keepalive at %u,%u,%u, "
                         "and ends the job on a peer that acknowledges nothing for %u s "
                         "(OSOE_KEEPALIVE)\n", b->node, idle, interval, count,
-                silent_budget_ms / 1000);
+                        silent_budget_ms / 1000);
 }
 
 /*
