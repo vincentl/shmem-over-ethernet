@@ -7449,7 +7449,10 @@ loop can use is batching. An `iput`'s elements but the last carry
 wake of the lead rather than one each, and an RDMA backend would post them
 under one doorbell. An `iget`'s elements are nonblocking gets, all but the last
 with `OSOE_TRANSPORT_MORE`, completed by one wait on its PE that names the
-routine: in flight together, up to the landing zone's records.
+routine: in flight together, up to the landing zone's records. A stride below 1,
+which §9.6.1.3 and §9.6.1.7 forbid, ends the job by name, as `ibput`'s below
+`bsize` does: unchecked, stride -1 wrote into the allocation before `dest` and
+0 left only the last element (P22).
 
 **Block-strided `ibput`/`ibget` are built** (§9.6.1.4, §9.6.1.8; phase 1 step 9
 slice 1): the same generated families, the same `strided_put`/`strided_get`

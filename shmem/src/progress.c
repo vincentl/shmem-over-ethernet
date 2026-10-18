@@ -1613,7 +1613,9 @@ void osoe_progress_attach_teams(struct osoe_progress *p, struct osoe_progress_te
                                 osoe_progress_team_source *source,
                                 osoe_progress_team_finder *find)
 {
-    memset(teams, 0, sizeof *teams * count);
+    /* `teams` arrives zeroed (progress.h), from calloc's untouched pages:
+     * zeroing it again touched every one of them - 340 KiB at the default
+     * 1,024 team blocks, 21 MiB at 65,536 - for nothing (P10). */
     p->team = teams;
     p->pending = pending;
     p->team_count = count;

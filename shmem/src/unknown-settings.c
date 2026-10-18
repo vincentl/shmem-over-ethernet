@@ -129,6 +129,7 @@ static const char *const known_settings[] = {
     "OSOE_TEST_STAT",
     "OSOE_TEST_STATICS_MISUSE",
     "OSOE_TEST_STOP_MS",
+    "OSOE_TEST_STRIDE_MISUSE",
     "OSOE_TEST_THREE_OF_FIVE",
     "OSOE_TEST_VAR",
     "OSOE_TEST_WAIT",

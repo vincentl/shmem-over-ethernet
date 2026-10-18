@@ -37,6 +37,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <shmem.h>
 
@@ -635,6 +636,18 @@ int main(void)
     if (getenv("OSOE_TEST_IBPUT_MISUSE")) {
         long dest[4], src[2] = { 1, 2 };
         shmem_long_ibput(dest, src, 1 /* < bsize 2 */, 2, 2, 1, right);
+    }
+    /* And the strided forms' strides below 1 (spec §9.6.1.3, §9.6.1.7; P22),
+     * typed and sized: each ends the job by name before any element moves. */
+    const char *stride_misuse = getenv("OSOE_TEST_STRIDE_MISUSE");
+    if (stride_misuse) {
+        long dest[8] = { 0 }, src[8] = { 0 };
+        if (strcmp(stride_misuse, "iput") == 0)
+            shmem_long_iput(dest, src, -1, 1, 4, right);
+        else if (strcmp(stride_misuse, "iget") == 0)
+            shmem_long_iget(dest, src, 1, 0, 4, right);
+        else if (strcmp(stride_misuse, "iput64") == 0)
+            shmem_iput64(dest, src, 1, 0, 4, right);
     }
 
     TEST_TYPES(BLOCK_RMA)

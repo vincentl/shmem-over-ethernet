@@ -2698,6 +2698,20 @@ add_test(NAME shmem.typed-rma.ibput-misuse
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_typed-rma>)
 set_tests_properties(shmem.typed-rma.ibput-misuse PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_long_ibput: dst 1, sst 2 below bsize 2. spec")
+# And iput's and iget's strides below 1, which §9.6.1.3 and §9.6.1.7 forbid:
+# stride -1 wrote into the allocation before dest, 0 left the last element alone
+# (P22). Typed and sized, each ended by name before an element moves.
+foreach(case "iput|shmem_long_iput: dst -1, sst 1" "iget|shmem_long_iget: dst 1, sst 0"
+             "iput64|shmem_iput64: dst 1, sst 0")
+  string(REPLACE "|" ";" parts "${case}")
+  list(GET parts 0 form)
+  list(GET parts 1 said)
+  add_test(NAME shmem.typed-rma.${form}-misuse
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STRIDE_MISUSE=${form}
+            $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_typed-rma>)
+  set_tests_properties(shmem.typed-rma.${form}-misuse PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "${said}. spec .+ requires each stride at least 1")
+endforeach()
 
 # Nonblocking gets (§4.6, as built; test-get-nbi.c): on one node, where every
 # get is applied before it returns; and across nodes with the landing records
