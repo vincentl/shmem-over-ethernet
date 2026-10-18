@@ -694,7 +694,9 @@ build tree.
   and the deprecated active-set collectives, which run PE by PE - while the
   connection mesh is linear in it, two connections to each of a node's n - 1
   peers ("Scaling with nodes", below); within a node, linear or better in the
-  PEs there - tested with at most 15 PEs on a node, and timed with 4 on the Pi
+  PEs there - tested with up to 64 PEs on a node (the barrier and the
+  reductions; the heap, puts and gets, atomics, the lock, the scans and teams
+  at 32), and timed with 4 on the Pi
   cluster, 16 on the Google Cloud one and, for the barrier alone, up to 32 on
   one four-core virtual machine (design §5.3): a node's barrier arrival is one
   cache line that all its PEs add to, and in a reduction the node's lead PE
@@ -1043,8 +1045,10 @@ specification or takes a choice the specification leaves open.
   come to exactly the budget, and 4,098 nodes are refused at start-up, naming
   it: the budget shrinks the buffers no further, so raise it or lower the
   chunk. A raised `OSOE_AM_BUFFER` shrinks the same way, and sooner. Past 8,192
-  nodes, at no helpers, a node's io_uring ring cannot hold its wires, and the
-  job ends saying only that the ring could not be made.
+  nodes, at no helpers, a node's io_uring ring cannot hold its wires - the
+  kernel gives a ring 32,768 submissions, two a wire and one - and past 16,384
+  with helpers, which take the data wires off the lead's ring; such a job is
+  refused at start-up, naming both counts and `OSOE_PROGRESS_HELPERS`.
 - **Global and static variables are symmetric only in a program linked by
   `oshcc`**, which links it without position independence and with osoe's
   linker script. Passing a static where a symmetric address is required in
@@ -1159,15 +1163,16 @@ specification or takes a choice the specification leaves open.
   shim, since Rosetta passes the classic futex through: 343 of its 349 tests,
   each failure the emulator's or the cross build's. Natively on x86-64 it has
   run on Debian 13's kernel alone.
-- **Every node of a job must have the same architecture.** The rendezvous
-  compares the job's size, the heap's size, the build's table of message
-  handlers, the collectives' fan-out, team count, pipeline depth, small
-  collectives' size and shape, and the link set by hand, and no architecture, so
-  a job that mixed x86-64 and aarch64 nodes would start. Its
-  `long double` values would then be wrong with no message - x86-64's 80-bit
-  extended format read as aarch64's 128-bit one, and the other way - in
-  reductions (`shmem/src/internode.h` says that nothing checks it) and in puts
-  and gets of them. Nobody has run such a job.
+- **Every node of a job must have the same architecture**, and the rendezvous
+  refuses a job that mixes them, naming both. Beside the job's size, the heap's
+  size, the build's table of message handlers, the collectives' fan-out, team
+  count, pipeline depth, small collectives' size and shape, and the link set by
+  hand, it compares each node's byte order, `long`'s size and `long double`'s
+  size and format - which x86-64 (the x87's 80-bit extended format) and aarch64
+  (IEEE binary128) do not share, so that their `long double` values would
+  otherwise be wrong with no message, in reductions and in puts and gets of
+  them. Nobody has run such a job; the refusal is tested by a node told to
+  claim the other architecture (`OSOE_TEST_ARCHITECTURE`).
 - **Run with `--cpu-bind=none`.** Slurm binds each task to one core by default
   where a node has as many tasks as cores, and the node's progress thread then
   waits behind its first PE's own thread on that PE's core, which costs a
@@ -1680,7 +1685,10 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
 | `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. A testing hook, refused by name, as the settings above are, when it is not a whole number in that range. |
+| `OSOE_TEST_DEADLOCK_DROPS` | A number of probes, `0` to `16`: a node other than the root drops that many of the deadlock detector's first probes, answering none, so that a test sees the root give the collection up after three seconds and begin again rather than wait for the job's life. Refused by name when it is not a whole number in that range. |
+| `OSOE_TEST_ARCHITECTURE` | `other`: the node's lead claims, in the rendezvous, the architecture of the other of x86-64 and aarch64 - `long double`'s format the other's - so that a test sees a job of mixed architectures refused on one machine. Any other value is refused by name. |
 | `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. Read by each node's lead in a job of more than one node alone, and checked only there. |
+| `OSOE_TEST_HOLD_GOODBYE` | `FROM:TO`, two nodes of the job: node `FROM` holds its abortive goodbye to node `TO` half a second after its abort begins, so that a test sees `TO` hear a third node's goodbye first - the relay a global exit's kept stream is for; every other node ignores it. Refused by name when it is not two different nodes of the job. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection's data wire, which its puts and gets go by (a control wire keeps the system's own): `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set at the end of `shmem_init` from the link, measured or set. `OSOE_COLLECTIVE_SHAPE=fixed` measures none, so there it is 16 KiB on any link unless the three `OSOE_LINK_*` give the bandwidth - less than the rule gives a link faster than a gigabit. Uncapped, as at v0.2 step 3, a fetch-add behind a put stream on the Pi cluster waited 17 to 20 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
 | `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED` | A rate per 10,000 at which sends and receives are cut short, and the seed that makes a failing pattern repeat. |

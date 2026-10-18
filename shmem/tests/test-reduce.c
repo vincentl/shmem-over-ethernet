@@ -3,8 +3,9 @@
  * The team-based reductions (spec §9.10.9; design §5.5, phase 1 step 5): every
  * operator family on types of each kind, one element, a few, and more than one
  * internal-region slot (so the leads' tree carries it in pieces); in place;
- * nreduce 0; SHMEM_TEAM_SHARED; the C11 generics; and the same reduction many
- * times over, so that the epoch counters and the leads' words go round.
+ * nreduce 0; SHMEM_TEAM_SHARED; the C11 generics; NaN, infinity and signed
+ * zero (T22); and the same reduction many times over, so that the epoch
+ * counters and the leads' words go round.
  *
  * Every PE's source is a function of its rank and the index, so every PE knows
  * the answer without talking. The one thing no single PE can check alone -
@@ -13,6 +14,7 @@
  * the minimum of the result's bits across the team must agree.
  */
 #include <complex.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -225,6 +227,89 @@ static void floating_reductions(void)
     shmem_free(dst);
 }
 
+/*
+ * NaN, infinity and signed zero through the reductions (T22; round nine's
+ * conformance C2, which found none of them in the suite), at a small count and
+ * a large one, so that whichever shape the link chooses for either carries
+ * them. Only what no order of combining can change is asserted - §9.10.9 lets
+ * a NaN's place in a max and the sign of a max over +0 and -0 vary: a NaN in
+ * gives NaN out; +inf with no -inf sums to +inf and is the max, and the min
+ * where it is alone; -0 everywhere sums to -0; +inf against -inf sums to NaN;
+ * and every PE gets the same bits, NaNs' among them, since a result is
+ * computed once and copied (§5.8 rule 3).
+ */
+static void special_values(void)
+{
+    static const int counts[2] = { SMALL, LARGE };
+    double *src = shmem_malloc(LARGE * sizeof *src);
+    double *dst = shmem_malloc(LARGE * sizeof *dst);
+    uint64_t *hash = shmem_malloc(2 * sizeof *hash);
+    CHECK_FATAL(src && dst && hash);
+    for (int k = 0; k < 2; k++) {
+        int n = counts[k];
+        for (int i = 0; i < n; i++) {
+            switch (i % 4) {
+            case 0:
+                src[i] = me == 0 ? NAN : 1.0;
+                break;
+            case 1:
+                src[i] = me == npes - 1 ? INFINITY : 1.0;
+                break;
+            case 2:
+                src[i] = -0.0;
+                break;
+            default:
+                src[i] = me == 0 ? INFINITY : me == npes - 1 ? -INFINITY : 1.0;
+                break;
+            }
+        }
+        CHECK(shmem_double_sum_reduce(SHMEM_TEAM_WORLD, dst, src, n) == 0);
+        int wrong = -1;
+        for (int i = 0; i < n && wrong < 0; i++) {
+            bool ok = i % 4 == 0   ? isnan(dst[i])
+                      : i % 4 == 1 ? dst[i] == INFINITY
+                      : i % 4 == 2 ? dst[i] == 0 && signbit(dst[i])
+                      : npes > 1   ? isnan(dst[i])
+                                   : dst[i] == INFINITY;
+            if (!ok)
+                wrong = i;
+        }
+        if (wrong >= 0)
+            fprintf(stderr, "PE %d: the sum of %d: element %d is %g\n", me, n, wrong, dst[wrong]);
+        CHECK(wrong < 0);
+        uint64_t h = UINT64_C(14695981039346656037);
+        const unsigned char *bytes = (const unsigned char *)dst;
+        for (size_t b = 0; b < (size_t)n * sizeof *dst; b++)
+            h = (h ^ bytes[b]) * UINT64_C(1099511628211);
+        hash[0] = h;
+        CHECK(shmem_uint64_max_reduce(SHMEM_TEAM_WORLD, &hash[1], &hash[0], 1) == 0);
+        uint64_t most = hash[1];
+        CHECK(shmem_uint64_min_reduce(SHMEM_TEAM_WORLD, &hash[1], &hash[0], 1) == 0);
+        if (most != hash[1])
+            fprintf(stderr, "PE %d: the PEs' sums of %d differ in their bits\n", me, n);
+        CHECK(most == hash[1]);
+
+        CHECK(shmem_double_max_reduce(SHMEM_TEAM_WORLD, dst, src, n) == 0);
+        wrong = -1;
+        for (int i = 0; i < n && wrong < 0; i++)
+            if ((i % 4 == 1 && dst[i] != INFINITY) || (i % 4 == 3 && dst[i] != INFINITY) ||
+                (i % 4 == 2 && !(dst[i] == 0 && signbit(dst[i]))))
+                wrong = i;
+        CHECK(wrong < 0);
+        CHECK(shmem_double_min_reduce(SHMEM_TEAM_WORLD, dst, src, n) == 0);
+        wrong = -1;
+        for (int i = 0; i < n && wrong < 0; i++)
+            if ((i % 4 == 1 && dst[i] != (npes > 1 ? 1.0 : INFINITY)) ||
+                (i % 4 == 3 && dst[i] != (npes > 1 ? -INFINITY : INFINITY)) ||
+                (i % 4 == 2 && !(dst[i] == 0 && signbit(dst[i]))))
+                wrong = i;
+        CHECK(wrong < 0);
+    }
+    shmem_free(hash);
+    shmem_free(src);
+    shmem_free(dst);
+}
+
 /* The C11 interfaces, the shared team, and many rounds with barriers between
  * some of them - the team's epochs are the barrier's too. */
 static void generics_teams_and_rounds(void)
@@ -327,6 +412,7 @@ int main(void)
 
     integer_reductions();
     floating_reductions();
+    special_values();
     generics_teams_and_rounds();
     every_element();
 

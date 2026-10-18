@@ -13,6 +13,7 @@
 
 #include "base/ring-check.h"
 #include "fatal.h"
+#include "owner-map.h"
 #include "ring.h"
 #include "wire.h"
 
@@ -53,6 +54,30 @@ static uint32_t next_power_of_two(uint32_t n)
     while (p < n)
         p <<= 1;
     return p;
+}
+
+const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, char *why, size_t len)
+{
+    uint32_t peers = node_count > 1 ? node_count - 1 : 0;
+    uint32_t most_wires = (OSOE_RING_SUBMISSIONS_MOST - 1) / 2;
+    for (uint32_t owner = 0; owner <= helpers; owner++) {
+        uint64_t wires = osoe_ring_wires(owner, peers, helpers);
+        if (wires <= most_wires)
+            continue;
+        snprintf(why, len,
+                 "a job of %u nodes needs a ring of %llu connections on each node's %s, which "
+                 "asks io_uring for %llu submissions where the kernel allows %u "
+                 "(IORING_MAX_ENTRIES): at most %u nodes at OSOE_PROGRESS_HELPERS=%u%s",
+                 node_count, (unsigned long long)wires,
+                 owner == 0 ? "lead" : "progress helper", 2 * (unsigned long long)wires + 1,
+                 OSOE_RING_SUBMISSIONS_MOST, (helpers == 0 ? most_wires / 2 : most_wires) + 1,
+                 helpers,
+                 helpers == 0 ? ", and 16384 with progress helpers, which take the data wires "
+                                "off the lead's ring"
+                              : "");
+        return why;
+    }
+    return NULL;
 }
 
 /*

@@ -370,6 +370,12 @@ if(OSOE_INTERNODE)
       LABELS "tier1" TIMEOUT 60 PASS_REGULAR_EXPRESSION "${expect}")
     osoe_internode_label(shmem.wire.misuse.${case})
   endforeach()
+  # The rings' ceiling refused by name before anything is made, not by
+  # io_uring's EINVAL at the mesh's end (ring.h, osoe_ring_refuses; P17).
+  add_test(NAME shmem.wire.ring-ceiling COMMAND shmem_test_wire ring-ceiling)
+  set_tests_properties(shmem.wire.ring-ceiling PROPERTIES LABELS "tier1" TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "RING CEILING OK")
+  osoe_internode_label(shmem.wire.ring-ceiling)
 
   # The wire between two processes (tier 2). Two logical nodes, one PE each, so
   # each process is a node lead - the only role that touches a wire (§3.12). It
@@ -600,8 +606,17 @@ if(OSOE_INTERNODE)
     PATTERNS "node 1 [(]or a node below it[)] has OSOE_MAX_TEAMS=128; node 0 has 256"
              "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
     PROGRAM $<TARGET_FILE:shmem_test_job>)
+
+  # And the architecture (P21): byte order, long's size and long double's size
+  # and format, which x86-64 and aarch64 do not share. Node 1's lead claims the
+  # other's (OSOE_TEST_ARCHITECTURE=other), so the refusal runs on one machine.
+  osoe_refusal_test(shmem.job.disagree.architecture 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_TEST_ARCHITECTURE=other
+    PATTERNS "node 1 [(]or a node below it[)] has long double in .*; node 0 has long double in .*: every node of a job must be of one architecture"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
   osoe_internode_label(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
-    shmem.job.disagree.max-teams)
+    shmem.job.disagree.max-teams shmem.job.disagree.architecture)
 endif()
 
 # Between the PEs of one node too: the lead sizes the team blocks, the rows of
@@ -1994,6 +2009,16 @@ if(OSOE_INTERNODE)
     PASS_REGULAR_EXPRESSION "shmem_quiet: the job is aborting on behalf of PE 1|waiting in shmem_quiet"
     FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP")
   osoe_internode_label(shmem.unswept-wait)
+  # And a thread waiting for another's quiet on the shared default context
+  # sweeps and is counted asleep, as the quiet itself is (context_enter; P26).
+  add_test(NAME shmem.unswept-wait.shared-context
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
+            $<TARGET_FILE:shmem_test_unswept-wait> shared-context)
+  set_tests_properties(shmem.unswept-wait.shared-context PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "both of PE 0's quieting threads counted asleep in library waits"
+    FAIL_REGULAR_EXPRESSION "WAITS NOT COUNTED|BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP")
+  osoe_internode_label(shmem.unswept-wait.shared-context)
 
   # Diagnosability experiment 1 (§3.14, §5.3): one PE never reaches a barrier,
   # and the node it is on is found by walking down the tree rather than by
@@ -2673,6 +2698,20 @@ add_test(NAME shmem.typed-rma.ibput-misuse
           $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_typed-rma>)
 set_tests_properties(shmem.typed-rma.ibput-misuse PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "shmem_long_ibput: dst 1, sst 2 below bsize 2. spec")
+# And iput's and iget's strides below 1, which §9.6.1.3 and §9.6.1.7 forbid:
+# stride -1 wrote into the allocation before dest, 0 left the last element alone
+# (P22). Typed and sized, each ended by name before an element moves.
+foreach(case "iput|shmem_long_iput: dst -1, sst 1" "iget|shmem_long_iget: dst 1, sst 0"
+             "iput64|shmem_iput64: dst 1, sst 0")
+  string(REPLACE "|" ";" parts "${case}")
+  list(GET parts 0 form)
+  list(GET parts 1 said)
+  add_test(NAME shmem.typed-rma.${form}-misuse
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STRIDE_MISUSE=${form}
+            $<TARGET_FILE:osoe-launch> -n 2 -t 30 -- $<TARGET_FILE:shmem_test_typed-rma>)
+  set_tests_properties(shmem.typed-rma.${form}-misuse PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "${said}. spec .+ requires each stride at least 1")
+endforeach()
 
 # Nonblocking gets (§4.6, as built; test-get-nbi.c): on one node, where every
 # get is applied before it returns; and across nodes with the landing records
@@ -3771,6 +3810,45 @@ foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,0,0" "sleepin
     osoe_internode_label(shmem.deadlock.${mode}.${label})
   endif()
 endforeach()
+# A probe never answered (P25): node 1's lead drops the detector's first probe,
+# so the first collection never hears from it; the root gives that collection
+# up after three seconds and begins again, and the job ends declared, where the
+# root waited for the dropped answer until the launcher's timeout.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.deadlock.waits.probe-dropped.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -e 2:OSOE_TEST_DEADLOCK_DROPS=1 --
+            $<TARGET_FILE:shmem_test_deadlock> waits)
+  set_tests_properties(shmem.deadlock.waits.probe-dropped.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION
+      "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+  osoe_internode_label(shmem.deadlock.waits.probe-dropped.0-0-1-1)
+endif()
+# A wake between the detector's two collections (T37): at
+# OSOE_DEADLOCK_SECONDS=3 the last PE's flag is set by a signal of its own 2.5 s
+# into the waits - after the first collection, a second into the quiet, has
+# found every node quiet, before the second three seconds later - and the job
+# must run to its end; a detector that declared after
+# one collection passed every case above and ends this one.
+foreach(map "0,0,0,0" "0,0,1,1")
+  string(REPLACE "," "-" label "${map}")
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  add_test(NAME shmem.deadlock.between.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=3
+            $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_deadlock> between)
+  set_tests_properties(shmem.deadlock.between.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: between"
+    FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.deadlock.between.${label})
+  endif()
+endforeach()
 add_test(NAME shmem.deadlock.off.0-0-0-0
   COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=0
           $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 6 --
@@ -4379,10 +4457,13 @@ if(OSOE_INTERNODE)
     add_test(NAME shmem.global-exit.kills.held-other-node.0-0-1-1
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 held-other-node)
-    # Three nodes, the held PE on one that may hear of the exit from the third
+    # Three nodes, the held PE on one that hears of the exit from the third
     # first: a lead told so used to end its stream to the caller's node at once,
     # which took it for its node's end, and the launcher killed its PEs - eight
     # runs in forty (the same read). Ranks 1 and 2 are node 2, rank 3 node 1.
+    # Node 0 holds its goodbye to node 2 half a second (OSOE_TEST_HOLD_GOODBYE),
+    # so node 2 always hears node 1's relay first: left to timing, the defect
+    # put back failed one run in five (round four's correctness F3; T33).
     add_test(NAME shmem.global-exit.kills.held-other-node.0-2-2-1
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_global-exit> 4 0,2,2,1 7 7 0 held-other-node)
@@ -4391,7 +4472,8 @@ if(OSOE_INTERNODE)
       PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes"
                  PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     set_tests_properties(shmem.global-exit.kills.held-other-node.0-2-2-1
-      PROPERTIES LABELS "tier2" TIMEOUT 90 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2"
+      PROPERTIES LABELS "tier2" TIMEOUT 90
+                 ENVIRONMENT "KILLS=yes;OSOE_TEST_HELD_RANK=2;OSOE_TEST_HOLD_GOODBYE=0:2"
                  PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
     osoe_internode_label(shmem.global-exit.kills.held-stdout.0-0-1-1
       shmem.global-exit.kills.held-other-node.0-0-1-1
@@ -5064,6 +5146,54 @@ if(OSOE_INTERNODE)
   endif()
 endif()
 
+# Past 16 logical nodes (T18): the global exit and a proved deadlock at 32, one
+# PE a node, where every test of either stopped at four - so that the changes of
+# step 4's Parts 2 and 3, made at a few nodes, are held to where a deadlock's
+# report and an abort's flood cross many. Not under a sanitizer, whose memory
+# jobs of more than 16 nodes outgrow (as the shapes' 64 do), and run alone.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  set(map "0")
+  foreach(node RANGE 1 31)
+    string(APPEND map ",${node}")
+  endforeach()
+  add_test(NAME shmem.global-exit.32-nodes
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 32 ${map} 7 7)
+  set_tests_properties(shmem.global-exit.32-nodes PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+  add_test(NAME shmem.deadlock.waits.32-nodes
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 32 -m ${map} -t 120 --
+            $<TARGET_FILE:shmem_test_deadlock> waits)
+  set_tests_properties(shmem.deadlock.waits.32-nodes PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION
+      "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+  osoe_internode_label(shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes)
+endif()
+
+# Wide nodes (T43): the barrier, the heap, puts and gets, atomics, the lock, the
+# scans, teams and the reductions at 32 PEs on one node, and the barrier and the
+# reductions at 64, where the suite's jobs that move data stopped at 15. One
+# node, so in both builds; not under a sanitizer, whose memory 32 PEs and more
+# outgrow (asan's 55 MB a PE), and run alone.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  # name.count.heap: rma's largest band is 1 MiB a PE, 32 MiB of each PE's heap
+  # at 32 PEs.
+  foreach(case barrier.32.16m malloc.32.16m rma.32.48m amo.32.16m lock.32.16m scan.32.16m
+               team.32.16m reduce.32.16m barrier.64.16m reduce.64.16m)
+    string(REPLACE "." ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 count)
+    list(GET parts 2 heap)
+    add_test(NAME shmem.${name}.L${count}
+      COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=${heap}
+              $<TARGET_FILE:osoe-launch> -n ${count} -t 240 -- $<TARGET_FILE:shmem_test_${name}>)
+    set_tests_properties(shmem.${name}.L${count} PROPERTIES LABELS "tier2" TIMEOUT 300
+      RUN_SERIAL TRUE)
+  endforeach()
+endif()
+
 # The jobs of 32 to 70 PEs on one machine run one at a time and alone, each
 # taking every core. Since shmem_init raises the locked-memory limit
 # (docs/decisions/2026-10-11.md) they run whole on a Pi node, where they were
@@ -5074,7 +5204,7 @@ endif()
 # registers none of them.
 foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33
              shmem.shape.chosen.pi.64 shmem.shape.chosen.loopback.64
-             shmem.reply-pool.overflow)
+             shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes)
   if(TEST ${test})
     set_tests_properties(${test} PROPERTIES RUN_SERIAL TRUE)
   endif()

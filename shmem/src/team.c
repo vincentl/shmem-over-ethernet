@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
+#define _GNU_SOURCE
 /*
  * Teams and contexts (§7.3; spec §9.4, §9.5).
  *
@@ -121,6 +122,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <pshmem.h>
 #include <shmem.h>
@@ -1361,6 +1363,7 @@ static int split(const char *routine, struct osoe_team *parent, uint32_t numbers
     uint32_t taking[2] = { 0, 0 }, count = 0;
     uint64_t marks;
     bool dry;
+    struct timespec busy_pause = { 0, 20 * 1000 };
     for (uint32_t round = 0;; round++) {
         /* A block for every team this PE leads here, before its mask; a claim
          * a round found dry is tried again in the next. A pool found empty
@@ -1393,6 +1396,15 @@ static int split(const char *routine, struct osoe_team *parent, uint32_t numbers
         marks = words[mask_words];
         if (!(marks & MARK_NOT_BUSY)) {
             osoe_count(OSOE_C_SHMEM_TEAM_SPLIT_BUSY_ROUNDS, 1);
+            /* A pause before the next round, doubling from 20 us to 1 ms, as
+             * start-up's waits back off (P8): a block on its way back comes
+             * back in a destroy's tail, and a round run again at once ran the
+             * parent's reductions back to back until it did, spinning a
+             * one-node parent's PEs. Every PE saw the same marks and pauses
+             * after the same round, so the rounds stay agreed. */
+            nanosleep(&busy_pause, NULL);
+            if (busy_pause.tv_nsec < 1000 * 1000)
+                busy_pause.tv_nsec *= 2;
             continue;
         }
         found = 0;

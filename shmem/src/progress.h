@@ -373,6 +373,7 @@ struct osoe_progress_owner {
      * same bytes for every peer, built once. */
     bool aborting;
     bool abort_keeps_stream;                    /* a global exit's (osoe_progress_abort) */
+    uint64_t abort_held_until_ns;               /* OSOE_TEST_HOLD_GOODBYE's end, or 0 */
     unsigned char abort_segment[64];
     uint32_t abort_segment_bytes;
     /* The replies its connections' queues hold (§3.8): the owner's own pool,
@@ -397,6 +398,11 @@ struct osoe_progress {
     struct osoe_connection_area *area;
     uint32_t node, nodes;
     uint32_t helpers;                           /* the area's (owner-map.h) */
+    /* OSOE_TEST_HOLD_GOODBYE (progress-host.c; T33): whether an abort holds
+     * its abortive goodbye to one node, and that node's peer slot. Zero, as an
+     * engine is made, holds nothing. */
+    bool abort_hold;
+    uint32_t abort_held_slot;
     struct osoe_progress_owner *owner;          /* helpers + 1, by owner */
     struct osoe_progress_host host;
 

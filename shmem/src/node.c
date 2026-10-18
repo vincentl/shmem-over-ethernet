@@ -280,7 +280,7 @@ static void tombstone(void)
     h->dir.header_bytes = (uint32_t)sizeof *h;
     h->dir.segment_bytes = bytes;
     h->job = refusal.job;
-    h->launch = refusal.launch;
+    atomic_store_explicit(&h->launch, refusal.launch, memory_order_release);
     h->step = refusal.step;
     h->node = refusal.node_id;
     h->session = refusal.session;
@@ -316,7 +316,7 @@ static void tell_the_lead(void)
              * launch's lead is about to reclaim (open_control). */
             if ((atomic_load_explicit(&h->ready, memory_order_acquire) ||
                  atomic_load_explicit(&h->failed, memory_order_acquire)) &&
-                h->launch != refusal.launch) {
+                atomic_load_explicit(&h->launch, memory_order_acquire) != refusal.launch) {
                 munmap(h, sizeof *h);
                 fd = -1;
             } else {
@@ -955,7 +955,7 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     h->dir.header_bytes = (uint32_t)header_bytes;
     h->dir.segment_bytes = n->control_bytes;
     h->job = b->job;
-    h->launch = b->launch;
+    atomic_store_explicit(&h->launch, b->launch, memory_order_release);
     h->step = b->step;
     h->node = b->node;
     h->session = session;
@@ -1190,7 +1190,9 @@ again:;
     for (;;) {
         bool ready = atomic_load_explicit(&n->hdr->ready, memory_order_acquire) != 0;
         bool failed = atomic_load_explicit(&n->hdr->failed, memory_order_acquire) != 0;
-        bool another_launch = (ready || failed) && n->hdr->launch != b->launch;
+        bool another_launch =
+            (ready || failed) &&
+            atomic_load_explicit(&n->hdr->launch, memory_order_acquire) != b->launch;
         if (ready && !another_launch)
             break;
         if (another_launch || osoe_shm_orphaned(n->control_fd)) {

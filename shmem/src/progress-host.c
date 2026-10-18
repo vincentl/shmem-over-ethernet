@@ -843,6 +843,23 @@ void osoe_progress_host_start(uint32_t session)
                                        landing_request, landed, completed, deadlock_arrived,
                                        node_aborting, describe_node };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, engine_owners, &host);
+    /* OSOE_TEST_HOLD_GOODBYE=FROM:TO: node FROM's abortive goodbye to node TO
+     * held half a second from its abort's start (progress.c, goodbye_held;
+     * T33); every other node ignores it, since the setting reaches them all. */
+    const char *hold = getenv("OSOE_TEST_HOLD_GOODBYE");
+    unsigned from = 0, to = 0;
+    int used = 0;
+    osoe_am.progress.abort_hold = false;
+    if (hold) {
+        if (sscanf(hold, "%u:%u%n", &from, &to, &used) != 2 || hold[used] != '\0' ||
+            from >= osoe.bootstrap.node_count || to >= osoe.bootstrap.node_count || from == to)
+            osoe_fatal("OSOE_TEST_HOLD_GOODBYE='%s' is not FROM:TO, two nodes of this job's %u",
+                       hold, osoe.bootstrap.node_count);
+        if (from == osoe.bootstrap.node) {
+            osoe_am.progress.abort_hold = true;
+            osoe_am.progress.abort_held_slot = to < from ? to : to - 1;
+        }
+    }
     uint64_t connections_before = 0, descriptors_before = 0, busy_before = 0;
     for (uint32_t o = 0; o < owners; o++) {
         uint32_t wires = osoe_owner_wires(o, peers, helpers);

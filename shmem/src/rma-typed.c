@@ -83,11 +83,19 @@ _Static_assert(_Generic((uint16_t)0, unsigned short: 1, default: 0),
  * The strided forms (spec §9.6.1.3, §9.6.1.7), typed and sized alike: element
  * i goes from source + i*sst elements to dest + i*dst elements, the strides
  * "scaled by the element size". nelems 0 makes the loop a no-op, matching
- * putmem's own zero-length rule.
+ * putmem's own zero-length rule, whatever the strides; a stride below 1, which
+ * both sections forbid, ends the job by name, as the block-strided forms' below
+ * bsize do - stride -1 wrote into the allocation before dest, and 0 left only
+ * the last element (P22; the release review's conformance C5).
  */
 static void strided_put(const char *routine, shmem_ctx_t ctx, void *dest, const void *source,
                         ptrdiff_t dst, ptrdiff_t sst, size_t nelems, size_t width, int pe)
 {
+    if (nelems == 0)
+        return;
+    if (dst < 1 || sst < 1)
+        osoe_fatal("%s: dst %td, sst %td; spec §9.6.1.3 requires each stride at least 1",
+                   routine, dst, sst);
     char *d = dest;
     const char *s = source;
     ptrdiff_t w = (ptrdiff_t)width;
@@ -114,6 +122,9 @@ static void strided_get(const char *routine, shmem_ctx_t ctx, void *dest, const 
      * the writes before it (§4.6, as built). */
     if (nelems == 0)
         return;
+    if (dst < 1 || sst < 1)
+        osoe_fatal("%s: dst %td, sst %td; spec §9.6.1.7 requires each stride at least 1",
+                   routine, dst, sst);
     for (size_t i = 0; i < nelems; i++)
         osoe_rma_get(routine, ctx, d + (ptrdiff_t)i * dst * w, s + (ptrdiff_t)i * sst * w, 1,
                      width, pe,

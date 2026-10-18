@@ -307,8 +307,33 @@ static int misuse(const char *what)
     return 1;
 }
 
+/* The rings' ceiling refused by name (ring.h, osoe_ring_refuses; P17): 8,192
+ * nodes at no helpers, where owner 0's ring holds 2(n - 1) wires, and 16,384
+ * with helpers, where it holds the control wires alone; one node more each
+ * refused, naming the counts and OSOE_PROGRESS_HELPERS. */
+static int ring_ceiling(void)
+{
+    char why[512];
+    CHECK(osoe_ring_refuses(8192, 0, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(8193, 0, why, sizeof why) == why);
+    CHECK(strstr(why, "a job of 8193 nodes needs a ring of 16384 connections on each node's "
+                      "lead") != NULL);
+    CHECK(strstr(why, "at most 8192 nodes at OSOE_PROGRESS_HELPERS=0, and 16384 with progress "
+                      "helpers") != NULL);
+    CHECK(osoe_ring_refuses(8193, 1, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(16384, 3, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(16385, 3, why, sizeof why) == why);
+    CHECK(strstr(why, "at most 16384 nodes at OSOE_PROGRESS_HELPERS=3") != NULL);
+    CHECK(osoe_ring_refuses(1, 0, why, sizeof why) == NULL);
+    if (!CHECK_DONE())
+        printf("RING CEILING OK\n");
+    return CHECK_DONE();
+}
+
 int main(int argc, char **argv)
 {
+    if (argc > 1 && strcmp(argv[1], "ring-ceiling") == 0)
+        return ring_ceiling();
     /* zero-copy-refused: the zero-copy send with every send by reference
      * refused for want of locked memory, the ring made first (locked-memory.h). */
     bool refused = argc > 1 && strcmp(argv[1], "zero-copy-refused") == 0;

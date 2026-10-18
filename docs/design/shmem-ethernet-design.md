@@ -2185,7 +2185,12 @@ to the rule above - time only paces the looking.
   again and asks again. If every node was quiet again, its activity unmoved
   since its first sample began, the job is deadlocked: every node prints its
   PEs, those waiting at the same place on one line, with the routine, the
-  detail and how long, and the job ends with status 1. The root asks every
+  detail and how long, and the job ends with status 1. A collection whose
+  answers have not all come in three seconds is given up, as a round is when
+  the root's node moves: a node drops a probe it cannot take - still answering
+  the last, or its control wire closing - and until P25 the root waited for
+  that answer for the job's life; a report that comes late is the old round's,
+  and dropped. The root asks every
   node directly, not up the collective tree: a round is O(N) small messages at
   the root, at most one a second and only while its node looks quiet, where
   the tree would make it O(log N) - the refinement once a job of hundreds of
@@ -6871,7 +6876,9 @@ waiting on its socket names it ("the rendezvous lost node 9, its child…").
 arithmetic progressions in local-id order (one under block, one under cyclic;
 `rank-map.h`) and its blob; and the values every node must agree on — the job's
 size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT`,
-`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE`, `OSOE_SMALL_COLLECTIVE_BYTES` —
+`OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE`, `OSOE_SMALL_COLLECTIVE_BYTES`, the
+collectives' shape and places, the link set by hand, and the architecture - byte
+order, `long`'s size, `long double`'s size and format (P21, "osoeup-7") —
 which each parent checks against
 its own, so a disagreement is refused by the
 lead that sees it, naming both nodes (`shmem.job.disagree.*`). *At the root* the
@@ -7442,7 +7449,10 @@ loop can use is batching. An `iput`'s elements but the last carry
 wake of the lead rather than one each, and an RDMA backend would post them
 under one doorbell. An `iget`'s elements are nonblocking gets, all but the last
 with `OSOE_TRANSPORT_MORE`, completed by one wait on its PE that names the
-routine: in flight together, up to the landing zone's records.
+routine: in flight together, up to the landing zone's records. A stride below 1,
+which §9.6.1.3 and §9.6.1.7 forbid, ends the job by name, as `ibput`'s below
+`bsize` does: unchecked, stride -1 wrote into the allocation before `dest` and
+0 left only the last element (P22).
 
 **Block-strided `ibput`/`ibget` are built** (§9.6.1.4, §9.6.1.8; phase 1 step 9
 slice 1): the same generated families, the same `strided_put`/`strided_get`

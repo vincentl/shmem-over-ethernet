@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 #define _GNU_SOURCE
 #include <arpa/inet.h>
+#include <float.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -32,9 +33,11 @@
  * bytes. The fifth, "osoeup-5", carries OSOE_COLLECTIVE_SHAPE in that word and
  * the link's three numbers after it (v0.2 step 2): 80 bytes. The sixth,
  * "osoeup-6", carries OSOE_COLLECTIVE_PLACES after them and a word kept zero
- * (P30, P31): 88 bytes.
+ * (P30, P31): 88 bytes. The seventh, "osoeup-7", carries the node's
+ * architecture in that word (P21): 88 bytes again, so the magic tells them
+ * apart.
  */
-#define UP_MAGIC   UINT64_C(0x362d7075656f736f)  /* "osoeup-6", little-endian */
+#define UP_MAGIC   UINT64_C(0x372d7075656f736f)  /* "osoeup-7", little-endian */
 #define DOWN_MAGIC UINT64_C(0x6e776f64656f736f)  /* "osoedown" */
 
 /* What every node must agree on (§6.2): a node that differs is a mismatched
@@ -68,7 +71,12 @@ struct agreement {
     /* P30, P31: how collect finds its places, every lead of a team alike or
      * they wait on different words - "osoeup-6". */
     uint32_t collective_places;
-    uint32_t reserved;
+    /* P21, "osoeup-7": the build's architecture as the library moves data -
+     * byte order, long's size, and long double's size and format, which
+     * x86-64 (the x87's 80-bit extended format) and aarch64 (binary128) do
+     * not share - so that a job mixing them is refused rather than reduce
+     * long doubles to garbage with no message (architecture_word). */
+    uint32_t architecture;
 };
 
 struct up_header {
@@ -80,7 +88,9 @@ struct up_header {
 
 _Static_assert(sizeof(struct up_header) == 88 &&
                offsetof(struct up_header, agreement) +
-                       offsetof(struct agreement, collective_places) == 72,
+                       offsetof(struct agreement, collective_places) == 72 &&
+               offsetof(struct up_header, agreement) +
+                       offsetof(struct agreement, architecture) == 76,
                "the up header's shape is UP_MAGIC's: a new shape takes a new magic");
 
 /* One node of a subtree, as it travels up. */
@@ -118,6 +128,41 @@ static void report_add(struct report *r, const struct node_record *records, uint
     memcpy(r->progressions + r->progression_count, progressions, sizeof *progressions * m);
     r->record_count += n;
     r->progression_count += m;
+}
+
+/*
+ * The build's architecture as the rendezvous compares it (P21): long double's
+ * mantissa in bits (LDBL_MANT_DIG) in the low byte, its size in the next, long's
+ * size in the third, and 1 above them for little-endian. Facts of the compiler,
+ * so a node's word is its binary's. OSOE_TEST_ARCHITECTURE=other gives a node
+ * the word of the other of x86-64 and aarch64 - binary128's mantissa if its own
+ * is not, the x87's if it is - so that a test sees the refusal on one machine.
+ */
+static uint32_t architecture_word(void)
+{
+    uint32_t mantissa = LDBL_MANT_DIG;
+    const char *test = getenv("OSOE_TEST_ARCHITECTURE");
+    if (test) {
+        if (strcmp(test, "other") != 0)
+            osoe_fatal("OSOE_TEST_ARCHITECTURE='%s': its one value is 'other', which gives "
+                       "this node the word of the other of x86-64 and aarch64", test);
+        mantissa = mantissa == 113 ? 64 : 113;
+    }
+    return mantissa | (uint32_t)sizeof(long double) << 8 | (uint32_t)sizeof(long) << 16 |
+           (uint32_t)(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) << 24;
+}
+
+static void describe_architecture(uint32_t word, char *text, size_t len)
+{
+    uint32_t mantissa = word & 0xff;
+    const char *format = mantissa == 64    ? "the x87's 80-bit extended format"
+                         : mantissa == 113 ? "IEEE 754's binary128"
+                         : mantissa == 53  ? "IEEE 754's binary64"
+                         : mantissa == 106 ? "the double-double format"
+                                           : "a format of its own";
+    snprintf(text, len, "long double in %s (a %u-bit mantissa in %u bytes), a long of %u bytes "
+             "and %s byte order", format, mantissa, (word >> 8) & 0xff, (word >> 16) & 0xff,
+             (word >> 24) & 1 ? "little-endian" : "big-endian");
 }
 
 /* A child's value against this node's, by name. */
@@ -167,6 +212,14 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
                    "every node must find collect's places the same way", child,
                    osoe_collective_places_name(theirs->collective_places), b->node,
                    osoe_collective_places_name(mine->collective_places));
+    if (theirs->architecture != mine->architecture) {
+        char theirs_text[160], mine_text[160];
+        describe_architecture(theirs->architecture, theirs_text, sizeof theirs_text);
+        describe_architecture(mine->architecture, mine_text, sizeof mine_text);
+        osoe_fatal("node %u (or a node below it) has %s; node %u has %s: every node of a job "
+                   "must be of one architecture, since the library moves data between nodes "
+                   "as bytes", child, theirs_text, b->node, mine_text);
+    }
     if (theirs->link_hop_ns != mine->link_hop_ns ||
         theirs->link_message_ns != mine->link_message_ns ||
         theirs->link_bytes_per_second != mine->link_bytes_per_second)
@@ -309,7 +362,8 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
                               osoe_am_table_checksum(), b->collective_fanout, b->max_teams,
                               b->collective_pipeline, b->small_collective_bytes,
                               b->collective_shape, b->link_hop_ns, b->link_message_ns,
-                              b->link_bytes_per_second, b->collective_places, 0 };
+                              b->link_bytes_per_second, b->collective_places,
+                              architecture_word() };
 
     /* This node's record: its address, its ranks as progressions, its blob. */
     struct report r = { 0 };

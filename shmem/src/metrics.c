@@ -203,6 +203,11 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     EPOCH("pe.shared_epoch", OSOE_TEAM_SHARED),
     EPOCH("pe.finalize_epoch", OSOE_TEAM_FINALIZE),
     PE("pe.sweeps", sweeps, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
+    /* The deadlock detector's word (layout 26; node.h): the PE's threads asleep
+     * in library waits in the low half, the changes in that number in the high
+     * half. Named in the table since P26, so that a test and osoe-stat's dump
+     * can see what the detector counts. */
+    PE("pe.waits", waits, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     /* An invariant at PE scope, because the thread it describes is by
      * definition one whose counter block nobody can read. */
     PE("invariant.blocks_exhausted", blocks_exhausted, OSOE_MTYPE_U32,
