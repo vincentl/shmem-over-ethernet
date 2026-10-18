@@ -2185,7 +2185,12 @@ to the rule above - time only paces the looking.
   again and asks again. If every node was quiet again, its activity unmoved
   since its first sample began, the job is deadlocked: every node prints its
   PEs, those waiting at the same place on one line, with the routine, the
-  detail and how long, and the job ends with status 1. The root asks every
+  detail and how long, and the job ends with status 1. A collection whose
+  answers have not all come in three seconds is given up, as a round is when
+  the root's node moves: a node drops a probe it cannot take - still answering
+  the last, or its control wire closing - and until P25 the root waited for
+  that answer for the job's life; a report that comes late is the old round's,
+  and dropped. The root asks every
   node directly, not up the collective tree: a round is O(N) small messages at
   the root, at most one a second and only while its node looks quiet, where
   the tree would make it O(log N) - the refinement once a job of hundreds of

@@ -47,12 +47,22 @@ enum { DEFAULT_SECONDS = 10, MAXIMUM_SECONDS = 86400 };
 /* How long the root waits for every node to say where its PEs wait before it
  * ends the job regardless: a node that cannot answer cannot be helped by more. */
 #define DECLARE_GRACE_NS (UINT64_C(3) * 1000000000)
+/* How long the root waits for every node's answer to a probe before it gives
+ * the round up and watches again (P25): a node drops a probe it cannot take - it
+ * is still answering the last, or its control wire is closing - and a
+ * collection that waited for that answer waited for the job's life. Given up,
+ * it costs a round, as a node seen to move does; a late report is the old
+ * round's, and dropped. */
+#define COLLECTION_GRACE_NS (UINT64_C(3) * 1000000000)
+/* OSOE_TEST_DEADLOCK_DROPS's most: probes a node drops, for a test. */
+#define MOST_PROBES_DROPPED 16
 
 /* A PE slot's `waits` word (node.h): threads asleep in the low half, changes
  * in the high. */
 #define WAITS_CHANGE (UINT64_C(1) << 32)
 
 static uint64_t quiet_needed_ns;        /* OSOE_DEADLOCK_SECONDS; 0: off */
+static uint32_t probes_to_drop;         /* OSOE_TEST_DEADLOCK_DROPS, still to drop */
 
 static void start_afresh(void);
 
@@ -68,6 +78,11 @@ void osoe_deadlock_init(void)
         osoe_fatal("OSOE_DEADLOCK_SECONDS=%s: 0 to turn deadlock detection off, or seconds "
                    "up to %d", getenv("OSOE_DEADLOCK_SECONDS"), MAXIMUM_SECONDS);
     quiet_needed_ns = (uint64_t)seconds * 1000000000;
+    probes_to_drop = 0;
+    status = osoe_environment_u32("OSOE_TEST_DEADLOCK_DROPS", &probes_to_drop);
+    if (status == OSOE_ENVIRONMENT_INVALID || probes_to_drop > MOST_PROBES_DROPPED)
+        osoe_fatal("OSOE_TEST_DEADLOCK_DROPS='%s' is not a number of probes from 0 to %d",
+                   getenv("OSOE_TEST_DEADLOCK_DROPS"), MOST_PROBES_DROPPED);
 }
 
 /* ---- Each PE's waits (base/sweep.h) --------------------------------------- */
@@ -400,6 +415,7 @@ static enum stage stage;
 static uint32_t round_number, reports, declared;
 static bool all_ok;
 static uint64_t next_look_ns, quiet_since_ns, first_activity, between_since_ns, declared_at_ns;
+static uint64_t collecting_since_ns;    /* when the collection out was asked for */
 static uint32_t rounds_failed;          /* since the root's node was last seen to move */
 
 /* A node answering the root: the probe it answers, and its round's first sample. */
@@ -414,6 +430,7 @@ static void start_afresh(void)
     round_number = reports = declared = 0;
     all_ok = false;
     next_look_ns = quiet_since_ns = first_activity = between_since_ns = declared_at_ns = 0;
+    collecting_since_ns = 0;
     rounds_failed = 0;
     answering = false;
     probe = (struct osoe_deadlock_message){ 0 };
@@ -521,6 +538,7 @@ static void sampled(bool ok, uint64_t activity)
         stage = FIRST_COLLECTION;
         reports = 0;
         all_ok = true;
+        collecting_since_ns = osoe_now_ns();
         send_all(OSOE_DEADLOCK_PROBE, 1);
     } else if (stage == SECOND_SAMPLE) {
         if (!ok || activity != first_activity || !every_waiter_swept()) {
@@ -534,6 +552,7 @@ static void sampled(bool ok, uint64_t activity)
         stage = SECOND_COLLECTION;
         reports = 0;
         all_ok = true;
+        collecting_since_ns = osoe_now_ns();
         send_all(OSOE_DEADLOCK_PROBE, 2);
     }
 }
@@ -605,12 +624,18 @@ bool osoe_deadlock_tick(void)
             return false;
         stage = SECOND_SAMPLE;
         return begin_sample();
+    case FIRST_COLLECTION:
+    case SECOND_COLLECTION:
+        /* Its reports move it - unless one never comes (COLLECTION_GRACE_NS). */
+        if (now - collecting_since_ns > COLLECTION_GRACE_NS)
+            watch_again();
+        return false;
     case DECLARING:
         if (declared >= peers() || now - declared_at_ns > DECLARE_GRACE_NS)
             end_job();
         return false;
     default:
-        return false;           /* a collection is out: its reports move it */
+        return false;
     }
 }
 
@@ -628,6 +653,10 @@ void osoe_deadlock_message(uint32_t node, const struct osoe_deadlock_message *m)
         /* Sampled from the agent's loop: its first half on the next turn. */
         if (osoe.job.node == 0 || answering || half.taken)
             break;
+        if (probes_to_drop > 0) {
+            probes_to_drop--;           /* OSOE_TEST_DEADLOCK_DROPS: as a busy node does */
+            break;
+        }
         if (!quiet_needed_ns) {
             struct osoe_deadlock_message veto = { .round = m->round,
                                                   .kind = OSOE_DEADLOCK_REPORT,

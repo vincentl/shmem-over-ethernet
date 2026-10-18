@@ -29,10 +29,19 @@
  * Run with -k, so the launcher leaves the survivors to the library. Until the
  * development watchdog was retired (2026-09-23), a sweep was also what found
  * the dead sibling; the sweep count is now how the test sees the sweep.
+ *
+ * With the argument `shared-context`, under SHMEM_THREAD_MULTIPLE, two of PE
+ * 0's threads put toward the stopped node and quiet the one default context,
+ * the second a moment after the first: it waits for the first's quiet on the
+ * context's mutex, and PE 1 reads PE 0's `pe.waits` until it counts both
+ * threads asleep in library waits (P26). A plain lock slept there uncounted,
+ * so the word said one, and a deadlock behind the mutex could not be proved.
  */
 #define _GNU_SOURCE
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,6 +73,36 @@ static bool alive(pid_t pid)
     stat[n] = '\0';
     const char *state = strrchr(stat, ')');
     return state && state[1] == ' ' && state[2] != 'Z' && state[2] != 'X';
+}
+
+/* Local PE 0's threads asleep in library waits, the low half of its
+ * `pe.waits` (layout 26), or -1 if it cannot be read. */
+static long pe0_waiting_threads(void)
+{
+    char segment[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(segment, sizeof segment, 0);
+    struct osoe_segment s;
+    if (osoe_segment_open(&s, segment, err, sizeof err) != 0)
+        return -1;
+    uint64_t word = 0;
+    bool read = osoe_segment_read_name(&s, "pe.waits", 0, &word);
+    osoe_segment_close(&s);
+    return read ? (long)(word & UINT32_MAX) : -1;
+}
+
+static long *quiet_target;
+
+/* One of PE 0's two quieting threads in the shared-context case: a put toward
+ * the stopped node, and the quiet that never returns. */
+static void *put_and_quiet(void *arg)
+{
+    sleep_ms((unsigned)(uintptr_t)arg);
+    long v = 1;
+    shmem_putmem(quiet_target, &v, sizeof v, 2);
+    shmem_quiet();
+    printf("QUIET RETURNED toward a stopped node\n");
+    fflush(stdout);
+    _Exit(1);
 }
 
 /* osoe-stat's per-PE table for this node, or an empty string. */
@@ -114,9 +153,16 @@ static int pe0_blocked_in_quiet(const char *out)
                        "reply 0\n") != NULL;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
-    shmem_init();
+    bool shared = argc > 1 && strcmp(argv[1], "shared-context") == 0;
+    if (shared) {
+        int provided = 0;
+        shmem_init_thread(SHMEM_THREAD_MULTIPLE, &provided);
+        CHECK_FATAL(provided == SHMEM_THREAD_MULTIPLE);
+    } else {
+        shmem_init();
+    }
     int me = shmem_my_pe();
     /* Symmetric statics are §4.3's phase 1.5, so these are allocated. */
     int *stopped_pid = shmem_calloc(1, sizeof *stopped_pid);
@@ -133,6 +179,17 @@ int main(void)
         raise(SIGSTOP);
         for (;;)
             pause();
+    }
+
+    if (me == 0 && shared) {
+        int pid = (int)getpid();
+        shmem_putmem(quiet_pid, &pid, sizeof pid, 1);    /* a node-mate: applied now */
+        quiet_target = target;
+        pthread_t first, second;
+        CHECK_FATAL(pthread_create(&first, NULL, put_and_quiet, (void *)(uintptr_t)200) == 0);
+        CHECK_FATAL(pthread_create(&second, NULL, put_and_quiet, (void *)(uintptr_t)400) == 0);
+        for (;;)
+            pause();                    /* outside the library, until the job ends */
     }
 
     if (me == 0) {
@@ -156,6 +213,17 @@ int main(void)
         sleep_ms(100);
         run_stat(out, sizeof out);
         seen = pe0_blocked_in_quiet(out);
+    }
+    if (shared) {
+        long waiting = -1;
+        for (int tries = 0; tries < 30 && waiting != 2; tries++) {
+            sleep_ms(100);
+            waiting = pe0_waiting_threads();
+        }
+        if (waiting == 2)
+            printf("PE 1: both of PE 0's quieting threads counted asleep in library waits\n");
+        else
+            printf("WAITS NOT COUNTED: PE 0's pe.waits counts %ld threads, not 2\n", waiting);
     }
     if (seen)
         printf("PE 1: osoe-stat shows PE 0 blocked in shmem_quiet\n");

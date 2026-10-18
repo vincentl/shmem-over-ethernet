@@ -82,8 +82,10 @@
  * hang and a clean abort. A blocking call also publishes the "blocked in"
  * record (§3.14) naming what it waits on, and gives up only by §3.15's
  * no-progress rule - never because time has passed. The AM backend's seven
- * waits do all three (transport-internode.c, struct am_wait), and shmem.unswept-wait
- * and shmem.stopped-node.* are the tests that would see one stop.
+ * waits do all three (transport-internode.c, struct am_wait), and a thread that
+ * waits for another's quiet on a shared context sweeps and is counted as they
+ * are (context_enter, P26); shmem.unswept-wait, its shared-context case, and
+ * shmem.stopped-node.* are the tests that would see one stop.
  */
 #ifndef OSOE_TRANSPORT_H
 #define OSOE_TRANSPORT_H

@@ -1994,6 +1994,16 @@ if(OSOE_INTERNODE)
     PASS_REGULAR_EXPRESSION "shmem_quiet: the job is aborting on behalf of PE 1|waiting in shmem_quiet"
     FAIL_REGULAR_EXPRESSION "BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP")
   osoe_internode_label(shmem.unswept-wait)
+  # And a thread waiting for another's quiet on the shared default context
+  # sweeps and is counted asleep, as the quiet itself is (context_enter; P26).
+  add_test(NAME shmem.unswept-wait.shared-context
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+            $<TARGET_FILE:osoe-launch> -n 3 -m 0,0,1 -t 15 -k --
+            $<TARGET_FILE:shmem_test_unswept-wait> shared-context)
+  set_tests_properties(shmem.unswept-wait.shared-context PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "both of PE 0's quieting threads counted asleep in library waits"
+    FAIL_REGULAR_EXPRESSION "WAITS NOT COUNTED|BLOCKED RECORD WRONG|QUIET RETURNED|QUIET DID NOT SWEEP")
+  osoe_internode_label(shmem.unswept-wait.shared-context)
 
   # Diagnosability experiment 1 (§3.14, §5.3): one PE never reaches a barrier,
   # and the node it is on is found by walking down the tree rather than by
@@ -3769,6 +3779,45 @@ foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,0,0" "sleepin
     FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
   if(nodes GREATER 1)
     osoe_internode_label(shmem.deadlock.${mode}.${label})
+  endif()
+endforeach()
+# A probe never answered (P25): node 1's lead drops the detector's first probe,
+# so the first collection never hears from it; the root gives that collection
+# up after three seconds and begins again, and the job ends declared, where the
+# root waited for the dropped answer until the launcher's timeout.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.deadlock.waits.probe-dropped.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 -e 2:OSOE_TEST_DEADLOCK_DROPS=1 --
+            $<TARGET_FILE:shmem_test_deadlock> waits)
+  set_tests_properties(shmem.deadlock.waits.probe-dropped.0-0-1-1 PROPERTIES LABELS "tier2"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION
+      "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+  osoe_internode_label(shmem.deadlock.waits.probe-dropped.0-0-1-1)
+endif()
+# A wake between the detector's two collections (T37): at
+# OSOE_DEADLOCK_SECONDS=3 the last PE's flag is set by a signal of its own 2.5 s
+# into the waits - after the first collection, a second into the quiet, has
+# found every node quiet, before the second three seconds later - and the job
+# must run to its end; a detector that declared after
+# one collection passed every case above and ends this one.
+foreach(map "0,0,0,0" "0,0,1,1")
+  string(REPLACE "," "-" label "${map}")
+  osoe_map_nodes("${map}" nodes)
+  if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
+    continue()
+  endif()
+  add_test(NAME shmem.deadlock.between.${label}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=3
+            $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_deadlock> between)
+  set_tests_properties(shmem.deadlock.between.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: between"
+    FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
+  if(nodes GREATER 1)
+    osoe_internode_label(shmem.deadlock.between.${label})
   endif()
 endforeach()
 add_test(NAME shmem.deadlock.off.0-0-0-0

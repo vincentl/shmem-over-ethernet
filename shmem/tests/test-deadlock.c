@@ -22,6 +22,18 @@
  *   busy        every PE waits for a flag that a thread of its own sets after
  *               computing for four seconds: every node looks quiet to a count
  *               of waits alone, and a round is begun and found busy each time
+ *   between     the last PE waits for a flag that a SIGALRM handler of its own
+ *               sets 2.5 s in, the rest wait in a barrier: run at
+ *               OSOE_DEADLOCK_SECONDS=3, the wake lands between the detector's
+ *               two collections - after the first, a second into the quiet,
+ *               has found every node quiet, before the second three seconds
+ *               after it - so only the second's look at the nodes'
+ *               activity keeps the job alive (T37; a detector that declared
+ *               after one collection passed every other case). A signal, not a
+ *               thread: a thread the library cannot see keeps its node from
+ *               ever looking quiet. The handler's store is outside the library,
+ *               which the README says a wait does not promise to see; inside
+ *               the detector's window it is seen at the wait's next sweep.
  *
  * The helper thread is named as io_uring names its workers, "iou-helper", so a
  * detector that told them apart by name would not see it.
@@ -34,6 +46,8 @@
  */
 #define _GNU_SOURCE
 #include <pthread.h>
+#include <signal.h>
+#include <sys/time.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,6 +83,14 @@ static void *set_later(void *flag)
     /* A store the library does not see: the waiter finds it at its next sweep. */
     atomic_store_explicit((_Atomic int *)flag, 1, memory_order_release);
     return NULL;
+}
+
+static _Atomic int *alarm_flag;
+
+static void set_on_alarm(int sig)
+{
+    (void)sig;
+    atomic_store_explicit(alarm_flag, 1, memory_order_release);
 }
 
 int main(int argc, char **argv)
@@ -118,6 +140,19 @@ int main(int argc, char **argv)
         }
         shmem_int_wait_until(flag, SHMEM_CMP_NE, 0);
         pthread_join(helper, NULL);
+        shmem_barrier_all();
+    } else if (strcmp(mode, "between") == 0) {
+        if (me == last) {
+            alarm_flag = (_Atomic int *)flag;
+            struct sigaction action = { .sa_handler = set_on_alarm };
+            sigemptyset(&action.sa_mask);
+            struct itimerval when = { .it_value = { 2, 500000 } };
+            if (sigaction(SIGALRM, &action, NULL) != 0 || setitimer(ITIMER_REAL, &when, NULL) != 0) {
+                fprintf(stderr, "CHECK(sigaction and setitimer) failed\n");
+                return 1;
+            }
+            shmem_int_wait_until(flag, SHMEM_CMP_NE, 0);
+        }
         shmem_barrier_all();
     } else if (strcmp(mode, "helper") == 0) {
         if (me == last) {

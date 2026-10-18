@@ -222,12 +222,40 @@ void osoe_internode_backend_context_close(struct osoe_transport_context *c)
  * Held across nothing but the network. Slice 2 held it around every call, an
  * interim. Below THREAD_MULTIPLE nothing is shared and no mutex is taken.
  */
-static void context_enter(struct osoe_transport_context *c)
+/*
+ * A thread that finds another of its PE's threads in the context's waits waits
+ * for it as every library wait does (P26): counted for the deadlock detector
+ * (base/sweep.h), its "blocked in" record offered, and sweeping every
+ * OSOE_SWEEP_NS - the mutex slept on a sweep interval at a time. A plain lock
+ * slept uncounted and unswept: a deadlock behind it could never be proved, and
+ * an abort was seen only once the holder let go. It gives up by no rule of its
+ * own: the holder's wait keeps §3.15's no-progress rule, and ends the job if
+ * it stops moving.
+ */
+static void context_enter(struct osoe_transport_context *c, const char *routine)
 {
-    if (c->concurrent) {
-        pthread_mutex_lock(&c->mutex);
-        osoe_count(OSOE_C_AM_CONTEXT_LOCKS, 1);
+    if (!c->concurrent)
+        return;
+    if (pthread_mutex_trylock(&c->mutex) != 0) {
+        osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_NONE, 0);
+        for (;;) {
+            struct timespec until;
+            clock_gettime(CLOCK_MONOTONIC, &until);
+            uint64_t ns = (uint64_t)until.tv_nsec + OSOE_SWEEP_NS;
+            until.tv_sec += (time_t)(ns / UINT64_C(1000000000));
+            until.tv_nsec = (long)(ns % UINT64_C(1000000000));
+            osoe_wait_sleeps();
+            int r = pthread_mutex_clocklock(&c->mutex, CLOCK_MONOTONIC, &until);
+            if (r == 0)
+                break;
+            if (r != ETIMEDOUT)
+                osoe_fatal("%s: cannot take the context's waits: %s", routine, strerror(r));
+            osoe_sweep_expired(routine);
+        }
+        osoe_wait_ends();
+        osoe_blocked_leave();
     }
+    osoe_count(OSOE_C_AM_CONTEXT_LOCKS, 1);
 }
 
 static void context_leave(struct osoe_transport_context *c)
@@ -1938,7 +1966,7 @@ static void wait_shared(struct osoe_transport_context *c, const int *pes, size_t
     struct osoe_context_block *block = osoe_transport_context_block(c);
     uint64_t e = atomic_load_explicit(&block->generation, memory_order_seq_cst);
     osoe_perturb();
-    context_enter(c);
+    context_enter(c, routine);
     uint64_t full = atomic_load_explicit(&block->full, memory_order_seq_cst);
     if (full > e) {
         context_leave(c);
