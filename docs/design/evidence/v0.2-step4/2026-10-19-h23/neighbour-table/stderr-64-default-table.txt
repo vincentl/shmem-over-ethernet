@@ -1,0 +1,103 @@
+osoe: PE 59: shmem_init on node 59 has waited 30 s for 59 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 46801 (0 callers part-way through the hello); still waiting
+osoe: PE 62: shmem_init on node 62 has waited 30 s for 62 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 43343 (0 callers part-way through the hello); still waiting
+osoe: PE 61: shmem_init on node 61 has waited 30 s for 61 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 35697 (0 callers part-way through the hello); still waiting
+osoe: PE 56: shmem_init on node 56 has waited 30 s for 56 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 45467 (0 callers part-way through the hello); still waiting
+osoe: PE 53: shmem_init on node 53 has waited 30 s for 53 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 39283 (0 callers part-way through the hello); still waiting
+osoe: PE 60: shmem_init on node 60 has waited 30 s for 60 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 42049 (0 callers part-way through the hello); still waiting
+osoe: PE 58: shmem_init on node 58 has waited 30 s for 58 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 34519 (0 callers part-way through the hello); still waiting
+osoe: PE 57: shmem_init on node 57 has waited 30 s for 57 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 40793 (0 callers part-way through the hello); still waiting
+osoe: PE 54: shmem_init on node 54 has waited 30 s for 54 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 36787 (0 callers part-way through the hello); still waiting
+osoe: PE 63: shmem_init on node 63 has waited 30 s for 63 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 44249 (0 callers part-way through the hello); still waiting
+osoe: PE 55: shmem_init on node 55 has waited 30 s for 55 lower nodes of the mesh (node 0, 1, 2, 3, 4, 5, 6, 7, ...) to call it on port 43905 (0 callers part-way through the hello); still waiting
+osoe: PE 11: shmem_init on node 11 has waited 30 s for node 31 (10.99.0.32, at 10.99.0.32) to answer on port 44809: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 2: shmem_init on node 2 has waited 30 s for node 35 (10.99.0.36, at 10.99.0.36) to answer on port 34635: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 5: shmem_init on node 5 has waited 30 s for node 32 (10.99.0.33, at 10.99.0.33) to answer on port 35977: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 26: shmem_init on node 26 has waited 30 s for node 29 (10.99.0.30, at 10.99.0.30) to answer on port 38837: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 15: shmem_init on node 15 has waited 30 s for node 30 (10.99.0.31, at 10.99.0.31) to answer on port 41277: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 13: shmem_init on node 13 has waited 30 s for node 31 (10.99.0.32, at 10.99.0.32) to answer on port 44809: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 1: shmem_init on node 1 has waited 30 s for node 39 (10.99.0.40, at 10.99.0.40) to answer on port 46737: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 3: shmem_init on node 3 has waited 30 s for node 36 (10.99.0.37, at 10.99.0.37) to answer on port 36049: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 23: shmem_init on node 23 has waited 30 s for node 30 (10.99.0.31, at 10.99.0.31) to answer on port 41277: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 21: shmem_init on node 21 has waited 30 s for node 31 (10.99.0.32, at 10.99.0.32) to answer on port 44809: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 18: shmem_init on node 18 has waited 30 s for node 30 (10.99.0.31, at 10.99.0.31) to answer on port 41277: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 9: shmem_init on node 9 has waited 30 s for node 51 (10.99.0.52, at 10.99.0.52) to answer on port 44803: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 5: shmem_init on node 5 has waited 30 s for node 35 (10.99.0.36, at 10.99.0.36) to answer on port 34635: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 27: shmem_init on node 27 has waited 30 s for node 54 (10.99.0.55, at 10.99.0.55) to answer on port 36787: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 11: shmem_init on node 11 has waited 30 s for node 43 (10.99.0.44, at 10.99.0.44) to answer on port 44101: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 30: shmem_init on node 30 has waited 30 s for 2 lower nodes of the mesh (node 18, 23) to call it on port 41277 (0 callers part-way through the hello); still waiting
+osoe: PE 31: shmem_init on node 31 has waited 30 s for 4 lower nodes of the mesh (node 18, 21, 23, 30) to call it on port 44809 (0 callers part-way through the hello); still waiting
+osoe: PE 33: shmem_init on node 33 has waited 30 s for 6 lower nodes of the mesh (node 18, 21, 23, 30, 31, 32) to call it on port 37941 (0 callers part-way through the hello); still waiting
+osoe: PE 32: shmem_init on node 32 has waited 30 s for 5 lower nodes of the mesh (node 18, 21, 23, 30, 31) to call it on port 35977 (0 callers part-way through the hello); still waiting
+osoe: PE 16: shmem_init on node 16 has waited 30 s for node 38 (10.99.0.39, at 10.99.0.39) to answer on port 34629: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 2: shmem_init on node 2 has waited 30 s for node 57 (10.99.0.58, at 10.99.0.58) to answer on port 40793: the connection timed out, 0.0 s ago; still waiting
+osoe: PE 17: node 17: node 31 (10.99.0.32, lead rank 31) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe: PE 9: node 9: node 31 (10.99.0.32, lead rank 31) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe-launch: rank 9 exited with status 1
+osoe: PE 31: node 31: node 0 (10.99.0.1, lead rank 0) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe: PE 28: node 28: node 0 (10.99.0.1, lead rank 0) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe: PE 24: node 24: node 0 (10.99.0.1, lead rank 0) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe: PE 23: node 23: node 0 (10.99.0.1, lead rank 0) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe: PE 32: node 32: node 0 (10.99.0.1, lead rank 0) stopped answering: its kernel acknowledged neither keepalive probes nor retransmissions (§3.15). The host has vanished, or the network between is down; this PE was waiting in shmem_init
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 23 exited with status 1
+osoe-launch: rank 28 exited with status 1
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 10 killed by signal 15
+osoe-launch: rank 34 killed by signal 15
+osoe-launch: rank 24 exited with status 1
+osoe-launch: rank 51 killed by signal 15
+osoe-launch: rank 44 killed by signal 15
+osoe-launch: rank 13 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+osoe-launch: rank 15 killed by signal 15
+osoe-launch: rank 29 killed by signal 15
+osoe-launch: rank 47 killed by signal 15
+osoe-launch: rank 48 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 56 killed by signal 15
+osoe-launch: rank 54 killed by signal 15
+osoe-launch: rank 30 killed by signal 15
+osoe-launch: rank 37 killed by signal 15
+osoe-launch: rank 63 killed by signal 15
+osoe-launch: rank 57 killed by signal 15
+osoe-launch: rank 42 killed by signal 15
+osoe-launch: rank 14 killed by signal 15
+osoe-launch: rank 50 killed by signal 15
+osoe-launch: rank 26 killed by signal 15
+osoe-launch: rank 32 exited with status 1
+osoe-launch: rank 33 killed by signal 15
+osoe-launch: rank 59 killed by signal 15
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 22 killed by signal 15
+osoe-launch: rank 36 killed by signal 15
+osoe-launch: rank 40 killed by signal 15
+osoe-launch: rank 43 killed by signal 15
+osoe-launch: rank 31 exited with status 1
+osoe-launch: rank 58 killed by signal 15
+osoe-launch: rank 11 killed by signal 15
+osoe-launch: rank 21 killed by signal 15
+osoe-launch: rank 46 killed by signal 15
+osoe-launch: rank 12 killed by signal 15
+osoe-launch: rank 60 killed by signal 15
+osoe-launch: rank 20 killed by signal 15
+osoe-launch: rank 3 killed by signal 15
+osoe-launch: rank 18 killed by signal 15
+osoe-launch: rank 53 killed by signal 15
+osoe-launch: rank 45 killed by signal 15
+osoe-launch: rank 16 killed by signal 15
+osoe-launch: rank 7 killed by signal 15
+osoe-launch: rank 17 exited with status 1
+osoe-launch: rank 19 killed by signal 15
+osoe-launch: rank 25 killed by signal 15
+osoe-launch: rank 35 killed by signal 15
+osoe-launch: rank 39 killed by signal 15
+osoe-launch: rank 41 killed by signal 15
+osoe-launch: rank 52 killed by signal 15
+osoe-launch: rank 55 killed by signal 15
+osoe-launch: rank 61 killed by signal 15
+osoe-launch: rank 62 killed by signal 15
+osoe-launch: rank 27 killed by signal 15
+osoe-launch: rank 49 killed by signal 15
+osoe-launch: rank 38 killed by signal 15
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 8 killed by signal 15

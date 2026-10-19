@@ -1,0 +1,32 @@
+built, warnings 0
+tier3.sh: 64 nodes need 4032 entries in the kernel's neighbour table, which every namespace shares, and net.ipv4.neigh.default.gc_thresh3 is 1024: raise it to 4032 or more, and gc_thresh2 with it, or run fewer nodes
+tier3.sh at 64 with the default table: status 2
+tier3.sh at 32 with the default table: status 0
+before link=tier3 nodes=16 round=1 status=0 job_ms=678 mesh_us_most=22919 mesh_us_median=21474 leads=16
+before link=tier3 nodes=16 round=2 status=0 job_ms=662 mesh_us_most=23551 mesh_us_median=22702 leads=16
+before link=tier3 nodes=16 round=3 status=0 job_ms=667 mesh_us_most=21863 mesh_us_median=21065 leads=16
+before link=tier3 nodes=32 round=1 status=0 job_ms=969 mesh_us_most=54687 mesh_us_median=51649 leads=32
+before link=tier3 nodes=32 round=2 status=0 job_ms=964 mesh_us_most=55482 mesh_us_median=52365 leads=32
+before link=tier3 nodes=32 round=3 status=0 job_ms=1032 mesh_us_most=54794 mesh_us_median=50839 leads=32
+before link=tier3 nodes=64 round=1 status=0 job_ms=1704 mesh_us_most=176197 mesh_us_median=158469 leads=64
+before link=tier3 nodes=64 round=2 status=0 job_ms=1712 mesh_us_most=175205 mesh_us_median=155721 leads=64
+before link=tier3 nodes=64 round=3 status=0 job_ms=1710 mesh_us_most=176924 mesh_us_median=163940 leads=64
+before link=tier3 nodes=128 round=1 status=0 job_ms=4757 mesh_us_most=1612552 mesh_us_median=1512007 leads=128
+before link=tier3 nodes=128 round=2 status=0 job_ms=4782 mesh_us_most=1684981 mesh_us_median=612284 leads=128
+before link=tier3 nodes=128 round=3 status=0 job_ms=3864 mesh_us_most=766658 mesh_us_median=691044 leads=128
+before link=loopback nodes=16 round=1 status=0 job_ms=195 mesh_us_most=7879 mesh_us_median=5174 leads=16
+before link=loopback nodes=16 round=2 status=0 job_ms=211 mesh_us_most=5574 mesh_us_median=4582 leads=16
+before link=loopback nodes=16 round=3 status=0 job_ms=183 mesh_us_most=7298 mesh_us_median=5411 leads=16
+before link=loopback nodes=32 round=1 status=0 job_ms=251 mesh_us_most=18657 mesh_us_median=14945 leads=32
+before link=loopback nodes=32 round=2 status=0 job_ms=310 mesh_us_most=18149 mesh_us_median=9842 leads=32
+before link=loopback nodes=32 round=3 status=0 job_ms=307 mesh_us_most=19765 mesh_us_median=15676 leads=32
+before link=loopback nodes=64 round=1 status=0 job_ms=539 mesh_us_most=52211 mesh_us_median=40850 leads=64
+before link=loopback nodes=64 round=2 status=0 job_ms=565 mesh_us_most=56060 mesh_us_median=45714 leads=64
+before link=loopback nodes=64 round=3 status=0 job_ms=568 mesh_us_most=57034 mesh_us_median=44383 leads=64
+before link=loopback nodes=128 round=1 status=0 job_ms=1221 mesh_us_most=207434 mesh_us_median=173752 leads=128
+before link=loopback nodes=128 round=2 status=0 job_ms=1208 mesh_us_most=211244 mesh_us_median=163736 leads=128
+before link=loopback nodes=128 round=3 status=0 job_ms=1193 mesh_us_most=200174 mesh_us_median=167639 leads=128
+before link=loopback nodes=254 round=1 status=0 job_ms=3926 mesh_us_most=978641 mesh_us_median=706637 leads=254
+before link=loopback nodes=254 round=2 status=0 job_ms=4027 mesh_us_most=998462 mesh_us_median=801378 leads=254
+before link=loopback nodes=254 round=3 status=0 job_ms=3680 mesh_us_most=837751 mesh_us_median=673918 leads=254
+BEFORE DONE 08:57:45

@@ -1,0 +1,24 @@
+built, warnings 0
+gc_thresh3 1024
+awk: line 2: function strtonum never defined
+/tmp/h23-diagnose.sh: line 13: bc: command not found
+awk: line 2: function strtonum never defined
+n32-default nodes=32 status=0 seconds= table_fulls_added=0 notices=0
+awk: line 2: function strtonum never defined
+/tmp/h23-diagnose.sh: line 13: bc: command not found
+awk: line 2: function strtonum never defined
+n64-default nodes=64 status=1 seconds= table_fulls_added=0 notices=32
+dmesg overflow lines: 250
+gc_thresh3 32768 (raised for the run)
+awk: line 2: function strtonum never defined
+/tmp/h23-diagnose.sh: line 13: bc: command not found
+awk: line 2: function strtonum never defined
+n64-raised nodes=64 status=0 seconds= table_fulls_added=0 notices=0
+awk: line 2: function strtonum never defined
+/tmp/h23-diagnose.sh: line 13: bc: command not found
+awk: line 2: function strtonum never defined
+n128-raised nodes=128 status=0 seconds= table_fulls_added=0 notices=0
+gc_thresh3 1024 (restored)
+DIAG DONE 08:17:50
+
+[exited with code 0]
