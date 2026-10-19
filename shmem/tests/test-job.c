@@ -3,9 +3,9 @@
  * The job-wide rendezvous and the locality function (§6.2, §8.1).
  *
  * §6.2 has only node leads cross the network, each publishing its node's rank
- * list, its SHMEM_SYMMETRIC_SIZE and its handler-table checksum, and the result
- * being the rank -> node map every PE needs before a message can be addressed
- * at all. This checks that shape directly, across real processes and several
+ * list, its SHMEM_SYMMETRIC_SIZE and its backend's agreement word - on AM the
+ * handler table's checksum - and the result being the rank -> node map every
+ * PE needs before a message can be addressed at all. This checks that shape directly, across real processes and several
  * node maps - including the two §8.1 calls out as the ones that break things:
  * uneven node sizes, and ranks that are not contiguous per node.
  *
@@ -61,6 +61,17 @@ void osoe_transport_advertise(void *blob);
 void osoe_transport_advertise(void *blob)
 {
     (void)blob;
+}
+
+/* The backend's agreement word (internode-backend.h), which the rendezvous
+ * compares between the leads (P27): this test has no backend, so a word of its
+ * own - or, on a node given OSOE_TEST_AGREEMENT_WORD, that one, so that
+ * shmem.job.disagree.agreement-word sees two binaries told apart. */
+uint32_t osoe_internode_backend_agreement_word(void);
+uint32_t osoe_internode_backend_agreement_word(void)
+{
+    const char *word = getenv("OSOE_TEST_AGREEMENT_WORD");
+    return word ? (uint32_t)strtoul(word, NULL, 0) : UINT32_C(0x0501d0e5);
 }
 
 /* The "blocked in" record (blocked.h), which job.c and rendezvous.c keep while

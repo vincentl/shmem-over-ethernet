@@ -481,10 +481,10 @@ foreach(fixture IN LISTS osoe_slurm_fixtures)
     PASS_REGULAR_EXPRESSION "FIXTURE OK")
 endforeach()
 
-# internode: shmem_test_job compiles am.c, rendezvous.c and listener.c, on one-node maps too
+# internode: shmem_test_job compiles rendezvous.c and listener.c, on one-node maps too
 if(OSOE_INTERNODE)
   add_executable(shmem_test_job test-job.c ../src/job.c ../src/bootstrap.c ../src/shm-object.c
-    ../src/am.c ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
+    ../src/rendezvous.c ../src/rank-map.c ../src/listener.c)
   target_include_directories(shmem_test_job PRIVATE ../src)
   target_link_libraries(shmem_test_job PRIVATE osoe_base rt)
   osoe_warnings(shmem_test_job)
@@ -615,8 +615,19 @@ if(OSOE_INTERNODE)
     PATTERNS "node 1 [(]or a node below it[)] has long double in .*; node 0 has long double in .*: every node of a job must be of one architecture"
              "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
     PROGRAM $<TARGET_FILE:shmem_test_job>)
+
+  # And the internode backend's agreement word (P27; internode-backend.h) - on
+  # AM the handler table's checksum, which binaries whose messages differ do
+  # not share. test-job.c stands in for the backend, and gives node 1's lead
+  # another word (OSOE_TEST_AGREEMENT_WORD).
+  osoe_refusal_test(shmem.job.disagree.agreement-word 2 0
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_TEST_AGREEMENT_WORD=0x5ca1ab1e
+    PATTERNS "node 1 [(]or a node below it[)] has the internode backend's agreement word 0x5ca1ab1e; node 0 has 0x501d0e5: the nodes are running different binaries"
+             "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
+    PROGRAM $<TARGET_FILE:shmem_test_job>)
   osoe_internode_label(shmem.job.disagree.symmetric-size shmem.job.disagree.fanout
-    shmem.job.disagree.max-teams shmem.job.disagree.architecture)
+    shmem.job.disagree.max-teams shmem.job.disagree.architecture
+    shmem.job.disagree.agreement-word)
 endif()
 
 # Between the PEs of one node too: the lead sizes the team blocks, the rows of

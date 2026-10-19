@@ -80,6 +80,11 @@ void osoe_internode_backend_rendezvous(const struct osoe_bootstrap *b, uint32_t 
     unreachable("osoe_internode_backend_rendezvous");
 }
 
+uint32_t osoe_internode_backend_agreement_word(void)
+{
+    unreachable("osoe_internode_backend_agreement_word");
+}
+
 void osoe_internode_backend_start(uint32_t session, bool check_quiet)
 {
     (void)session;

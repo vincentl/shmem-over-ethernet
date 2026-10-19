@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 cmake_minimum_required(VERSION 3.25)
 
-# Two checks over the library's includes:
+# Three checks over the library's includes:
 #
 #   1. No file above the backend boundary includes, however indirectly, a
 #      header below it (design §4.10; second review, roce-seam F6) - nor the
 #      generic internode implementation's, which only a backend calls; and no
-#      file on the boundary does either, but the three that are known to.
+#      file on the boundary does either, but the one that is known to.
 #   2. Nothing but the API includes an API header or a public one (phase 1
 #      step 5 slice 2): the runtime, the files on the boundary and the backend
 #      include nothing of the OpenSHMEM layer's, so the includes run one way,
@@ -110,14 +110,15 @@ set(OSOE_ON_BOUNDARY
   listener.h node.h rank-map.h rendezvous.h rmw.h shm-object.h transport.h watch-range.h
   wire-settings.h)
 
-# The two files on the boundary that reach an AM header, each known (roce-seam
-# §3.2): rendezvous.c checks the AM handler table's checksum (L6);
-# transport-local.c, the intranode backend every build keeps, includes the
-# header the AM backend shares with it. A third, node.c, sized the landing
-# zones from the AM chunk (L5) until v0.2's step 1 gave the AM layer's sizes a
-# file of their own on the boundary. Every other file on the boundary is held
-# to the first check.
-set(OSOE_ON_BOUNDARY_READING_AM rendezvous.c transport-local.c)
+# The one file on the boundary that reaches an AM header, known (roce-seam
+# §3.2): transport-local.c, the intranode backend every build keeps, includes
+# the header the AM backend shares with it. Two more did: node.c sized the
+# landing zones from the AM chunk (L5) until v0.2's step 1 gave the AM layer's
+# sizes a file of their own on the boundary, and rendezvous.c checked the AM
+# handler table's checksum (L6) until P27 had it compare the internode
+# backend's agreement word, which internode-backend.h returns. Every other file
+# on the boundary is held to the first check.
+set(OSOE_ON_BOUNDARY_READING_AM transport-local.c)
 
 # The internode backend (internode-backend.h): every file only a job of more
 # than one node uses, on AM - the far half, the engine, the wires and the ring,
@@ -231,7 +232,7 @@ function(walk top forbidden forbid_public out)
 endfunction()
 
 # 1. Above the boundary, nothing below it or backend-facing; on it, nothing
-#    below but for the three files known to.
+#    below but for the one file known to.
 set(below_names ${OSOE_BELOW_BOUNDARY} ${OSOE_BACKEND_FACING})
 paths_of(below_names below)
 paths_of(OSOE_BELOW_BOUNDARY below_only)
