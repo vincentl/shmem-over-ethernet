@@ -270,6 +270,8 @@ OSOE_BUILD_NOTE
 "                           0 to 5000: a node acts on a peer's abortive\n"
 "                           goodbye that late, and a helper begins its abort\n"
 "                           that long after its node's (§3.15)\n"
+"    OSOE_TEST_PRINT_LINK   1: rank 0 prints the link it measured, as the\n"
+"                           OSOE_LINK_* that pin it (§5.3)\n"
 "    OSOE_WIRE_UNSENT_BYTES about the most the kernel may hold unsent on a\n"
 "                           data wire, up to 1073741824, or 0 for the\n"
 "                           system's own; by default the link's bandwidth\n"
@@ -547,6 +549,21 @@ static void session_start(void)
      * choose; or as set, or none (link-measure.h).
      */
     osoe_link_establish();
+    /*
+     * OSOE_TEST_PRINT_LINK (T19): the link measured, from rank 0 alone, as the
+     * three settings that pin it, so that a test's failure tied to the shapes
+     * this link chose can be run again on them. Every test of more than one
+     * node sets it (cmake/OsoeInternode.cmake). A link set by hand is already
+     * the test's own, and under `fixed` nothing is measured.
+     */
+    if (osoe.bootstrap.print_link && osoe.bootstrap.rank == 0 &&
+        osoe.job.link_source == OSOE_LINK_MEASURED)
+        osoe_print_line("osoe: the link measured at start-up, to run again on it: "
+                        "OSOE_LINK_HOP_NS=%llu OSOE_LINK_MESSAGE_NS=%llu "
+                        "OSOE_LINK_BYTES_PER_SECOND=%llu\n",
+                        (unsigned long long)osoe.job.link.hop_ns,
+                        (unsigned long long)osoe.job.link.message_ns,
+                        (unsigned long long)osoe.job.link.bytes_per_second);
     /*
      * Then what the transport queues, sized by that link: on AM the kernel's
      * unsent bytes on every connection (v0.2 step 4, design §3.2). Start-up ran

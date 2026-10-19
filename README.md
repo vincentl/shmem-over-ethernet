@@ -268,10 +268,10 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - about 950,
+That builds one file at a time and runs the tests one at a time - about 990,
 checks of the build itself and jobs of a few processes. On four cores of an
 idle virtual machine it took about thirteen minutes, one for the build and
-twelve for the tests (2026-10-17). Both may run four at a time, as this
+twelve for the tests (2026-10-17, when they were about 950). Both may run four at a time, as this
 project's own runs do (`cmake --build --preset release -j4`, `ctest --preset
 release -j4`). The 41 tests of the model checker (`tools/modelcheck`, which
 needs Python 3) took 62 minutes in a development VM one at a time on
@@ -319,16 +319,17 @@ profiles refuse it: Docker 25 and later and containerd 2.0 and later with
 `EPERM`, which the message tells from the sysctl's own refusal by reading the
 sysctl - naming a seccomp filter where the sysctl allows io_uring, as it does
 inside such a container - and Podman with `ENOSYS`. There jobs on one node run, but about
-480 of the test suite's 951 tests fail at `shmem_init` or at opening a ring -
-all of them among the 523 labelled `internode` but `env.probe`, which need more
-than one node or test the internode backend's own files, io_uring or futex2
-(`ctest -L internode`); the single-node build has neither them nor io_uring. Set
+480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
+opening a ring - all of them among the 523 then labelled `internode` but
+`env.probe`, which need more than one node or test the internode backend's own
+files, io_uring or futex2 (`ctest -L internode`, 541 tests now); the
+single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
 asked for more (Docker's and Podman's `--shm-size`; Kubernetes' pods likewise) -
 less than one PE needs at the default heap of 256 MiB - so at their defaults
 even a job of one PE is refused at start-up, naming the sizes, and about 760 of
-the suite's 951 tests fail, with io_uring refused as well. Give the container a
+those 951 tests failed, with io_uring refused as well. Give the container a
 `/dev/shm` of its own, about 300 MiB for each PE of the node at the default heap, or lower
 `SHMEM_SYMMETRIC_SIZE`, rather than the host's (`--ipc=host`), which outlives
 the container.
@@ -1452,7 +1453,7 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 950 tests in
+  run before every merge, on the exact tree that merges: about 990 tests in
   release, and the model checker's 41 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
@@ -1460,6 +1461,10 @@ that one could be added without touching the OpenSHMEM layer.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
   well as at none, by the environment `ctest` passes on to every test, in every
   preset.
+- **The measured link.** Every test of more than one node runs with
+  `OSOE_TEST_PRINT_LINK=1`, so that its output gives the link the job measured
+  as it started, as the three `OSOE_LINK_*` settings that run it again on the
+  shapes that link chose: a failure tied to one of them can be repeated.
 - **ThreadSanitizer's verdict.** Under it every test runs with the tool's
   `exitcode=0`, `abort_on_error=1` and a `log_path` of its own
   (`cmake/OsoeThreadSanitizer.cmake`): the tool leaves each process its own
@@ -1474,7 +1479,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 292 of the 523 tests labelled `internode`, `shmem.internode`'s
+  leaves out 298 of the 541 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1506,11 +1511,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  523 tests labelled `internode` - those of a job of more than one node, of
+  541 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 427 of the full build's 951 tests in
+  development VM with liburing hidden: 447 of the full build's 989 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1709,6 +1714,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_HOLD_GOODBYE` | `FROM:TO`, two nodes of the job: node `FROM` holds its abortive goodbye to node `TO` half a second after its abort begins, so that a test sees `TO` hear a third node's goodbye first - the relay a global exit's kept stream is for; every other node ignores it. Refused by name when it is not two different nodes of the job. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
+| `OSOE_TEST_PRINT_LINK` | `1`: rank 0 prints the link it measured at the end of `shmem_init`, as the three `OSOE_LINK_*` settings that pin it, so that a test that failed on the shapes that link chose can be run again on them; nothing where the link is set by hand, the shape is `fixed` or the job has one node. Every test of more than one node in the suite sets it. Refused by name when it is not `0` or `1`. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection's data wire, which its puts and gets go by (a control wire keeps the system's own): `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set at the end of `shmem_init` from the link, measured or set. `OSOE_COLLECTIVE_SHAPE=fixed` measures none, so there it is 16 KiB on any link unless the three `OSOE_LINK_*` give the bandwidth - less than the rule gives a link faster than a gigabit. Uncapped, as at v0.2 step 3, a fetch-add behind a put stream on the Pi cluster waited 17 to 20 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
 | `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED` | A rate per 10,000 at which sends and receives are cut short, and the seed that makes a failing pattern repeat. |
 

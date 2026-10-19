@@ -4998,7 +4998,11 @@ if(OSOE_INTERNODE)
     add_executable(shmem_test_vanished-node test-vanished-node.c)
     target_link_libraries(shmem_test_vanished-node PRIVATE osoe)
     osoe_warnings(shmem_test_vanished-node)
-    set(osoe_tier3 sudo -n ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
+    # tier3.sh hands its own environment to the job, and sudo passes none on:
+    # the testing hook every multi-node test has (OSOE_TEST_PRINT_LINK, T19;
+    # cmake/OsoeInternode.cmake) goes through env, inside sudo.
+    set(osoe_tier3 sudo -n env OSOE_TEST_PRINT_LINK=1
+        ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
     set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
         OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
     # tier3.<shape>.<name>: PROGRAM [ARGS...] launched on MAP, with ENV's NAME=VALUE

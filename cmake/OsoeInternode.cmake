@@ -30,10 +30,18 @@ else()
 endif()
 
 # osoe_internode_label(<test>...): add the label to tests already added,
-# after whatever set their LABELS, which replaces the list.
+# after whatever set their LABELS, which replaces the list. And the testing
+# hook OSOE_TEST_PRINT_LINK=1 (T19), so that every test of more than one node
+# says the link it measured at start-up, from rank 0, as the three OSOE_LINK_*
+# settings that run it again on the same shapes: through the environment's
+# modification, which a later ENVIRONMENT property does not replace. Tier 3's
+# tests run their wrapper through sudo, which passes no environment on, so it
+# is set inside sudo there (osoe_tier3, shmem/tests/CMakeLists.txt).
 function(osoe_internode_label)
   foreach(test IN LISTS ARGN)
     set_property(TEST ${test} APPEND PROPERTY LABELS internode)
+    set_property(TEST ${test} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+                 "OSOE_TEST_PRINT_LINK=set:1")
   endforeach()
 endfunction()
 
