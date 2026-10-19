@@ -1007,7 +1007,9 @@ endforeach()
 # The AM layer's settings and the wire's, which a lead alone read before: the lead
 # when it laid out the segment, and the wire's after the rendezvous and on a job
 # of several nodes only, so that a job of one node accepted OSOE_WIRE_BYTES=abc
-# without a word. Each PE refuses its own.
+# without a word. Each PE refuses its own. And T19's testing hook,
+# OSOE_TEST_PRINT_LINK, which every PE reads at bootstrap and refuses unless it
+# is 0 or 1 - a value that is no number, and a number past 1.
 foreach(case_expect
     "am-chunk|OSOE_AM_CHUNK|abc|OSOE_AM_CHUNK='abc' is not a decimal byte count"
     "am-buffer|OSOE_AM_BUFFER|abc|OSOE_AM_BUFFER='abc' is not a decimal byte count"
@@ -1021,7 +1023,9 @@ foreach(case_expect
     "wire-zero-copy|OSOE_WIRE_ZERO_COPY|yes|OSOE_WIRE_ZERO_COPY=yes: on, to send connection buffers by reference"
     "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1"
     "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not a number of threads from 0 to 64"
-    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64")
+    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64"
+    "test-print-link|OSOE_TEST_PRINT_LINK|yes|OSOE_TEST_PRINT_LINK='yes' is not 0 or 1"
+    "test-print-link-large|OSOE_TEST_PRINT_LINK|2|OSOE_TEST_PRINT_LINK='2' is not 0 or 1")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
