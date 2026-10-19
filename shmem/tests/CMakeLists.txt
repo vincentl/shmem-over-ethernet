@@ -2774,6 +2774,36 @@ if(OSOE_INTERNODE)
   endif()
 endif()
 
+# What OSOE_COLLECTIVE_SHAPE=fixed promises (T23; test-fixed-shape.c,
+# fixed-shape.sh): the same bits from every run of this version - for the same
+# team, node map and settings - and nothing across versions, which may change
+# the tree. Floating-point reductions whose results depend on the order they
+# combine in - a sum that rounds, one that overflows on the way, signed zeros,
+# a NaN, a float sum - at the small class's size, a few pieces' and a MiB's,
+# hashed, from four separate launches: at no helpers and at two, with the
+# machine idle and beside a busy loop a core. Every hash must be the same. On
+# six nodes of one and two PEs, at 0.1.0's fan-out and pipeline, 4 and 2,
+# where node 1 is an interior node of the leads' tree, and at the defaults,
+# where the tree is the root's alone. Run alone, since its loops would slow the
+# tests beside it; tsan is left out for shmem.internode.*'s reason.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_fixed-shape test-fixed-shape.c)
+  target_link_libraries(shmem_test_fixed-shape PRIVATE osoe)
+  osoe_warnings(shmem_test_fixed-shape)
+  foreach(case "fanout-4-pipeline-2;4;2" "defaults;8;4")
+    list(GET case 0 name)
+    list(GET case 1 fanout)
+    list(GET case 2 pipeline)
+    add_test(NAME shmem.fixed-shape.${name}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/fixed-shape.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_fixed-shape> 0,0,1,1,2,3,4,5,5
+              OSOE_COLLECTIVE_FANOUT=${fanout} OSOE_COLLECTIVE_PIPELINE=${pipeline})
+    set_tests_properties(shmem.fixed-shape.${name} PROPERTIES LABELS "tier2" TIMEOUT 900
+      RUN_SERIAL TRUE PASS_REGULAR_EXPRESSION "FIXED SHAPE REPEATS")
+    osoe_internode_label(shmem.fixed-shape.${name})
+  endforeach()
+endif()
+
 # The public headers compiled under each standard they promise, every warning
 # an error (headers.c, headers.cpp): no other translation unit is C99 or C++,
 # so without these a break in either mode would ship. C++ where the machine has
