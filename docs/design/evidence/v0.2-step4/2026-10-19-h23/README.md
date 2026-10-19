@@ -21,3 +21,7 @@ The record is `docs/decisions/2026-10-19.md`. Every run was in the development V
   model at four CPUs beside the VM's runs.
 - `mutants/`: the nine mutants, each applied to the build's tree, built, its test run, and the
   tree put back (`mutants.py`); every one failed its test.
+- `verify/`: the whole verification (`batch.txt`, by `/tmp/batch-verify.sh` and then tier 3's
+  suite and the mesh models, `batch-and-tier3.sh`) on `f8e370da`, and the final tree's again after
+  the boundary's fix (`final.txt`, `final.sh` and `extra.sh`: the internode tests at two progress
+  helpers and the mesh's notice with a lead held back).

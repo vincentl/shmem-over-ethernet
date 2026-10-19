@@ -1,0 +1,26 @@
+built release 0 warnings 0
+built debug 0 warnings 0
+built asan 0 warnings 0
+built tsan 0 warnings 0
+built tier3 0 warnings 0
+built single-node 0 warnings 0
+static: 94% tests passed, 1 tests failed out of 17
+	 18 - shmem.boundary (Failed)                           tier1
+counts: release 1003 internode 547 asan 971 tsan 683 single-node 460
+release: 99% tests passed, 1 tests failed out of 1003
+	 18 - shmem.boundary (Failed)                           tier1
+debug: 99% tests passed, 1 tests failed out of 1003
+	 18 - shmem.boundary (Failed)                           tier1
+asan: 99% tests passed, 1 tests failed out of 971
+	 18 - shmem.boundary (Failed)                           tier1
+tsan: 99% tests passed, 1 tests failed out of 683
+	 19 - shmem.boundary (Failed)                           tier1
+0 report files, 0 reports, 0 passed in 0 tests
+THREAD SANITIZER GATE PASSED
+single-node: 99% tests passed, 1 tests failed out of 460
+	 18 - shmem.boundary (Failed)                           tier1
+oom kills so far: 0
+VERIFY DONE 09:53:36
+tier3: 100% tests passed, 0 tests failed out of 138
+mesh models: 100% tests passed, 0 tests failed out of 3
+H23 VERIFY DONE 09:57:31
