@@ -1,0 +1,204 @@
+At main 5ef7e197 (before) and at 1d23e536 (after, the verification tree), release, 1000 runs each (repeat.sh).
+before-release: failed 25 of 1000, idle; survivors' lines agent 1488, sweep 487; 109 to 227 ms
+after-release: failed 0 of 1000, idle; survivors' lines agent 1568, sweep 432; 107 to 134 ms
+
+== before-release run-58
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4089753) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-66
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4089977) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-82
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4090430) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-99
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4090917) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-163
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4092740) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-179
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4093194) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-300
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4096649) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-330
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4097504) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-360
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4098366) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-401
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4099532) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-405
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4099644) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-449
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4100900) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-464
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4101326) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-526
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4103092) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-551
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4103803) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-553
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4103858) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-627
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4105976) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-637
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4106258) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-659
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4106885) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-686
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4107658) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-806
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4111085) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-818
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4111427) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-853
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4112426) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-876
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4113087) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+== before-release run-939
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 4114884) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned

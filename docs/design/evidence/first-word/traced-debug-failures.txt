@@ -1,0 +1,243 @@
+== run 87
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3716427) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 0 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3716430 agent liveness: a local PE ended
+      41.9   rank 0 tid 3716430 agent first word: won
+      89.5   rank 0 tid 3716430 agent agent: sees the abort
+      93.5   rank 0 tid 3716430 agent abort_end: entered
+      95.2   rank 0 tid 3716430 agent abort_end: this thread ends the process
+     148.5   rank 1 tid 3716428 agent agent: sees the abort
+     155.9   rank 2 tid 3716429 agent agent: sees the abort
+     158.8   rank 1 tid 3716428 agent abort_end: entered
+     160.9   rank 1 tid 3716428 agent abort_end: this thread ends the process
+     165.8   rank 2 tid 3716429 agent abort_end: entered
+     167.4   rank 2 tid 3716429 agent abort_end: this thread ends the process
+     287.9   rank 0 tid 3716430 agent first word: lost
+     288.1   rank 2 tid 3716429 agent first word: won
+     291.0   rank 0 tid 3716430 agent abort_end: _exit
+     296.6   rank 2 tid 3716429 agent abort_end: wrote
+     297.5   rank 2 tid 3716429 agent abort_end: _exit
+     306.3   rank 1 tid 3716425 other sweep: sees the abort
+     315.9   rank 1 tid 3716425 other fatal: entered
+     318.0   rank 1 tid 3716425 other first word: won
+     330.5   rank 1 tid 3716428 agent first word: lost
+     332.9   rank 1 tid 3716428 agent abort_end: _exit
+== run 375
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3725294) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3725298 agent liveness: a local PE ended
+      72.0   rank 0 tid 3725298 agent first word: won
+     140.8   rank 0 tid 3725298 agent agent: sees the abort
+     146.1   rank 0 tid 3725298 agent abort_end: entered
+     148.1   rank 0 tid 3725298 agent abort_end: this thread ends the process
+     215.7   rank 1 tid 3725295 agent agent: sees the abort
+     224.9   rank 2 tid 3725296 agent agent: sees the abort
+     228.1   rank 1 tid 3725295 agent abort_end: entered
+     230.3   rank 1 tid 3725295 agent abort_end: this thread ends the process
+     235.0   rank 2 tid 3725296 agent abort_end: entered
+     236.8   rank 2 tid 3725296 agent abort_end: this thread ends the process
+     334.9   rank 0 tid 3725298 agent first word: lost
+     338.2   rank 0 tid 3725298 agent abort_end: _exit
+     381.9   rank 1 tid 3725292 other sweep: sees the abort
+     391.7   rank 2 tid 3725296 agent first word: won
+     391.9   rank 1 tid 3725292 other fatal: entered
+     398.5   rank 1 tid 3725292 other first word: won
+     399.4   rank 2 tid 3725296 agent abort_end: wrote
+     400.2   rank 2 tid 3725296 agent abort_end: _exit
+     408.2   rank 1 tid 3725295 agent first word: lost
+     412.8   rank 1 tid 3725295 agent abort_end: _exit
+== run 400
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3726062) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3726066 agent liveness: a local PE ended
+     197.2   rank 0 tid 3726066 agent first word: won
+     275.5   rank 0 tid 3726066 agent agent: sees the abort
+     280.8   rank 0 tid 3726066 agent abort_end: entered
+     282.3   rank 0 tid 3726066 agent abort_end: this thread ends the process
+     332.7   rank 1 tid 3726063 agent agent: sees the abort
+     345.2   rank 2 tid 3726064 agent agent: sees the abort
+     346.0   rank 1 tid 3726063 agent abort_end: entered
+     349.6   rank 1 tid 3726063 agent abort_end: this thread ends the process
+     355.4   rank 2 tid 3726064 agent abort_end: entered
+     356.8   rank 2 tid 3726064 agent abort_end: this thread ends the process
+     386.9   rank 1 tid 3726060 other sweep: sees the abort
+     397.5   rank 1 tid 3726060 other fatal: entered
+     405.5   rank 1 tid 3726060 other first word: won
+     447.9   rank 0 tid 3726066 agent first word: lost
+     448.8   rank 2 tid 3726064 agent first word: won
+     450.2   rank 0 tid 3726066 agent abort_end: _exit
+     468.8   rank 1 tid 3726063 agent first word: lost
+     470.6   rank 1 tid 3726063 agent abort_end: _exit
+     471.3   rank 2 tid 3726064 agent abort_end: wrote
+     472.2   rank 2 tid 3726064 agent abort_end: _exit
+== run 444
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3727411) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: shmem_barrier_all: the job is aborting on behalf of PE 3; this PE cannot make progress
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3727415 agent liveness: a local PE ended
+      40.7   rank 0 tid 3727415 agent first word: won
+     137.7   rank 0 tid 3727415 agent agent: sees the abort
+     143.2   rank 0 tid 3727415 agent abort_end: entered
+     145.3   rank 0 tid 3727415 agent abort_end: this thread ends the process
+     251.4   rank 1 tid 3727413 agent agent: sees the abort
+     276.1   rank 2 tid 3727412 agent agent: sees the abort
+     287.4   rank 2 tid 3727412 agent abort_end: entered
+     288.4   rank 1 tid 3727413 agent abort_end: entered
+     289.4   rank 2 tid 3727412 agent abort_end: this thread ends the process
+     290.2   rank 1 tid 3727413 agent abort_end: this thread ends the process
+     320.9   rank 0 tid 3727415 agent first word: lost
+     323.0   rank 0 tid 3727415 agent abort_end: _exit
+     389.0   rank 1 tid 3727409 other sweep: sees the abort
+     396.5   rank 1 tid 3727409 other fatal: entered
+     403.2   rank 1 tid 3727409 other first word: won
+     418.0   rank 2 tid 3727410 other sweep: sees the abort
+     423.0   rank 2 tid 3727410 other fatal: entered
+     429.6   rank 1 tid 3727409 other fatal: flushed
+     431.0   rank 2 tid 3727410 other first word: won
+     433.7   rank 2 tid 3727412 agent first word: lost
+     435.5   rank 2 tid 3727412 agent abort_end: _exit
+     446.9   rank 1 tid 3727409 other fatal: wrote
+     448.0   rank 1 tid 3727409 other fatal: _exit
+== run 604
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3732339) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3732343 agent liveness: a local PE ended
+      46.7   rank 0 tid 3732343 agent first word: won
+     114.8   rank 0 tid 3732343 agent agent: sees the abort
+     120.4   rank 0 tid 3732343 agent abort_end: entered
+     124.0   rank 0 tid 3732343 agent abort_end: this thread ends the process
+     726.3   rank 0 tid 3732343 agent first word: lost
+     848.4   rank 0 tid 3732343 agent abort_end: _exit
+     891.5   rank 2 tid 3732341 agent agent: sees the abort
+     911.2   rank 2 tid 3732341 agent abort_end: entered
+     914.7   rank 2 tid 3732341 agent abort_end: this thread ends the process
+     979.0   rank 1 tid 3732340 agent agent: sees the abort
+     995.6   rank 1 tid 3732340 agent abort_end: entered
+     999.2   rank 1 tid 3732340 agent abort_end: this thread ends the process
+    1111.2   rank 2 tid 3732338 other sweep: sees the abort
+    1129.5   rank 2 tid 3732338 other fatal: entered
+    1141.5   rank 1 tid 3732340 agent first word: won
+    1142.9   rank 2 tid 3732338 other first word: won
+    1148.8   rank 2 tid 3732341 agent first word: lost
+    1152.6   rank 2 tid 3732341 agent abort_end: _exit
+    1154.7   rank 1 tid 3732340 agent abort_end: wrote
+    1156.8   rank 1 tid 3732340 agent abort_end: _exit
+== run 705
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3735454) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3735458 agent liveness: a local PE ended
+      39.2   rank 0 tid 3735458 agent first word: won
+      77.7   rank 0 tid 3735458 agent agent: sees the abort
+      80.5   rank 0 tid 3735458 agent abort_end: entered
+      82.0   rank 0 tid 3735458 agent abort_end: this thread ends the process
+     138.4   rank 1 tid 3735456 agent agent: sees the abort
+     146.9   rank 1 tid 3735456 agent abort_end: entered
+     148.0   rank 2 tid 3735455 agent agent: sees the abort
+     148.4   rank 1 tid 3735456 agent abort_end: this thread ends the process
+     156.2   rank 2 tid 3735455 agent abort_end: entered
+     158.0   rank 2 tid 3735455 agent abort_end: this thread ends the process
+     224.4   rank 0 tid 3735458 agent first word: lost
+     225.7   rank 0 tid 3735458 agent abort_end: _exit
+     255.6   rank 2 tid 3735453 other sweep: sees the abort
+     263.7   rank 2 tid 3735453 other fatal: entered
+     269.7   rank 2 tid 3735453 other first word: won
+     278.2   rank 2 tid 3735455 agent first word: lost
+     280.0   rank 2 tid 3735455 agent abort_end: _exit
+     311.5   rank 1 tid 3735456 agent first word: won
+     319.8   rank 1 tid 3735456 agent abort_end: wrote
+     320.8   rank 1 tid 3735456 agent abort_end: _exit
+== run 801
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3738416) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 1: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3738420 agent liveness: a local PE ended
+      48.5   rank 0 tid 3738420 agent first word: won
+     137.2   rank 0 tid 3738420 agent agent: sees the abort
+     150.1   rank 0 tid 3738420 agent abort_end: entered
+     153.5   rank 0 tid 3738420 agent abort_end: this thread ends the process
+     293.5   rank 1 tid 3738418 agent agent: sees the abort
+     315.9   rank 1 tid 3738418 agent abort_end: entered
+     319.5   rank 1 tid 3738418 agent abort_end: this thread ends the process
+     346.7   rank 2 tid 3738417 agent agent: sees the abort
+     365.5   rank 2 tid 3738417 agent abort_end: entered
+     372.3   rank 2 tid 3738417 agent abort_end: this thread ends the process
+     398.5   rank 0 tid 3738420 agent first word: lost
+     405.5   rank 0 tid 3738420 agent abort_end: _exit
+     522.4   rank 2 tid 3738415 other sweep: sees the abort
+     545.8   rank 2 tid 3738415 other fatal: entered
+     550.1   rank 2 tid 3738415 other first word: won
+     581.2   rank 2 tid 3738417 agent first word: lost
+     585.9   rank 2 tid 3738417 agent abort_end: _exit
+     664.1   rank 1 tid 3738418 agent first word: won
+     704.7   rank 1 tid 3738418 agent abort_end: wrote
+     707.6   rank 1 tid 3738418 agent abort_end: _exit
+== run 876
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3740720) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+-- its trace, every PE, by time (us from the first event)
+       0.0   rank 0 tid 3740723 agent liveness: a local PE ended
+      30.5   rank 0 tid 3740723 agent first word: won
+      95.4   rank 0 tid 3740723 agent agent: sees the abort
+     103.6   rank 0 tid 3740723 agent abort_end: entered
+     106.6   rank 0 tid 3740723 agent abort_end: this thread ends the process
+     179.9   rank 1 tid 3740721 agent agent: sees the abort
+     191.8   rank 2 tid 3740722 agent agent: sees the abort
+     194.9   rank 1 tid 3740721 agent abort_end: entered
+     198.5   rank 1 tid 3740721 agent abort_end: this thread ends the process
+     234.0   rank 2 tid 3740722 agent abort_end: entered
+     239.8   rank 2 tid 3740722 agent abort_end: this thread ends the process
+     259.9   rank 0 tid 3740723 agent first word: lost
+     265.3   rank 0 tid 3740723 agent abort_end: _exit
+     314.2   rank 1 tid 3740718 other sweep: sees the abort
+     328.0   rank 1 tid 3740718 other fatal: entered
+     338.3   rank 1 tid 3740718 other first word: won
+     343.0   rank 1 tid 3740721 agent first word: lost
+     347.6   rank 1 tid 3740721 agent abort_end: _exit
+     389.7   rank 2 tid 3740722 agent first word: won
+     760.0   rank 2 tid 3740722 agent abort_end: wrote
+     764.4   rank 2 tid 3740722 agent abort_end: _exit

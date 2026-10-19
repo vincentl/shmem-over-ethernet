@@ -102,11 +102,8 @@ static void ended(uint32_t i)
                      "ended without finalizing; ending the job (§3.15); this PE was %s\n",
                      osoe.bootstrap.rank, i, s->rank, s->pid,
                      osoe_blocked_where(where, sizeof where));
-    if (n > 0 && osoe_fatal_first_word()) {
-        ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
-                                                                          : sizeof msg - 1);
-        (void)ignored;
-    }
+    if (n > 0)
+        osoe_fatal_first_word(msg, (size_t)n < sizeof msg ? (size_t)n : sizeof msg - 1);
     osoe_node_declare_abort(&osoe.node, s->rank, EXIT_FAILURE, OSOE_ABORT_FATAL);
 }
 

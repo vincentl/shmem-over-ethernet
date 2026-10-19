@@ -4,14 +4,17 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <stdatomic.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "abort.h"
 #include "agent.h"
+#include "base/deadline.h"
 #include "blocked.h"
 #include "fatal.h"
 #include "metrics.h"
@@ -28,12 +31,39 @@
 static void (*last_word)(void *);
 static void *last_word_context;
 
-/* fatal.h's first word: set by the first writer of this process's end. */
-static atomic_bool end_said;
+/* fatal.h's first word: no line of this process's end yet, its first writer's
+ * line being written, or its line out. */
+enum { UNSAID, BEING_SAID, SAID };
+static _Atomic uint32_t first_word;
 
-bool osoe_fatal_first_word(void)
+bool osoe_fatal_first_word(const char *line, size_t len)
 {
-    return !atomic_exchange_explicit(&end_said, true, memory_order_seq_cst);
+    uint32_t unsaid = UNSAID;
+    if (!atomic_compare_exchange_strong_explicit(&first_word, &unsaid, BEING_SAID,
+                                                 memory_order_seq_cst, memory_order_acquire))
+        return false;
+    ssize_t ignored = write(STDERR_FILENO, line, len);
+    (void)ignored;
+    /* After the write has returned: an end that loads this goes on with the
+     * line already in its pipe or file. */
+    atomic_store_explicit(&first_word, SAID, memory_order_release);
+    return true;
+}
+
+/*
+ * By polling, not by a futex: a fatal is how a full build refuses a kernel
+ * without futex2 (init.c), and base's futex calls abort on such a kernel. The
+ * line takes one write, so a wait here is rare and short, and a millisecond
+ * more of an end is nothing.
+ */
+void osoe_fatal_await_first_word(void)
+{
+    struct osoe_deadline until = osoe_deadline_in(UINT64_C(1000000000) *
+                                                  OSOE_ABORT_GRACE_SECONDS);
+    struct timespec millisecond = { 0, 1000 * 1000 };
+    while (atomic_load_explicit(&first_word, memory_order_acquire) == BEING_SAID &&
+           !osoe_deadline_expired(&until))
+        nanosleep(&millisecond, NULL);
 }
 
 /*
@@ -79,10 +109,8 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
     }
 
     int n;
-    if (!osoe_fatal_first_word())
-        n = 0;                          /* this process's end is said already */
-    else if (osoe.bootstrap.have_rank && osoe.node.control_name[0] &&
-             segment_named(osoe.node.control_name))
+    if (osoe.bootstrap.have_rank && osoe.node.control_name[0] &&
+        segment_named(osoe.node.control_name))
         n = snprintf(out, sizeof out, "osoe: PE %u: %s\nosoe: PE %u: control segment "
                      "%s, its name still in /dev/shm (osoe-stat %s; osoe-stat --gc removes "
                      "it once its PEs are gone)\n",
@@ -104,13 +132,15 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
     pthread_sigmask(SIG_BLOCK, &broken_pipe, NULL);
 
     /* The reason reaches stderr before anything that lets another process end
-     * the job (fatal.h). */
+     * the job (fatal.h) - unless this process's end is said already, by
+     * another thread or an earlier writer (fatal.h's first word). The word is
+     * taken with the line made and stdio flushed, so that it is held for the
+     * write alone: a main thread that took it and then made its line was
+     * ended under it by its agent, and its PE left the job silent
+     * (2026-10-18). */
     fflush(NULL);
-    if (n > 0) {
-        size_t len = (size_t)n < sizeof out ? (size_t)n : sizeof out - 1;
-        ssize_t ignored = write(STDERR_FILENO, out, len);
-        (void)ignored;
-    }
+    if (n > 0)
+        osoe_fatal_first_word(out, (size_t)n < sizeof out ? (size_t)n : sizeof out - 1);
 
     if (publish) {
         publish(context);
@@ -146,7 +176,10 @@ static _Noreturn void fatal(void (*publish)(void *), void *context, const char *
      * collective the others will never reach; it hung start_pes programs until
      * the launcher's timeout (second review, conformance F1). stdio was flushed
      * above, which is the one thing exit would have done that is wanted here.
+     * And not while another thread's first word is still being written, which
+     * this end would cut off (fatal.h).
      */
+    osoe_fatal_await_first_word();
     _exit(EXIT_FAILURE);
 }
 

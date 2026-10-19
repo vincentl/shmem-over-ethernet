@@ -328,18 +328,17 @@ static void exit_without_finalize(void)
     int n = snprintf(msg, sizeof msg, "osoe: PE %u: the process exited without calling "
                      "shmem_finalize; ending the job (spec §4, §9.1.4)\n",
                      osoe.bootstrap.rank);
-    if (n > 0 && osoe_fatal_first_word()) {
-        ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
-                                                                          : sizeof msg - 1);
-        (void)ignored;
-    }
+    if (n > 0)
+        osoe_fatal_first_word(msg, (size_t)n < sizeof msg ? (size_t)n : sizeof msg - 1);
     /* A global exit declared since the read above wins the word, and this PE
      * then ends as it does, with its status - as fatal.c routes a fatal that
-     * loses (review of the watchdog's retirement). */
+     * loses (review of the watchdog's retirement). And, as every end does, not
+     * while another thread's first word is still being written (fatal.h). */
     if (!osoe_node_declare_abort(&osoe.node, osoe.bootstrap.rank, EXIT_FAILURE,
                                  OSOE_ABORT_FATAL) &&
         osoe_node_abort_read(&osoe.node, &pe, &status) == OSOE_ABORT_GLOBAL_EXIT)
         osoe_abort_end();
+    osoe_fatal_await_first_word();
     _exit(EXIT_FAILURE);
 }
 

@@ -1,0 +1,13 @@
+== mutant no-await
+no-await: shmem.fatal-order 0% tests passed, 1 tests failed out of 1
+a fatal beside a first word still being written left:
+
+/tmp/diw-fix/shmem/tests/test-fatal-order.c:259: CHECK(strcmp(out, held_word) == 0) failed
+
+no-await: death-in-wait.barrier.L4 passed 1000, failed 0 of 1000; lines agent 1505 sweep 495
+== mutant wide
+wide: shmem.fatal-order 100% tests passed, 0 tests failed out of 1
+wide: death-in-wait.barrier.L4 passed 1000, failed 0 of 1000; lines agent 1617 sweep 383
+restored and rebuilt 0
+100% tests passed, 0 tests failed out of 1
+MUTANTS DONE 23:34:58
