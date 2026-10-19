@@ -167,13 +167,18 @@ _Noreturn void osoe_abort_end(void)
      * but with 0 (above): its main thread may be running the program still,
      * and a handler or destructor run beside it would pull state from under it
      * - and _exit takes no lock, where exit waits for good on a thread already
-     * inside exit, since glibc 2.41 (BZ 31997). */
+     * inside exit, since glibc 2.41 (BZ 31997). And neither ends while another
+     * thread's first word is still being written, which a global exit, saying
+     * nothing of its own, would cut off (fatal.h). */
     if (how == OSOE_ABORT_GLOBAL_EXIT) {
-        if (caller)
+        if (caller) {
+            osoe_fatal_await_first_word();
             exit(carrier ? status : 0);
+        }
         fflush(NULL);
         if (outlasts)
             osoe_liveness_outlast(outlast_besides, &outlast_until);
+        osoe_fatal_await_first_word();
         _exit(0);
     }
     /* A fatal elsewhere on the node (or across the job): say so, once, for a PE
@@ -187,11 +192,12 @@ _Noreturn void osoe_abort_end(void)
                      osoe_blocked_where(where, sizeof where));
     fflush(NULL);
     /* Unless this process has said its end already - its own thread's fatal on
-     * the same abort, say (fatal.h's first word). */
-    if (n > 0 && osoe_fatal_first_word()) {
-        ssize_t ignored = write(STDERR_FILENO, msg, (size_t)n < sizeof msg ? (size_t)n
-                                                                          : sizeof msg - 1);
-        (void)ignored;
-    }
+     * the same abort, say (fatal.h's first word) - and then not before that
+     * line is out: made while the main thread's sweep was writing its own,
+     * this end cut the line off, and the PE left the job without a word
+     * (fatal.h). */
+    if (n > 0)
+        osoe_fatal_first_word(msg, (size_t)n < sizeof msg ? (size_t)n : sizeof msg - 1);
+    osoe_fatal_await_first_word();
     _exit(status);
 }

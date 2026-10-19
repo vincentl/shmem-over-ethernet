@@ -8,6 +8,7 @@
 #define OSOE_FATAL_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 _Noreturn void osoe_fatal(const char *fmt, ...)
     __attribute__((format(printf, 1, 2)));
@@ -45,15 +46,28 @@ void osoe_fatal_last_word(void (*tell)(void *), void *context);
 void osoe_notice(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 /*
- * Whether the line of this process's end is this caller's to write: true for
- * the first caller in the process, false after (D18, D20, D21). An end has
- * several writers - a fatal on any thread, a progress helper's among them, the
- * agent's "ending" on another PE's abort (abort.c), a local PE's death seen
- * (liveness.c), an exit without shmem_finalize (init.c) - and a lead with
- * helpers wrote one death twice, a non-lead the abort twice; the first says
- * it, the cause where there is one, and a later writer ends the process all
- * the same, silently.
+ * The line of this process's end, written once (D18, D20, D21): `line`, `len`
+ * bytes in one write, by the first caller in the process, which is told true;
+ * nothing for any caller after, told false. An end has several writers - a
+ * fatal on any thread, a progress helper's among them, the agent's "ending" on
+ * another PE's abort (abort.c), a local PE's death seen (liveness.c), an exit
+ * without shmem_finalize (init.c) - and a lead with helpers wrote one death
+ * twice, a non-lead the abort twice; the first says it, the cause where there
+ * is one, and a later writer ends the process all the same, silently, once the
+ * first's line is out (osoe_fatal_await_first_word).
  */
-bool osoe_fatal_first_word(void);
+bool osoe_fatal_first_word(const char *line, size_t len);
+
+/*
+ * What every end of this process does before its exit or _exit: wait while a
+ * first word is being written - another thread's, since a caller's own has
+ * returned - for at most OSOE_ABORT_GRACE_SECONDS, the bound on an end
+ * (abort.h), after which a line still held, on a stderr nobody reads, is left.
+ * An end that did not wait cut the line off with its process: a survivor of a
+ * node-mate's death, its agent ending it while its main thread, swept in the
+ * same moment, wrote, left the job without a word, one run in about 26 of
+ * shmem.death-in-wait.barrier.L4 (docs/decisions/2026-10-18.md).
+ */
+void osoe_fatal_await_first_word(void);
 
 #endif /* OSOE_FATAL_H */

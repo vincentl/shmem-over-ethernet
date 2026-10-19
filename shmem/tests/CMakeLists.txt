@@ -434,10 +434,11 @@ endif()
 # node - the last two being where two-level collectives break, and a uniform
 # map never shows it.
 # A loud failure writes its reason before it publishes anything (fatal.h),
-# checked on fatal.c alone. See test-fatal-order.c.
+# and an end of the process waits for a first word another thread is still
+# writing, checked on fatal.c alone. See test-fatal-order.c.
 add_executable(shmem_test_fatal-order test-fatal-order.c ../src/fatal.c)
 target_include_directories(shmem_test_fatal-order PRIVATE ../src)
-target_link_libraries(shmem_test_fatal-order PRIVATE osoe_base)
+target_link_libraries(shmem_test_fatal-order PRIVATE osoe_base Threads::Threads)
 osoe_warnings(shmem_test_fatal-order)
 add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)

@@ -16,12 +16,27 @@
  * PE, through osoe_abort_end and with its status, after the reason. A fatal
  * the agent raises itself says where this PE's thread was waiting; one from any
  * other thread does not.
+ *
+ * And a fatal that loses the first word (fatal.h) to a thread still writing
+ * it does not end the process under that write: the child's stderr is a pipe
+ * filled to the brim, so a thread's first word waits in its write until the
+ * parent reads, and the parent reads only after a second, by when a fatal
+ * that did not wait has ended the child with the line unwritten - the
+ * survivor of shmem.death-in-wait.barrier.L4 that left the job without a word
+ * (docs/decisions/2026-10-18.md). The stubs write no marker then: theirs
+ * would wait in the same pipe and hold the fatal back by themselves.
  */
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "abort.h"
@@ -35,8 +50,14 @@
 struct osoe_state osoe;
 static struct osoe_node_header header;
 
+/* Whether the stubs write their markers: not beside a first word held in a
+ * full pipe. */
+static bool markers_written = true;
+
 static void mark(const char *what)
 {
+    if (!markers_written)
+        return;
     ssize_t ignored = write(STDERR_FILENO, what, strlen(what));
     (void)ignored;
 }
@@ -133,6 +154,82 @@ static bool in_order(const char *out, const char *first, const char *second)
     return a && b && a < b;
 }
 
+static const char held_word[] = "THE FIRST WORD\n";
+static _Atomic bool taking;         /* the thread is about to take the first word */
+
+static void *say_held_word(void *unused)
+{
+    (void)unused;
+    atomic_store_explicit(&taking, true, memory_order_release);
+    osoe_fatal_first_word(held_word, sizeof held_word - 1);
+    return NULL;
+}
+
+static void sleep_ms(long ms)
+{
+    struct timespec t = { ms / 1000, (ms % 1000) * 1000 * 1000 };
+    nanosleep(&t, NULL);
+}
+
+/* The held case's child: stderr filled, a thread taking the first word into
+ * it, and then - its write waiting, a tenth of a second on - this thread's
+ * fatal, which loses the word. */
+static _Noreturn void held_child(void)
+{
+    int flags = fcntl(STDERR_FILENO, F_GETFL);
+    CHECK_FATAL(flags >= 0 && fcntl(STDERR_FILENO, F_SETFL, flags | O_NONBLOCK) == 0);
+    char fill[4096];                    /* PIPE_BUF: each write all or nothing */
+    memset(fill, 0, sizeof fill);
+    while (write(STDERR_FILENO, fill, sizeof fill) > 0)
+        ;
+    CHECK_FATAL(errno == EAGAIN && fcntl(STDERR_FILENO, F_SETFL, flags) == 0);
+    pthread_t t;
+    CHECK_FATAL(pthread_create(&t, NULL, say_held_word, NULL) == 0);
+    pthread_detach(t);
+    while (!atomic_load_explicit(&taking, memory_order_acquire))
+        sleep_ms(1);
+    sleep_ms(100);
+    markers_written = false;
+    osoe_fatal("THE LOSER");
+}
+
+/* The held case: the child's stderr, read a second after the fork unless the
+ * child has ended by then, the fill's NUL bytes left out. */
+static void held_output(char *out, size_t len)
+{
+    int fds[2];
+    CHECK_FATAL(pipe(fds) == 0);
+    pid_t pid = fork();
+    CHECK_FATAL(pid >= 0);
+    if (pid == 0) {
+        close(fds[0]);
+        dup2(fds[1], STDERR_FILENO);
+        osoe.bootstrap.have_rank = true;
+        osoe.bootstrap.rank = 7;
+        osoe.node.hdr = &header;
+        held_child();
+    }
+    close(fds[1]);
+    int status = 0;
+    pid_t ended = 0;
+    for (int ms = 0; ms < 1000 && ended == 0; ms += 10) {
+        sleep_ms(10);
+        ended = waitpid(pid, &status, WNOHANG);
+    }
+    size_t got = 0;
+    char chunk[4096];
+    ssize_t n;
+    while ((n = read(fds[0], chunk, sizeof chunk)) > 0)
+        for (ssize_t i = 0; i < n; i++)
+            if (chunk[i] != '\0' && got + 1 < len)
+                out[got++] = chunk[i];
+    out[got] = '\0';
+    close(fds[0]);
+    if (ended == 0)
+        ended = waitpid(pid, &status, 0);
+    CHECK(ended == pid && WIFEXITED(status) && WEXITSTATUS(status) == EXIT_FAILURE);
+}
+
 int main(void)
 {
     char out[4096];
@@ -155,6 +252,11 @@ int main(void)
         fprintf(stderr, "osoe_fatal on the agent wrote:\n%s", out);
     CHECK(strstr(out, "THE REASON; this PE was waiting in shmem_barrier_all\n") != NULL);
     on_agent = false;
+
+    held_output(out, sizeof out);
+    if (strcmp(out, held_word) != 0)
+        fprintf(stderr, "a fatal beside a first word still being written left:\n%s\n", out);
+    CHECK(strcmp(out, held_word) == 0);
 
     word = OSOE_ABORT_GLOBAL_EXIT;
     child_output(false, GLOBAL_STATUS, out, sizeof out);

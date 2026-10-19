@@ -598,10 +598,11 @@ a hang the library cannot prove, such as a PE computing for ever, is what
   N", saying where it was: waiting in a routine, in `shmem_finalize`, or not
   waiting in the library. Each process says its end once, in the first line any
   of its threads writes - a lead with progress helpers wrote its agent's line
-  and a helper's, and a PE its agent's and its own thread's - and names its
-  control segment for `osoe-stat` only where the name is still in `/dev/shm`
-  (`OSOE_KEEP_CONTROL_SEGMENT`, or a start that failed), since a running job's
-  segment goes with its PEs. A node's number is its place in the
+  and a helper's, and a PE its agent's and its own thread's - and does not end
+  until that line is out, unless standard error stays blocked for 10 s. It
+  names its control segment for `osoe-stat` only where the name is still in
+  `/dev/shm` (`OSOE_KEEP_CONTROL_SEGMENT`, or a start that failed), since a
+  running job's segment goes with its PEs. A node's number is its place in the
   step's node list, from 0: Slurm's `SLURM_NODEID`, or `osoe-launch`'s logical
   node (`-m`), whose entry is a loopback address. A status
   given to `shmem_global_exit` comes through as it is. Under `srun -K1` a task
