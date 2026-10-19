@@ -309,7 +309,11 @@ def volume_table():
 # grant_tag folds in and r checks field by field; the C's field holds the
 # epoch, identity and bytes beside the lane, each receiver's alone (as built
 # since the review of v0.2 step 4's merge point, Q2-4, where the C had put one
-# head every receiver wrote) - and r cannot tell from one counter
+# head every receiver wrote), and no writer or round as the tag does: the
+# arithmetic gives each field one writer, the receiver r reads it as from
+# (shmem.circulant.arithmetic, to 300 leads), and r clears each field once
+# read, so that one not written again reads as none (shmem.circulant-grants.*;
+# T40) - and r cannot tell from one counter
 # which of them has come: it waits for all of them, at the reduce-scatter's
 # start, every receiver granting as it enters. The allgather's round k comes
 # from r + s_k into r's row k, which r's reduce-scatter round k used, so r

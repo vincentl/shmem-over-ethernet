@@ -16,6 +16,11 @@
  * table, digested, to be what tools/modelcheck/circulant_model.py wrote into
  * FILE, where the same arithmetic is checked against the rounds written out
  * element by element.
+ *
+ * And for every node count from 2 to 300, that each field of a lead's
+ * reduce-scatter grant has one writer (T40): the receiver whose round the
+ * lead reads it for (internode-generic.c, circulant_grants and
+ * take_round_grants).
  */
 #include <inttypes.h>
 #include <stdint.h>
@@ -150,6 +155,59 @@ static uint64_t digest(uint32_t nodes, uint64_t count)
     return h;
 }
 
+/*
+ * One writer a reduce-scatter grant field, over `nodes` leads (T40). Entering,
+ * lead r puts its field for round k into the lead its round k receives from,
+ * osoe_circulant_round(r, k).from, as field k (circulant_grants); that lead,
+ * the sender, reads field k as from the lead its round k sends to,
+ * osoe_circulant_round(sender, k).to (take_round_grants). The C's field
+ * carries neither writer nor round, where circulant_model.py's tags both, so
+ * the arithmetic must give each (sender, field) exactly one writer, and that
+ * one the receiver the sender names: a second would land its put on a field
+ * the sender reads as another's, two helpers' copies of one word at once, and
+ * a field nobody writes would leave its sender waiting on its counter for
+ * ever.
+ */
+static int one_writer_check(uint32_t nodes, uint64_t count)
+{
+    uint32_t rows = osoe_circulant_rows(nodes);
+    uint32_t *writers = calloc((size_t)nodes * rows, sizeof *writers);
+    uint32_t *writer = calloc((size_t)nodes * rows, sizeof *writer);
+    CHECK_FATAL(writers && writer);
+    int bad = 0;
+    for (uint32_t receiver = 0; receiver < nodes; receiver++)
+        for (uint32_t k = 0; k < rows; k++) {
+            struct osoe_circulant_round r = osoe_circulant_round(receiver, nodes, k, count);
+            if (r.from >= nodes || !r.combines || r.row != k) {
+                fprintf(stderr, "N %u: lead %u's round %u receives from lead %u, row %u, %s\n",
+                        nodes, receiver, k, r.from, r.row,
+                        r.combines ? "combining" : "copying");
+                bad = 1;
+                continue;
+            }
+            writers[(size_t)r.from * rows + k]++;
+            writer[(size_t)r.from * rows + k] = receiver;
+        }
+    for (uint32_t sender = 0; sender < nodes && !bad; sender++)
+        for (uint32_t k = 0; k < rows; k++) {
+            uint32_t n = writers[(size_t)sender * rows + k];
+            uint32_t named = osoe_circulant_round(sender, nodes, k, count).to;
+            if (n != 1) {
+                fprintf(stderr, "N %u: lead %u's grant field %u has %u writers, where lead %u "
+                        "alone should write it\n", nodes, sender, k, n, named);
+                bad = 1;
+            } else if (writer[(size_t)sender * rows + k] != named) {
+                fprintf(stderr, "N %u: lead %u's grant field %u is written by lead %u, and read "
+                        "as from lead %u\n", nodes, sender, k,
+                        writer[(size_t)sender * rows + k], named);
+                bad = 1;
+            }
+        }
+    free(writers);
+    free(writer);
+    return bad;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -181,8 +239,14 @@ int main(int argc, char **argv)
     fclose(f);
     printf("%u node counts and lengths: %u where an element is wrong, %u where the C and the "
            "model differ\n", digests, failed, differ);
+    unsigned writers_wrong = 0;
+    for (uint32_t nodes = 2; nodes <= 300; nodes++)
+        writers_wrong += (unsigned)(one_writer_check(nodes, 1) | one_writer_check(nodes, 1000));
+    printf("node counts 2 to 300: %u where a grant field has other than one writer, the "
+           "receiver its lead names\n", writers_wrong);
     CHECK(failed == 0);
     CHECK(differ == 0);
     CHECK(digests > 500);
+    CHECK(writers_wrong == 0);
     return CHECK_DONE();
 }

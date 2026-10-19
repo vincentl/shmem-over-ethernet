@@ -210,7 +210,9 @@ set_tests_properties(shmem.shape.choice shmem.shape.grid shmem.shape.places-grid
 # every lead's result combined from every node exactly once, for every node
 # count from 2 to 70, and the C's whole table against what
 # tools/modelcheck/circulant_model.py digested (circulant-digest.txt;
-# model.circulant.digest checks the model still writes it).
+# model.circulant.digest checks the model still writes it); and each field of
+# a lead's reduce-scatter grant written by one lead, the receiver it is read as
+# from, at every node count from 2 to 300 (T40).
 add_executable(shmem_test_circulant test-circulant.c ../src/collective-circulant.c)
 target_include_directories(shmem_test_circulant PRIVATE ../src)
 osoe_warnings(shmem_test_circulant)
@@ -2772,6 +2774,36 @@ if(OSOE_INTERNODE)
   endif()
 endif()
 
+# What OSOE_COLLECTIVE_SHAPE=fixed promises (T23; test-fixed-shape.c,
+# fixed-shape.sh): the same bits from every run of this version - for the same
+# team, node map and settings - and nothing across versions, which may change
+# the tree. Floating-point reductions whose results depend on the order they
+# combine in - a sum that rounds, one that overflows on the way, signed zeros,
+# a NaN, a float sum - at the small class's size, a few pieces' and a MiB's,
+# hashed, from four separate launches: at no helpers and at two, with the
+# machine idle and beside a busy loop a core. Every hash must be the same. On
+# six nodes of one and two PEs, at 0.1.0's fan-out and pipeline, 4 and 2,
+# where node 1 is an interior node of the leads' tree, and at the defaults,
+# where the tree is the root's alone. Run alone, since its loops would slow the
+# tests beside it; tsan is left out for shmem.internode.*'s reason.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_executable(shmem_test_fixed-shape test-fixed-shape.c)
+  target_link_libraries(shmem_test_fixed-shape PRIVATE osoe)
+  osoe_warnings(shmem_test_fixed-shape)
+  foreach(case "fanout-4-pipeline-2;4;2" "defaults;8;4")
+    list(GET case 0 name)
+    list(GET case 1 fanout)
+    list(GET case 2 pipeline)
+    add_test(NAME shmem.fixed-shape.${name}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/fixed-shape.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_fixed-shape> 0,0,1,1,2,3,4,5,5
+              OSOE_COLLECTIVE_FANOUT=${fanout} OSOE_COLLECTIVE_PIPELINE=${pipeline})
+    set_tests_properties(shmem.fixed-shape.${name} PROPERTIES LABELS "tier2" TIMEOUT 900
+      RUN_SERIAL TRUE PASS_REGULAR_EXPRESSION "FIXED SHAPE REPEATS")
+    osoe_internode_label(shmem.fixed-shape.${name})
+  endforeach()
+endif()
+
 # The public headers compiled under each standard they promise, every warning
 # an error (headers.c, headers.cpp): no other translation unit is C99 or C++,
 # so without these a break in either mode would ship. C++ where the machine has
@@ -4085,6 +4117,42 @@ if(OSOE_INTERNODE)
     PASS_REGULAR_EXPRESSION "the reduce-scatter grant of node [0-9]+'s lead \\(PE [0-9]+\\), which this node's lead \\(PE [0-9]+\\) sends round [0-9]+, is for"
     FAIL_REGULAR_EXPRESSION "a divergent reduction returned")
   osoe_internode_label(shmem.circulant.4.diverge)
+
+  # A lead's reduce-scatter grant fields and senders' lane words, read and then
+  # cleared (T40; test-circulant-grants.c): after each of three Träff's
+  # reductions every node's lead finds its grant counter at the rounds so far
+  # and every byte past it, and of the senders' lanes line, zero - the clear
+  # that keeps an untagged field nobody wrote again from passing for a new one,
+  # which no result shows. On 3, 4, 5 and 9 nodes, two to four rows - on four,
+  # a round whose sender is its receiver too - and on three nodes of two PEs;
+  # the link the Pi's, as shmem.circulant.*'s, on which two nodes take a tree at
+  # every size to 1 MiB. White-box, like internal-region's; ThreadSanitizer one
+  # PE a node, as there.
+  add_executable(shmem_test_circulant-grants test-circulant-grants.c
+    ${osoe_library_sources})
+  target_include_directories(shmem_test_circulant-grants PRIVATE ../src ../include)
+  target_link_libraries(shmem_test_circulant-grants PRIVATE osoe_base rt Threads::Threads
+    PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_circulant-grants)
+  foreach(map 0,1,2 0,1,2,3 0,1,2,3,4 0,1,2,3,4,5,6,7,8 0,0,1,1,2,2)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    osoe_map_nodes("${map}" nodes)
+    if(count GREATER nodes AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+      continue()
+    endif()
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.circulant-grants.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
+              OSOE_LINK_BYTES_PER_SECOND=116000000 SHMEM_SYMMETRIC_SIZE=12m
+              $<TARGET_FILE:osoe-launch> -n ${count} -m ${map} -t 120 --
+              $<TARGET_FILE:shmem_test_circulant-grants>)
+    set_tests_properties(shmem.circulant-grants.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 180
+      PASS_REGULAR_EXPRESSION "CIRCULANT GRANTS CLEARED: 3 .* on ${nodes} nodes, 0 failures"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.circulant-grants.${label})
+  endforeach()
 endif()
 
 # The prefix scans (spec §9.10.10; phase 1 step 10 slice 1; test-scan.c): on
