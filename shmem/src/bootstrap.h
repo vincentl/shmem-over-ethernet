@@ -66,7 +66,7 @@ struct osoe_bootstrap {
     bool keepalive_off, keepalive_set;
     /* OSOE_MESH_SLOT (H23): the mesh's slot, microseconds, where `mesh_slot_set`
      * says it was set - 0 then for no slots at all - and otherwise
-     * OSOE_MESH_SLOT_DEFAULT_US, so that a bootstrap built by hand keeps it. */
+     * OSOE_DEFAULT_MESH_SLOT_US, so that a bootstrap built by hand keeps it. */
     uint32_t mesh_slot_us;
     bool mesh_slot_set;
     const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
@@ -94,6 +94,11 @@ struct osoe_bootstrap {
 #define OSOE_DEFAULT_KEEPALIVE_IDLE_S     60
 #define OSOE_DEFAULT_KEEPALIVE_INTERVAL_S 10
 #define OSOE_DEFAULT_KEEPALIVE_COUNT      6
+
+/* The default OSOE_MESH_SLOT (H23): a slot of the mesh's start-up schedule
+ * (mesh-schedule.h), in microseconds, and the most it may be. */
+#define OSOE_DEFAULT_MESH_SLOT_US 100
+#define OSOE_MESH_SLOT_MOST_US    100000
 
 /* The default OSOE_PORT_RANGE (§6.2): below the ephemeral ports. */
 #define OSOE_DEFAULT_PORT_LOW  17000

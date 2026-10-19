@@ -352,7 +352,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
      * just now, nothing between them (the proposal: a late start is one
      * waiting call a slot missed, at the late lead). */
     uint64_t begun_ns = now_ns();
-    uint64_t slot_ns = (uint64_t)(b->mesh_slot_set ? b->mesh_slot_us : OSOE_MESH_SLOT_DEFAULT_US) *
+    uint64_t slot_ns = (uint64_t)(b->mesh_slot_set ? b->mesh_slot_us : OSOE_DEFAULT_MESH_SLOT_US) *
                        1000;
 
     uint32_t slots = osoe_mesh_schedule_slots(n);

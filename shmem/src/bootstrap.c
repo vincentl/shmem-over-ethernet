@@ -12,7 +12,6 @@
 #include "base/print-line.h"
 #include "base/size.h"
 #include "bootstrap.h"
-#include "mesh-schedule.h"
 #include "node.h"
 #include "fatal.h"
 #include "watch-range.h"

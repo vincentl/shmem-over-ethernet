@@ -39,9 +39,6 @@
  */
 enum { OSOE_MESH_CALLS_IN_FLIGHT = 8 };
 
-/* A slot's length by default, OSOE_MESH_SLOT's (microseconds). */
-enum { OSOE_MESH_SLOT_DEFAULT_US = 100, OSOE_MESH_SLOT_MOST_US = 100000 };
-
 /* How many slots the schedule has: (N - 1) / 2 rounded up, one an offset. */
 uint32_t osoe_mesh_schedule_slots(uint32_t node_count);
 
