@@ -1,0 +1,24 @@
+Internal ctest changing into directory: /tmp/t19/build/debug
+Test project /tmp/t19/build/debug
+    Start 802: shmem.death-in-wait.barrier.L4
+1/1 Test #802: shmem.death-in-wait.barrier.L4 ...***Failed  Required regular expression not found. Regex=[DEATH IN WAIT OK
+]  0.12 sec
+osoe-launch: rank 3 killed by signal 9
+osoe: PE 0: local PE 3 (rank 3, pid 3653461) has ended without finalizing; ending the job (§3.15); this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 3; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 1 exited with status 1
+death in a wait: 2 of 3 survivors named shmem_barrier_all; 0 timed out or returned
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+tier2    =   0.12 sec*proc (1 test)
+
+Total Test time (real) =   0.15 sec
+
+The following tests FAILED:
+	802 - shmem.death-in-wait.barrier.L4 (Failed)           tier2
+Errors while running CTest

@@ -1,0 +1,68 @@
+== run 1 (passed)
+       0.0   rank 0 tid 3713787 agent liveness: a local PE ended
+      19.7   rank 0 tid 3713787 agent first word: won
+      47.8   rank 0 tid 3713787 agent agent: sees the abort
+      51.5   rank 0 tid 3713787 agent abort_end: entered
+      53.0   rank 0 tid 3713787 agent abort_end: this thread ends the process
+      90.1   rank 1 tid 3713784 agent agent: sees the abort
+      94.9   rank 2 tid 3713785 agent agent: sees the abort
+      99.1   rank 1 tid 3713784 agent abort_end: entered
+     101.3   rank 1 tid 3713784 agent abort_end: this thread ends the process
+     101.8   rank 2 tid 3713785 agent abort_end: entered
+     103.7   rank 2 tid 3713785 agent abort_end: this thread ends the process
+     137.3   rank 0 tid 3713787 agent first word: lost
+     139.5   rank 0 tid 3713787 agent abort_end: _exit
+     160.4   rank 2 tid 3713785 agent first word: won
+     166.2   rank 1 tid 3713784 agent first word: won
+     170.6   rank 1 tid 3713784 agent abort_end: wrote
+     171.8   rank 1 tid 3713784 agent abort_end: _exit
+     213.3   rank 2 tid 3713785 agent abort_end: wrote
+     216.1   rank 2 tid 3713785 agent abort_end: _exit
+== run 2 (passed)
+       0.0   rank 0 tid 3713817 agent liveness: a local PE ended
+      20.8   rank 0 tid 3713817 agent first word: won
+      50.2   rank 0 tid 3713817 agent agent: sees the abort
+      55.0   rank 0 tid 3713817 agent abort_end: entered
+      56.5   rank 0 tid 3713817 agent abort_end: this thread ends the process
+      83.5   rank 1 tid 3713815 agent agent: sees the abort
+      90.9   rank 1 tid 3713815 agent abort_end: entered
+      91.4   rank 2 tid 3713814 agent agent: sees the abort
+      92.7   rank 1 tid 3713815 agent abort_end: this thread ends the process
+      99.8   rank 2 tid 3713814 agent abort_end: entered
+     101.6   rank 2 tid 3713814 agent abort_end: this thread ends the process
+     206.4   rank 1 tid 3713815 agent first word: won
+     206.5   rank 0 tid 3713817 agent first word: lost
+     210.5   rank 0 tid 3713817 agent abort_end: _exit
+     219.6   rank 2 tid 3713814 agent first word: won
+     225.5   rank 2 tid 3713814 agent abort_end: wrote
+     227.4   rank 1 tid 3713815 agent abort_end: wrote
+     227.6   rank 2 tid 3713814 agent abort_end: _exit
+     229.8   rank 1 tid 3713815 agent abort_end: _exit
+== run 3 (passed)
+       0.0   rank 0 tid 3713847 agent liveness: a local PE ended
+      43.2   rank 0 tid 3713847 agent first word: won
+     114.7   rank 0 tid 3713847 agent agent: sees the abort
+     122.2   rank 0 tid 3713847 agent abort_end: entered
+     125.0   rank 0 tid 3713847 agent abort_end: this thread ends the process
+     228.7   rank 2 tid 3713844 agent agent: sees the abort
+     238.1   rank 1 tid 3713846 agent agent: sees the abort
+     241.2   rank 2 tid 3713842 other sweep: sees the abort
+     246.7   rank 2 tid 3713844 agent abort_end: entered
+     250.9   rank 2 tid 3713844 agent abort_end: this thread ends the process
+     253.3   rank 1 tid 3713846 agent abort_end: entered
+     256.3   rank 1 tid 3713846 agent abort_end: this thread ends the process
+     263.7   rank 2 tid 3713842 other fatal: entered
+     268.0   rank 2 tid 3713842 other first word: won
+     282.6   rank 0 tid 3713847 agent first word: lost
+     286.5   rank 0 tid 3713847 agent abort_end: _exit
+     300.3   rank 2 tid 3713842 other fatal: flushed
+     315.7   rank 2 tid 3713842 other fatal: wrote
+     318.1   rank 2 tid 3713842 other fatal: _exit
+     397.0   rank 1 tid 3713841 other sweep: sees the abort
+     409.7   rank 1 tid 3713841 other fatal: entered
+     412.7   rank 1 tid 3713841 other first word: won
+     435.2   rank 1 tid 3713841 other fatal: flushed
+     447.5   rank 1 tid 3713846 agent first word: lost
+     451.0   rank 1 tid 3713841 other fatal: wrote
+     451.7   rank 1 tid 3713846 agent abort_end: _exit
+     454.0   rank 1 tid 3713841 other fatal: _exit
