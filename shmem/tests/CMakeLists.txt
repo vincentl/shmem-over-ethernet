@@ -4093,16 +4093,18 @@ if(OSOE_INTERNODE)
   # reductions every node's lead finds its grant counter at the rounds so far
   # and every byte past it, and of the senders' lanes line, zero - the clear
   # that keeps an untagged field nobody wrote again from passing for a new one,
-  # which no result shows. On 2, 3, 5 and 9 nodes, one to four rows, and on
-  # three nodes of two PEs; the link the Pi's, as shmem.circulant.*'s.
-  # White-box, like internal-region's; ThreadSanitizer one PE a node, as there.
+  # which no result shows. On 3, 4, 5 and 9 nodes, two to four rows - on four,
+  # a round whose sender is its receiver too - and on three nodes of two PEs;
+  # the link the Pi's, as shmem.circulant.*'s, on which two nodes take a tree at
+  # every size to 1 MiB. White-box, like internal-region's; ThreadSanitizer one
+  # PE a node, as there.
   add_executable(shmem_test_circulant-grants test-circulant-grants.c
     ${osoe_library_sources})
   target_include_directories(shmem_test_circulant-grants PRIVATE ../src ../include)
   target_link_libraries(shmem_test_circulant-grants PRIVATE osoe_base rt Threads::Threads
     PkgConfig::LIBURING)
   osoe_warnings(shmem_test_circulant-grants)
-  foreach(map 0,1 0,1,2 0,1,2,3,4 0,1,2,3,4,5,6,7,8 0,0,1,1,2,2)
+  foreach(map 0,1,2 0,1,2,3 0,1,2,3,4 0,1,2,3,4,5,6,7,8 0,0,1,1,2,2)
     string(REPLACE "," ";" ranks "${map}")
     list(LENGTH ranks count)
     osoe_map_nodes("${map}" nodes)
