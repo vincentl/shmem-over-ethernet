@@ -337,13 +337,43 @@ static inline uint32_t osoe_internal_circulant_rows(uint32_t nodes)
     return rows < OSOE_INTERNAL_CIRCULANT_ROWS_MOST ? rows : OSOE_INTERNAL_CIRCULANT_ROWS_MOST;
 }
 
-/* One team number's reduce-scatter words: a line for each row, the credit
- * counter's and the allgather grant counter's, the grant's lines and the
- * senders' lanes line, none on one node. */
+/*
+ * The lines of one team number's reduce-scatter words for `rows` rows, in the
+ * order above: row r's arrival counter on line r, then the credit counter's
+ * line, the allgather grant counter's, the first of the reduce-scatter grant's
+ * - its counter, its fields past it - and the senders' lanes line. Here and
+ * not in internode-generic.c alone, so that test-circulant-grants.c, which
+ * reads the grant's fields and the senders' lanes as the library left them,
+ * finds the lines the library uses: a copy of the arithmetic that a change of
+ * the layout left behind would read other lines, as zero as cleared ones.
+ */
+static inline uint32_t osoe_internal_circulant_credit_line(uint32_t rows)
+{
+    return rows;
+}
+
+static inline uint32_t osoe_internal_circulant_allgather_grant_line(uint32_t rows)
+{
+    return rows + 1;
+}
+
+static inline uint32_t osoe_internal_circulant_reduce_scatter_grant_line(uint32_t rows)
+{
+    return rows + 2;
+}
+
+static inline uint32_t osoe_internal_circulant_senders_line(uint32_t rows)
+{
+    return osoe_internal_circulant_reduce_scatter_grant_line(rows) +
+           osoe_internal_circulant_grant_lines(rows);
+}
+
+/* One team number's reduce-scatter words: every line to the senders' lanes
+ * line, none on one node. */
 static inline uint64_t osoe_internal_team_circulant_bytes(uint32_t rows)
 {
     return rows == 0 ? 0
-                     : (uint64_t)(rows + 3 + osoe_internal_circulant_grant_lines(rows)) *
+                     : (uint64_t)(osoe_internal_circulant_senders_line(rows) + 1) *
                            OSOE_INTERNAL_LINE_BYTES;
 }
 
@@ -356,6 +386,19 @@ static inline uint64_t osoe_internal_circulant_offset(uint32_t fanout, uint32_t 
     return osoe_internal_gather_offset(fanout, max_teams, small_collective_bytes) +
            (uint64_t)max_teams *
                osoe_internal_team_gather_bytes(osoe_internal_gather_steps(nodes));
+}
+
+/* Where line `line` of team number `number`'s reduce-scatter words starts, in
+ * a job of `nodes` nodes. */
+static inline uint64_t osoe_internal_circulant_line(uint32_t fanout, uint32_t max_teams,
+                                                    uint32_t small_collective_bytes,
+                                                    uint32_t nodes, uint32_t number,
+                                                    uint32_t line)
+{
+    return osoe_internal_circulant_offset(fanout, max_teams, small_collective_bytes, nodes) +
+           (uint64_t)number *
+               osoe_internal_team_circulant_bytes(osoe_internal_circulant_rows(nodes)) +
+           (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
 }
 
 /*

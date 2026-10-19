@@ -212,7 +212,9 @@ set_tests_properties(shmem.shape.choice shmem.shape.grid shmem.shape.places-grid
 # tools/modelcheck/circulant_model.py digested (circulant-digest.txt;
 # model.circulant.digest checks the model still writes it); and each field of
 # a lead's reduce-scatter grant written by one lead, the receiver it is read as
-# from, at every node count from 2 to 300 (T40).
+# from, at every node count Träff's takes at the default fan-out ceiling, 2 to
+# 512, and past it at the counts beside each power of two to the 65,536 it
+# takes at any (T40).
 add_executable(shmem_test_circulant test-circulant.c ../src/collective-circulant.c)
 target_include_directories(shmem_test_circulant PRIVATE ../src)
 osoe_warnings(shmem_test_circulant)
@@ -442,6 +444,16 @@ target_link_libraries(shmem_test_fatal-order PRIVATE osoe_base Threads::Threads)
 osoe_warnings(shmem_test_fatal-order)
 add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
+# And so do osoe_abort_end's three ends - a global exit's its PE called, one
+# another PE called, and an abort a fatal declared - checked on abort.c and
+# fatal.c alone; an exit without shmem_finalize's, which only a PE makes, is
+# shmem.exit-without-finalize.first-word's. See test-abort-end.c.
+add_executable(shmem_test_abort-end test-abort-end.c ../src/abort.c ../src/fatal.c)
+target_include_directories(shmem_test_abort-end PRIVATE ../src)
+target_link_libraries(shmem_test_abort-end PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_abort-end)
+add_test(NAME shmem.abort-end COMMAND shmem_test_abort-end)
+set_tests_properties(shmem.abort-end PROPERTIES LABELS "tier1" TIMEOUT 30)
 
 # The "blocked in" record read while it is rewritten (§3.14; blocked.c): the
 # library's writer on one CPU, both readers on another - its own, which the
@@ -1005,7 +1017,9 @@ endforeach()
 # The AM layer's settings and the wire's, which a lead alone read before: the lead
 # when it laid out the segment, and the wire's after the rendezvous and on a job
 # of several nodes only, so that a job of one node accepted OSOE_WIRE_BYTES=abc
-# without a word. Each PE refuses its own.
+# without a word. Each PE refuses its own. And T19's testing hook,
+# OSOE_TEST_PRINT_LINK, which every PE reads at bootstrap and refuses unless it
+# is 0 or 1 - a value that is no number, and a number past 1.
 foreach(case_expect
     "am-chunk|OSOE_AM_CHUNK|abc|OSOE_AM_CHUNK='abc' is not a decimal byte count"
     "am-buffer|OSOE_AM_BUFFER|abc|OSOE_AM_BUFFER='abc' is not a decimal byte count"
@@ -1019,7 +1033,9 @@ foreach(case_expect
     "wire-zero-copy|OSOE_WIRE_ZERO_COPY|yes|OSOE_WIRE_ZERO_COPY=yes: on, to send connection buffers by reference"
     "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1"
     "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not a number of threads from 0 to 64"
-    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64")
+    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64"
+    "test-print-link|OSOE_TEST_PRINT_LINK|yes|OSOE_TEST_PRINT_LINK='yes' is not 0 or 1"
+    "test-print-link-large|OSOE_TEST_PRINT_LINK|2|OSOE_TEST_PRINT_LINK='2' is not 0 or 1")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -2781,8 +2797,10 @@ endif()
 # the tree. Floating-point reductions whose results depend on the order they
 # combine in - a sum that rounds, one that overflows on the way, signed zeros,
 # a NaN, a float sum - at the small class's size, a few pieces' and a MiB's,
-# hashed, from four separate launches: at no helpers and at two, with the
-# machine idle and beside a busy loop a core. Every hash must be the same. On
+# hashed, from six separate launches: at no helpers, two and three, with the
+# machine idle and beside a busy loop a core. Every hash must be the same, and
+# the infinite, -0.0 and NaN results of the three cases the order turns some
+# and not all, so that their inputs still depend on the order. On
 # six nodes of one and two PEs, at 0.1.0's fan-out and pipeline, 4 and 2,
 # where node 1 is an interior node of the leads' tree, and at the defaults,
 # where the tree is the root's alone. Run alone, since its loops would slow the
@@ -3400,6 +3418,25 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(internal-region 0,1)
   osoe_tier2_map_test(internal-region 0,0,1,1)
 endif()
+
+# An exit without shmem_finalize waits, as every end of a process does, for a
+# first word another thread is still writing (fatal.h; test-exit-first-word.c,
+# exit-first-word.sh): one PE holds the word in its full standard error and
+# returns from main, its exit's line and its agent's losing the word, and the
+# script reads a second later - by when an end that had not waited had ended
+# the PE with the line unwritten. White-box, for the library's own first word,
+# like internal-region's; beside shmem.exit-without-finalize.init and
+# .start_pes, and shmem.abort-end, the other ends'.
+add_executable(shmem_test_exit-first-word test-exit-first-word.c ${osoe_library_sources})
+target_include_directories(shmem_test_exit-first-word PRIVATE ../src ../include)
+target_link_libraries(shmem_test_exit-first-word PRIVATE osoe_base rt Threads::Threads
+  ${OSOE_LIBURING_LINK})
+osoe_warnings(shmem_test_exit-first-word)
+add_test(NAME shmem.exit-without-finalize.first-word
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-first-word.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_exit-first-word>)
+set_tests_properties(shmem.exit-without-finalize.first-word PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION "THE FIRST WORD WAITED FOR")
 
 # Where a team's state lives and how its shape is found (phase 1 step 7 slice
 # 1; test-team-storage.c): the descriptor's local list against the map - every

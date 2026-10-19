@@ -17,10 +17,11 @@
  * FILE, where the same arithmetic is checked against the rounds written out
  * element by element.
  *
- * And for every node count from 2 to 300, that each field of a lead's
- * reduce-scatter grant has one writer (T40): the receiver whose round the
- * lead reads it for (internode-generic.c, circulant_grants and
- * take_round_grants).
+ * And for every node count Träff's reduction takes at the default fan-out
+ * ceiling, 2 to 512, and past it at counts up to the 65,536 it takes at any
+ * ceiling (one_writer_counts), that each field of a lead's reduce-scatter
+ * grant has one writer (T40): the receiver whose round the lead reads it for
+ * (internode-generic.c, circulant_grants and take_round_grants).
  */
 #include <inttypes.h>
 #include <stdint.h>
@@ -30,6 +31,7 @@
 
 #include "check.h"
 #include "collective-circulant.h"
+#include "internal-region.h"
 
 /* The nodes combined into one element: up to 128. */
 struct set {
@@ -208,6 +210,32 @@ static int one_writer_check(uint32_t nodes, uint64_t count)
     return bad;
 }
 
+/*
+ * The node counts one_writer_check takes: those Träff's reduction can run on.
+ * It needs ceil(log2 N) rows, no more than a lane's - the fan-out ceiling + 1
+ * (collective-shape.c, osoe_shape_choose) - nor than the reduce-scatter's
+ * words hold, OSOE_INTERNAL_CIRCULANT_ROWS_MOST (internode-generic.c,
+ * shape_of): every count to 512 at the default ceiling of 8, and to 65,536 at
+ * a ceiling of 15 or more. Every count to 512, and 513, the first the default
+ * ceiling leaves to the trees; past it, each power of two from 1,024 and the
+ * counts beside it, where a count gains a row - since a count costs its
+ * rounds for each of its leads, and every count to 65,536 would be some 10^11
+ * rounds. Writes up to `most` counts into `counts`, and returns how many there
+ * are.
+ */
+static uint32_t one_writer_counts(uint32_t *counts, uint32_t most)
+{
+    uint32_t n = 0;
+    for (uint32_t nodes = 2; nodes <= 513 && n < most; nodes++)
+        counts[n++] = nodes;
+    uint32_t ceiling = UINT32_C(1) << OSOE_INTERNAL_CIRCULANT_ROWS_MOST;
+    for (uint32_t power = 1024; power <= ceiling; power *= 2)
+        for (uint32_t nodes = power - 1; nodes <= power + 1 && nodes <= ceiling && n < most;
+             nodes++)
+            counts[n++] = nodes;
+    return n;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -239,14 +267,19 @@ int main(int argc, char **argv)
     fclose(f);
     printf("%u node counts and lengths: %u where an element is wrong, %u where the C and the "
            "model differ\n", digests, failed, differ);
+    uint32_t counts[600];
+    uint32_t taken = one_writer_counts(counts, sizeof counts / sizeof counts[0]);
     unsigned writers_wrong = 0;
-    for (uint32_t nodes = 2; nodes <= 300; nodes++)
-        writers_wrong += (unsigned)(one_writer_check(nodes, 1) | one_writer_check(nodes, 1000));
-    printf("node counts 2 to 300: %u where a grant field has other than one writer, the "
-           "receiver its lead names\n", writers_wrong);
+    for (uint32_t i = 0; i < taken; i++)
+        writers_wrong += (unsigned)(one_writer_check(counts[i], 1) |
+                                    one_writer_check(counts[i], 1000));
+    printf("%u node counts, every one from 2 to 513 and %u the most: %u where a grant field has "
+           "other than one writer, the receiver its lead names\n", taken, counts[taken - 1],
+           writers_wrong);
     CHECK(failed == 0);
     CHECK(differ == 0);
     CHECK(digests > 500);
     CHECK(writers_wrong == 0);
+    CHECK(counts[taken - 1] == UINT32_C(1) << OSOE_INTERNAL_CIRCULANT_ROWS_MOST);
     return CHECK_DONE();
 }

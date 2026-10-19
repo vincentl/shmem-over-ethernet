@@ -1294,12 +1294,14 @@ specification or takes a choice the specification leaves open.
   `OSOE_COLLECTIVE_SHAPE=fixed`, or the link's three numbers set
   (`OSOE_LINK_*`), makes a run repeat its results. Under `fixed` that is the
   same bits from every run of this version for the same team, node map and
-  settings, at any number of progress helpers and whatever else the machine
-  runs - separate launches of reductions like these, at no helpers and at two,
-  idle and beside a busy loop a core, give one hash (`shmem.fixed-shape.*`) -
-  and nothing across versions, which stay free to change the leads' tree;
-  `fixed` with `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2` takes
-  0.1.0's fan-out and pipeline.
+  settings, at any number of progress helpers - a node combines its members
+  by local id and a parent its children by position, whichever thread carries
+  their bytes - and whatever else the machine runs: separate launches of
+  reductions like these, at no helpers, two and three, idle and beside a busy
+  loop a core, give one hash (`shmem.fixed-shape.*`). Nothing is promised
+  across versions, which stay free to change the leads' tree; `fixed` with
+  `OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2` takes 0.1.0's fan-out
+  and pipeline.
 - **By default one thread a node moves every message between nodes.** The
   progress thread of a node's first PE seals, sends, receives and applies the
   traffic of all the node's PEs, so a node's message rate and its bandwidth to
@@ -1516,7 +1518,7 @@ that one could be added without touching the OpenSHMEM layer.
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 447 of the full build's 989 tests in
+  development VM with liburing hidden: 451 of the full build's 993 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
