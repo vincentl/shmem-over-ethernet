@@ -444,6 +444,16 @@ target_link_libraries(shmem_test_fatal-order PRIVATE osoe_base Threads::Threads)
 osoe_warnings(shmem_test_fatal-order)
 add_test(NAME shmem.fatal-order COMMAND shmem_test_fatal-order)
 set_tests_properties(shmem.fatal-order PROPERTIES LABELS "tier1" TIMEOUT 30)
+# And so do osoe_abort_end's three ends - a global exit's its PE called, one
+# another PE called, and an abort a fatal declared - checked on abort.c and
+# fatal.c alone; an exit without shmem_finalize's, which only a PE makes, is
+# shmem.exit-without-finalize.first-word's. See test-abort-end.c.
+add_executable(shmem_test_abort-end test-abort-end.c ../src/abort.c ../src/fatal.c)
+target_include_directories(shmem_test_abort-end PRIVATE ../src)
+target_link_libraries(shmem_test_abort-end PRIVATE osoe_base Threads::Threads)
+osoe_warnings(shmem_test_abort-end)
+add_test(NAME shmem.abort-end COMMAND shmem_test_abort-end)
+set_tests_properties(shmem.abort-end PROPERTIES LABELS "tier1" TIMEOUT 30)
 
 # The "blocked in" record read while it is rewritten (§3.14; blocked.c): the
 # library's writer on one CPU, both readers on another - its own, which the
@@ -3408,6 +3418,25 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   osoe_tier2_map_test(internal-region 0,1)
   osoe_tier2_map_test(internal-region 0,0,1,1)
 endif()
+
+# An exit without shmem_finalize waits, as every end of a process does, for a
+# first word another thread is still writing (fatal.h; test-exit-first-word.c,
+# exit-first-word.sh): one PE holds the word in its full standard error and
+# returns from main, its exit's line and its agent's losing the word, and the
+# script reads a second later - by when an end that had not waited had ended
+# the PE with the line unwritten. White-box, for the library's own first word,
+# like internal-region's; beside shmem.exit-without-finalize.init and
+# .start_pes, and shmem.abort-end, the other ends'.
+add_executable(shmem_test_exit-first-word test-exit-first-word.c ${osoe_library_sources})
+target_include_directories(shmem_test_exit-first-word PRIVATE ../src ../include)
+target_link_libraries(shmem_test_exit-first-word PRIVATE osoe_base rt Threads::Threads
+  ${OSOE_LIBURING_LINK})
+osoe_warnings(shmem_test_exit-first-word)
+add_test(NAME shmem.exit-without-finalize.first-word
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/exit-first-word.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_exit-first-word>)
+set_tests_properties(shmem.exit-without-finalize.first-word PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION "THE FIRST WORD WAITED FOR")
 
 # Where a team's state lives and how its shape is found (phase 1 step 7 slice
 # 1; test-team-storage.c): the descriptor's local list against the map - every
