@@ -491,7 +491,8 @@ static uint64_t data_counter(uint32_t team, uint32_t step)
  * the job's node count takes, at most OSOE_INTERNAL_CIRCULANT_ROWS_MOST - then
  * the credit counter and the allgather's grant counter, each on its own line;
  * the reduce-scatter's grant lines, its counter and a field a row, one to four
- * lines; and the senders' lanes line.
+ * lines; and the senders' lanes line. Each line where internal-region.h puts
+ * it, as test-circulant-grants.c finds it.
  */
 static uint32_t circulant_layout_rows(void)
 {
@@ -500,12 +501,10 @@ static uint32_t circulant_layout_rows(void)
 
 static uint64_t circulant_line(uint32_t number, uint32_t line)
 {
-    return osoe_internal_circulant_offset(osoe.bootstrap.collective_fanout,
-                                          osoe.bootstrap.max_teams,
-                                          osoe.bootstrap.small_collective_bytes,
-                                          osoe.bootstrap.node_count) +
-           (uint64_t)number * osoe_internal_team_circulant_bytes(circulant_layout_rows()) +
-           (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
+    return osoe_internal_circulant_line(osoe.bootstrap.collective_fanout,
+                                        osoe.bootstrap.max_teams,
+                                        osoe.bootstrap.small_collective_bytes,
+                                        osoe.bootstrap.node_count, number, line);
 }
 
 /* Row `row`'s arrival counter: the pieces of the rounds that take that row of
@@ -517,17 +516,19 @@ static uint64_t circulant_arrival_counter(uint32_t number, uint32_t row)
 
 static uint64_t circulant_credit_counter(uint32_t number)
 {
-    return circulant_line(number, circulant_layout_rows());
+    return circulant_line(number, osoe_internal_circulant_credit_line(circulant_layout_rows()));
 }
 
 static uint64_t circulant_allgather_grant_counter(uint32_t number)
 {
-    return circulant_line(number, circulant_layout_rows() + 1);
+    return circulant_line(number,
+                          osoe_internal_circulant_allgather_grant_line(circulant_layout_rows()));
 }
 
 static uint64_t circulant_reduce_scatter_grant_counter(uint32_t number)
 {
-    return circulant_line(number, circulant_layout_rows() + 2);
+    return circulant_line(
+        number, osoe_internal_circulant_reduce_scatter_grant_line(circulant_layout_rows()));
 }
 
 /* The reduce-scatter grant's fields, a round's each, past its counter and so
@@ -540,8 +541,7 @@ static uint64_t circulant_reduce_scatter_grant_words(uint32_t number)
 /* The senders' lanes line, past the grant's lines: a lane word a row. */
 static uint64_t circulant_senders(uint32_t number)
 {
-    uint32_t rows = circulant_layout_rows();
-    return circulant_line(number, rows + 2 + osoe_internal_circulant_grant_lines(rows));
+    return circulant_line(number, osoe_internal_circulant_senders_line(circulant_layout_rows()));
 }
 
 /* This PE's own internal region, at `offset`. */
@@ -3484,7 +3484,8 @@ void osoe_internode_generic_number_taken(uint32_t number)
         memset(internal(at + 8), 0, OSOE_INTERNAL_LINE_BYTES - 8);
     }
     uint32_t rows = circulant_layout_rows();
-    for (uint32_t line = 0; rows > 0 && line < rows + 3; line++)
+    for (uint32_t line = 0;
+         rows > 0 && line <= osoe_internal_circulant_reduce_scatter_grant_line(rows); line++)
         atomic_store_explicit((_Atomic uint64_t *)internal(circulant_line(number, line)), 0,
                               memory_order_release);
     if (rows > 0) {

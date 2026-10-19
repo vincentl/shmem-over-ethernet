@@ -212,7 +212,9 @@ set_tests_properties(shmem.shape.choice shmem.shape.grid shmem.shape.places-grid
 # tools/modelcheck/circulant_model.py digested (circulant-digest.txt;
 # model.circulant.digest checks the model still writes it); and each field of
 # a lead's reduce-scatter grant written by one lead, the receiver it is read as
-# from, at every node count from 2 to 300 (T40).
+# from, at every node count Träff's takes at the default fan-out ceiling, 2 to
+# 512, and past it at the counts beside each power of two to the 65,536 it
+# takes at any (T40).
 add_executable(shmem_test_circulant test-circulant.c ../src/collective-circulant.c)
 target_include_directories(shmem_test_circulant PRIVATE ../src)
 osoe_warnings(shmem_test_circulant)

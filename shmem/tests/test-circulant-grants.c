@@ -10,9 +10,9 @@
  * word nobody has written since reads as none (internode-generic.c, cleared).
  * circulant_model.py tags each field with its writer and its round; the C
  * carries neither, and what makes its fields safe untagged is one writer a
- * field, which shmem.circulant.arithmetic checks at every node count from 2 to
- * 300, and the clear - which nothing else sees: with it deleted, every result
- * is still right.
+ * field, which shmem.circulant.arithmetic checks at every node count to 512
+ * and at counts on to 65,536, and the clear - which nothing else sees: with it
+ * deleted, every result is still right.
  *
  * Over logical nodes, the link set by OSOE_LINK_* so that the chooser takes
  * Träff's: three sum reductions of the world at the smallest of a ladder of
@@ -60,15 +60,14 @@ static struct osoe_collective_shape chosen(uint64_t bytes)
 }
 
 /* Where team number `number`'s reduce-scatter line `line` starts in a PE's
- * internal region (internode-generic.c, circulant_line). */
+ * internal region: by internal-region.h's arithmetic, which the library's
+ * circulant_line is too, so that the lines read below are the ones the
+ * library writes and clears. */
 static uint64_t circulant_line(uint32_t number, uint32_t line)
 {
     const struct osoe_bootstrap *b = &osoe.bootstrap;
-    uint32_t rows = osoe_internal_circulant_rows(b->node_count);
-    return osoe_internal_circulant_offset(b->collective_fanout, b->max_teams,
-                                          b->small_collective_bytes, b->node_count) +
-           (uint64_t)number * osoe_internal_team_circulant_bytes(rows) +
-           (uint64_t)line * OSOE_INTERNAL_LINE_BYTES;
+    return osoe_internal_circulant_line(b->collective_fanout, b->max_teams,
+                                        b->small_collective_bytes, b->node_count, number, line);
 }
 
 /* How many of `bytes` bytes at `offset` in this PE's internal region are not
@@ -88,9 +87,9 @@ static uint64_t written(uint64_t offset, uint64_t bytes, uint64_t *first)
 /*
  * This node's lead after `done` reductions: its grant counter at `done` times
  * the rounds of a half, and nothing left past it in the grant's lines or in
- * the senders' lanes line. The counter is the line after the credit counter
- * and the allgather's grant counter; the grant's lines follow it, and the
- * senders' lanes line them (internode-generic.c).
+ * the senders' lanes line (internal-region.h). A wrong line read for the
+ * counter fails, read for a cleared field passes - every line is found by the
+ * library's own arithmetic for that (circulant_line, above).
  */
 static int lead_cleared(int me, uint32_t done)
 {
@@ -98,8 +97,9 @@ static int lead_cleared(int me, uint32_t done)
     uint32_t layout = osoe_internal_circulant_rows(osoe.bootstrap.node_count);
     uint32_t rows = osoe_circulant_rows(osoe.job.node_count);
     uint32_t grant_lines = osoe_internal_circulant_grant_lines(layout);
-    uint64_t counter = circulant_line(number, layout + 2);
-    uint64_t senders = circulant_line(number, layout + 2 + grant_lines);
+    uint64_t counter =
+        circulant_line(number, osoe_internal_circulant_reduce_scatter_grant_line(layout));
+    uint64_t senders = circulant_line(number, osoe_internal_circulant_senders_line(layout));
     int bad = 0;
     uint64_t grants = osoe_transport_load(OSOE_REGION_INTERNAL, counter, 8);
     if (grants != (uint64_t)done * rows) {
