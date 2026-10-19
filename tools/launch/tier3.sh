@@ -67,6 +67,22 @@ if [ "$NODES" -lt 1 ] || [ "$NODES" -gt 254 ]; then
     exit 2
 fi
 
+# Every namespace's record of its neighbours' Ethernet addresses is one table,
+# the kernel's: NODES namespaces on one bridge need NODES x (NODES - 1) of its
+# entries, and past net.ipv4.neigh.default.gc_thresh3 - 1,024 by default, so
+# past 32 nodes - the kernel drops the packets it cannot address, and a job's
+# calls time out until its nodes declare each other vanished (64 nodes, H24 and
+# H23, 2026-10-19). Refused here by name instead, the limit unchanged: it is
+# the host's, not this run's.
+NEIGHBOURS=$((NODES * (NODES - 1)))
+LIMIT=$(cat /proc/sys/net/ipv4/neigh/default/gc_thresh3 2>/dev/null || echo 0)
+if [ "$LIMIT" -gt 0 ] && [ "$NEIGHBOURS" -gt "$LIMIT" ]; then
+    echo "tier3.sh: $NODES nodes need $NEIGHBOURS entries in the kernel's neighbour table," \
+         "which every namespace shares, and net.ipv4.neigh.default.gc_thresh3 is $LIMIT:" \
+         "raise it to $NEIGHBOURS or more, and gc_thresh2 with it, or run fewer nodes" >&2
+    exit 2
+fi
+
 PREFIX=osoe-tier3-$$-
 SWITCH=${PREFIX}switch
 CUTTER=

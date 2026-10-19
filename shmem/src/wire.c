@@ -10,11 +10,13 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <linux/sockios.h>
 
 #include "base/environment.h"
+#include "base/print-line.h"
 #include "fatal.h"
 #include "listener.h"
 #include "owner-map.h"
@@ -201,6 +203,13 @@ static bool lacks_a_wire(const struct mesh_waiting *m, uint32_t peer)
     return false;
 }
 
+static uint64_t now_ns(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * UINT64_C(1000000000) + (uint64_t)t.tv_nsec;
+}
+
 static void describe_missing(const void *context, char *text, size_t len)
 {
     const struct mesh_waiting *m = context;
@@ -228,6 +237,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
      * on one that is itself waiting to be answered, and establishing the whole
      * mesh takes about N connection times rather than a chain of them.
      */
+    uint64_t begun_ns = now_ns();
     uint32_t peers = b->node_count - 1;
     for (uint32_t i = 0; i < 2 * peers; i++)
         wires[i] = (struct osoe_wire){ .fd = -1 };
@@ -278,6 +288,12 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
                                           &ring, &ring_index);
             attach_purpose(w, ring, ring_index, fd, peer, purposes[k], b);
         }
+    /* Under SHMEM_DEBUG, how long the mesh took this lead, from the
+     * rendezvous's release to its last wire (H23's timing). */
+    if (b->debug)
+        osoe_print_line("osoe: node %u connected its mesh in %llu us: %u wires answered and %u "
+                        "called\n", b->node, (unsigned long long)((now_ns() - begun_ns) / 1000),
+                        2 * b->node, 2 * (peers - b->node));
     for (uint32_t o = 0; o <= helpers; o++)
         ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
                   osoe_ring_wires(o, peers, helpers), osoe_owner_wires(o, peers, helpers), b,

@@ -916,7 +916,9 @@ times these:
   of its n - 1 peers, and Linux allows 1,024 by default: for more than about a
   thousand nodes on one subnet, an administrator raises
   `net.ipv4.neigh.default.gc_thresh3` above the node count, and `gc_thresh1`
-  and `gc_thresh2` with it.
+  and `gc_thresh2` with it. Logical nodes in network namespaces of one machine,
+  as tier 3 makes them, share that machine's table, n × (n - 1) entries -
+  more than 1,024 past 32 nodes, where `tier3.sh` refuses by name.
 - **`/dev/shm`**: each PE makes a heap object, which every PE of its node maps,
   so the capacity check asks for P × (`SHMEM_SYMMETRIC_SIZE` + the program's
   statics + 16.3 MiB) and the control segment - 68.1 GiB a node at 256 PEs and
@@ -1646,7 +1648,7 @@ both are set the `SHMEM_` one controls.
 | `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. `0` is refused. *Checked*. |
 | `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.1.0, OpenSHMEM 1.6`. |
 | `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults, under a first line naming osoe's version. |
-| `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it, and whether it probes them with TCP keepalive and checks for a silent peer (`OSOE_KEEPALIVE`). |
+| `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it, whether it probes them with TCP keepalive and checks for a silent peer (`OSOE_KEEPALIVE`), and how long its mesh took, from the rendezvous's release to its last connection. |
 
 **Limits**
 
