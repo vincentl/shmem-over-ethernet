@@ -105,6 +105,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **A vanished node with data in flight is found within keepalive's budget**: once a keepalive interval the lead reads `TCP_INFO`, and a peer whose kernel has acknowledged nothing for the whole budget while segments wait ends the job, naming it; a stopped peer's kernel still acknowledges, so it is waited for. Claude, found by tier 3, [2026-09-28-overnight](2026-09-28-overnight.md) item 4. Off with keepalive where every node has a loopback address: [2026-10-10](2026-10-10.md) item 1.
 - **Every agent asks for a short scheduler slice, and may run on any CPU of its node's tasks where asked** (`OSOE_AGENT_CPUS=node`; the default, `task`, keeps it on its PE's CPUs) - the union of the bindings the PEs publish; the PEs' own threads keep theirs, and nothing of the system's configuration changes. Author (the question) and Claude, [2026-09-28-overnight](2026-09-28-overnight.md) item 3.
 - **AM's handler checksum leaves the rendezvous through a backend entry**, the backend's agreement word compared where the checksum is (P27); **a team block claim moves to a word by local id after a failed swap**, highest-free-first kept, built and timed at a cluster (P9). Author, [2026-10-18](2026-10-18.md), "The author's answers on the stopped items".
+- **Connections on demand built before 0.2's tag**, an item of its own, a proposal and models first; the mesh's start-up window eight connections, four pairs (H23). Author, [2026-10-19](2026-10-19.md), "The author's answers".
 
 ## Settings and defaults
 
@@ -146,6 +147,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Slurm stays installed in the VM,** and fixtures come from real Slurm and the Pi cluster. [2026-09-24-overnight](2026-09-24-overnight.md) items 5-6.
 - **Disk.** Merged worktrees are removed; uncommitted work is archived first. Author, [2026-09-26-overnight](2026-09-26-overnight.md) item 7.
 - **The circulant protocol's grant fields tested in the C**, not the model brought to it (T40); **multi-node tests print the measured link** rather than pin one (T19). Author, [2026-10-18](2026-10-18.md), "The author's answers on the stopped items".
+- **Tier 3 refuses more logical nodes than the shared neighbour table holds**, by name, changing nothing on the host; the one-second tail at 128 nodes to be found (T46). Author, [2026-10-19](2026-10-19.md), "The author's answers".
 
 ## Tools
 
