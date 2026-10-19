@@ -14,8 +14,10 @@ pairs' slot, where the upper half are called and the lower half call. The
 slots' offsets in one shuffled order every lead computes alike from the job's
 ids (`order`; `digest` writes the orders into
 `shmem/tests/mesh-schedule-digest.txt`, which model.mesh.digest holds to what
-the model writes now). Each pair connects twice, the control wire and the data
-wire (§3.1), both calls in the pair's slot.
+the model writes now and shmem.mesh-schedule holds mesh-schedule.c to). Each
+pair connects twice, the control wire and the data wire (§3.1), both calls in
+the pair's slot. The C is mesh-schedule.c and wire.c's osoe_wires_open, its
+calls listener.c's calls part-way.
 
 The protocol. Each lead runs one loop that answers its listener and drives its
 own calls, at most W in flight, a call begun no earlier than its slot - a slot

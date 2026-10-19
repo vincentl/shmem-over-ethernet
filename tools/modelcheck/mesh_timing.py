@@ -24,7 +24,12 @@ The link is tier3.sh's `pi`: 100 µs each way, 1 Gbit/s - about the Pi
 cluster's. The CPU a connection costs each end is the proposal's estimate, 35
 µs at the caller and 25 at the callee, one CPU a lead as on a cluster; `cores`
 shares a few CPUs among every lead, as tier 3 runs them on the development
-VM's four.
+VM's four, and `wake` delays each piece of a lead's work as a loaded machine's
+scheduler does. `tier3` sets the model at four CPUs and a wake of 50 µs beside
+H23's runs there (docs/design/evidence/v0.2-step4/2026-10-19-h23/): within a sixth
+at 16 and 32 nodes, both orders, and short of both at 64, where 64 namespaces
+on four CPUs cost more than it has - 96 ms for the chain against 156 to 173
+measured, 67 for the schedule against 82 to 105.
 
 Entry: on schedule, every lead at once; `tree`, each lead when the
 rendezvous's tables reach it - a parent sending them to its children over one
@@ -35,7 +40,7 @@ Measured: the time until every wire is attached; the most SYNs reaching one
 listener within one round trip; the most connections waiting at one lead
 (handshake done, hello not yet answered).
 
-Usage: mesh_timing.py [check] | table [COUNTS...]
+Usage: mesh_timing.py [check] | table [COUNTS...] | tier3
 """
 import heapq
 import sys
@@ -85,7 +90,7 @@ def plan(n, schedule, wires, slot_order):
 
 
 def simulate(n, schedule, window=8, slot=100e-6, wires=2, one_way=ONE_WAY, costs=COSTS,
-             cores=None, entry=None, slot_order=None):
+             cores=None, entry=None, slot_order=None, wake=0.0):
     slot_order = slot_order if slot_order is not None else order(JOB, STEP, n)
     calls = plan(n, schedule, wires, slot_order)
     expected = [0] * n
@@ -106,6 +111,7 @@ def simulate(n, schedule, window=8, slot=100e-6, wires=2, one_way=ONE_WAY, costs
 
     def work(lead, t, cost, kind, i, j):
         nonlocal sequence
+        t += wake                       # the thread woken: a loaded machine's delay
         start = t if t > busy[lead] else busy[lead]
         if free_cores is not None:
             c = heapq.heappop(free_cores)
@@ -331,10 +337,32 @@ def check():
     return ok
 
 
+# Tier 3's runs of 2026-10-19 (H23): the slowest lead's mesh in ms over the
+# Pi-like link, the chain's three rounds and the schedule's, alternating on one
+# idle development VM of four CPUs (mesh-timing.txt in the evidence).
+TIER3_MEASURED = {16: ((24.5, 22.0, 21.4), (5.0, 5.1, 4.9)),
+                  32: ((51.6, 49.1, 49.7), (19.7, 19.4, 18.4)),
+                  64: ((156.2, 173.0, 161.1), (87.7, 104.8, 81.6))}
+
+
+def tier3():
+    print('Tier 3 on the development VM: four CPUs for every lead, a wake of 50 us before each')
+    print('piece of a lead\'s work; the model against the runs, ms.\n')
+    print(f"  {'nodes':>6}{'chain':>10}{'measured':>22}{'schedule':>10}{'measured':>22}")
+    for n, (chain, schedule) in TIER3_MEASURED.items():
+        a = simulate(n, TODAY, cores=4, wake=50e-6)['done'] * 1e3
+        b = simulate(n, SLOTTED, cores=4, wake=50e-6)['done'] * 1e3
+        fmt = lambda xs: ' '.join(f'{x:6.1f}' for x in xs)
+        print(f'  {n:>6}{a:10.1f}{fmt(chain):>22}{b:10.1f}{fmt(schedule):>22}')
+
+
 def main(argv):
     if argv[:1] == ['table']:
         counts = [int(x) for x in argv[1:]] or [64, 128, 256, 512, 1024, 2048, 4097]
         table(counts)
+        return 0
+    if argv[:1] == ['tier3']:
+        tier3()
         return 0
     if argv[:1] in (['check'], []):
         return 0 if check() else 1

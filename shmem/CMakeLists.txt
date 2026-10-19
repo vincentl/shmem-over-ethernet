@@ -26,6 +26,7 @@ if(OSOE_BACKEND STREQUAL "am")
     src/connection-area.c
     src/internode-am.c
     src/listener.c
+    src/mesh-schedule.c
     src/progress.c
     src/progress-host.c
     src/rendezvous.c

@@ -6752,6 +6752,11 @@ phase 1 step 3 as a tree rooted at that lead - "The rendezvous as built", below.
   was 322 (`mesh_timing.py`'s two wires) - which `docs/design/mesh-schedule-proposal.md`
   is the answer to either way. The control wires are owner 0's, on its ring
   after its data wires (`owner-map.h`).
+  *As built since H23 (2026-10-19), by the author's decision A8:* who calls whom
+  is that proposal's schedule (`mesh-schedule.h`): node i calls node (i + d)
+  mod N at each offset d = 1 .. (N - 1)/2, and an even N's opposite pairs from
+  the lower node, so each pair still has one caller and one stream of each wire;
+  the hello's check is the schedule's rule, where it was "a lower node".
 
 *Node-pair connections as built* (phase 1 step 3 slice 1; `listener.[ch]`,
 `osoe_wires_open`). **Every lead listens, not only node 0's**, on the first free
@@ -6786,6 +6791,19 @@ listens on a port the kernel chooses, **advertises it in its backend blob**
 connect to the address and port the rendezvous carried (below). The port rule's
 probing remains for the rendezvous's own parent connection, and for the tests
 below the library that make a mesh without a rendezvous.
+*As built since H23 (2026-10-19):* the order above is the mesh's schedule's
+(`docs/design/mesh-schedule-proposal.md`), and the calls are cycles - at the
+offset 1 every lead calls the next - so no lead waits in one: one loop
+(`wire.c`) answers the listener and takes each of its own calls a step on as
+its socket allows (`listener.h`'s calls part-way), at most eight in flight -
+four pairs' two wires - each begun no earlier than its slot, `OSOE_MESH_SLOT`
+apart from the rendezvous's release, and never skipped. A lead has at most N
+callers' connections, both wires of N/2 callers, which `min(N, 4096)` holds to
+4,097 nodes, where the last lead before had 2(N - 1). The listener closes once
+every caller the schedule gives the lead is in.
+`tools/modelcheck/mesh_model.py` searches every lead's calls and accepts for a
+lead that waits for ever; `mesh_timing.py` times the schedule against the order
+before it.
 
 **What the map holds, and what it costs** (phase 1 step 2 slice 3; second review,
 D7). Per rank: its node (4 bytes) and its **local index on that node** (2 bytes;
@@ -6934,7 +6952,9 @@ kept open for the life of the job, served by a multishot accept on the ring
 rather than closed after init; a writer that finds no connection toward a node
 posting a request to the lead rather than reserving, since only the lead
 connects (§3.12); and a rule for two leads that connect to each other at once —
-the lower node's connection wins, as §6.2's direction already says. The ring's
+the lower node's connection wins, as §6.2's direction already says. *(Since
+H23 the direction is the mesh's schedule's, which a rule of the same kind would
+follow: the connection the schedule makes wins.)* The ring's
 bounds would then follow the active peers rather than *N*.
 
 **`set_range` is not acted on here** (§4.10, §7.1 step 3). A TCP backend has

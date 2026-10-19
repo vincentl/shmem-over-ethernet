@@ -12,6 +12,7 @@
 #include "base/print-line.h"
 #include "base/size.h"
 #include "bootstrap.h"
+#include "mesh-schedule.h"
 #include "node.h"
 #include "fatal.h"
 #include "watch-range.h"
@@ -487,6 +488,17 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         b->keepalive_count = count;
     }
 
+    /* OSOE_MESH_SLOT (H23): how far apart a lead's slots of the mesh's
+     * schedule begin, 0 for no slots - each call as soon as the window of
+     * calls in flight has room. Not checked between nodes: a slot only paces
+     * a lead's own calls, and mesh_model.py holds the mesh at any pace. */
+    enum osoe_environment_status slot = osoe_environment_u32("OSOE_MESH_SLOT", &b->mesh_slot_us);
+    if (slot == OSOE_ENVIRONMENT_INVALID ||
+        (slot == OSOE_ENVIRONMENT_OK && b->mesh_slot_us > OSOE_MESH_SLOT_MOST_US))
+        osoe_fatal("OSOE_MESH_SLOT='%s' is not a whole number of microseconds from 0 to %u",
+                   getenv("OSOE_MESH_SLOT"), (unsigned)OSOE_MESH_SLOT_MOST_US);
+    b->mesh_slot_set = slot == OSOE_ENVIRONMENT_OK;
+
     /*
      * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map
      * does too: where each node's lead listens, for the rendezvous (§6.2).
@@ -591,6 +603,20 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
             OSOE_ENVIRONMENT_INVALID || print_link > 1)
         osoe_fatal("OSOE_TEST_PRINT_LINK='%s' is not 0 or 1", getenv("OSOE_TEST_PRINT_LINK"));
     b->print_link = print_link == 1;
+
+    /* And H23's: a lead held back from its mesh, refused by name when it names
+     * no node of the job or no time. */
+    const char *hold = getenv("OSOE_TEST_MESH_HOLD");
+    if (hold) {
+        unsigned node, ms;
+        int used = 0;
+        if (sscanf(hold, "%u:%u%n", &node, &ms, &used) != 2 || hold[used] != '\0' ||
+            node >= b->node_count || ms < 1 || ms > 60000)
+            osoe_fatal("OSOE_TEST_MESH_HOLD='%s' is not NODE:MS, a node of this job of %u and "
+                       "1 to 60000 milliseconds", hold, b->node_count);
+        b->mesh_hold_node = node;
+        b->mesh_hold_ms = ms;
+    }
 }
 
 void osoe_bootstrap_free(struct osoe_bootstrap *b)

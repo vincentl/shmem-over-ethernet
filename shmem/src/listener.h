@@ -42,7 +42,9 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "bootstrap.h"
@@ -68,6 +70,10 @@ struct osoe_listener_caller;
  * backlog, as a caller of a lead that is busy waits. */
 enum { OSOE_LISTENER_CALLERS = 16 };
 
+/* The entries a listener puts into a poll set: each caller part-way through
+ * the hello, and its listening socket (osoe_listener_poll). */
+enum { OSOE_LISTENER_POLLED = 1 + OSOE_LISTENER_CALLERS };
+
 struct osoe_listener {
     int fd;
     uint16_t port;              /* the candidate this lead bound */
@@ -75,6 +81,10 @@ struct osoe_listener {
     uint32_t session;
     const struct osoe_bootstrap *bootstrap;
     struct osoe_listener_caller *callers;   /* OSOE_LISTENER_CALLERS of them */
+    /* What the last osoe_listener_poll put in each entry: a caller's place, or
+     * UINT32_MAX for the listening socket. */
+    uint32_t polled[OSOE_LISTENER_POLLED];
+    uint32_t polled_count;
 };
 
 /*
@@ -117,6 +127,63 @@ int osoe_listener_accept_described(struct osoe_listener *l, uint32_t purposes, u
                                    enum osoe_hello_purpose *purpose,
                                    void (*describe)(const void *context, char *text, size_t len),
                                    const void *context);
+
+/*
+ * A listener served by a loop that waits on more than it - the mesh's, which
+ * makes its own calls meanwhile (H23). osoe_listener_poll writes into `p` what
+ * to poll, at most OSOE_LISTENER_POLLED entries - each caller part-way through
+ * the hello, and the listening socket while a place is free - returns how
+ * many, and lowers `*serve_by_ns` (CLOCK_MONOTONIC) to when a hello next runs
+ * out of time. After poll(2), osoe_listener_serve takes what those entries
+ * say, as osoe_listener_accept does, and returns a caller's socket once its
+ * confirmation has come, with `peer` and `purpose`, or -1; called again with
+ * the same entries it goes on past the ones it has taken, so a loop takes
+ * every caller confirmed at once. osoe_listener_accept is these two in a loop.
+ */
+uint32_t osoe_listener_poll(struct osoe_listener *l, uint32_t purposes, struct pollfd *p,
+                            uint64_t *serve_by_ns);
+/* How many callers it holds part-way through the hello, for a notice. */
+uint32_t osoe_listener_part_way(const struct osoe_listener *l);
+int osoe_listener_serve(struct osoe_listener *l, uint32_t purposes, struct pollfd *p,
+                        uint32_t *peer, enum osoe_hello_purpose *purpose);
+
+/*
+ * A call part-way: the calling side of the hello one step at a time, for a
+ * loop that answers its own listener meanwhile (the mesh's; H23) - where
+ * osoe_listener_connect and osoe_listener_connect_port, which are a call and a
+ * loop that waits for it alone, would hold the lead while a peer that is itself
+ * calling waits for its answer. The hello, its answer, the confirmation and
+ * every retry are theirs.
+ */
+struct osoe_listener_call;
+
+struct osoe_listener_call *osoe_listener_call_new(void);
+void osoe_listener_call_free(struct osoe_listener_call *c);
+
+/* Begin calling node `node` at `host` for `purpose`: on `port` as the caller
+ * was told (osoe_listener_connect_port), or with 0 on the port rule's
+ * candidates (osoe_listener_connect). The first dial is at once. */
+void osoe_listener_call_begin(struct osoe_listener_call *c, const struct osoe_bootstrap *b,
+                              uint32_t session, const struct sockaddr_in *host, uint16_t port,
+                              uint32_t node, enum osoe_hello_purpose purpose);
+
+/* What to poll for it: its socket, with `*events`, or -1 while it waits to dial
+ * again; and `*step_by_ns` (CLOCK_MONOTONIC) lowered to when it must be
+ * stepped whatever poll says - a dial's limit, an answer's on a candidate, the
+ * end of a back-off. */
+int osoe_listener_call_poll(const struct osoe_listener_call *c, short *events,
+                            uint64_t *step_by_ns);
+
+/* Take it on from what poll said of its socket (0 for nothing, or when it was
+ * not polled): the connected socket, confirmed and blocking, once the call is
+ * made - the call then done with until begun again - else -1. Fatal where
+ * osoe_listener_connect_port's answer is: a told port answered by another node
+ * or a stranger, a secret that differs. */
+int osoe_listener_call_step(struct osoe_listener_call *c, short revents);
+
+/* For a notice: whom it calls and what it last met - "node 5 (pi5, at
+ * 10.0.0.5) to answer on port 40213: Connection refused, 0.2 s ago". */
+void osoe_listener_call_describe(const struct osoe_listener_call *c, char *text, size_t len);
 
 /*
  * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors

@@ -1,5 +1,13 @@
 # A start-up schedule for the mesh
 
+*Built on 2026-10-19 (H23), by the author's decision of 2026-10-11 (A8: built
+now, a large system's measurement waived) - as proposed but for W, which counts
+connections: eight, four pairs' two wires, since the control wire came after
+this proposal and four connections were two pairs (`mesh-schedule.h`); and
+the shuffle's draws, MurmurHash3's finalizer over the job, the step and N
+(`mesh-schedule.c`, `tools/modelcheck/mesh_model.py`'s `order`). The model,
+the timing and tier 3's runs are in `docs/decisions/2026-10-19.md`.*
+
 *A proposal, 2026-10-05, postponed by the author that day until a system large
 enough to measure it (`docs/decisions/2026-10-05-before-the-tag.md` item 2). It
 answers the author's question of that day:
