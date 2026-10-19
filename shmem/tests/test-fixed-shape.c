@@ -22,7 +22,11 @@
  * No long double: its format is the architecture's. Every PE hashes each
  * result's bits, and the team requires its members' hashes alike; PE 0 prints
  * one line naming the hash of them all, which fixed-shape.sh compares across
- * separate launches.
+ * separate launches. And each case whose result the order can turn - infinite
+ * or not, -0.0 or +0.0, NaN or not - must turn it in some of its results and
+ * not in all, so that its inputs still depend on the order: inputs that did
+ * not would hash alike in every run whatever the order, and pass for a shape
+ * that repeats.
  */
 #include <math.h>
 #include <stdint.h>
@@ -68,8 +72,21 @@ static uint64_t hash_floats(const float *v, size_t n)
     return h;
 }
 
-static int me, npes, disagree;
+static int me, npes, disagree, order_unseen;
 static uint64_t *hash_in, *hash_most, *hash_least, all;
+
+/* A case the order can turn must show it in some of its results and not in
+ * all (the file's comment): `shown` of `results` are `what`. */
+static void shows_the_order(const char *reduction, const char *what, size_t shown,
+                            size_t results)
+{
+    if (shown != 0 && shown != results)
+        return;
+    if (me == 0)
+        fprintf(stderr, "%s: %zu of %zu results %s, where its inputs should make some and not "
+                "all - they no longer depend on the order\n", reduction, shown, results, what);
+    order_unseen++;
+}
 
 /* The team's members must hold one result: their hashes' maximum and minimum
  * alike. Then into the hash of everything. */
@@ -101,10 +118,11 @@ int main(void)
     hash_most = hash_in + 1;
     hash_least = hash_in + 2;
     all = UINT64_C(0xcbf29ce484222325);
-    size_t infinities = 0, negative_zeros = 0, nans = 0;
+    size_t infinities = 0, negative_zeros = 0, nans = 0, results = 0;
 
     for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
         size_t n = sizes[s];
+        results += n;
         for (size_t i = 0; i < n; i++)
             source[i] = 1.0 / (double)(3 + (size_t)me * 7 + i % 101) * (me % 2 ? 1e-9 : 1e9);
         shmem_barrier_all();
@@ -148,11 +166,16 @@ int main(void)
         agree(hash_floats(dest_float, n), "a sum of floats that rounds", n);
     }
 
+    shows_the_order("a sum that overflows", "infinite", infinities, results);
+    shows_the_order("a maximum of signed zeros", "-0.0", negative_zeros, results);
+    shows_the_order("a maximum with a NaN", "NaN", nans, results);
     CHECK(disagree == 0);
+    CHECK(order_unseen == 0);
     if (me == 0)
-        printf("FIXED SHAPE: hash %016llx of %zu reductions on %d PEs (%zu results infinite, "
-               "%zu -0.0, %zu NaN)\n", (unsigned long long)all,
-               6 * (sizeof sizes / sizeof sizes[0]), npes, infinities, negative_zeros, nans);
+        printf("FIXED SHAPE: hash %016llx of %zu reductions on %d PEs (of each case's %zu "
+               "results, %zu infinite, %zu -0.0, %zu NaN)\n", (unsigned long long)all,
+               6 * (sizeof sizes / sizeof sizes[0]), npes, results, infinities, negative_zeros,
+               nans);
     shmem_free(hash_in);
     shmem_free(dest_float);
     shmem_free(source_float);

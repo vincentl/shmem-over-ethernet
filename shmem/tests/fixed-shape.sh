@@ -7,10 +7,11 @@
 #   fixed-shape.sh LAUNCHER PROGRAM MAP [NAME=VALUE]...
 #
 # runs PROGRAM (test-fixed-shape.c) under fixed, with the settings given, as
-# four separate launches over the node map MAP - at OSOE_PROGRESS_HELPERS=0
-# and 2, each with the machine idle and beside a busy loop a core - and
-# requires each to succeed and to print one hash, and every hash to be the
-# same. Nothing is compared across versions: the promise is this version's.
+# six separate launches over the node map MAP - at OSOE_PROGRESS_HELPERS=0, 2
+# and 3, the counts the suite runs at, each with the machine idle and beside a
+# busy loop a core - and requires each to succeed and to print one hash, and
+# every hash to be the same. Nothing is compared across versions: the promise
+# is this version's.
 set -u
 LAUNCHER=$1 PROGRAM=$2 MAP=$3
 shift 3
@@ -38,7 +39,7 @@ for load in idle loaded; do
             i=$((i + 1))
         done
     fi
-    for helpers in 0 2; do
+    for helpers in 0 2 3; do
         out=$(env OSOE_COLLECTIVE_SHAPE=fixed OSOE_PROGRESS_HELPERS=$helpers "$@" \
             "$LAUNCHER" -n "$ranks" -m "$MAP" -t 240 -- "$PROGRAM" 2>&1)
         status=$?

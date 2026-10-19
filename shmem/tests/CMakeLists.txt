@@ -2781,8 +2781,10 @@ endif()
 # the tree. Floating-point reductions whose results depend on the order they
 # combine in - a sum that rounds, one that overflows on the way, signed zeros,
 # a NaN, a float sum - at the small class's size, a few pieces' and a MiB's,
-# hashed, from four separate launches: at no helpers and at two, with the
-# machine idle and beside a busy loop a core. Every hash must be the same. On
+# hashed, from six separate launches: at no helpers, two and three, with the
+# machine idle and beside a busy loop a core. Every hash must be the same, and
+# the infinite, -0.0 and NaN results of the three cases the order turns some
+# and not all, so that their inputs still depend on the order. On
 # six nodes of one and two PEs, at 0.1.0's fan-out and pipeline, 4 and 2,
 # where node 1 is an interior node of the leads' tree, and at the defaults,
 # where the tree is the root's alone. Run alone, since its loops would slow the
