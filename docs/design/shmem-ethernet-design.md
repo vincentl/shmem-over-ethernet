@@ -5655,6 +5655,18 @@ the number is claimed by then and the split cannot fail alike - the second part
 makes it such a failure. The control queue's term stays per number (§3.8),
 which a node's blocks match one for one while numbers are job-wide.
 
+*As built since P9 (2026-10-19; the author's choice (b) of 2026-10-18).* A
+claim's swap lost to a word changed since its load - another lead claiming or
+giving back a block of it at the same moment - moves the claim to the word the
+claiming PE's local id names, modulo the pool's words, and on down from there
+round to the top: leads claiming at once, as every PE of a node splitting a
+team of its own does, would otherwise all try the top word again. A claim
+nobody contends still takes the highest free block, and a swap failing
+spuriously, the word as loaded, is tried again where it was.
+`shmem.team-claim.*` loses a swap on purpose through a white-box hook the
+library never sets (`osoe_node_team_claim_rival`); the contention itself is
+timed on a cluster (`docs/fast-link.md` §18).
+
 *As built (the team redesign's step D, part 2, layout 30;
 `docs/design/team-resources-proposal.md` D1, D2 and D4 to D8).* **A number is
 each PE's own**: no PE is in two live teams under one number, and two teams with

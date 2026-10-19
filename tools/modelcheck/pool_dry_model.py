@@ -192,7 +192,9 @@ def returning(design, blocks, p, yes, no):
 
 def claim(design, who, p, got, dry):
     """osoe_node_team_claim: the highest free bit by compare-and-swap, then the
-    block's members zeroed (but in `first` and `zero_at_leave`)."""
+    block's members zeroed (but in `first` and `zero_at_leave`). The pools here
+    are one word, so a lost swap's move to the word a local id names (P9)
+    stays in it, as a retry does."""
     B = [(p, ('load', lambda L: FREE, 'w', '@' + p + 'e')),
          (p + 'e', ('br', lambda L: L['w'] == 0, dry, '@' + p + 'p')),
          (p + 'p', ('set', 'c', lambda L: L['w'].bit_length() - 1, '@' + p + 'x')),

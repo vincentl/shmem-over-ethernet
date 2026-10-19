@@ -1467,22 +1467,40 @@ static _Atomic uint64_t *free_word(const struct osoe_node *n, uint32_t block_ind
     return &n->team_free[block_index / 64];
 }
 
+bool osoe_node_team_claim_rival;
+
 /*
  * The members count goes to 0 as the block is claimed (node.h, osoe_team_name):
  * until then it is its last team's, which osoe_node_team_returning reads as
  * "on its way back" while the block is neither held nor in the bitmap.
+ *
+ * A word is left for the one below once it is seen empty, and the claim fails
+ * once every word has been. A swap lost to a word changed since its load - a
+ * lead claiming or giving back in it at the same time - starts that count
+ * again at the word `local_id` names, once a claim (P9; docs/decisions/
+ * 2026-10-18.md): 257 leads claiming at once would otherwise all try the top
+ * word again. A swap failing spuriously, the word as loaded, is tried again
+ * where it was, so that a claim nobody contends takes the highest free block.
  */
-uint32_t osoe_node_team_claim(struct osoe_node *n)
+uint32_t osoe_node_team_claim(struct osoe_node *n, uint32_t local_id)
 {
-    for (uint32_t w = n->team_free_words; w-- > 0;) {
+    uint32_t words = n->team_free_words, w = words - 1, left = words;
+    bool moved = false;
+    while (left > 0) {
         _Atomic uint64_t *word = &n->team_free[w];
         uint64_t bits = atomic_load_explicit(word, memory_order_acquire);
-        while (bits) {
+        bool lost = false;
+        while (bits && !lost) {
             uint32_t bit = 63 - (uint32_t)__builtin_clzll(bits);   /* the highest free */
             uint32_t block_index = w * 64 + bit;
             if (block_index >= n->team_count)
                 osoe_fatal("block %u of a pool of %u is marked free", block_index,
                            n->team_count);
+            uint64_t seen = bits;
+            if (osoe_node_team_claim_rival) {
+                osoe_node_team_claim_rival = false;
+                atomic_fetch_and_explicit(word, ~(UINT64_C(1) << bit), memory_order_seq_cst);
+            }
             if (atomic_compare_exchange_weak_explicit(word, &bits,
                                                       bits & ~(UINT64_C(1) << bit),
                                                       memory_order_seq_cst,
@@ -1491,6 +1509,15 @@ uint32_t osoe_node_team_claim(struct osoe_node *n)
                                       memory_order_release);
                 return block_index;
             }
+            lost = bits != seen && !moved;
+        }
+        if (lost) {
+            moved = true;
+            w = local_id % words;
+            left = words;
+        } else {
+            w = (w == 0 ? words : w) - 1;
+            left--;
         }
     }
     return UINT32_MAX;
