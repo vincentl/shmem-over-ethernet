@@ -74,6 +74,10 @@ struct osoe_bootstrap {
     bool print_version;         /* SHMEM_VERSION */
     bool print_info;            /* SHMEM_INFO */
     bool debug;                 /* SHMEM_DEBUG */
+
+    /* OSOE_TEST_PRINT_LINK=1, a testing hook (T19): rank 0 prints the link it
+     * measured at the end of shmem_init, as the OSOE_LINK_* that pin it. */
+    bool print_link;
 };
 
 /* The default OSOE_KEEPALIVE (§3.15): a node that has vanished is found one to

@@ -583,6 +583,14 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         (notice == OSOE_ENVIRONMENT_OK && (notice_s < 1 || notice_s > 3600)))
         osoe_fatal("OSOE_TEST_NOTICE_SECONDS='%s' is not a whole number of seconds from 1 to "
                    "3600", getenv("OSOE_TEST_NOTICE_SECONDS"));
+
+    /* And T19's: every PE refuses a bad value alike, before its node joins,
+     * though only rank 0 prints the line. */
+    uint32_t print_link = 0;
+    if (osoe_environment_u32("OSOE_TEST_PRINT_LINK", &print_link) ==
+            OSOE_ENVIRONMENT_INVALID || print_link > 1)
+        osoe_fatal("OSOE_TEST_PRINT_LINK='%s' is not 0 or 1", getenv("OSOE_TEST_PRINT_LINK"));
+    b->print_link = print_link == 1;
 }
 
 void osoe_bootstrap_free(struct osoe_bootstrap *b)
