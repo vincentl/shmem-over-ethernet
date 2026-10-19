@@ -1518,7 +1518,7 @@ that one could be added without touching the OpenSHMEM layer.
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 447 of the full build's 989 tests in
+  development VM with liburing hidden: 451 of the full build's 993 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
