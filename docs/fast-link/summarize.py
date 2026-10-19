@@ -14,6 +14,7 @@ barrier and collective lines and shapes.c's, which take their form, osoe-bench's
 places lines (collect's ways side by side, and the way shape_timing.py's
 choose_places takes on each default job's link), hol's (each operation's,
 alone and behind the stream, at each helper count), get-pieces', fan-in's,
+the claims probe's (P9: before and after, side by side),
 echo-uring's and iperf3's, ping's round trips, the floor test's ratios, the
 start-up probe's, and the pacer's and the SOS programs' outcomes; osoe-bench's
 other lines are printed as they are, and so are nstat's lines of loss and
@@ -56,6 +57,7 @@ PLACES = re.compile(r"places way=(\w+) lengths=(\w+) pes=(\d+) bytes=\d+ median_
                     r"fastest_us=([0-9.]+)$")
 PING = re.compile(r"rtt min/avg/max/mdev = ([0-9.]+)/([0-9.]+)/([0-9.]+)/([0-9.]+) ms")
 PLACES_WAYS = ("members", "totals", "scan", "exchange", "link")
+CLAIMS_FIELDS = ("last_us", "last_p90_us", "split_us", "split_p90_us", "split_p99_us")
 
 
 def places_way(nodes, link):
@@ -208,6 +210,7 @@ def summarize(directory):
     hol = defaultdict(lambda: defaultdict(list))
     pieces = defaultdict(lambda: defaultdict(list))         # zone -> bytes -> [(put, get, nbi)]
     fan_in = defaultdict(lambda: defaultdict(list))
+    claims = defaultdict(lambda: defaultdict(list))        # (base, pes) -> field -> values
     moved = defaultdict(lambda: defaultdict(list))
     links = defaultdict(lambda: defaultdict(list))         # key -> link field -> values
     echo = {}
@@ -296,6 +299,10 @@ def summarize(directory):
                     (fields["put_quiet_us"], fields["get_us"], fields["get_nbi_quiet_us"]))
             elif line.startswith("fan-in "):
                 fan_in[key]["mib_per_s"].append(number_fields(line)["mib_per_s"])
+            elif line.startswith("claims pes="):
+                fields = number_fields(line)
+                for k in CLAIMS_FIELDS:
+                    claims[(base, parts.get("pes"))][k].append(fields[k])
             elif line.startswith("startup "):
                 fields = number_fields(line)
                 for k in ("init_ms_slowest", "init_ms_fastest"):
@@ -473,6 +480,13 @@ def summarize(directory):
         for pes in sorted(startup, key=lambda p: p or 0):
             v = startup[pes]
             print(f"  pes={pes}  slowest {spread(v['init_ms_slowest'])}  fastest {spread(v['init_ms_fastest'])}")
+    if claims:
+        print("\nclaims (P9): microseconds - the last PE's splits done after the start, and a"
+              "\nsplit's time a claim; each the job's median or percentile, median (range) over"
+              "\nthe rounds")
+        for key in sorted(claims, key=lambda k: (k[0], k[1] or 0)):
+            fields = "  ".join(f"{n} {spread(claims[key][n])}" for n in CLAIMS_FIELDS)
+            print(f"  {key[0]} pes={key[1]}  {fields}")
     if outcomes:
         print("\noutcomes")
         for line in outcomes:
