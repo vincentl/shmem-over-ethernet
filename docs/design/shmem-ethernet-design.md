@@ -3883,7 +3883,10 @@ it. *(Since v0.2 step 1 `node.c` reads the AM layer's sizes from a file of their
 own on the boundary, so two remain; the backend-facing headers are two,
 `internode-generic.h` and `internode-backend.h`; and a third check holds every
 file outside the internode backend to reaching it through `internode-backend.h`
-alone: below, "As built, v0.2 step 1".)*
+alone: below, "As built, v0.2 step 1". Since P27, 2026-10-18, `rendezvous.c`
+compares the internode backend's agreement word, which `internode-backend.h`
+returns - on AM the handler checksum, in the same word of the up report - so
+one remains, `transport-local.c`.)*
 *(Since phase 1 step 5 slice 2 a second walk checks that nothing outside the API
 includes an API header or a public one: the includes run from the OpenSHMEM
 layer down to the runtime and never back - the backend's one call up is the
@@ -6875,7 +6878,8 @@ waiting on its socket names it ("the rendezvous lost node 9, its child…").
 *Up the tree* goes each subtree's report: per node its address, its ranks as
 arithmetic progressions in local-id order (one under block, one under cyclic;
 `rank-map.h`) and its blob; and the values every node must agree on — the job's
-size, `SHMEM_SYMMETRIC_SIZE`, the handler checksum, `OSOE_COLLECTIVE_FANOUT`,
+size, `SHMEM_SYMMETRIC_SIZE`, the backend's agreement word (the handler checksum
+on AM; P27), `OSOE_COLLECTIVE_FANOUT`,
 `OSOE_MAX_TEAMS`, `OSOE_COLLECTIVE_PIPELINE`, `OSOE_SMALL_COLLECTIVE_BYTES`, the
 collectives' shape and places, the link set by hand, and the architecture - byte
 order, `long`'s size, `long double`'s size and format (P21, "osoeup-7") —

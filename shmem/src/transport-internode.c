@@ -389,6 +389,14 @@ void osoe_internode_backend_advertise(void *blob)
     osoe_progress_host_advertise(blob);
 }
 
+/* The rendezvous's agreement word, on AM: the handler table's checksum, which
+ * covers each message's shape and the revision of what its fields mean
+ * (§3.13, am.c). */
+uint32_t osoe_internode_backend_agreement_word(void)
+{
+    return osoe_am_table_checksum();
+}
+
 /* The agent thread, lent to this backend (transport.h, §3.12). */
 bool osoe_internode_backend_agent_pass(void)
 {

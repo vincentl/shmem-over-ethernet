@@ -89,6 +89,7 @@ static const char *const known_settings[] = {
     "OSOE_WATCHDOG",
     /* The test suite's own, which its programs read: no setting of the
      * library's, and set in the PEs' environment by the tests alone. */
+    "OSOE_TEST_AGREEMENT_WORD",
     "OSOE_TEST_ALLTOALL_STRIDE",
     "OSOE_TEST_AMO_NBI_MISUSE",
     "OSOE_TEST_BAD_ROOT",

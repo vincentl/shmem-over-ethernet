@@ -9,7 +9,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "am.h"
 #include "blocked.h"
 #include "fatal.h"
 #include "internode-backend.h"
@@ -47,7 +46,11 @@ struct agreement {
     uint32_t world_size;
     uint32_t node_count;
     uint64_t symmetric_size;
-    uint32_t handler_checksum;
+    /* The internode backend's agreement word (internode-backend.h) - on AM the
+     * handler table's checksum: a node whose messages mean other things runs
+     * another binary (§3.13). Where the checksum travelled before P27, and the
+     * same value on AM, so the report's shape and its magic stay. */
+    uint32_t backend_agreement_word;
     uint32_t collective_fanout;     /* §5.3: a node building another tree hangs the job */
     /* §5.7: a node with another count of team numbers lays its internal
      * region out differently, and a put of one team's piece would land in
@@ -179,10 +182,11 @@ static void agree(const struct osoe_bootstrap *b, uint32_t child, const struct a
                    "%llu: every PE of a job must agree", child,
                    (unsigned long long)theirs->symmetric_size, b->node,
                    (unsigned long long)mine->symmetric_size);
-    if (theirs->handler_checksum != mine->handler_checksum)
-        osoe_fatal("node %u (or a node below it) has AM handler table checksum %#x; node %u "
-                   "has %#x: the nodes are running different binaries (§3.13)", child,
-                   theirs->handler_checksum, b->node, mine->handler_checksum);
+    if (theirs->backend_agreement_word != mine->backend_agreement_word)
+        osoe_fatal("node %u (or a node below it) has the internode backend's agreement word "
+                   "%#x; node %u has %#x: the nodes are running different binaries (on AM the "
+                   "word is the handler table's checksum, §3.13)", child,
+                   theirs->backend_agreement_word, b->node, mine->backend_agreement_word);
     if (theirs->collective_fanout != mine->collective_fanout)
         osoe_fatal("node %u (or a node below it) has OSOE_COLLECTIVE_FANOUT=%u; node %u has "
                    "%u: every node must build the same internode tree (§5.3)", child,
@@ -359,7 +363,8 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
 {
     *out = (struct osoe_rendezvous_result){ 0 };
     struct agreement mine = { b->world_size, b->node_count, b->symmetric_size,
-                              osoe_am_table_checksum(), b->collective_fanout, b->max_teams,
+                              osoe_internode_backend_agreement_word(),
+                              b->collective_fanout, b->max_teams,
                               b->collective_pipeline, b->small_collective_bytes,
                               b->collective_shape, b->link_hop_ns, b->link_message_ns,
                               b->link_bytes_per_second, b->collective_places,

@@ -54,10 +54,11 @@
  * What only AM calls, a second backend replaces or leaves unused:
  * am-configuration.h, wire-settings.h, base/ring-check.h, and node.h's
  * landing zone and thread records. AM still shows outside these files in
- * three places a second backend meets: the job's agreement on
- * osoe_am_table_checksum (rendezvous.c, open item P27), the landing zone
- * node.c sizes from AM's configuration, and the per-node and per-owner AM
- * metrics node.c lays out (node.h, metrics.h).
+ * two places a second backend meets: the landing zone node.c sizes from AM's
+ * configuration, and the per-node and per-owner AM metrics node.c lays out
+ * (node.h, metrics.h). A third, the job's agreement on AM's handler table
+ * checksum, which rendezvous.c read from am.h, has been the backend's
+ * agreement word since P27 (osoe_internode_backend_agreement_word, below).
  *
  * Contexts are the AM backend's (transport-context.h): this header passes them
  * by pointer, and the internode backend keeps its own state for each behind
@@ -130,6 +131,19 @@ void osoe_internode_backend_advertise(void *blob);
  */
 void osoe_internode_backend_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
                                        const void *blob, struct osoe_rendezvous_result *result);
+
+/*
+ * The backend's agreement word: what every node's binary must hold alike for
+ * the backend's messages to mean the same at both ends, as one word, which the
+ * job rendezvous compares beside the job's settings (§6.2) - so that a node
+ * running another binary is refused at start-up, naming both nodes, rather
+ * than found as an undecodable message at PE 47 an hour in (§3.13). On AM, its
+ * handler table's checksum (osoe_am_table_checksum); a backend on RDMA returns
+ * its own, a revision of the formats its queue pairs carry, say. This node's
+ * lead, during the rendezvous - where rendezvous.c read AM's checksum from
+ * am.h until P27, the last AM symbol above the seam.
+ */
+uint32_t osoe_internode_backend_agreement_word(void);
 
 /*
  * osoe_transport_init's share: whatever a job of more than one node needs -
