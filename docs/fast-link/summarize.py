@@ -307,7 +307,7 @@ def summarize(directory):
                 fields = number_fields(line)
                 for k in ("init_ms_slowest", "init_ms_fastest"):
                     if k in fields:
-                        startup[parts.get("pes")][k].append(fields[k])
+                        startup[(base, parts.get("pes"))][k].append(fields[k])
         for name, value in moved_counters(text).items():
             moved[key][name].append(value)
         m = re.match(r"echo-(\d+)\.txt$", f)
@@ -477,9 +477,10 @@ def summarize(directory):
     if startup:
         print("\nstart-up: shmem_init, milliseconds - the slowest PE's, the launcher's spread"
               "\nwith it, and the fastest's, nearer init's own cost")
-        for pes in sorted(startup, key=lambda p: p or 0):
-            v = startup[pes]
-            print(f"  pes={pes}  slowest {spread(v['init_ms_slowest'])}  fastest {spread(v['init_ms_fastest'])}")
+        for key in sorted(startup, key=lambda k: (k[0], k[1] or 0)):
+            v = startup[key]
+            print(f"  {key[0]} pes={key[1]}  slowest {spread(v['init_ms_slowest'])}"
+                  f"  fastest {spread(v['init_ms_fastest'])}")
     if claims:
         print("\nclaims (P9): microseconds - the last PE's splits done after the start, and a"
               "\nsplit's time a claim; each the job's median or percentile, median (range) over"

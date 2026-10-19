@@ -729,3 +729,23 @@ checkout has its `.git`, as §16 does, and built on the first node with
 four a vCPU, at one and at eight blocks a PE, the two builds in another order
 each round, three rounds: 36 jobs of a few seconds, and the build, about ten
 minutes.
+
+## 19. The link's measurement on two and three nodes (H14)
+
+```sh
+docs/fast-link/link-cost.sh NODES out/link-cost
+```
+
+H14: the link's measurement at start-up - fifteen round trips of a small put,
+fifteen tries of a put to each of the root's first children and three streams
+of 128 KiB and 512 KiB, about 27 ms of a start on the Pi's gigabit
+(`link-measure.c`) - was found running on two and three nodes, where every
+fan-out builds one tree and so no choice read it (the step 2 adversarial read,
+finding 12). Since then the chooser's Träff's on three nodes and every data
+wire's unsent limit at any count read it; what is left to know is its cost on
+a fast link. The start-up probe (`startup`, §10's) on the list's first two and
+three nodes at 1 and 8 PEs a node, with the link measured - the default - and
+set by `OSOE_LINK_*` to what a first job measured, so that the two do the same
+but the measurement, five rounds in another order each: the fastest PE's
+`shmem_init`, nearer init's own cost, measured against set. 41 jobs of a few
+seconds: about five minutes.

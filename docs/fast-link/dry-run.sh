@@ -21,7 +21,7 @@ KIT=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$OUT"
 NODES=$OUT/nodes
 printf 'one\ntwo\nthree\nfour\nfive\n' > "$NODES"
-SECTIONS=${SECTIONS:-facts floor helpers ladder zero-copy gets fan-in scale collect behind window tuning trees claims}
+SECTIONS=${SECTIONS:-facts floor helpers ladder zero-copy gets fan-in scale collect behind window tuning trees claims link-cost}
 wanted() { case " $SECTIONS " in *" $1 "*) return 0 ;; esac; return 1; }
 run() {   # SECTION [NAME=VALUE...]: the section's script at small sizes
     local section=$1
@@ -47,7 +47,8 @@ run tuning ROUNDS=1 PES_PER_NODE=2 HOL_SECONDS=2 MAILBOX_SECONDS=5 CONNECTIONS=1
 run trees ROUNDS=1 STREAM_SECONDS=2 MAILBOX_SECONDS=5
 # The kit's build alone (BEFORE empty): the tree before P9 needs git archive.
 run claims ROUNDS=1 BEFORE= PES_PER_NODE="2 4" KEEPS="1 2" ITERATIONS=50
-for section in floor helpers ladder zero-copy gets fan-in scale collect behind window tuning trees claims; do
+run link-cost ROUNDS=1 NODE_COUNTS="2 3" PES_PER_NODE="1 2"
+for section in floor helpers ladder zero-copy gets fan-in scale collect behind window tuning trees claims link-cost; do
     wanted "$section" || continue
     python3 "$KIT/summarize.py" "$OUT/$section" > "$OUT/$section-summary.txt" 2>&1 \
         || echo "summarize.py failed on $section"
