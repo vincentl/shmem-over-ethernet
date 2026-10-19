@@ -344,8 +344,8 @@ static inline uint32_t osoe_internal_circulant_rows(uint32_t nodes)
  * - its counter, its fields past it - and the senders' lanes line. Here and
  * not in internode-generic.c alone, so that test-circulant-grants.c, which
  * reads the grant's fields and the senders' lanes as the library left them,
- * finds the lines the library uses: a copy of the arithmetic, left behind by a
- * change of the layout, read other lines, as zero as cleared ones.
+ * finds the lines the library uses: a copy of the arithmetic that a change of
+ * the layout left behind would read other lines, as zero as cleared ones.
  */
 static inline uint32_t osoe_internal_circulant_credit_line(uint32_t rows)
 {
