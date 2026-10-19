@@ -1,0 +1,34 @@
+mesh/design/n2/order0/wires2/window2/places1: holds (31 states)
+mesh/design/n3/order0/wires2/window2/places1: holds (8443 states)
+mesh/design/n4/order0/wires1/window2/places1: holds (12615 states)
+mesh/design/n4/order1/wires1/window2/places1: holds (12399 states)
+mesh/design/n5/order0/wires1/window2/places1: holds (3521527 states)
+mesh/design/n5/order1/wires1/window2/places1: holds (3521737 states)
+mesh/design/n3/wires2/window1/places1: holds (2451 states)
+mesh/design/n4/wires1/window1/places1: holds (5563 states)
+mesh/design/n5/wires1/window1/places1: holds (398885 states)
+mesh/design/n3/wires2/window4/places16: holds (9725 states)
+mesh/design/n4/wires1/window4/places16: holds (13563 states)
+mesh/design/n3/wires2/window1/slots: holds (3061 states)
+mesh/design/n4/wires1/window1/slots: holds (52164 states)
+mesh/design/n5/wires1/window1/slots: holds (2553161 states)
+mesh/today/n2/wires2: holds (23 states)
+mesh/today/n3/wires2: holds (371 states)
+mesh/today/n4/wires2: holds (10650 states)
+mesh/today/n5/wires2: holds (595816 states)
+mesh/blocking/n3: FAILS STUCK: node 0 waits for ever (3 of 3 still in the mesh) (68 states)
+   trace: 2 reaches the mesh ; 2 dials 0 for wire 0 ; 1 reaches the mesh ; 1 dials 2 for wire 0 ; 0 reaches the mesh ; 0 dials 1 for wire 0
+mesh/blocking/n5: FAILS STUCK: node 0 waits for ever (4 of 5 still in the mesh) (406 states)
+   trace: 1 answers 4 for wire 0 ; 4 confirms to 1 and attaches wire 0 ; 4 attaches wire 0 from 3 ; 4 answers 2 for wire 0 ; 2 confirms to 4 and attaches wire 0 ; 4 attaches wire 0 from 2 ; 4 closes its listener ; 2 attaches wire 0 from 1 ; 1 attaches wire 0 from 4 ; 1 dials 3 for wire 0 ; 0 attaches wire 0 from 4 ; 0 dials 1 for wire 0
+mesh/lower_check/n3: FAILS RULE: node 0 refused node 2, a caller its schedule gives it (18 states)
+   trace: 2 reaches the mesh ; 2 dials 0 for wire 0 ; 1 reaches the mesh ; 1 dials 2 for wire 0 ; 2 answers 1 for wire 0 ; 1 confirms to 2 and attaches wire 0 ; 2 attaches wire 0 from 1 ; 0 reaches the mesh
+mesh/opposite_both/n2: FAILS ONCE: node 0 attached a second wire 0 toward node 1 (14 states)
+   trace: 1 reaches the mesh ; 1 dials 0 for wire 0 ; 0 reaches the mesh ; 0 answers 1 for wire 0 ; 1 confirms to 0 and attaches wire 0 ; 0 attaches wire 0 from 1 ; 0 dials 1 for wire 0 ; 1 answers 0 for wire 0
+mesh/opposite_both/n4: FAILS ONCE: node 1 attached a second wire 0 toward node 3 (60 states)
+   trace: 3 attaches wire 0 from 2 ; 2 dials 0 for wire 0 ; 1 reaches the mesh ; 1 answers 3 for wire 0 ; 3 confirms to 1 and attaches wire 0 ; 1 attaches wire 0 from 3 ; 1 dials 2 for wire 0 ; 2 answers 1 for wire 0 ; 1 confirms to 2 and attaches wire 0 ; 2 attaches wire 0 from 1 ; 1 dials 3 for wire 0 ; 3 answers 1 for wire 0
+mesh/opposite_neither/n4: FAILS MESH: node 0 has no wire 0 toward node 2 (54 states)
+   trace: 2 closes its listener ; 0 reaches the mesh ; 0 answers 3 for wire 0 ; 3 confirms to 0 and attaches wire 0 ; 3 closes its listener ; 0 attaches wire 0 from 3 ; 0 dials 1 for wire 0 ; 1 answers 0 for wire 0 ; 0 confirms to 1 and attaches wire 0 ; 1 attaches wire 0 from 0 ; 1 closes its listener ; 0 closes its listener
+mesh/close_early/n3: FAILS STUCK: node 0 waits for ever (1 of 3 still in the mesh) (31 states)
+   trace: 1 reaches the mesh ; 1 dials 2 for wire 0 ; 2 answers 1 for wire 0 ; 1 confirms to 2 and attaches wire 0 ; 2 attaches wire 0 from 1 ; 1 closes its listener early ; 0 reaches the mesh ; 0 answers 2 for wire 0 ; 2 confirms to 0 and attaches wire 0 ; 2 closes its listener ; 0 attaches wire 0 from 2 ; 0 dials 1 for wire 0
+mesh/skip_late/n4: FAILS STUCK: node 0 waits for ever (1 of 4 still in the mesh) (149 states)
+   trace: 1 attaches wire 1 from 0 ; 1 closes its listener ; 0: slot 1 due ; 0 dials 2 for wire 0 ; 2 answers 0 for wire 0 ; 0 confirms to 2 and attaches wire 0 ; 2 attaches wire 0 from 0 ; 0 dials 2 for wire 1 ; 2 answers 0 for wire 1 ; 0 confirms to 2 and attaches wire 1 ; 2 attaches wire 1 from 0 ; 2 closes its listener

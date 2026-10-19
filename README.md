@@ -268,12 +268,12 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - about 990,
+That builds one file at a time and runs the tests one at a time - about 1,000,
 checks of the build itself and jobs of a few processes. On four cores of an
 idle virtual machine it took about thirteen minutes, one for the build and
 twelve for the tests (2026-10-17, when they were about 950). Both may run four at a time, as this
 project's own runs do (`cmake --build --preset release -j4`, `ctest --preset
-release -j4`). The 41 tests of the model checker (`tools/modelcheck`, which
+release -j4`). The 44 tests of the model checker (`tools/modelcheck`, which
 needs Python 3) took 62 minutes in a development VM one at a time on
 2026-10-11, when they were 40, the longest of them, `model.reservation`, 14 of
 those, and check the design, which does not vary with the machine. They want
@@ -322,7 +322,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 541 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 547 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -801,7 +801,7 @@ in all), computed from the code; the times are measured where a record says so.
 | `alltoall`, `alltoalls` | every block put directly, then a barrier | O(N) a PE - inherent: every PE has a block for every other - and so P(N - P) blocks into a node, all applied by its one progress thread, a message each up to a chunk (`OSOE_AM_CHUNK`) and, for an `alltoalls` with a stride, one an element: 32.7 million messages a call at 500 nodes of 256 |
 | a team | a number agreed by one reduction over the parent of every member's free numbers, the same on all of them, and a block from each member node's pool, given back at destroy | the reduction of `OSOE_MAX_TEAMS` / 64 + 1 words - about what one broadcast costs - and a second, of one word, when any PE of the parent has `SHMEM_THREAD_MULTIPLE`, then a sync of the parent: about a broadcast and a barrier, and a destroy a barrier of the team; O(P) a member, testing its node's PEs; on each node's lead, O(M log n) once to find the team's nodes from its members, a search of the rank map for each - O(M log M) more when they are not met in node order - and the S leads kept |
 | waiting | a futex word per resource a connection has, shared by the node's PEs; one per thread for its replies and watches, per PE for its agent and its landing zone, per context for its counters | O(1) a waiter - but room made in a connection's buffer wakes every writer waiting for it (Limits) |
-| start-up | the node leads' rendezvous tree, then their mesh; then, where the large collectives' link is measured, the root's lead timing round trips and streams to its first children's, and one reduction of three words handing every PE its numbers | ⌈log₈ n⌉ levels, then 2(n - 1) connections a lead - a control wire and a data wire a peer - made one after another; then the measurement, about 27 ms of the Pi cluster's start - its streams carry 1.9 MiB, so about 170 ms on a link of 100 Mbit/s - and the reduction's ⌈log_k n⌉ levels at the fan-out k |
+| start-up | the node leads' rendezvous tree, then their mesh; then, where the large collectives' link is measured, the root's lead timing round trips and streams to its first children's, and one reduction of three words handing every PE its numbers | ⌈log₈ n⌉ levels, then 2(n - 1) connections a lead - a control wire and a data wire a peer - about half of them its own calls, over ⌈(n - 1)/2⌉ slots of 100 µs with at most eight in flight, and the rest its callers', answered meanwhile; then the measurement, about 27 ms of the Pi cluster's start - its streams carry 1.9 MiB, so about 170 ms on a link of 100 Mbit/s - and the reduction's ⌈log_k n⌉ levels at the fan-out k |
 | `SHMEM_THREAD_MULTIPLE` | threads issue on a shared context without a lock; every wait that completes its operations - a quiet, `shmem_pe_quiet`, a strided get's end, and the quiet a barrier or `shmem_clear_lock` makes - takes the context's, and one shares a full quiet that began and ended while it waited for it | O(1) an operation |
 
 Where the design admits a limit of its own: a large broadcast, and a reduction
@@ -906,17 +906,29 @@ times these:
   the set's ranks, log₂ of its size deep, its edges across nodes wherever its
   PEs are.
 - **The mesh**: every pair of nodes connects twice at start-up, a control wire
-  and a data wire, each lead's 2(n - 1) connections made one after another. A
-  lead calls no higher node until every lower one has called it, so the start-up
-  is a chain of node-to-node connections, the last lead connected after about 2n
-  connection times - modelled at 1.7 ms for 4 nodes and 0.58 s for 1,024 - and a
-  larger system may need it changed (`docs/design/mesh-schedule-proposal.md`
-  proposes a schedule). On one subnet each node also needs an entry in the
+  and a data wire, by a schedule (`docs/design/mesh-schedule-proposal.md`): each
+  lead calls the leads one to (n - 1)/2 places after it round the circle - of
+  an even count's opposite pairs, the lower - and answers the rest, one place a
+  slot of 100 µs (`OSOE_MESH_SLOT`) in an order every lead draws alike from the
+  job's ids, at most eight calls in flight, its callers answered throughout.
+  Before it a lead called the higher leads one after another once every lower
+  one had called it, a chain. Over a Pi-like link, 100 µs each way, with a CPU
+  a lead, the model (`tools/modelcheck/mesh_timing.py`) connects 64 nodes in
+  4.6 ms where the chain took 64 ms, 1,024 in 71 ms where it took 1.0 s, and
+  4,097 in 0.26 s where it took 4.1 s - with the leads arriving as the
+  rendezvous's tables reach them, 6.3 ms, 0.11 s and 0.45 s. No system large
+  enough has measured it, which the author waived; tier 3 has, its logical
+  nodes sharing one virtual machine's four CPUs: 64 nodes in 82 to 105 ms where
+  the chain took 156 to 173, and 16 in 5 ms where it took 21 to 25; over
+  loopback, where those CPUs are the limit, 254 nodes take the same 0.65 to
+  0.75 s either way. On one subnet each node also needs an entry in the
   kernel's neighbour table, its record of a peer's Ethernet address, for each
   of its n - 1 peers, and Linux allows 1,024 by default: for more than about a
   thousand nodes on one subnet, an administrator raises
   `net.ipv4.neigh.default.gc_thresh3` above the node count, and `gc_thresh1`
-  and `gc_thresh2` with it.
+  and `gc_thresh2` with it. Logical nodes in network namespaces of one machine,
+  as tier 3 makes them, share that machine's table, n × (n - 1) entries -
+  more than 1,024 past 32 nodes, where `tier3.sh` refuses by name.
 - **`/dev/shm`**: each PE makes a heap object, which every PE of its node maps,
   so the capacity check asks for P × (`SHMEM_SYMMETRIC_SIZE` + the program's
   statics + 16.3 MiB) and the control segment - 68.1 GiB a node at 256 PEs and
@@ -1456,8 +1468,8 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 990 tests in
-  release, and the model checker's 41 tests beside them, which run in that build
+  run before every merge, on the exact tree that merges: about 1,000 tests in
+  release, and the model checker's 44 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
@@ -1482,7 +1494,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 298 of the 541 tests labelled `internode`, `shmem.internode`'s
+  leaves out 298 of the 547 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1514,11 +1526,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  541 tests labelled `internode` - those of a job of more than one node, of
+  547 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 451 of the full build's 993 tests in
+  development VM with liburing hidden: 455 of the full build's 1,003 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1646,7 +1658,7 @@ both are set the `SHMEM_` one controls.
 | `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. `0` is refused. *Checked*. |
 | `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.1.0, OpenSHMEM 1.6`. |
 | `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults, under a first line naming osoe's version. |
-| `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it, and whether it probes them with TCP keepalive and checks for a silent peer (`OSOE_KEEPALIVE`). |
+| `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it, whether it probes them with TCP keepalive and checks for a silent peer (`OSOE_KEEPALIVE`), and how long its mesh took, from the rendezvous's release to its last connection. |
 
 **Limits**
 
@@ -1676,6 +1688,7 @@ both are set the `SHMEM_` one controls.
 | `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A start-up wait on another node has two seconds more, and a PE's wait on its lead in the rendezvous four, so that a node whose own PE never calls `shmem_init` ends first, naming the PE's rank. A program's own waits and collectives are not timed. |
 | `OSOE_KEEPALIVE` | `60,10,6`, or `0` where every node has a loopback address | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - `osoe-launch`'s logical nodes - has neither: with no link between its nodes to cut, and a kernel that closes a dead node's connections itself and answers for a stopped one, a probe can find nothing there, and an overloaded machine's receive backlog drops them. Nodes with addresses of their own keep both, tier 3's namespaces on one machine among them. `SHMEM_DEBUG` says which a node chose. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
+| `OSOE_MESH_SLOT` | `100` | Microseconds between the slots of the mesh's start-up schedule, `0` to `100000`: each lead calls one place further round the circle a slot, its calls of a slot begun no earlier than the slot's time, counted from the rendezvous's release, so that each lead is called by about one other at a time; `0`, no slots, each call as soon as fewer than eight are in flight. The schedule's ⌈(n - 1)/2⌉ slots are 3.2 ms at 64 nodes and 0.2 s at 4,097 at the default, the least it takes; calls slower than a slot's share of the eight in flight set the pace instead. Nodes may differ. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. A value that is not 32 hexadecimal digits is refused by name, but an empty one is taken as unset, without a word: a wrapper whose secret came out empty starts the job unsecured. *Checked* between nodes: where one node has a secret and another has none, or a different one, the node that sees it ends naming the variable and both nodes; a node's PEs are not compared, and only its lead's is used. |
 | `OSOE_HEAP_BASE` | chosen | The address every PE maps its heap at, a multiple of the page size, in place of the library's own candidates - digits, in decimal or after `0x` in hexadecimal, with no sign: a node whose lead cannot map its heap there refuses to start, naming the address and the kernel's reason - or, under ThreadSanitizer, the tool's: it refuses an address outside its application memory, as it does the library's first candidates, which the lead passes over. The node's first PE's value is the node's. |
@@ -1716,6 +1729,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_TEST_ARCHITECTURE` | `other`: the node's lead claims, in the rendezvous, the architecture of the other of x86-64 and aarch64 - `long double`'s format the other's - so that a test sees a job of mixed architectures refused on one machine. Any other value is refused by name. |
 | `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_HOLD_GOODBYE` | `FROM:TO`, two nodes of the job: node `FROM` holds its abortive goodbye to node `TO` half a second after its abort begins, so that a test sees `TO` hear a third node's goodbye first - the relay a global exit's kept stream is for; every other node ignores it. Refused by name when it is not two different nodes of the job. |
+| `OSOE_TEST_MESH_HOLD` | `NODE:MS`: node `NODE`'s lead reaches its mesh `MS` milliseconds late, `1` to `60000`, its callers waiting in its listener's backlog meanwhile - the schedule's late lead (`shmem.mesh.hold`). Refused by name when it names no node of the job or no time. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_PRINT_LINK` | `1`: rank 0 prints the link it measured at the end of `shmem_init`, as the three `OSOE_LINK_*` settings that pin it, so that a test that failed on the shapes that link chose can be run again on them; nothing where the link is set by hand, the shape is `fixed` or the job has one node. Every test of more than one node in the suite sets it. Refused by name when it is not `0` or `1`. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection's data wire, which its puts and gets go by (a control wire keeps the system's own): `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set at the end of `shmem_init` from the link, measured or set. `OSOE_COLLECTIVE_SHAPE=fixed` measures none, so there it is 16 KiB on any link unless the three `OSOE_LINK_*` give the bandwidth - less than the rule gives a link faster than a gigabit. Uncapped, as at v0.2 step 3, a fetch-add behind a put stream on the Pi cluster waited 17 to 20 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
@@ -1852,9 +1866,10 @@ PEs that have not joined, and their ranks; a node's first other PE, while its
 lead has made no segment, names the lead; a lead calling another node names that
 node, its host-list entry, the address and ports it dialled and the last error
 ("Connection refused", "the connection timed out", "no answer to the hello"); a
-lead waiting to be called names the nodes it waits for; and a lead whose
-progress thread, created, the system has not yet run says so. The launcher ends
-what remains - `srun -K1` at the first task that fails - and
+lead waiting to be called names the nodes it waits for, and a lead connecting
+its mesh, calling and called at once, says both in its one line; and a lead
+whose progress thread, created, the system has not yet run says so. The
+launcher ends what remains - `srun -K1` at the first task that fails - and
 `OSOE_NO_PROGRESS_TIMEOUT` ends a wait that stops moving. The start's last
 step, once every node is connected - the link's measurement and the reduction
 that hands every PE its numbers - waits as a collective does: a hang there

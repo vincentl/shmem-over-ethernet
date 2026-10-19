@@ -1,0 +1,21 @@
+rebuilt release 0 warnings 0
+rebuilt debug 0 warnings 0
+rebuilt asan 0 warnings 0
+rebuilt tsan 0 warnings 0
+rebuilt tier3 0 warnings 0
+rebuilt single-node 0 warnings 0
+static: 100% tests passed, 0 tests failed out of 17
+release affected: 100% tests passed, 0 tests failed out of 74
+debug affected: 100% tests passed, 0 tests failed out of 74
+asan affected: 100% tests passed, 0 tests failed out of 75
+tsan affected: 100% tests passed, 0 tests failed out of 76
+single-node affected: 100% tests passed, 0 tests failed out of 47
+internode: release 547, tsan 249
+FINAL DONE 10:02:11
+internode at 2 helpers: 100% tests passed, 0 tests failed out of 547
+held job: status 0
+osoe: PE 2: shmem_init on node 2 has waited 1 s for 1 node of the mesh to call it on port 33325 (node 1; 0 callers part-way through the hello); still waiting
+osoe: PE 0: shmem_init on node 0 has waited 1 s for node 1 (127.0.0.2, at 127.0.0.2) to answer on port 41315: connected, and its hello not yet answered, 1.0 s ago, and 1 more call of its own; still waiting
+osoe: PE 2: shmem_init on node 2 has waited 3 s for 1 node of the mesh to call it on port 33325 (node 1; 0 callers part-way through the hello); still waiting
+osoe: PE 0: shmem_init on node 0 has waited 3 s for node 1 (127.0.0.2, at 127.0.0.2) to answer on port 41315: connected, and its hello not yet answered, 3.0 s ago, and 1 more call of its own; still waiting
+EXTRA DONE 10:04:57

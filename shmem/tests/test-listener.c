@@ -83,9 +83,10 @@ static bool joined_in_time(pthread_t t)
 static int stranger(const struct osoe_bootstrap *as, const struct sockaddr_in *at,
                     const struct hello *h, struct answer *a)
 {
-    struct attempt tried;
-    int fd = dial(at, lead.port, &tried);
-    CHECK_FATAL(fd >= 0);
+    struct sockaddr_in to = *at;
+    to.sin_port = htons(lead.port);
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    CHECK_FATAL(fd >= 0 && connect(fd, (struct sockaddr *)&to, sizeof to) == 0);
     CHECK_FATAL(write_all(as, fd, h, sizeof *h, 0) && read_all(as, fd, a, sizeof *a, 0, 0));
     return fd;
 }

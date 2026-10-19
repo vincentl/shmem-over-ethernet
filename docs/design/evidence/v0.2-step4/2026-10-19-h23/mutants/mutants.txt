@@ -1,0 +1,11 @@
+m1-seed-without-step: FAILS (caught): 1/1 Test #56: shmem.mesh-schedule ..............***Failed    1.05 sec | 0% tests passed, 1 tests failed out of 1
+m2-opposite-upper-calls: FAILS (caught): 1/1 Test #56: shmem.mesh-schedule ..............***Failed    1.10 sec | 0% tests passed, 1 tests failed out of 1
+m3-no-rule-check: FAILS (caught): 1/1 Test #57: shmem.mesh.refused-caller ........***Failed  Required regular expression not found. Regex=[osoe_fatal: node 2 was called by node 0, which the mesh's schedule has node 2 call | 0% tests passed, 1 tests failed out of 1
+m4-slot-unbounded: FAILS (caught): 1/1 Test #167: shmem.start-up.mesh-slot-large.invalid ...***Failed  Required regular expression not found. Regex=[REFUSAL OK | 0% tests passed, 1 tests failed out of 1
+m5-hold-any-node: FAILS (caught): 1/1 Test #169: shmem.start-up.test-mesh-hold-node.invalid ...***Failed  Required regular expression not found. Regex=[REFUSAL OK | 0% tests passed, 1 tests failed out of 1
+m6-no-hold: FAILS (caught): 1/1 Test #170: shmem.mesh.hold ..................***Failed  Required regular expression not found. Regex=[MESH START OK | 0% tests passed, 1 tests failed out of 1
+m7-no-slot-clock: FAILS (caught): 1/1 Test #171: shmem.mesh.slot ..................***Failed  Required regular expression not found. Regex=[MESH START OK | 0% tests passed, 1 tests failed out of 1
+m8-skip-late: FAILS (caught): 1/1 Test #173: shmem.mesh.crowd .................***Failed  Required regular expression not found. Regex=[MESH START OK | 0% tests passed, 1 tests failed out of 1
+m9-deaf-while-calling: FAILS (caught): 1/1 Test #172: shmem.mesh.none ..................***Failed  Required regular expression not found. Regex=[MESH START OK | 0% tests passed, 1 tests failed out of 1
+rebuilt unmutated: 0
+

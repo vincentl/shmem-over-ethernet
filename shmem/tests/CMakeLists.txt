@@ -334,7 +334,7 @@ if(OSOE_INTERNODE)
   # The node-pair wire on its own (tier 1): both ends in one process, so no
   # launcher. wire.c is compiled in, since libosoe hides it, and the test supplies
   # its own osoe_fatal so a failure inside it fails the test.
-  add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c
+  add_executable(shmem_test_wire test-wire.c ../src/wire.c ../src/mesh-schedule.c ../src/wire-settings.c ../src/ring.c ../src/listener.c
     ../src/shm-object.c)
   target_include_directories(shmem_test_wire PRIVATE ../src)
   target_link_libraries(shmem_test_wire PRIVATE osoe_base rt PkgConfig::LIBURING)
@@ -387,7 +387,7 @@ if(OSOE_INTERNODE)
   # and takes its identity straight from the launcher environment.
   # The seed is fixed: §3.14 wants an injected fault reproducible, and without it
   # the pattern would follow the launcher's pid and differ every run.
-  add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/wire-settings.c ../src/ring.c
+  add_executable(shmem_test_wire_pair test-wire-pair.c ../src/wire.c ../src/mesh-schedule.c ../src/wire-settings.c ../src/ring.c
     ../src/listener.c ../src/shm-object.c)
   target_include_directories(shmem_test_wire_pair PRIVATE ../src)
   target_link_libraries(shmem_test_wire_pair PRIVATE osoe_base rt PkgConfig::LIBURING)
@@ -399,6 +399,31 @@ if(OSOE_INTERNODE)
             $<TARGET_FILE:shmem_test_wire_pair>)
   set_tests_properties(shmem.wire-pair PROPERTIES LABELS "tier2" TIMEOUT 90)
   osoe_internode_label(shmem.wire-pair)
+
+  # The mesh's start-up schedule (H23; mesh-schedule.h): its arithmetic on its
+  # own - one caller a pair, each slot a permutation, every node's calls made,
+  # at every node count to 300 and by the slots to 8,193 - and each slots' order
+  # against what tools/modelcheck/mesh_model.py wrote (mesh-schedule-digest.txt;
+  # model.mesh.digest checks the model still writes it). And a caller the
+  # schedule does not give refused by name: of three nodes, node 0 calls node 2,
+  # which node 2 calls itself; without wire.c's check node 2 takes the call
+  # and waits for its own, past the launcher's limit.
+  add_executable(shmem_test_mesh_schedule test-mesh-schedule.c ../src/mesh-schedule.c)
+  target_include_directories(shmem_test_mesh_schedule PRIVATE ../src)
+  osoe_warnings(shmem_test_mesh_schedule)
+  add_test(NAME shmem.mesh-schedule
+    COMMAND shmem_test_mesh_schedule ${CMAKE_CURRENT_SOURCE_DIR}/mesh-schedule-digest.txt)
+  set_tests_properties(shmem.mesh-schedule PROPERTIES LABELS "tier1" TIMEOUT 120)
+  add_executable(shmem_test_mesh_refusal test-mesh-refusal.c ../src/wire.c ../src/mesh-schedule.c
+    ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
+  target_include_directories(shmem_test_mesh_refusal PRIVATE ../src)
+  target_link_libraries(shmem_test_mesh_refusal PRIVATE osoe_base rt PkgConfig::LIBURING)
+  osoe_warnings(shmem_test_mesh_refusal)
+  add_test(NAME shmem.mesh.refused-caller
+    COMMAND $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 30 -- $<TARGET_FILE:shmem_test_mesh_refusal>)
+  set_tests_properties(shmem.mesh.refused-caller PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "osoe_fatal: node 2 was called by node 0, which the mesh's schedule has node 2 call")
+  osoe_internode_label(shmem.mesh-schedule shmem.mesh.refused-caller)
 endif()
 
 # Multi-process tests (tier 2): each program runs under osoe-launch at every
@@ -412,7 +437,7 @@ if(OSOE_INTERNODE)
   # all of them - and that mutation passed a two-node test.
   add_executable(shmem_test_barrier_am test-barrier-am.c
     ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
-    ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+    ../src/reply.c ../src/wire.c ../src/mesh-schedule.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
     ../src/shm-object.c)
   target_include_directories(shmem_test_barrier_am PRIVATE ../src)
   target_link_libraries(shmem_test_barrier_am PRIVATE osoe_base rt PkgConfig::LIBURING)
@@ -1019,7 +1044,9 @@ endforeach()
 # of several nodes only, so that a job of one node accepted OSOE_WIRE_BYTES=abc
 # without a word. Each PE refuses its own. And T19's testing hook,
 # OSOE_TEST_PRINT_LINK, which every PE reads at bootstrap and refuses unless it
-# is 0 or 1 - a value that is no number, and a number past 1.
+# is 0 or 1 - a value that is no number, and a number past 1; and H23's
+# OSOE_MESH_SLOT past its 100,000 microseconds or no number, and its hook
+# OSOE_TEST_MESH_HOLD without a time or naming a node the job has not.
 foreach(case_expect
     "am-chunk|OSOE_AM_CHUNK|abc|OSOE_AM_CHUNK='abc' is not a decimal byte count"
     "am-buffer|OSOE_AM_BUFFER|abc|OSOE_AM_BUFFER='abc' is not a decimal byte count"
@@ -1035,7 +1062,11 @@ foreach(case_expect
     "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not a number of threads from 0 to 64"
     "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64"
     "test-print-link|OSOE_TEST_PRINT_LINK|yes|OSOE_TEST_PRINT_LINK='yes' is not 0 or 1"
-    "test-print-link-large|OSOE_TEST_PRINT_LINK|2|OSOE_TEST_PRINT_LINK='2' is not 0 or 1")
+    "test-print-link-large|OSOE_TEST_PRINT_LINK|2|OSOE_TEST_PRINT_LINK='2' is not 0 or 1"
+    "mesh-slot|OSOE_MESH_SLOT|abc|OSOE_MESH_SLOT='abc' is not a whole number of microseconds from 0 to 100000"
+    "mesh-slot-large|OSOE_MESH_SLOT|100001|OSOE_MESH_SLOT='100001' is not a whole number of microseconds from 0 to 100000"
+    "test-mesh-hold|OSOE_TEST_MESH_HOLD|3|OSOE_TEST_MESH_HOLD='3' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds"
+    "test-mesh-hold-node|OSOE_TEST_MESH_HOLD|1:100|OSOE_TEST_MESH_HOLD='1:100' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -1049,6 +1080,21 @@ foreach(case_expect
 endforeach()
 
 if(OSOE_INTERNODE)
+  # The mesh's start-up schedule as each lead's SHMEM_DEBUG line shows it (H23;
+  # mesh-start.sh): seven nodes, node 3 held 1.5 s by OSOE_TEST_MESH_HOLD, the
+  # nodes that call it waiting for it and its own mesh counted from its arrival;
+  # nine nodes at OSOE_MESH_SLOT=20000, no lead's mesh shorter than its last
+  # slot's 60 ms; eight at OSOE_MESH_SLOT=0, no slots at all; and 21 at 1 us,
+  # most of a lead's calls waiting for a place in the window long after their
+  # slot, made late and never skipped.
+  foreach(mode hold slot none crowd)
+    add_test(NAME shmem.mesh.${mode}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/mesh-start.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_barrier> ${mode})
+    set_tests_properties(shmem.mesh.${mode} PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "MESH START OK")
+    osoe_internode_label(shmem.mesh.${mode})
+  endforeach()
   # A non-lead whose OSOE_AM_BUFFER made a larger connection area than its lead's
   # once waited for ever for the object to grow, which the lead sizes in one step.
   # It refuses at once, by name, and the job ends: the other PE of its node by the
@@ -1276,7 +1322,7 @@ if(OSOE_INTERNODE)
   # vacuous.
   add_executable(shmem_test_progress test-progress.c
     ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
-    ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
+    ../src/reply.c ../src/wire.c ../src/mesh-schedule.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/shm-object.c)
   target_include_directories(shmem_test_progress PRIVATE ../src)
   target_link_libraries(shmem_test_progress PRIVATE osoe_base rt PkgConfig::LIBURING)
   osoe_warnings(shmem_test_progress)
@@ -1354,7 +1400,7 @@ if(OSOE_INTERNODE)
   # connection's record (the adversarial read of v0.2 step 4's Part 1, S1).
   add_executable(shmem_test_owners test-owners.c
     ../src/progress.c ../src/collective-tree.c ../src/am.c ../src/connection.c ../src/connection-area.c ../src/am-configuration.c
-    ../src/reply.c ../src/wire.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
+    ../src/reply.c ../src/wire.c ../src/mesh-schedule.c ../src/wire-settings.c ../src/ring.c ../src/listener.c ../src/bootstrap.c
     ../src/shm-object.c)
   target_include_directories(shmem_test_owners PRIVATE ../src)
   target_link_libraries(shmem_test_owners PRIVATE osoe_base rt PkgConfig::LIBURING)

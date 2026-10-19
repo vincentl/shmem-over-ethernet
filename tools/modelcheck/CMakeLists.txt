@@ -44,7 +44,8 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
                   chained_wake lead_wake rendezvous wait_word credit_wait tree_barrier close
                   abort abort_exit lock pipeline allgather scan scan_pipeline deadlock
                   team_block split_numbers pool_dry posted_bitmap lane lane_scan visit
-                  control_ack carrier helper_request deadlock_owners abort_owners exchange)
+                  control_ack carrier helper_request deadlock_owners abort_owners exchange
+                  mesh)
   if(OSOE_MULTIPLE_MODELS)
     list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim
                             pe_quiet)
@@ -91,6 +92,18 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/circulant_model.py
             digest-compare ${PROJECT_SOURCE_DIR}/shmem/tests/circulant-digest.txt)
   set_tests_properties(model.circulant PROPERTIES LABELS "model" TIMEOUT 1800)
+  # The mesh's start-up schedule (H23): the slots' offsets in each job's order
+  # as the model writes them now; and its
+  # timing against the order before it - each slot a permutation, the backlog
+  # holding every caller, four times today's order at 64 and 256 nodes, the
+  # callers spread as the leads arrive - each with what fails it.
+  add_test(NAME model.mesh.digest
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/mesh_model.py
+            digest-compare ${PROJECT_SOURCE_DIR}/shmem/tests/mesh-schedule-digest.txt)
+  add_test(NAME model.mesh_timing
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/mesh_timing.py check)
+  set_tests_properties(model.mesh.digest model.mesh_timing PROPERTIES LABELS "tier1;model"
+                       TIMEOUT 300)
   set_tests_properties(model.circulant.digest PROPERTIES LABELS "tier1;model" TIMEOUT 300)
 elseif(NOT Python3_Interpreter_FOUND)
   message(STATUS "python3 not found: the concurrency models will not run as tests")

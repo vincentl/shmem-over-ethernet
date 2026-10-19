@@ -1,0 +1,22 @@
+The Pi-like link: 100 us each way, 1 Gbit/s; a connection 35 us of CPU at the caller
+and 25 at the callee; two wires a pair; the slotted schedule at W = 8 calls in
+flight - four pairs - and slots of 100 us. One CPU a lead, as on a cluster.
+"SYN": the most reaching one listener within a round trip; "wait": the most
+connections waiting at one lead for the answer to their hello.
+
+Every lead enters at once
+   nodes                         today                       slotted   faster
+      64     63.8 ms   4 SYN    1 wait      4.6 ms   7 SYN    4 wait    13.7x
+     128    128.6 ms   4 SYN    1 wait      8.8 ms   7 SYN    4 wait    14.6x
+     256    258.1 ms   4 SYN    2 wait     17.2 ms   9 SYN    5 wait    15.0x
+     512    516.5 ms   6 SYN    2 wait     35.5 ms  12 SYN    8 wait    14.5x
+    1024   1034.9 ms   6 SYN    2 wait     70.6 ms  14 SYN    9 wait    14.7x
+
+Each lead enters as the rendezvous's tables reach it
+   nodes                         today                       slotted   faster
+      64     64.2 ms   4 SYN    1 wait      6.3 ms  10 SYN    5 wait    10.2x
+     128    129.6 ms   4 SYN    1 wait     13.4 ms  12 SYN   12 wait     9.7x
+     256    260.5 ms   4 SYN    1 wait     26.5 ms  13 SYN    8 wait     9.8x
+     512    521.1 ms   6 SYN    3 wait     51.6 ms  12 SYN    8 wait    10.1x
+    1024   1047.3 ms  12 SYN    9 wait    113.7 ms  19 SYN   28 wait     9.2x
+

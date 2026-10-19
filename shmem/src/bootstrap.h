@@ -64,6 +64,11 @@ struct osoe_bootstrap {
      * loopback address (progress-host.c), and `keepalive_set` says it was. */
     uint32_t keepalive_idle_s, keepalive_interval_s, keepalive_count;
     bool keepalive_off, keepalive_set;
+    /* OSOE_MESH_SLOT (H23): the mesh's slot, microseconds, where `mesh_slot_set`
+     * says it was set - 0 then for no slots at all - and otherwise
+     * OSOE_DEFAULT_MESH_SLOT_US, so that a bootstrap built by hand keeps it. */
+    uint32_t mesh_slot_us;
+    bool mesh_slot_set;
     const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */
@@ -78,6 +83,9 @@ struct osoe_bootstrap {
     /* OSOE_TEST_PRINT_LINK=1, a testing hook (T19): rank 0 prints the link it
      * measured at the end of shmem_init, as the OSOE_LINK_* that pin it. */
     bool print_link;
+    /* OSOE_TEST_MESH_HOLD=NODE:MS, a testing hook (H23): node NODE's lead
+     * reaches its mesh MS milliseconds late; 0 milliseconds for none. */
+    uint32_t mesh_hold_node, mesh_hold_ms;
 };
 
 /* The default OSOE_KEEPALIVE (§3.15): a node that has vanished is found one to
@@ -86,6 +94,11 @@ struct osoe_bootstrap {
 #define OSOE_DEFAULT_KEEPALIVE_IDLE_S     60
 #define OSOE_DEFAULT_KEEPALIVE_INTERVAL_S 10
 #define OSOE_DEFAULT_KEEPALIVE_COUNT      6
+
+/* The default OSOE_MESH_SLOT (H23): a slot of the mesh's start-up schedule
+ * (mesh-schedule.h), in microseconds, and the most it may be. */
+#define OSOE_DEFAULT_MESH_SLOT_US 100
+#define OSOE_MESH_SLOT_MOST_US    100000
 
 /* The default OSOE_PORT_RANGE (§6.2): below the ephemeral ports. */
 #define OSOE_DEFAULT_PORT_LOW  17000

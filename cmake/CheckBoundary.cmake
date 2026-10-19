@@ -94,6 +94,9 @@ set(OSOE_BACKEND_FACING internode-backend.h internode-generic.h)
 # as an RDMA backend would keep them, and are the internode backend's files
 # below (the third check).
 #
+# And the mesh's start-up schedule (mesh-schedule.c, H23), the order in which
+# the leads connect, which an RDMA backend would keep with the listener.
+#
 # Two more every build keeps: the AM layer's sizes (am-configuration.c), which
 # lay out every PE's landing zone in the node segment whatever the job's shape,
 # and the wire's settings (wire-settings.c), which every PE checks as values
@@ -102,13 +105,13 @@ set(OSOE_BACKEND_FACING internode-backend.h internode-generic.h)
 set(OSOE_ON_BOUNDARY
   am-configuration.c collective-circulant.c collective-shape.c collective-tree.c combine.c
   internode-generic.c job.c
-  listener.c node.c rank-map.c rendezvous.c shm-object.c transport-local.c watch.c
-  wire-settings.c
+  listener.c mesh-schedule.c node.c rank-map.c rendezvous.c shm-object.c transport-local.c
+  watch.c wire-settings.c
   am-configuration.h collective-circulant.h collective-shape.h collective-tree.h combine.h
   internal-region.h
   internode.h job.h
-  listener.h node.h rank-map.h rendezvous.h rmw.h shm-object.h transport.h watch-range.h
-  wire-settings.h)
+  listener.h mesh-schedule.h node.h rank-map.h rendezvous.h rmw.h shm-object.h transport.h
+  watch-range.h wire-settings.h)
 
 # The one file on the boundary that reaches an AM header, known (roce-seam
 # §3.2): transport-local.c, the intranode backend every build keeps, includes
@@ -130,9 +133,9 @@ set(OSOE_ON_BOUNDARY_READING_AM transport-local.c)
 # for them where none is compiled, so it is held to the third check too.
 set(OSOE_INTERNODE_BACKEND
   am.c am.h am-state.h connection.c connection.h connection-area.c connection-area.h
-  internode-am.c listener.c listener.h owner-map.h progress.c progress.h progress-host.c
-  progress-host.h rendezvous.c rendezvous.h reply.c reply.h ring.c ring.h
-  transport-internode.c wire.c wire.h)
+  internode-am.c listener.c listener.h mesh-schedule.c mesh-schedule.h owner-map.h progress.c
+  progress.h progress-host.c progress-host.h rendezvous.c rendezvous.h reply.c reply.h ring.c
+  ring.h transport-internode.c wire.c wire.h)
 
 if(NOT SOURCE_DIR)
   message(FATAL_ERROR "usage: cmake -DSOURCE_DIR=<repository root> -P CheckBoundary.cmake")

@@ -10,13 +10,18 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <linux/sockios.h>
 
 #include "base/environment.h"
+#include "base/print-line.h"
+#include "base/stall-watch.h"
+#include "base/sweep.h"
 #include "fatal.h"
 #include "listener.h"
+#include "mesh-schedule.h"
 #include "owner-map.h"
 #include "wire.h"
 #include "wire-settings.h"
@@ -176,45 +181,150 @@ static void attach_purpose(struct osoe_wire *w, struct osoe_ring *r, uint32_t in
         w->zero_copy = false;
 }
 
-/* What the mesh's accept still waits for, for the notice of a wait that lasts
- * or its no-progress fatal: the lower nodes still to call, the first few of
- * them and how many in all. Written only when one is due
- * (osoe_listener_accept_described; P16): written before every accept, it cost
- * two lookups a lower node, 2(n - 1) times. */
-struct mesh_waiting {
-    struct osoe_wire *wires;
-    struct osoe_ring *const *rings;
-    uint32_t peers, helpers, node;
+static uint64_t now_ns(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * UINT64_C(1000000000) + (uint64_t)t.tv_nsec;
+}
+
+/* A peer's slot among this node's: the others in node order. */
+static uint32_t peer_slot(uint32_t peer, uint32_t node)
+{
+    return peer < node ? peer : peer - 1;
+}
+
+/* One call of this lead's in the mesh's schedule: a peer, a wire, the slot. */
+struct mesh_call {
+    uint32_t peer;
+    enum osoe_hello_purpose purpose;
+    uint32_t slot;
 };
 
-static bool lacks_a_wire(const struct mesh_waiting *m, uint32_t peer)
+/*
+ * The mesh as this lead makes it: its calls in the schedule's order, those in
+ * flight, and what its listener has taken - with what the notice of a wait
+ * that lasts, or its no-progress fatal, says of it. Written only when one is
+ * due (P16): written at every connection, the callers still to come cost two
+ * lookups a peer, 2(n - 1) times.
+ */
+struct mesh {
+    struct osoe_wire *wires;
+    struct osoe_ring *const *rings;
+    const struct osoe_bootstrap *b;
+    struct osoe_listener *listener;
+    uint32_t peers, helpers;
+    struct mesh_call *calls;
+    uint32_t call_count, begun, made;
+    uint32_t expected, answered;            /* callers' wires, as the schedule gives */
+    struct osoe_listener_call *flying[OSOE_MESH_CALLS_IN_FLIGHT];
+    uint32_t flying_call[OSOE_MESH_CALLS_IN_FLIGHT];    /* which call; UINT32_MAX: none */
+};
+
+static bool lacks_a_wire(const struct mesh *m, uint32_t peer)
 {
     static const enum osoe_hello_purpose purposes[2] = { OSOE_HELLO_CONTROL_WIRE,
                                                          OSOE_HELLO_DATA_WIRE };
     for (uint32_t k = 0; k < 2; k++) {
         struct osoe_ring *ring;
         uint32_t ring_index;
-        if (wire_of(m->wires, m->rings, peer, purposes[k], m->peers, m->helpers, &ring,
-                    &ring_index)->fd < 0)
+        if (wire_of(m->wires, m->rings, peer_slot(peer, m->b->node), purposes[k], m->peers,
+                    m->helpers, &ring, &ring_index)->fd < 0)
             return true;
     }
     return false;
 }
 
-static void describe_missing(const void *context, char *text, size_t len)
+/* "3 nodes of the mesh to call it on port 40213 (node 1, 4, 6; 1 caller
+ * part-way through the hello) and node 9 (pi9, at 10.0.0.10) to answer on port
+ * 37011: the connection timed out, 0.4 s ago, and 5 more calls of its own" -
+ * what a lead calling and called at once waits for, in one line. */
+static void describe_mesh(const struct mesh *m, char *text, size_t len)
 {
-    const struct mesh_waiting *m = context;
-    uint32_t missing = 0, named = 0;
-    for (uint32_t peer = 0; peer < m->node; peer++)
-        missing += lacks_a_wire(m, peer);
-    int used = snprintf(text, len, "%u lower node%s of the mesh (", missing,
-                        missing == 1 ? "" : "s");
-    for (uint32_t peer = 0; peer < m->node && used > 0 && (size_t)used < len - 24; peer++)
-        if (lacks_a_wire(m, peer) && named++ < 8)
-            used += snprintf(text + used, len - (size_t)used, "%s%u",
-                             named == 1 ? "node " : ", ", peer);
-    if (used > 0 && (size_t)used < len - 8)
-        snprintf(text + used, len - (size_t)used, "%s)", named > 8 ? ", ..." : "");
+    const struct osoe_bootstrap *b = m->b;
+    uint32_t n = b->node_count, missing = 0, named = 0, part = 0;
+    int used = 0;
+    text[0] = '\0';
+    if (m->answered < m->expected) {
+        for (uint32_t peer = 0; peer < n; peer++)
+            missing += osoe_mesh_schedule_calls(peer, b->node, n) && lacks_a_wire(m, peer);
+        used = snprintf(text, len, "%u node%s of the mesh to call it on port %u (", missing,
+                        missing == 1 ? "" : "s", m->listener->port);
+        for (uint32_t peer = 0; peer < n && used > 0 && (size_t)used < len - 80; peer++)
+            if (osoe_mesh_schedule_calls(peer, b->node, n) && lacks_a_wire(m, peer) &&
+                named++ < 8)
+                used += snprintf(text + used, len - (size_t)used, "%s%u",
+                                 named == 1 ? "node " : ", ", peer);
+        part = osoe_listener_part_way(m->listener);
+        if (used > 0 && (size_t)used < len - 64)
+            used += snprintf(text + used, len - (size_t)used,
+                             "%s; %u caller%s part-way through the hello)",
+                             named > 8 ? ", ..." : "", part, part == 1 ? "" : "s");
+    }
+    if (m->made == m->call_count || used < 0 || (size_t)used >= len - 16)
+        return;
+    /* The first call in flight, whole, and how many more are to come. */
+    for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++)
+        if (m->flying_call[k] != UINT32_MAX) {
+            if (used > 0)
+                used += snprintf(text + used, len - (size_t)used, " and ");
+            if (used >= 0 && (size_t)used < len) {
+                osoe_listener_call_describe(m->flying[k], text + used, len - (size_t)used);
+                used += (int)strlen(text + used);
+            }
+            break;
+        }
+    uint32_t more = m->call_count - m->made - (m->begun > m->made ? 1 : 0);
+    if (more && used >= 0 && (size_t)used < len)
+        snprintf(text + used, len - (size_t)used, ", and %u more call%s of its own", more,
+                 more == 1 ? "" : "s");
+}
+
+/* The listener's caller from `peer` for `purpose`, confirmed: by the schedule's
+ * rule, and once a wire. */
+static void attach_called(struct mesh *m, int fd, uint32_t peer, enum osoe_hello_purpose purpose)
+{
+    const struct osoe_bootstrap *b = m->b;
+    if (!osoe_mesh_schedule_calls(peer, b->node, b->node_count))
+        osoe_fatal("node %u was called by node %u, which the mesh's schedule has node %u call "
+                   "(§6.2)", b->node, peer, b->node);
+    struct osoe_ring *ring;
+    uint32_t ring_index;
+    struct osoe_wire *w = wire_of(m->wires, m->rings, peer_slot(peer, b->node), purpose, m->peers,
+                                  m->helpers, &ring, &ring_index);
+    if (w->fd >= 0)
+        osoe_fatal("node %u was connected to twice by node %u for its %s wire", b->node, peer,
+                   wire_name(purpose));
+    attach_purpose(w, ring, ring_index, fd, peer, purpose, b);
+    m->answered++;
+}
+
+/* One of this lead's own calls, made. */
+static void attach_made(struct mesh *m, int fd, const struct mesh_call *call)
+{
+    const struct osoe_bootstrap *b = m->b;
+    struct osoe_ring *ring;
+    uint32_t ring_index;
+    struct osoe_wire *w = wire_of(m->wires, m->rings, peer_slot(call->peer, b->node),
+                                  call->purpose, m->peers, m->helpers, &ring, &ring_index);
+    if (w->fd >= 0)
+        osoe_fatal("node %u connected to node %u twice for its %s wire", b->node, call->peer,
+                   wire_name(call->purpose));
+    attach_purpose(w, ring, ring_index, fd, call->peer, call->purpose, b);
+    m->made++;
+}
+
+/* OSOE_TEST_MESH_HOLD: this lead reaches its mesh `ms` late, sweeping, its
+ * callers waiting in its listener's backlog meanwhile (H23's late lead). */
+static void hold(uint32_t ms)
+{
+    uint64_t until = now_ns() + (uint64_t)ms * 1000000;
+    for (uint64_t now = now_ns(); now < until; now = now_ns()) {
+        uint64_t wait = until - now < OSOE_SWEEP_NS ? until - now : OSOE_SWEEP_NS;
+        struct timespec t = { (time_t)(wait / 1000000000), (long)(wait % 1000000000) };
+        nanosleep(&t, NULL);
+        osoe_sweep_expired("shmem_init");
+    }
 }
 
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
@@ -222,62 +332,167 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
                      const struct osoe_mesh *mesh)
 {
     /*
-     * §6.2: the lower node index connects to the higher, so each pair has one
-     * stream (§3.1). Every lower node first, then every higher one: a lead is
-     * answering its callers the whole time it waits for them, so no lead waits
-     * on one that is itself waiting to be answered, and establishing the whole
-     * mesh takes about N connection times rather than a chain of them.
+     * §6.2, by the mesh's schedule (mesh-schedule.h; H23): each pair has one
+     * caller, so one stream of each wire (§3.1), and each lead calls about
+     * half its peers and answers the rest, one offset a slot, at most
+     * OSOE_MESH_CALLS_IN_FLIGHT calls in flight. The calls are cycles - at the
+     * offset 1 every lead calls the next - so a lead never waits in one call:
+     * one loop answers its listener and takes each call a step on as its
+     * socket allows (mesh_model.py: blocking calls wait for ever).
      */
-    uint32_t peers = b->node_count - 1;
+    uint32_t n = b->node_count, peers = n - 1;
     for (uint32_t i = 0; i < 2 * peers; i++)
         wires[i] = (struct osoe_wire){ .fd = -1 };
     struct osoe_listener own, *l = mesh ? mesh->listener : &own;
     if (!mesh)
         osoe_listener_open(&own, b, session, NULL);
-    const enum osoe_hello_purpose purposes[2] = { OSOE_HELLO_CONTROL_WIRE,
-                                                  OSOE_HELLO_DATA_WIRE };
-    const struct mesh_waiting waiting = { wires, rings, peers, helpers, b->node };
-    for (uint32_t accepted = 0; accepted < 2 * b->node; accepted++) {
-        uint32_t peer;
-        enum osoe_hello_purpose purpose;
-        int fd = osoe_listener_accept_described(l, OSOE_HELLO_PURPOSE(OSOE_HELLO_CONTROL_WIRE) |
-                                                       OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE),
-                                                &peer, &purpose, describe_missing, &waiting);
-        if (peer >= b->node)
-            osoe_fatal("node %u was connected to by node %u, which is not a lower node",
-                       b->node, peer);
-        struct osoe_ring *ring;
-        uint32_t ring_index;
-        struct osoe_wire *w = wire_of(wires, rings, peer, purpose, peers, helpers, &ring,
-                                      &ring_index);
-        if (w->fd >= 0)
-            osoe_fatal("node %u was connected to twice by node %u for its %s wire", b->node,
-                       peer, wire_name(purpose));
-        attach_purpose(w, ring, ring_index, fd, peer, purpose, b);
+    if (b->mesh_hold_ms && b->mesh_hold_node == b->node)
+        hold(b->mesh_hold_ms);
+    /* The slots begin with the rendezvous's release, which reached this lead
+     * just now, nothing between them (the proposal: a late start is one
+     * waiting call a slot missed, at the late lead). */
+    uint64_t begun_ns = now_ns();
+    uint64_t slot_ns = (uint64_t)(b->mesh_slot_set ? b->mesh_slot_us : OSOE_DEFAULT_MESH_SLOT_US) *
+                       1000;
+
+    uint32_t slots = osoe_mesh_schedule_slots(n);
+    uint32_t *offsets = malloc((slots ? slots : 1) * sizeof *offsets);
+    struct mesh m = { wires, rings, b, l, peers, helpers,
+                      malloc((slots ? 2 * slots : 1) * sizeof *m.calls), 0, 0, 0,
+                      2 * osoe_mesh_schedule_callers(b->node, n), 0, { NULL }, { 0 } };
+    if (!offsets || !m.calls)
+        osoe_fatal("out of memory for the mesh's schedule of %u nodes", n);
+    osoe_mesh_schedule_order(b->job, b->step, n, offsets);
+    for (uint32_t s = 0; s < slots; s++) {
+        uint32_t peer = osoe_mesh_schedule_callee(b->node, offsets[s], n);
+        if (peer == n)
+            continue;
+        m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_CONTROL_WIRE, s };
+        m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_DATA_WIRE, s };
+    }
+    free(offsets);
+    for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++) {
+        m.flying[k] = osoe_listener_call_new();
+        m.flying_call[k] = UINT32_MAX;
+    }
+
+    const uint32_t purposes = OSOE_HELLO_PURPOSE(OSOE_HELLO_CONTROL_WIRE) |
+                              OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE);
+    struct pollfd p[OSOE_LISTENER_POLLED + OSOE_MESH_CALLS_IN_FLIGHT];
+    uint32_t polled_call[OSOE_MESH_CALLS_IN_FLIGHT];
+    struct osoe_stall_watch watch;
+    osoe_stall_watch_begin_noticed(&watch, 0, osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
+    uint64_t progress = 0, sweep_ns = begun_ns + OSOE_SWEEP_NS;
+    while (m.made < m.call_count || m.answered < m.expected) {
+        uint64_t now = now_ns();
+        if (now >= sweep_ns) {
+            sweep_ns = now + OSOE_SWEEP_NS;
+            osoe_sweep_expired("shmem_init");
+            bool stalled = osoe_stall_watch_stalled(&watch, progress);
+            bool notice = !stalled && osoe_stall_watch_notice_due(&watch);
+            char what[640];
+            if (stalled || notice)
+                describe_mesh(&m, what, sizeof what);
+            if (stalled)
+                osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): node %u is "
+                           "waiting for %s", (unsigned long long)osoe_stall_watch_seconds(&watch),
+                           b->node, what);
+            if (notice)
+                osoe_notice("shmem_init on node %u has waited %llu s for %s; still waiting",
+                            b->node, (unsigned long long)osoe_stall_watch_waited_seconds(&watch),
+                            what);
+        }
+        /* Begin each call whose slot has come while a place is free: in
+         * order, and however late - a slot says not before (mesh_model.py's
+         * skip_late). */
+        uint64_t wake = sweep_ns;
+        for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT && m.begun < m.call_count; k++) {
+            if (m.flying_call[k] != UINT32_MAX)
+                continue;
+            const struct mesh_call *call = &m.calls[m.begun];
+            uint64_t due = begun_ns + call->slot * slot_ns;
+            if (due > now) {
+                if (due < wake)
+                    wake = due;
+                break;
+            }
+            struct sockaddr_in at;
+            uint16_t port = 0;
+            if (mesh) {
+                at = mesh->peers[call->peer];
+                port = ntohs(at.sin_port);
+            } else {
+                /* Without a rendezvous - the tests below the library - each
+                 * peer is found at its host-list address on its candidate
+                 * ports, as the rendezvous finds its parent. Not at loopback:
+                 * a node in a network namespace of its own (tier 3, §8.2)
+                 * reaches only itself there. */
+                osoe_listener_node_address(b, call->peer, &at);
+            }
+            osoe_listener_call_begin(m.flying[k], b, session, &at, port, call->peer,
+                                     call->purpose);
+            m.flying_call[k] = m.begun++;
+        }
+        uint32_t count = osoe_listener_poll(l, purposes, p, &wake);
+        for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++) {
+            polled_call[k] = UINT32_MAX;
+            if (m.flying_call[k] == UINT32_MAX)
+                continue;
+            short events = 0;
+            int fd = osoe_listener_call_poll(m.flying[k], &events, &wake);
+            if (fd < 0)
+                continue;
+            polled_call[k] = count;
+            p[count++] = (struct pollfd){ .fd = fd, .events = events };
+        }
+        now = now_ns();
+        uint64_t wait_ns = wake > now ? wake - now : 0;
+        struct timespec t = { (time_t)(wait_ns / 1000000000), (long)(wait_ns % 1000000000) };
+        int r = ppoll(p, count, &t, NULL);
+        if (r < 0 && errno != EINTR)
+            osoe_fatal("waiting for the mesh's connections: %s", strerror(errno));
+        if (r < 0)
+            continue;
+        /* Every caller its listener has, confirmed. */
+        for (;;) {
+            uint32_t peer;
+            enum osoe_hello_purpose purpose;
+            int fd = osoe_listener_serve(l, purposes, p, &peer, &purpose);
+            if (fd < 0)
+                break;
+            attach_called(&m, fd, peer, purpose);
+        }
+        /* Each call in flight a step on, polled or not: a dial's limit, a
+         * back-off's end. */
+        for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++) {
+            if (m.flying_call[k] == UINT32_MAX)
+                continue;
+            short revents = polled_call[k] != UINT32_MAX ? p[polled_call[k]].revents : 0;
+            int fd = osoe_listener_call_step(m.flying[k], revents);
+            if (fd < 0)
+                continue;
+            attach_made(&m, fd, &m.calls[m.flying_call[k]]);
+            m.flying_call[k] = UINT32_MAX;
+        }
+        /* A wait is for the next wire: each one that comes begins it again,
+         * so the notice says how long none has. */
+        if ((uint64_t)m.made + m.answered != progress) {
+            progress = (uint64_t)m.made + m.answered;
+            osoe_stall_watch_begin_noticed(&watch, progress,
+                                           osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
+        }
     }
     osoe_listener_close(l);
-    /* Without a rendezvous's mesh - the tests below the library - each peer is
-     * found at its host-list address on its candidate ports, as the rendezvous
-     * finds its parent. Not at loopback: a node in a network namespace of its
-     * own (tier 3, §8.2) reaches only itself there. */
-    for (uint32_t peer = b->node + 1; peer < b->node_count; peer++)
-        for (uint32_t k = 0; k < 2; k++) {
-            int fd;
-            if (mesh) {
-                fd = osoe_listener_connect_port(b, session, &mesh->peers[peer],
-                                                ntohs(mesh->peers[peer].sin_port), peer,
-                                                purposes[k]);
-            } else {
-                struct sockaddr_in at;
-                osoe_listener_node_address(b, peer, &at);
-                fd = osoe_listener_connect(b, session, &at, peer, purposes[k]);
-            }
-            struct osoe_ring *ring;
-            uint32_t ring_index;
-            struct osoe_wire *w = wire_of(wires, rings, peer - 1, purposes[k], peers, helpers,
-                                          &ring, &ring_index);
-            attach_purpose(w, ring, ring_index, fd, peer, purposes[k], b);
-        }
+    for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++)
+        osoe_listener_call_free(m.flying[k]);
+    free(m.calls);
+    /* Under SHMEM_DEBUG, how long the mesh took this lead, from the
+     * rendezvous's release to its last wire (H23's timing). */
+    if (b->debug)
+        osoe_print_line("osoe: node %u connected its mesh in %llu us: %u wires answered and %u "
+                        "called, in %u slots of %llu us, %u calls in flight at most\n", b->node,
+                        (unsigned long long)((now_ns() - begun_ns) / 1000), m.answered, m.made,
+                        slots, (unsigned long long)(slot_ns / 1000), OSOE_MESH_CALLS_IN_FLIGHT);
     for (uint32_t o = 0; o <= helpers; o++)
         ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
                   osoe_ring_wires(o, peers, helpers), osoe_owner_wires(o, peers, helpers), b,
