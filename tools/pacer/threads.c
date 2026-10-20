@@ -170,8 +170,7 @@ static void large_get(struct worker *w, enum kind k, shmem_ctx_t ctx, int next, 
     uint64_t *buffer = w->large_buffer;
     memset(buffer, 0xa5, sizeof *buffer * LARGE_WORDS);
     if (k == DEFAULT && slice % 2)
-        shmem_getmem(buffer, threads.large + start, sizeof *buffer * LARGE_WORDS,
-                     threads.next_world);
+        shmem_getmem(buffer, threads.large + start, sizeof *buffer * LARGE_WORDS, next);
     else
         shmem_ctx_getmem(ctx, buffer, threads.large + start, sizeof *buffer * LARGE_WORDS, next);
     const uint64_t *expected = threads.large_expected + start;

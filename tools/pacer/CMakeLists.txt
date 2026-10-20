@@ -197,6 +197,24 @@ if(OSOE_INTERNODE)
       FAIL_REGULAR_EXPRESSION "${pacer_failed}")
     osoe_internode_label(tools.pacer.mix-cycle.0-0-0-0-1-1-1-1)
 
+    # mix with one team, which on a block map holds node-mates. The default
+    # teams, {k, k+K}, hold none once K reaches the PEs a node has: on 0,0,1,1
+    # and on the 8-PE block map above never, and on 0,0,0,1,1,2 only team 0
+    # does. So a team period's stores through shmem_ptr, and its puts to a PE of
+    # the node, ran in the world's periods alone there (the release review's
+    # pacer paragraph, T27): a mutant of osoe_transport_local_put dropping the
+    # last byte of a put to another PE of the node fails the first two maps in
+    # the world's alltoall and no team's period, 3 runs of 3 (2026-10-19). Here
+    # the whole job is the team, so that every team period meets node-mates:
+    # that mutant fails mailbox in the first period.
+    add_test(NAME tools.pacer.mix-node-mates.0-0-1-1
+      COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick
+              --mix-teams 1 mix)
+    set_tests_properties(tools.pacer.mix-node-mates.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
+      PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+      FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+    osoe_internode_label(tools.pacer.mix-node-mates.0-0-1-1)
+
     # start_pes and the unprefixed routines, and each of their checks' plants:
     # the failure line on PE 1 or the PE after it, and the job's count.
     add_test(NAME tools.pacer.start-pes.0-0-1-1
@@ -531,6 +549,11 @@ if(OSOE_INTERNODE)
       "mix1.3. locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
     pacer_plant_named(mix-waits-value waits-value mix
       "mix1.3. waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
+    # And a plant that needs node-mates in a team: PE 1's, with node-mate PE 0 on
+    # this map, only where the one team holds the whole job (--mix-teams 1; the
+    # default teams {1,3} and {0,2} hold none), seen in the rma period.
+    pacer_plant_named(mix-rma-ptr rma-ptr "--mix-teams;1;mix"
+      "mix0.0. rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
     # The library's counters: a world run on two nodes prints both nodes' growth,
     # and bytes crossed between them - a reader that stops finding the segment,
     # or a field, would otherwise leave the line out unnoticed.
