@@ -268,7 +268,7 @@ Builds use CMake presets and run on Linux only. Each preset builds under
 cmake --workflow --preset release    # configure, build, and test, without the models
 ```
 
-That builds one file at a time and runs the tests one at a time - about 1,000,
+That builds one file at a time and runs the tests one at a time - about 1,100,
 checks of the build itself and jobs of a few processes. On four cores of an
 idle virtual machine it took about thirteen minutes, one for the build and
 twelve for the tests (2026-10-17, when they were about 950). Both may run four at a time, as this
@@ -1473,7 +1473,7 @@ that one could be added without touching the OpenSHMEM layer.
 
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
-  run before every merge, on the exact tree that merges: about 1,000 tests in
+  run before every merge, on the exact tree that merges: about 1,100 tests in
   release, and the model checker's 44 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
@@ -1535,7 +1535,7 @@ that one could be added without touching the OpenSHMEM layer.
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 463 of the full build's 1,019 tests in
+  development VM with liburing hidden: 545 of the full build's 1,101 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
