@@ -515,9 +515,35 @@ protocol, which `shmem.multiple` alone held until the exercise had this get
 (round nine, C9-4: a get returning before a piece it counted was copied ran
 `mix` 60 s clean).
 
+After its four contexts, each thread's slice ends with a fifth phase,
+`collectives`, which is not a context (T25, round six's correctness H1): the
+thread splits its own copy of the exercise's team, made at setup, into a team
+of a shape of its own - all the PEs, all but the first, the even ones, the
+order reversed, turning with the slice and the thread - and on it runs a sum,
+an inclusive scan, a broadcast from a turning root and an exclusive scan; then,
+on the copy, a large sum and a large inclusive and exclusive scan - every
+thread's copy is the same team, so that every slice has scans of one tree in
+flight on several threads at once, which the teams' differing shapes leave to
+chance; on the team a second sum; and destroys the team. The sizes run from 64
+bytes to 40,000, either side of the library's class line and up to three
+pieces, each stage's words its own, every result poisoned first and checked
+against the sum of the members' words; the plant `threads-collective` has
+thread 0 of PE 1 change a bit of the first result of each kind it checks. Until
+the phase, no exercise had two threads of a PE lead collectives at once, so the
+stress tester could not see a lane shared by threads - the library's `own_lane`
+returning 0, or the scans' lane bound to 0, passed `mix`, `collectives` and
+`teams` - which the library's own `shmem.lanes.threads` is the test of (the
+phase is its counterpart here, among the other contexts' puts, gets and
+atomics, and under the two test hooks). Each thread holds two team numbers, its
+copy and its team, so `--threads` is refused where `2T + 4` passes
+`OSOE_MAX_TEAMS`.
+
 Covers: `init_thread`, `query_thread`, `team_create_ctx`, `ctx_create`
 with each option, `ctx_session_*`, every `ctx_` RMA and AMO form, `getmem`
-of several pieces from several threads.
+of several pieces from several threads, `team_split_strided` and
+`team_destroy` from several threads at once, and `sum_reduce`, `sum_inscan`,
+`sum_exscan` and `broadcastmem` small and large from several threads, each on
+a team of its own.
 
 ### 4.8 `locks`, `memory`, `collectives`
 
@@ -621,7 +647,7 @@ checked against the header rather than remembered.
 | RMA blocking, nonblocking, strided, block-strided, sized (§9.6) | `rma`, `alltoall`, `sort` |
 | AMOs, all types and operations, nbi forms (§9.7) | `atomics`, `sort` (fetch-add), `locks` |
 | Signaling operations, `signal_fetch` (§9.8) | `mailbox`, `alltoall` |
-| Collectives, scans, `sync` (§9.10) | `teams`, `collectives`, `sort`, `parallel_print` |
+| Collectives, scans, `sync` (§9.10) | `teams`, `collectives`, `sort`, `parallel_print`; from several threads of a PE at once, `threads` |
 | Point-to-point synchronization, all forms (§9.11) | `mailbox`, `rma` |
 | Memory ordering: `fence`, `quiet`, `pe_quiet` (§9.12) | `rma`, `sort` |
 | Distributed locking (§9.13) | `locks` |

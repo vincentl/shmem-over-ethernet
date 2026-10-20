@@ -190,9 +190,10 @@ rated them (round six's readiness Q5-5).
   - `osoe-stat --summary`'s walk of a data collective: the generic phase
     publishing its state as it waits, as the progress thread does a barrier's
     (readiness Q5-1; the README says what the view walks today);
-  - an `osoe-pacer` exercise of collectives on per-thread teams under
+  - ~~an `osoe-pacer` exercise of collectives on per-thread teams under
     `SHMEM_THREAD_MULTIPLE`, so that the stress tester can see a lane shared by
-    threads (correctness H1; `shmem.lanes.threads` sees it today);
+    threads (correctness H1; `shmem.lanes.threads` sees it today)~~ - done
+    2026-10-20 (T25: `threads`' fifth phase);
   - step E's two models under the checker's weaker orders, not sequential
     consistency only; the PID-namespace message when pids are shifted rather
     than repeated; an x86-64 tsan build's heap placement (portability Q5);

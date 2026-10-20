@@ -214,9 +214,9 @@ ping-pong's round trip at every checkpoint, each PE with the PE of its rank
 on the other node of its pair: `pi-001` with `pi-002`, `pi-003` with `pi-004`) and `teams` (teams of every shape and collectives on a grid's
 rows and columns at once), ten minutes each in `release`; and an hour of
 `threads` - four worker threads a PE on private, serialized, default and team
-contexts - in a `debug` build, with the library's two test hooks on and a
-landing zone its gets overfill, which is where a race in the shared contexts
-would show:
+contexts, each also leading sums, scans and broadcasts on teams of its own - in
+a `debug` build, with the library's two test hooks on and a landing zone its
+gets overfill, which is where a race in the shared contexts would show:
 
 ```sh
 srun -K1 -N4 --ntasks-per-node=4 $P --seconds 600 mailbox > pacer-mailbox.txt
