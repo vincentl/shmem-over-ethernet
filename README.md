@@ -672,7 +672,7 @@ build tree.
 |---|---|---|
 | `wrapper/` | `oshcc`, the compiler wrapper, and `osoe-statics.ld`, the linker script it passes, which makes a program's global and static variables symmetric | yes, both |
 | `stat/` | `osoe-stat`, which reads a running or hung job's counters and state from outside | yes |
-| `pacer/` | `osoe-pacer`, the stress tester; in the full build `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-start-pes-counted` and, in the full build, `osoe-pacer-counted`, builds that count every call to the library | `osoe-pacer` only |
+| `pacer/` | `osoe-pacer`, the stress tester; `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-start-pes-counted` and, in the full build, `osoe-pacer-counted`, builds that count every call to the library | `osoe-pacer` only |
 | `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace, and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | `osoe-launch` only |
 | `bench/` | `osoe-bench`, what the library costs on a cluster, one measurement a line; and `collect-places.sh`, which times `collect`'s places by each way at each count of logical nodes with `osoe-bench places` (H24) | no |
 | `probe/` | `probe`, which checks that the kernel has every facility the build relies on - io_uring and futex2 in the full build, the classic futex in the single-node build (the `env.probe` test) | no |
