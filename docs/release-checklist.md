@@ -218,11 +218,22 @@ rated them (round six's readiness Q5-5).
   The check above the seam that belonged below it (Q5-7) is done: v0.2 step 1's
   Part 1 moved it into the transport's settings check.
 - **What v0.2 step 1 left to a later step** (its record's adversarial read,
-  item 4): one-node variants of `shmem.leftovers.*`, `shmem.dead-pe.lead-in-init`
-  and `shmem.job.0*`, and of the pacer's planted defects, whose
-  `PacerPlant.cmake` launches `0,0,1,1` - so the single-node build runs none of
-  the 77, and nothing in it shows the stress tester's oracles can fail (the
-  step's review, readiness Q5-7).
+  item 4; T17): one-node variants of `shmem.leftovers.*`,
+  `shmem.dead-pe.lead-in-init` and `shmem.job.0*`, and of the pacer's planted
+  defects, so that the single-node build runs them and something in it shows
+  the stress tester's oracles can fail (the step's review, readiness Q5-7).
+  Built: `shmem.leftovers.reclaim.one-node` and `.live.one-node`, which plant
+  the control segment alone - a job of one node makes no other object, so
+  `start-leftovers.sh` and `restart-leftovers.sh` have no form there - and every
+  planted defect but `mailbox-round-trip`, whose round trips run across nodes
+  alone, on `0,0,0,0` (`tools.pacer.plant.*.0-0-0-0`, and `start_pes`'s). Left:
+  `shmem.dead-pe.lead-in-init`, whose window, the job's rendezvous held open by
+  a node that starts late, a job of one node has not - struck, or built with a
+  shim that holds some other step of init open, as `slow-create.c` holds a
+  creation, the author's choice; and `shmem.job.0*`, struck, since
+  `shmem_test_job` compiles the internode backend's files
+  (`docs/decisions/2026-10-06-single-node-build.md`, item 4 of its adversarial
+  read).
 - **What v0.2 step 2 left to after its merge** (its adversarial read, findings
   10 to 12, `docs/reviews/archive/v0.2-step2-adversarial-read.md`): multi-node
   tests on the measured link take shapes that vary from start to start, so pin

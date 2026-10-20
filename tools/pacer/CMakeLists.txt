@@ -22,14 +22,11 @@ install(TARGETS osoe-pacer)
 # outside the block of tests below, which a decision may remove.
 osoe_version_test(tools.pacer.version $<TARGET_FILE:osoe-pacer> osoe-pacer)
 
-# internode: every test that runs it runs over two nodes
-if(OSOE_INTERNODE)
-  # Annex F's unprefixed routines, start_pes first, in a program of their own:
-  # start_pes starts the library where shmem_init would, and ends it at exit.
-  add_executable(osoe-pacer-start-pes start-pes.c)
-  target_link_libraries(osoe-pacer-start-pes PRIVATE osoe)
-  osoe_warnings(osoe-pacer-start-pes)
-endif()
+# Annex F's unprefixed routines, start_pes first, in a program of their own:
+# start_pes starts the library where shmem_init would, and ends it at exit.
+add_executable(osoe-pacer-start-pes start-pes.c)
+target_link_libraries(osoe-pacer-start-pes PRIVATE osoe)
+osoe_warnings(osoe-pacer-start-pes)
 
 # osoe-pacer-counted: the same program with a shim that counts every call of
 # every routine the library declares (spec §10: every shmem_ name is a weak
@@ -215,32 +212,6 @@ if(OSOE_INTERNODE)
       FAIL_REGULAR_EXPRESSION "${pacer_failed}")
     osoe_internode_label(tools.pacer.mix-node-mates.0-0-1-1)
 
-    # start_pes and the unprefixed routines, and each of their checks' plants:
-    # the failure line on PE 1 or the PE after it, and the job's count.
-    add_test(NAME tools.pacer.start-pes.0-0-1-1
-      COMMAND osoe-launch -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-start-pes>)
-    set_tests_properties(tools.pacer.start-pes.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 300
-      PASS_REGULAR_EXPRESSION "start-pes failures=0\n"
-      FAIL_REGULAR_EXPRESSION "${pacer_failed}")
-    osoe_internode_label(tools.pacer.start-pes.0-0-1-1)
-    foreach(defect_line IN ITEMS
-        "my-pe|start-pes: PE 1: _my_pe says 2 and _num_pes 4, where shmem_my_pe says 1"
-        "put|start-pes: PE 2: word 32 of the shmalloc'd block holds [0-9]+ from PE 1"
-        "realloc|start-pes: PE 1: shrealloc to [0-9]+ bytes changed word 0, [0-9]+, expected [0-9]+"
-        "align|start-pes: PE 1: shmemalign.64, 100. returned 0x[0-9a-f]+, not a multiple of 64")
-      string(FIND "${defect_line}" "|" bar)
-      string(SUBSTRING "${defect_line}" 0 ${bar} defect)
-      math(EXPR after "${bar} + 1")
-      string(SUBSTRING "${defect_line}" ${after} -1 line)
-      add_test(NAME tools.pacer.plant.start-pes-${defect}
-        COMMAND osoe-launch -k -n 4 -m 0,0,1,1 -t 240 -- $<TARGET_FILE:osoe-pacer-start-pes>
-                --plant ${defect})
-      set_tests_properties(tools.pacer.plant.start-pes-${defect} PROPERTIES LABELS "tier2"
-        TIMEOUT 300 PASS_REGULAR_EXPRESSION "${line}.*start-pes failures=[1-9][0-9]* plant=${defect}"
-        FAIL_REGULAR_EXPRESSION "killed by signal|timeout after|left behind")
-      osoe_internode_label(tools.pacer.plant.start-pes-${defect})
-    endforeach()
-
     # Annex F's routines through their whole cycle - every case on every active
     # set, by name and by the deprecated generics - on five PEs over three nodes,
     # interleaved; and every wait form of every type in both spellings.
@@ -264,261 +235,6 @@ if(OSOE_INTERNODE)
       PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
       FAIL_REGULAR_EXPRESSION "${pacer_failed}")
     osoe_internode_label(tools.pacer.sort-paths.0-0-1-1)
-
-    # The planted defects: each check must still fire - the brief's four, and
-    # three more the author added on 2026-09-27 so that every check has one (the
-    # capacity plant loses keys, so the oracle fires beside it). Every line a
-    # plant's checks must print is required, each on its own, by
-    # cmake/PacerPlant.cmake: several PEs' lines come in an order that depends
-    # on who reserved first, and one pattern of "line, then count" would let
-    # every check but the first go quiet unnoticed. The alltoall's totals say
-    # that all eight variants caught it, every exchange. A `.` stands for each
-    # `;` of a line, which would otherwise split the list of patterns.
-    # Every planted run also says so, in a line after the header and on its
-    # last line, so that it cannot be taken for a finding.
-    function(pacer_plant_named name defect exercise)
-      set(patterns "osoe-pacer planted ${defect}: PE 1[ ']"
-          "osoe-pacer failures=[1-9][0-9]* seconds=[0-9.]+ plant=${defect}" ${ARGN})
-      add_test(NAME tools.pacer.plant.${name}
-        COMMAND ${CMAKE_COMMAND} -DLAUNCH=$<TARGET_FILE:osoe-launch>
-                -DPACER=$<TARGET_FILE:osoe-pacer>
-                "-DARGUMENTS=--quick;--plant;${defect};${exercise}" "-DPATTERNS=${patterns}"
-                "-DFAIL=killed by signal|timeout after|left behind"
-                -P ${PROJECT_SOURCE_DIR}/cmake/PacerPlant.cmake)
-      set_tests_properties(tools.pacer.plant.${name} PROPERTIES LABELS "tier2" TIMEOUT 300)
-      # internode: PacerPlant.cmake launches over the 0,0,1,1 map
-      osoe_internode_label(tools.pacer.plant.${name})
-    endfunction()
-    function(pacer_plant defect exercise)
-      pacer_plant_named(${defect} ${defect} "${exercise}" ${ARGN})
-    endfunction()
-    pacer_plant(sort-key sort
-      "sort round=0 oracle: sum generated [0-9a-f]+, received [0-9a-f]+"
-      "sort round=0 oracle: xor generated [0-9a-f]+, received [0-9a-f]+"
-      "sort round=0 oracle: hash generated [0-9a-f]+, received [0-9a-f]+"
-      "osoe-pacer failures=[1-9]")
-    pacer_plant(sort-order sort
-      "sort round=0 order: [0-9]+ keys follow a larger one. the first at [0-9]+ of [0-9]+"
-      "osoe-pacer failures=[1-9]")
-    pacer_plant(sort-range sort
-      "sort round=0 range: 1 of [0-9]+ keys belong elsewhere. the first, [0-9a-f]+, is PE [0-9]+'s"
-      "osoe-pacer failures=[1-9]")
-    pacer_plant(sort-capacity sort
-      "sort round=0 capacity: PE [0-9]+ holds [0-9]+ keys. a reservation of [0-9]+ reached [0-9]+"
-      "sort round=0 capacity: reservations here reached [0-9]+ keys, past the [0-9]+ this PE holds. its batch goes unchecked"
-      "sort round=0 oracle: count generated [0-9]+, received [0-9]+"
-      "osoe-pacer failures=[1-9]")
-    pacer_plant(alltoall-byte alltoall
-      "alltoall round=0 team=world block=8 alltoall: 1 of [0-9]+ words wrong. the first, word 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+: it matches no word sent"
-      "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=96"
-      "osoe-pacer failures=96 ")
-    pacer_plant(alltoall-gap alltoall
-      "alltoall round=0 team=world block=8 alltoalls: 1 word outside the blocks written. the first at word 1 of dest, [0-9a-f]+"
-      "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=12"
-      "osoe-pacer failures=12 ")
-    # PE 0 records this failure after two others, PEs 2 and 3 after one: the
-    # line under all three says the failure lines are grouped by content.
-    # The mailbox's four: a payload word, a signal word's value, the count of
-    # what arrived, which only the last checkpoint's pairwise check sees, and
-    # both checks of a round trip across nodes - PE 1 serves PE 3 on 0,0,1,1.
-    pacer_plant(mailbox-payload mailbox
-      "mailbox round=0 wait_until_all from PE 1: 1 of [0-9]+ payload words wrong. the first, word 1, is [0-9a-f]+")
-    pacer_plant(mailbox-signal mailbox
-      "mailbox round=3 wait_until_all_vector from PE 1: signal 2, expected 1")
-    pacer_plant(mailbox-count mailbox
-      "mailbox round=19 count: PE [0-9]+ sent [0-9]+ here, [0-9]+ were read")
-    pacer_plant(mailbox-round-trip mailbox
-      "mailbox round=0 round_trip ping from PE 1: signal 2, expected 1"
-      "mailbox round=0 round_trip ping from PE 1: 1 of 4 words wrong. the first, word 2, is [0-9a-f]+")
-    # threads' four and teams' three; the exhaust plant needs its mode.
-    pacer_plant(threads-row threads
-      "threads round=0 private row: thread 0 read back word 3 as [0-9a-f]+, not [0-9a-f]+")
-    pacer_plant(threads-table threads
-      "threads round=0 [a-z]+ table: thread [0-9]+ got word 5 of PE 1's row [0-9]+ as [0-9a-f]+")
-    pacer_plant(threads-count threads
-      "threads round=0 counter [0-9]+: holds [0-9]+, and [0-9]+ were added")
-    # The large get's check: one word of the array PE 0 reads, the last that
-    # any worker's get covers and one the get's last piece delivers, is wrong,
-    # and each of PE 0's 4 workers' gets of it, on each of the 4 contexts in
-    # each of the 8 quick slices, finds exactly that one word: 128 failures.
-    # (A checkpoint keeps only its first 8 failure lines, and a worker reaches
-    # the private context first, so that is the one line named; the count says
-    # that no other context's get went unchecked.)
-    pacer_plant(threads-pieces threads
-      "threads round=0 private pieces: thread [0-9]+ read 1 of 2560 words of PE 1's array wrong, words [0-9]+ to [0-9]+ of the get, the last [0-9a-f]+, not [0-9a-f]+"
-      "osoe-pacer failures=128 ")
-    # The collectives phase's checks, one bit of the first result of each kind
-    # that PE 1's thread 0 checks: on its first slice's team of all four PEs, the
-    # first sum (8 words), the inclusive scan (129, a large one), the broadcast
-    # (1,029 bytes, from rank 0) and the exclusive scan (8). Each is a line of PE
-    # 1's alone, and nothing else is wrong: 4 failures.
-    pacer_plant(threads-collective threads
-      "threads round=0 collectives: thread 0 sum_reduce of 8 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
-      "threads round=0 collectives: thread 0 sum_inscan of 129 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
-      "threads round=0 collectives: thread 0 broadcast of 1029 bytes on team all of 4 from rank 0: byte 0 is [0-9a-f]+, expected [0-9a-f]+"
-      "threads round=0 collectives: thread 0 sum_exscan of 8 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
-      "osoe-pacer failures=4 ")
-    pacer_plant(teams-query teams
-      "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+"
-      "teams [a-z]+: rank 0 translates to world PE [0-9]+, expected [0-9]+"
-      "teams [a-z]+: team_ptr to rank 0, world PE [0-9]+, is [A-Za-z ]+. it is "
-      "teams [a-z]+: world PE 0 translates to rank -?[0-9]+, expected -?[0-9]+"
-      "teams [a-z]+: team_get_config gave num_contexts 0, expected 1"
-      "teams [a-z]+: a context of the team names another team"
-      "teams row: this PE's row rank [0-9]+ translates to column rank [0-9]+, expected [0-9]+")
-    pacer_plant(teams-collective teams
-      "teams round=[0-9]+ row sum_reduce: element 0 is"
-      "teams round=[0-9]+ row max_reduce: element 0 is 1000,"
-      "teams round=[0-9]+ row min_reduce: element 0 is -1,"
-      "teams round=[0-9]+ row prod_reduce: element 0 is"
-      "teams round=[0-9]+ row and_reduce: element 0 is 0000000000000000,"
-      "teams round=[0-9]+ row or_reduce: element 0 is ffffffffffffffff,"
-      "teams round=[0-9]+ row xor_reduce: element 0 is"
-      "teams round=[0-9]+ row double_sum_reduce: element 0 is"
-      "teams round=[0-9]+ row broadcast: element 0 is"
-      "teams round=[0-9]+ row collect: element 0 is"
-      "teams round=[0-9]+ row fcollect: element [0-9]+ is"
-      "teams round=[0-9]+ row alltoall: element [0-9]+ is"
-      "teams round=[0-9]+ row sum_inscan: element 0 is"
-      "teams round=[0-9]+ row sum_exscan: element 0 is")
-    pacer_plant(teams-member teams
-      "teams one: this PE is a member, and its handle is SHMEM_TEAM_INVALID")
-    pacer_plant(teams-ring teams
-      "teams round=0 strided context: read back [0-9]+ from rank [0-9]+, not [0-9]+")
-    # The atomics' seven: each family's check, on the first round of its family
-    # - int for the first five, unsigned int for the bitwise two.
-    pacer_plant(atomics-add atomics
-      "atomics round=0 add int default: slot [0-9]+ holds [0-9]+, expected [0-9]+")
-    pacer_plant(atomics-fetch atomics
-      "atomics round=12 fetch_add int default: slot [0-9]+ handed out values summing to [0-9]+, not the [0-9]+ of its [0-9]+ increments"
-      "atomics round=12 fetch_add int default: slot [0-9]+ handed out values hashing to [0-9a-f]+, not [0-9a-f]+")
-    pacer_plant(atomics-claim atomics
-      "atomics round=24 claim int default: the table holds 63 claims, not the 64 made"
-      "atomics round=24 claim int default: slot [0-9]+ of PE [0-9]+ holds [0-9]+, not this PE's claim [0-9]+")
-    pacer_plant(atomics-swap atomics
-      "atomics round=36 swap int default: the tokens sum to [0-9]+, not the [0-9]+ they started at"
-      "atomics round=36 swap int default: the tokens hash to [0-9a-f]+, not the [0-9a-f]+ they started at")
-    pacer_plant(atomics-set atomics
-      "atomics round=50 set_fetch int serialized: fetched [0-9]+ from slot 0 of PE [0-9]+, which this PE set to [0-9]+"
-      "atomics round=50 set_fetch int serialized: slot 0 holds [0-9]+, not the [0-9]+ PE 1 set")
-    pacer_plant(atomics-bitwise atomics
-      "atomics round=64 bitwise uint private: after the xor pass slot [0-9]+ holds [0-9a-f]+, expected [0-9a-f]+")
-    pacer_plant(atomics-fetched-bit atomics
-      "atomics round=64 bitwise uint private: fetch_or from slot [0-9]+ of PE [0-9]+ returned bit 1 clear, expected set")
-    # The rma's six. The source PE 1 corrupts is read twice - by the next PE's
-    # get and by its node-mate's loads through shmem_ptr - and both must see it.
-    pacer_plant(rma-halo rma
-      "rma round=0 halo putmem atomic_add default: byte 4 of 8 from PE 1 is [0-9a-f]+, not [0-9a-f]+, when the flag said it had landed")
-    pacer_plant(rma-put rma
-      "rma round=0 put_get float default put: byte 0, of element 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+")
-    pacer_plant(rma-gap rma
-      "rma round=29 iput_iget float default put: byte 4, where no element lands, is 5a, not the canary")
-    pacer_plant(rma-get rma
-      "rma round=0 put_get float default get: byte 0, of element 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+"
-      "rma round=0 ptr: byte 0 loaded from node-mate PE 1's source is [0-9a-f]+, not [0-9a-f]+")
-    pacer_plant(rma-get-gap rma
-      "rma round=29 iput_iget float default get: byte 4, where no element lands, is 5a, not the canary")
-    pacer_plant(rma-ptr rma
-      "rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
-    # The locks' two and the memory's five. The count stays one off once
-    # planted, so every later checkpoint says so too; the first is asserted.
-    pacer_plant(locks-count locks
-      "locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
-    pacer_plant(locks-holder locks
-      "locks round=0 lock [0-9]+: PE -1 holds its home's holder word while this PE is in the section")
-    pacer_plant(memory-free memory
-      "memory round=2 free: byte [0-9]+ of a block of [0-9]+ bytes is not what was written there")
-    pacer_plant(memory-realloc memory
-      "memory round=0 realloc: of [0-9]+ bytes kept from [0-9]+, byte 0 is not what was written")
-    pacer_plant(memory-refused memory
-      "memory round=0 realloc: a refused realloc left byte 0 of [0-9]+ not what was written")
-    pacer_plant(memory-granted memory
-      "memory round=0 realloc: [0-9]+ bytes were granted, on a heap of far less")
-    pacer_plant(memory-calloc memory
-      "memory round=0 calloc: byte [0-9]+ of [0-9]+ is 01, not zero")
-    pacer_plant(memory-align memory
-      "memory round=0 align: a block of [0-9]+ bytes aligned to [0-9]+ is at an address 1 past a multiple of it")
-    pacer_plant(memory-accessible memory
-      "memory round=0 [a-z_]+: a block of [0-9]+ bytes is accessible from this PE and not accessible from PE 2")
-    pacer_plant(memory-agree memory
-      "memory round=0: the PEs' allocations differ, hashes from [0-9a-f]+ to [0-9a-f]+")
-    # The collectives' four, each on the first case PE 1 takes part in.
-    pacer_plant(collectives-reduce collectives
-      "collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
-    # --fold-nodes: that failure, which every PE of the one host reports alike, is
-    # labeled by the host's name - which ends in no bracket, as [0-3] would.
-    pacer_plant_named(collectives-reduce-folded collectives-reduce "--fold-nodes;collectives"
-      "[-A-Za-z0-9_]+ collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
-    pacer_plant(collectives-scan collectives
-      "collectives round=30 sum_inscan char world: element 0 is [0-9]+, expected [0-9]+")
-    pacer_plant(collectives-data collectives
-      "collectives round=65 fcollect float world: byte [0-9]+ is [0-9a-f]+, not what was sent")
-    pacer_plant(collectives-gap collectives
-      "collectives round=76 alltoalls int world: byte [0-9]+ is a5, where nothing lands")
-    # The checks the first plants could not reach: a slot's count, the claim
-    # budget, the halo's flag, p and g, a NULL shmem_ptr, a collective's status
-    # and the timing sweep's two checks.
-    pacer_plant(atomics-fetch-count atomics
-      "atomics round=12 fetch_add int default: slot [0-9]+ holds [0-9]+ after [0-9]+ increments, expected [0-9]+")
-    pacer_plant(atomics-attempts atomics
-      "atomics round=24 claim int default: 1 of 16 claims after [0-9]+ attempts, in a table half empty"
-      "atomics round=24 claim int default: the table holds 49 claims, not the 64 made")
-    pacer_plant(rma-flag rma
-      "rma round=0 halo atomic_add default: the flag reads 1, expected 2")
-    pacer_plant(rma-single rma
-      "rma round=116 p_g float default put: element 0 from PE 1 is [0-9]+, not [0-9]+")
-    pacer_plant(rma-ptr-null rma
-      "rma round=0 ptr: shmem_ptr to node-mate PE 0 is NULL")
-    pacer_plant(collectives-status collectives
-      "collectives round=0 and_reduce uchar world: returned 1")
-    pacer_plant(collectives-timed collectives
-      "collectives round=0 timed reduce world bytes=8: element 0 of 1 is [0-9]+, expected [0-9]+")
-    pacer_plant(collectives-timed-data collectives
-      "collectives round=2 timed collect world bytes=8: byte 0 of block 1 is [0-9a-f]+, not what PE 1 sent")
-    pacer_plant(teams-exhaust "teams;--teams-exhaust"
-      "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
-    # The renewal's and the exhaust's own check that the numbers come back: a
-    # status misread fires each, with nothing else changed.
-    pacer_plant(teams-renew teams
-      "teams round=[0-9]+ renew [a-z]+: a split returned 1: a number or a block was not given back")
-    pacer_plant(teams-back "teams;--teams-exhaust"
-      "teams exhaust: a split of the whole team after the [0-9]+ teams made were destroyed returned 1: their numbers did not come back")
-    pacer_plant(print-hash print
-      "print round=0 same: returned 2 lines, expected 1"
-      ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
-      "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
-      "osoe-pacer failures=[1-9]")
-    pacer_plant(deprecated-reduce deprecated
-      "deprecated round=12 int_sum_to_all set=0:0:4: element 0 is [0-9]+.0i, expected [0-9]+.0i")
-    pacer_plant(deprecated-data deprecated
-      "deprecated round=46 collect32 set=1:1:2: byte 0 is [0-9a-f]+, not [0-9a-f]+")
-    pacer_plant(deprecated-outside deprecated
-      "deprecated round=45 broadcast64 set=0:1:2: byte 0 is a4, not a5, on a PE outside the set")
-    pacer_plant(deprecated-barrier deprecated
-      "deprecated round=54 barrier set=1:1:2: the first member counted 1 arrivals when it returned, expected 2")
-    pacer_plant(deprecated-amo deprecated
-      "deprecated round=56 int_set_fetch: returned [0-9]+, expected [0-9]+")
-    pacer_plant(deprecated-word deprecated
-      "deprecated round=57 int_swap: the word holds [0-9]+ after PE 1's, expected [0-9]+")
-    pacer_plant(deprecated-wait deprecated
-      "deprecated round=81 shmem_short_wait: the word from PE 1 holds [0-9]+, expected [0-9]+")
-    pacer_plant(waits-value waits
-      "waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
-    pacer_plant(waits-index waits
-      "waits round=24 int wait_until_any [a-z]+: returned index [0-3], which the status excludes")
-    pacer_plant(waits-count waits
-      "waits round=36 int wait_until_some [a-z]+: returned [0-9]+ indices with [0-9]+ words left")
-    pacer_plant(waits-excluded waits
-      "waits round=24 int wait_until_any [a-z]+: returned [0-9]+ with every word excluded, not SIZE_MAX")
-    pacer_plant(rma-signal rma
-      "rma round=140 put_signal_get float default: the signal from PE 0 reads [0-9]+, expected [0-9]+")
-    pacer_plant(print-route print
-      "print round=0 same, signal route: returned 2 lines, expected 1"
-      "print round=0 same, signal route: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this.")
-    pacer_plant(print-fold print
-      "print round=0 fold: pi-001,pi-002,pi-003,pi-004 folded to pi-.1-4., expected pi-.001-004."
-      "print round=0 fold: pi-004,pi-001,pi-002,pi-001 folded to pi-.1-2,4., expected pi-.001-002,004."
-      "print round=0 fold: pi-003,login,pi-001,gpu08,gpu07 folded to gpu.7-8.,login,pi-.1,3., expected gpu.07-08.,login,pi-.001,003.")
 
     # A run whose every parallel_print takes the signal route, the print
     # exercise's cases by both: the same lines, and nothing hangs.
@@ -554,17 +270,7 @@ if(OSOE_INTERNODE)
       PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
       FAIL_REGULAR_EXPRESSION "${pacer_failed}")
     osoe_internode_label(tools.pacer.installed.0-0-1-1)
-    # Plants fired inside mix periods, on PE 1's team: locks' in its first team
-    # period, waits' in its fifth.
-    pacer_plant_named(mix-locks-count locks-count mix
-      "mix1.3. locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
-    pacer_plant_named(mix-waits-value waits-value mix
-      "mix1.3. waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
-    # And a plant that needs node-mates in a team: PE 1's, with node-mate PE 0 on
-    # this map, only where the one team holds the whole job (--mix-teams 1; the
-    # default teams {1,3} and {0,2} hold none), seen in the rma period.
-    pacer_plant_named(mix-rma-ptr rma-ptr "--mix-teams;1;mix"
-      "mix0.0. rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
+
     # The library's counters: a world run on two nodes prints both nodes' growth,
     # and bytes crossed between them - a reader that stops finding the segment,
     # or a field, would otherwise leave the line out unnoticed.
@@ -599,6 +305,345 @@ if(OSOE_INTERNODE)
     endforeach()
   endif()
 endif()
+
+# ---- start_pes and the planted defects, on one node and across nodes ----------
+#
+# Each runs on one node of four PEs in both builds, and in the full build - not
+# under ThreadSanitizer (above) - across two nodes of two PEs as well. The
+# single-node build ran none of them, and nothing in it showed that the stress
+# tester's oracles can fail (the v0.2 step 1 review, readiness Q5-7). A test
+# across nodes has the name it always had; one on one node adds its map, as the
+# pacer's other tests do.
+set(pacer_plant_maps 0,0,0,0)
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(pacer_plant_maps 0,0,1,1 0,0,0,0)
+endif()
+
+# start_pes and the unprefixed routines, and each of their checks' plants:
+# the failure line on PE 1 or the PE after it, and the job's count.
+foreach(map IN LISTS pacer_plant_maps)
+  osoe_map_nodes("${map}" nodes)
+  string(REPLACE "," ";" ranks "${map}")
+  list(LENGTH ranks count)
+  string(REPLACE "," "-" label "${map}")
+  add_test(NAME tools.pacer.start-pes.${label}
+    COMMAND osoe-launch -n ${count} -m ${map} -t 240 -- $<TARGET_FILE:osoe-pacer-start-pes>)
+  set_tests_properties(tools.pacer.start-pes.${label} PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "start-pes failures=0\n"
+    FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+  if(nodes GREATER 1)
+    osoe_internode_label(tools.pacer.start-pes.${label})
+  endif()
+  foreach(defect_line IN ITEMS
+      "my-pe|start-pes: PE 1: _my_pe says 2 and _num_pes 4, where shmem_my_pe says 1"
+      "put|start-pes: PE 2: word 32 of the shmalloc'd block holds [0-9]+ from PE 1"
+      "realloc|start-pes: PE 1: shrealloc to [0-9]+ bytes changed word 0, [0-9]+, expected [0-9]+"
+      "align|start-pes: PE 1: shmemalign.64, 100. returned 0x[0-9a-f]+, not a multiple of 64")
+    string(FIND "${defect_line}" "|" bar)
+    string(SUBSTRING "${defect_line}" 0 ${bar} defect)
+    math(EXPR after "${bar} + 1")
+    string(SUBSTRING "${defect_line}" ${after} -1 line)
+    set(test tools.pacer.plant.start-pes-${defect})
+    if(nodes EQUAL 1)
+      set(test ${test}.${label})
+    endif()
+    add_test(NAME ${test}
+      COMMAND osoe-launch -k -n ${count} -m ${map} -t 240 -- $<TARGET_FILE:osoe-pacer-start-pes>
+              --plant ${defect})
+    set_tests_properties(${test} PROPERTIES LABELS "tier2"
+      TIMEOUT 300 PASS_REGULAR_EXPRESSION "${line}.*start-pes failures=[1-9][0-9]* plant=${defect}"
+      FAIL_REGULAR_EXPRESSION "killed by signal|timeout after|left behind")
+    if(nodes GREATER 1)
+      osoe_internode_label(${test})
+    endif()
+  endforeach()
+endforeach()
+
+# The planted defects: each check must still fire - the brief's four, and
+# three more the author added on 2026-09-27 so that every check has one (the
+# capacity plant loses keys, so the oracle fires beside it). Every line a
+# plant's checks must print is required, each on its own, by
+# cmake/PacerPlant.cmake: several PEs' lines come in an order that depends
+# on who reserved first, and one pattern of "line, then count" would let
+# every check but the first go quiet unnoticed. The alltoall's totals say
+# that all eight variants caught it, every exchange. A `.` stands for each
+# `;` of a line, which would otherwise split the list of patterns.
+# Every planted run also says so, in a line after the header and on its
+# last line, so that it cannot be taken for a finding.
+#
+# On one node every plant fires, by every line its test requires, but one:
+# mailbox-round-trip changes a message of PE 1's round trips with its partner,
+# the PE of its rank on the other node of its pair, and a job of one node has no
+# such PE - osoe-pacer refuses the run, status 2. The round trips are the
+# mailbox's check across nodes alone (a node-mate's message is timed on one
+# clock instead, mailbox.c), so their plant is registered across nodes alone.
+set(pacer_plants_across_nodes_only mailbox-round-trip)
+function(pacer_plant_named name defect exercise)
+  set(patterns "osoe-pacer planted ${defect}: PE 1[ ']"
+      "osoe-pacer failures=[1-9][0-9]* seconds=[0-9.]+ plant=${defect}" ${ARGN})
+  foreach(map IN LISTS pacer_plant_maps)
+    osoe_map_nodes("${map}" nodes)
+    string(REPLACE "," "-" label "${map}")
+    set(test tools.pacer.plant.${name})
+    if(nodes EQUAL 1)
+      if("${name}" IN_LIST pacer_plants_across_nodes_only)
+        continue()
+      endif()
+      set(test ${test}.${label})
+    endif()
+    add_test(NAME ${test}
+      COMMAND ${CMAKE_COMMAND} -DLAUNCH=$<TARGET_FILE:osoe-launch>
+              -DPACER=$<TARGET_FILE:osoe-pacer> -DMAP=${map}
+              "-DARGUMENTS=--quick;--plant;${defect};${exercise}" "-DPATTERNS=${patterns}"
+              "-DFAIL=killed by signal|timeout after|left behind"
+              -P ${PROJECT_SOURCE_DIR}/cmake/PacerPlant.cmake)
+    set_tests_properties(${test} PROPERTIES LABELS "tier2" TIMEOUT 300)
+    if(nodes GREATER 1)
+      osoe_internode_label(${test})
+    endif()
+  endforeach()
+endfunction()
+function(pacer_plant defect exercise)
+  pacer_plant_named(${defect} ${defect} "${exercise}" ${ARGN})
+endfunction()
+pacer_plant(sort-key sort
+  "sort round=0 oracle: sum generated [0-9a-f]+, received [0-9a-f]+"
+  "sort round=0 oracle: xor generated [0-9a-f]+, received [0-9a-f]+"
+  "sort round=0 oracle: hash generated [0-9a-f]+, received [0-9a-f]+"
+  "osoe-pacer failures=[1-9]")
+pacer_plant(sort-order sort
+  "sort round=0 order: [0-9]+ keys follow a larger one. the first at [0-9]+ of [0-9]+"
+  "osoe-pacer failures=[1-9]")
+pacer_plant(sort-range sort
+  "sort round=0 range: 1 of [0-9]+ keys belong elsewhere. the first, [0-9a-f]+, is PE [0-9]+'s"
+  "osoe-pacer failures=[1-9]")
+pacer_plant(sort-capacity sort
+  "sort round=0 capacity: PE [0-9]+ holds [0-9]+ keys. a reservation of [0-9]+ reached [0-9]+"
+  "sort round=0 capacity: reservations here reached [0-9]+ keys, past the [0-9]+ this PE holds. its batch goes unchecked"
+  "sort round=0 oracle: count generated [0-9]+, received [0-9]+"
+  "osoe-pacer failures=[1-9]")
+pacer_plant(alltoall-byte alltoall
+  "alltoall round=0 team=world block=8 alltoall: 1 of [0-9]+ words wrong. the first, word 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+: it matches no word sent"
+  "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=96"
+  "osoe-pacer failures=96 ")
+pacer_plant(alltoall-gap alltoall
+  "alltoall round=0 team=world block=8 alltoalls: 1 word outside the blocks written. the first at word 1 of dest, [0-9a-f]+"
+  "summary alltoall rounds=12 exchanges=[0-9]+ seconds=[0-9.]+ exchanges_per_s=[0-9]+ failures=12"
+  "osoe-pacer failures=12 ")
+# PE 0 records this failure after two others, PEs 2 and 3 after one: the
+# line under all three says the failure lines are grouped by content.
+# The mailbox's four: a payload word, a signal word's value, the count of
+# what arrived, which only the last checkpoint's pairwise check sees, and
+# both checks of a round trip across nodes - PE 1 serves PE 3 on 0,0,1,1.
+pacer_plant(mailbox-payload mailbox
+  "mailbox round=0 wait_until_all from PE 1: 1 of [0-9]+ payload words wrong. the first, word 1, is [0-9a-f]+")
+pacer_plant(mailbox-signal mailbox
+  "mailbox round=3 wait_until_all_vector from PE 1: signal 2, expected 1")
+pacer_plant(mailbox-count mailbox
+  "mailbox round=19 count: PE [0-9]+ sent [0-9]+ here, [0-9]+ were read")
+pacer_plant(mailbox-round-trip mailbox
+  "mailbox round=0 round_trip ping from PE 1: signal 2, expected 1"
+  "mailbox round=0 round_trip ping from PE 1: 1 of 4 words wrong. the first, word 2, is [0-9a-f]+")
+# threads' four and teams' three; the exhaust plant needs its mode.
+pacer_plant(threads-row threads
+  "threads round=0 private row: thread 0 read back word 3 as [0-9a-f]+, not [0-9a-f]+")
+pacer_plant(threads-table threads
+  "threads round=0 [a-z]+ table: thread [0-9]+ got word 5 of PE 1's row [0-9]+ as [0-9a-f]+")
+pacer_plant(threads-count threads
+  "threads round=0 counter [0-9]+: holds [0-9]+, and [0-9]+ were added")
+# The large get's check: one word of the array PE 0 reads, the last that
+# any worker's get covers and one the get's last piece delivers, is wrong,
+# and each of PE 0's 4 workers' gets of it, on each of the 4 contexts in
+# each of the 8 quick slices, finds exactly that one word: 128 failures.
+# (A checkpoint keeps only its first 8 failure lines, and a worker reaches
+# the private context first, so that is the one line named; the count says
+# that no other context's get went unchecked.)
+pacer_plant(threads-pieces threads
+  "threads round=0 private pieces: thread [0-9]+ read 1 of 2560 words of PE 1's array wrong, words [0-9]+ to [0-9]+ of the get, the last [0-9a-f]+, not [0-9a-f]+"
+  "osoe-pacer failures=128 ")
+# The collectives phase's checks (T25), one bit of the first result of each
+# kind that PE 1's thread 0 checks: on its first slice's team of all four PEs,
+# the first sum (8 words), the inclusive scan (129, a large one), the broadcast
+# (1,029 bytes, from rank 0) and the exclusive scan (8). Each is a line of PE
+# 1's alone, and nothing else is wrong: 4 failures.
+pacer_plant(threads-collective threads
+  "threads round=0 collectives: thread 0 sum_reduce of 8 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
+  "threads round=0 collectives: thread 0 sum_inscan of 129 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
+  "threads round=0 collectives: thread 0 broadcast of 1029 bytes on team all of 4 from rank 0: byte 0 is [0-9a-f]+, expected [0-9a-f]+"
+  "threads round=0 collectives: thread 0 sum_exscan of 8 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
+  "osoe-pacer failures=4 ")
+pacer_plant(teams-query teams
+  "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+"
+  "teams [a-z]+: rank 0 translates to world PE [0-9]+, expected [0-9]+"
+  "teams [a-z]+: team_ptr to rank 0, world PE [0-9]+, is [A-Za-z ]+. it is "
+  "teams [a-z]+: world PE 0 translates to rank -?[0-9]+, expected -?[0-9]+"
+  "teams [a-z]+: team_get_config gave num_contexts 0, expected 1"
+  "teams [a-z]+: a context of the team names another team"
+  "teams row: this PE's row rank [0-9]+ translates to column rank [0-9]+, expected [0-9]+")
+pacer_plant(teams-collective teams
+  "teams round=[0-9]+ row sum_reduce: element 0 is"
+  "teams round=[0-9]+ row max_reduce: element 0 is 1000,"
+  "teams round=[0-9]+ row min_reduce: element 0 is -1,"
+  "teams round=[0-9]+ row prod_reduce: element 0 is"
+  "teams round=[0-9]+ row and_reduce: element 0 is 0000000000000000,"
+  "teams round=[0-9]+ row or_reduce: element 0 is ffffffffffffffff,"
+  "teams round=[0-9]+ row xor_reduce: element 0 is"
+  "teams round=[0-9]+ row double_sum_reduce: element 0 is"
+  "teams round=[0-9]+ row broadcast: element 0 is"
+  "teams round=[0-9]+ row collect: element 0 is"
+  "teams round=[0-9]+ row fcollect: element [0-9]+ is"
+  "teams round=[0-9]+ row alltoall: element [0-9]+ is"
+  "teams round=[0-9]+ row sum_inscan: element 0 is"
+  "teams round=[0-9]+ row sum_exscan: element 0 is")
+pacer_plant(teams-member teams
+  "teams one: this PE is a member, and its handle is SHMEM_TEAM_INVALID")
+pacer_plant(teams-ring teams
+  "teams round=0 strided context: read back [0-9]+ from rank [0-9]+, not [0-9]+")
+# The atomics' seven: each family's check, on the first round of its family
+# - int for the first five, unsigned int for the bitwise two.
+pacer_plant(atomics-add atomics
+  "atomics round=0 add int default: slot [0-9]+ holds [0-9]+, expected [0-9]+")
+pacer_plant(atomics-fetch atomics
+  "atomics round=12 fetch_add int default: slot [0-9]+ handed out values summing to [0-9]+, not the [0-9]+ of its [0-9]+ increments"
+  "atomics round=12 fetch_add int default: slot [0-9]+ handed out values hashing to [0-9a-f]+, not [0-9a-f]+")
+pacer_plant(atomics-claim atomics
+  "atomics round=24 claim int default: the table holds 63 claims, not the 64 made"
+  "atomics round=24 claim int default: slot [0-9]+ of PE [0-9]+ holds [0-9]+, not this PE's claim [0-9]+")
+pacer_plant(atomics-swap atomics
+  "atomics round=36 swap int default: the tokens sum to [0-9]+, not the [0-9]+ they started at"
+  "atomics round=36 swap int default: the tokens hash to [0-9a-f]+, not the [0-9a-f]+ they started at")
+pacer_plant(atomics-set atomics
+  "atomics round=50 set_fetch int serialized: fetched [0-9]+ from slot 0 of PE [0-9]+, which this PE set to [0-9]+"
+  "atomics round=50 set_fetch int serialized: slot 0 holds [0-9]+, not the [0-9]+ PE 1 set")
+pacer_plant(atomics-bitwise atomics
+  "atomics round=64 bitwise uint private: after the xor pass slot [0-9]+ holds [0-9a-f]+, expected [0-9a-f]+")
+pacer_plant(atomics-fetched-bit atomics
+  "atomics round=64 bitwise uint private: fetch_or from slot [0-9]+ of PE [0-9]+ returned bit 1 clear, expected set")
+# The rma's six. The source PE 1 corrupts is read twice - by the next PE's
+# get and by its node-mate's loads through shmem_ptr - and both must see it.
+pacer_plant(rma-halo rma
+  "rma round=0 halo putmem atomic_add default: byte 4 of 8 from PE 1 is [0-9a-f]+, not [0-9a-f]+, when the flag said it had landed")
+pacer_plant(rma-put rma
+  "rma round=0 put_get float default put: byte 0, of element 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+")
+pacer_plant(rma-gap rma
+  "rma round=29 iput_iget float default put: byte 4, where no element lands, is 5a, not the canary")
+pacer_plant(rma-get rma
+  "rma round=0 put_get float default get: byte 0, of element 0 from PE 1, is [0-9a-f]+, not [0-9a-f]+"
+  "rma round=0 ptr: byte 0 loaded from node-mate PE 1's source is [0-9a-f]+, not [0-9a-f]+")
+pacer_plant(rma-get-gap rma
+  "rma round=29 iput_iget float default get: byte 4, where no element lands, is 5a, not the canary")
+pacer_plant(rma-ptr rma
+  "rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
+# The locks' two and the memory's five. The count stays one off once
+# planted, so every later checkpoint says so too; the first is asserted.
+pacer_plant(locks-count locks
+  "locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
+pacer_plant(locks-holder locks
+  "locks round=0 lock [0-9]+: PE -1 holds its home's holder word while this PE is in the section")
+pacer_plant(memory-free memory
+  "memory round=2 free: byte [0-9]+ of a block of [0-9]+ bytes is not what was written there")
+pacer_plant(memory-realloc memory
+  "memory round=0 realloc: of [0-9]+ bytes kept from [0-9]+, byte 0 is not what was written")
+pacer_plant(memory-refused memory
+  "memory round=0 realloc: a refused realloc left byte 0 of [0-9]+ not what was written")
+pacer_plant(memory-granted memory
+  "memory round=0 realloc: [0-9]+ bytes were granted, on a heap of far less")
+pacer_plant(memory-calloc memory
+  "memory round=0 calloc: byte [0-9]+ of [0-9]+ is 01, not zero")
+pacer_plant(memory-align memory
+  "memory round=0 align: a block of [0-9]+ bytes aligned to [0-9]+ is at an address 1 past a multiple of it")
+pacer_plant(memory-accessible memory
+  "memory round=0 [a-z_]+: a block of [0-9]+ bytes is accessible from this PE and not accessible from PE 2")
+pacer_plant(memory-agree memory
+  "memory round=0: the PEs' allocations differ, hashes from [0-9a-f]+ to [0-9a-f]+")
+# The collectives' four, each on the first case PE 1 takes part in.
+pacer_plant(collectives-reduce collectives
+  "collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
+# --fold-nodes: that failure, which every PE of the one host reports alike, is
+# labeled by the host's name - which ends in no bracket, as [0-3] would.
+pacer_plant_named(collectives-reduce-folded collectives-reduce "--fold-nodes;collectives"
+  "[-A-Za-z0-9_]+ collectives round=0 and_reduce uchar world: element 0 is 0, expected [0-9]+")
+pacer_plant(collectives-scan collectives
+  "collectives round=30 sum_inscan char world: element 0 is [0-9]+, expected [0-9]+")
+pacer_plant(collectives-data collectives
+  "collectives round=65 fcollect float world: byte [0-9]+ is [0-9a-f]+, not what was sent")
+pacer_plant(collectives-gap collectives
+  "collectives round=76 alltoalls int world: byte [0-9]+ is a5, where nothing lands")
+# The checks the first plants could not reach: a slot's count, the claim
+# budget, the halo's flag, p and g, a NULL shmem_ptr, a collective's status
+# and the timing sweep's two checks.
+pacer_plant(atomics-fetch-count atomics
+  "atomics round=12 fetch_add int default: slot [0-9]+ holds [0-9]+ after [0-9]+ increments, expected [0-9]+")
+pacer_plant(atomics-attempts atomics
+  "atomics round=24 claim int default: 1 of 16 claims after [0-9]+ attempts, in a table half empty"
+  "atomics round=24 claim int default: the table holds 49 claims, not the 64 made")
+pacer_plant(rma-flag rma
+  "rma round=0 halo atomic_add default: the flag reads 1, expected 2")
+pacer_plant(rma-single rma
+  "rma round=116 p_g float default put: element 0 from PE 1 is [0-9]+, not [0-9]+")
+pacer_plant(rma-ptr-null rma
+  "rma round=0 ptr: shmem_ptr to node-mate PE 0 is NULL")
+pacer_plant(collectives-status collectives
+  "collectives round=0 and_reduce uchar world: returned 1")
+pacer_plant(collectives-timed collectives
+  "collectives round=0 timed reduce world bytes=8: element 0 of 1 is [0-9]+, expected [0-9]+")
+pacer_plant(collectives-timed-data collectives
+  "collectives round=2 timed collect world bytes=8: byte 0 of block 1 is [0-9a-f]+, not what PE 1 sent")
+pacer_plant(teams-exhaust "teams;--teams-exhaust"
+  "teams exhaust: this PE made [0-9]+ teams before a split failed, another [0-9]+")
+# The renewal's and the exhaust's own check that the numbers come back: a
+# status misread fires each, with nothing else changed.
+pacer_plant(teams-renew teams
+  "teams round=[0-9]+ renew [a-z]+: a split returned 1: a number or a block was not given back")
+pacer_plant(teams-back "teams;--teams-exhaust"
+  "teams exhaust: a split of the whole team after the [0-9]+ teams made were destroyed returned 1: their numbers did not come back")
+pacer_plant(print-hash print
+  "print round=0 same: returned 2 lines, expected 1"
+  ".0,2-3. print round=0 parity: returned 3 lines, expected 2"
+  "print round=0 same: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this."
+  "osoe-pacer failures=[1-9]")
+pacer_plant(deprecated-reduce deprecated
+  "deprecated round=12 int_sum_to_all set=0:0:4: element 0 is [0-9]+.0i, expected [0-9]+.0i")
+pacer_plant(deprecated-data deprecated
+  "deprecated round=46 collect32 set=1:1:2: byte 0 is [0-9a-f]+, not [0-9a-f]+")
+pacer_plant(deprecated-outside deprecated
+  "deprecated round=45 broadcast64 set=0:1:2: byte 0 is a4, not a5, on a PE outside the set")
+pacer_plant(deprecated-barrier deprecated
+  "deprecated round=54 barrier set=1:1:2: the first member counted 1 arrivals when it returned, expected 2")
+pacer_plant(deprecated-amo deprecated
+  "deprecated round=56 int_set_fetch: returned [0-9]+, expected [0-9]+")
+pacer_plant(deprecated-word deprecated
+  "deprecated round=57 int_swap: the word holds [0-9]+ after PE 1's, expected [0-9]+")
+pacer_plant(deprecated-wait deprecated
+  "deprecated round=81 shmem_short_wait: the word from PE 1 holds [0-9]+, expected [0-9]+")
+pacer_plant(waits-value waits
+  "waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
+pacer_plant(waits-index waits
+  "waits round=24 int wait_until_any [a-z]+: returned index [0-3], which the status excludes")
+pacer_plant(waits-count waits
+  "waits round=36 int wait_until_some [a-z]+: returned [0-9]+ indices with [0-9]+ words left")
+pacer_plant(waits-excluded waits
+  "waits round=24 int wait_until_any [a-z]+: returned [0-9]+ with every word excluded, not SIZE_MAX")
+pacer_plant(rma-signal rma
+  "rma round=140 put_signal_get float default: the signal from PE 0 reads [0-9]+, expected [0-9]+")
+pacer_plant(print-route print
+  "print round=0 same, signal route: returned 2 lines, expected 1"
+  "print round=0 same, signal route: printed ..0,2-3. print round=0 same: every PE says this., expected ..0-3. print round=0 same: every PE says this.")
+pacer_plant(print-fold print
+  "print round=0 fold: pi-001,pi-002,pi-003,pi-004 folded to pi-.1-4., expected pi-.001-004."
+  "print round=0 fold: pi-004,pi-001,pi-002,pi-001 folded to pi-.1-2,4., expected pi-.001-002,004."
+  "print round=0 fold: pi-003,login,pi-001,gpu08,gpu07 folded to gpu.7-8.,login,pi-.1,3., expected gpu.07-08.,login,pi-.001,003.")
+# Plants fired inside mix periods, on PE 1's team: locks' in its first team
+# period, waits' in its fifth.
+pacer_plant_named(mix-locks-count locks-count mix
+  "mix1.3. locks round=0 lock [0-9]+: its count is [0-9]+, but it was taken [0-9]+ times")
+pacer_plant_named(mix-waits-value waits-value mix
+  "mix1.3. waits round=1 long wait_until ne: word 0 from PE 1 holds [0-9]+, expected [0-9]+")
+# And a plant that needs node-mates in a team: PE 1's, with node-mate PE 0 on
+# this map, only where the one team holds the whole job (--mix-teams 1; the
+# default teams {1,3} and {0,2} hold none), seen in the rma period.
+pacer_plant_named(mix-rma-ptr rma-ptr "--mix-teams;1;mix"
+  "mix0.0. rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
 
 # The installed program on one node, in both builds - the single-node build's
 # only way to it: installed under a prefix of its own, it finds the library

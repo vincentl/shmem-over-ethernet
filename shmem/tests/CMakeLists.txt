@@ -2368,6 +2368,34 @@ set_tests_properties(shmem.launcher.timeout-summary PROPERTIES LABELS "tier2" TI
     "osoe-launch: timeout after 3 s. killing 2 process[(]es[)] of job [0-9]+.*where job [0-9]+ waits, by osoe-stat --summary [0-9]+:.*node 0 .* world "
   FAIL_REGULAR_EXPRESSION "there is none beside this launcher")
 
+# Init reclaims leftovers of a job killed during init, and refuses an object
+# whose creator is alive (§6.2; review round two, D11, D15). On one node in both
+# builds (v0.2 step 1's adversarial read, item 4: the single-node build ran
+# none of the leftovers' tests), where the control segment is the only object a
+# start makes - a job of one node has no job tables and no connection area - and
+# on two below. See leftovers.sh, and creator-offset.c for where the live case
+# stores its pid. That case requires the job to end, the owner to be named, and
+# the owner's object to be there afterwards: a running process's to remove.
+# The two scripts below of what a start that never finished leaves,
+# start-leftovers.sh and restart-leftovers.sh, have no form for one node: they
+# are about those two objects. The control segment's leftovers have tests on one
+# node already, in both builds: the tombstone a refusing lead leaves, and a start
+# by the same ids that finds it (shmem.start-up.tombstone-gc and .same-ids).
+add_executable(shmem_test_creator-offset creator-offset.c)
+target_include_directories(shmem_test_creator-offset PRIVATE ../src ${PROJECT_SOURCE_DIR})
+osoe_warnings(shmem_test_creator-offset)
+add_test(NAME shmem.leftovers.reclaim.one-node
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init> reclaim $<TARGET_FILE:shmem_test_creator-offset>)
+set_tests_properties(shmem.leftovers.reclaim.one-node PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "reclaimed /dev/shm.*job exited 0.*with a name afterwards: 0")
+add_test(NAME shmem.leftovers.live.one-node
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
+          $<TARGET_FILE:shmem_test_init> live $<TARGET_FILE:shmem_test_creator-offset>)
+set_tests_properties(shmem.leftovers.live.one-node PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION
+    "job exited [1-9].*the refusal names the owner: yes.*with a name afterwards: 1")
+
 # internode: each of these launches a job of several nodes, here or in its script
 if(OSOE_INTERNODE)
   foreach(sig KILL TERM)
@@ -2393,7 +2421,9 @@ if(OSOE_INTERNODE)
   osoe_internode_label(shmem.kill-after-init.kept)
 
   # Init reclaims leftovers of a job killed during init, and refuses an object
-  # whose creator is alive (§6.2; review round two, D11, D15). See leftovers.sh.
+  # whose creator is alive (§6.2; review round two, D11, D15), on two nodes here
+  # with the job tables and connection area planted beside the control segment
+  # (on one node: above). See leftovers.sh.
   add_test(NAME shmem.leftovers.reclaim
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/leftovers.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_init> reclaim)
@@ -4860,6 +4890,11 @@ endforeach()
 if(OSOE_INTERNODE)
   # A lead that dies inside shmem_init, before any agent runs: its non-lead must
   # find it from init's own sweeps. See dead-pe-init.sh.
+  # No form for one node yet (T17): the window is the job's rendezvous, held open
+  # by a node that starts late while the non-lead waits on its lead (job.c,
+  # follow), and a job of one node has none - osoe_job_join returns at once. A
+  # window there would take a shim that holds some other step of init open, as
+  # slow-create.c holds a creation, or the test is struck: the author's choice.
   add_test(NAME shmem.dead-pe.lead-in-init
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe-init.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_dead-pe>)
