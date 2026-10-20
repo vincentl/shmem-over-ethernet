@@ -3,7 +3,7 @@
 A brief for the sessions that take osoe from round nine's merge to the 0.2 tag,
 written on 2026-10-11 from the author's direction of that day: **0.2 clears every
 open item - nothing is held "for after the release".** Read it whole, then
-`v0.2-open-items.md` beside it, which lists the 65 items by number; this brief
+`v0.2-open-items.md` beside it, which lists the 64 items by number; this brief
 says in what order to do them, how, on which machines, and what the author must
 decide first.
 
