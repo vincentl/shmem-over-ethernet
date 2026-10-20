@@ -4890,6 +4890,11 @@ endforeach()
 if(OSOE_INTERNODE)
   # A lead that dies inside shmem_init, before any agent runs: its non-lead must
   # find it from init's own sweeps. See dead-pe-init.sh.
+  # No form for one node yet (T17): the window is the job's rendezvous, held open
+  # by a node that starts late while the non-lead waits on its lead (job.c,
+  # follow), and a job of one node has none - osoe_job_join returns at once. A
+  # window there would take a shim that holds some other step of init open, as
+  # slow-create.c holds a creation, or the test is struck: the author's choice.
   add_test(NAME shmem.dead-pe.lead-in-init
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/dead-pe-init.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_dead-pe>)
