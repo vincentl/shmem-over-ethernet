@@ -116,6 +116,7 @@ enum pacer_plant {
     PACER_PLANT_WAITS_COUNT,        /* PE 1 misreads one count a _some form returned */
     PACER_PLANT_TEAMS_RENEW,        /* PE 1 misreads the status of one renewal's split */
     PACER_PLANT_TEAMS_BACK,         /* PE 1 misreads the status of the split after the exhaust */
+    PACER_PLANT_THREADS_PIECES,     /* PE 1 changes a word at the end of every large get's pieces */
     PACER_PLANTS
 };
 

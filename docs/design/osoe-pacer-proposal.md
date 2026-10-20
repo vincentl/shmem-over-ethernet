@@ -505,8 +505,19 @@ checked. Oracles as in the parent exercises, summed across threads. This is
 the exercise to leave running under `OSOE_CHECK_QUIET=1
 OSOE_TEST_PERTURB=1` in a debug build.
 
+Each thread's slice on each context includes one blocking get of 20 KiB -
+three pieces at the tests' landing zone of 8 KiB - from an array the next PE
+seeded once, into a buffer of the thread's own that is poisoned first and
+checked word by word, last word first. A blocking get's pieces go out
+together, and any thread of the PE that finds no room for its own copies a
+landed one out into the waiting thread's buffer: the library's newest
+protocol, which `shmem.multiple` alone held until the exercise had this get
+(round nine, C9-4: a get returning before a piece it counted was copied ran
+`mix` 60 s clean).
+
 Covers: `init_thread`, `query_thread`, `team_create_ctx`, `ctx_create`
-with each option, `ctx_session_*`, every `ctx_` RMA and AMO form.
+with each option, `ctx_session_*`, every `ctx_` RMA and AMO form, `getmem`
+of several pieces from several threads.
 
 ### 4.8 `locks`, `memory`, `collectives`
 
@@ -536,6 +547,13 @@ AMO storm into its members from another, a team is destroyed beside one in
 flight, and `parallel_print` runs on a team whose members are busy
 elsewhere. `--seconds` makes it a soak; the schedule prints in the header
 and repeats from the seed.
+
+A team is the PEs k, k+K, k+2K and so on, so what a team period moves between
+node-mates - stores through `shmem_ptr`, puts to a PE of the node - depends
+on the map: on a block map the PEs K apart share a node only while K is below
+the PEs a node has, and at the default K a team there holds none, so only the
+world's periods meet node-mates (the release review's pacer paragraph; T27).
+`--mix-teams 1` makes the team the whole job, whose every period does.
 
 ### 4.10 Optional: the deprecated forms
 

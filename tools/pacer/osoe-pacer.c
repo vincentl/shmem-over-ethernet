@@ -86,7 +86,8 @@ static const char *const plant_names[PACER_PLANTS] = {
     "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
     "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
     "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
-    "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back"
+    "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back",
+    "threads-pieces"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -97,7 +98,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
     "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
     "deprecated", "deprecated", "deprecated", "deprecated", "deprecated", "waits", "teams",
-    "teams"
+    "teams", "threads"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -171,6 +172,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 misreads one count a _some form returned",
     "PE 1 misreads the status of one renewal's split",
     "PE 1 misreads the status of the split that follows the exhaust's destroys",
+    "PE 1 changes a word at the end of every large get's pieces",
 };
 
 static void usage(FILE *out)
@@ -231,7 +233,10 @@ static void usage(FILE *out)
 "                      that destroying what it made gives the numbers back, and\n"
 "                      stops; teams must be the only exercise named\n"
 "  --mix-teams K       mix: the teams the world is split into, 1 to 6 (default\n"
-"                      4 from 8 PEs, 2 from 4, else 1)\n"
+"                      4 from 8 PEs, 2 from 4, else 1). A team is the PEs k,\n"
+"                      k+K, k+2K...: on a block map it holds node-mates only\n"
+"                      while K is below the PEs a node has, so 1 makes every\n"
+"                      team period store through shmem_ptr and put on a node\n"
 "  --period S          mix: a team period's mean length (default 10 seconds)\n"
 "  --fold-nodes        label a line by its hosts' names where it holds every PE\n"
 "                      of each: pi-[001-004] rather than [0-15]\n"
@@ -1056,6 +1061,14 @@ const char *pacer_prefix(void)
  * symmetric memory sized there - allocation is collective over the world
  * (§9.3) - and moved onto a period's team by its rebind, afresh, with the
  * period's own seed. Between periods, a world sync.
+ *
+ * A team is the PEs k, k+K, k+2K ... , so what a team period moves between
+ * node-mates - the stores through shmem_ptr, the puts to a PE of the node -
+ * depends on the map: on a block map (0,0,1,1) the PEs K apart are on one
+ * node only while K is below the PEs a node has, and at the default K
+ * (4 from 8 PEs, 2 from 4) a team there holds none, so that only the world's
+ * periods meet node-mates. --mix-teams 1 is the team of the whole job, whose
+ * every period meets them (T27: tools.pacer.mix-node-mates, plant mix-rma-ptr).
  */
 static const struct pacer_exercise *const mix_team_exercises[] = {
     &pacer_mailbox, &pacer_atomics, &pacer_rma, &pacer_locks, &pacer_collectives, &pacer_waits
