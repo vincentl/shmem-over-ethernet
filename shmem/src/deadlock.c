@@ -110,20 +110,15 @@ void osoe_wait_ends(void)
 /* ---- A node's sample -------------------------------------------------------- */
 
 /*
- * Whether thread `tid` of PE `s` is one of its node's progress helpers (v0.2
- * step 4, Part 3): threads of the lead's process, each naming itself in its
- * owner record (node.h, layout 36) before its first turn. One not yet named is
- * counted as the program's, and a sample that sees it awake fails, as it does
- * for any thread of the program's that runs.
+ * Whether thread `tid` of PE `s` is one of its node's backend threads - on AM
+ * its progress helpers (v0.2 step 4, Part 3) - threads of the lead's process,
+ * which the backend names (transport.h, backend_thread; P28). One not named
+ * yet is counted as the program's, and a sample that sees it awake fails, as
+ * it does for any thread of the program's that runs.
  */
 static bool progress_helper(const struct osoe_pe_slot *s, int32_t tid)
 {
-    if (s != &osoe.node.slots[0])
-        return false;
-    for (uint32_t o = 1; o < osoe.node.owner_count; o++)
-        if (atomic_load_explicit(&osoe.node.owner_metrics[o].tid, memory_order_acquire) == tid)
-            return true;
-    return false;
+    return s == &osoe.node.slots[0] && osoe_transport_agent_backend_thread(tid);
 }
 
 /*

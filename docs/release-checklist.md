@@ -359,9 +359,11 @@ rated them (round six's readiness Q5-5).
     locked-memory limit to the hard one, as it does for open files, the author
     decided on 2026-10-11, for the rings on Linux 6.14 and later: it does,
     zero copy on or off);
-  - the backend's own threads named to the deadlock detector through
-    `internode-backend.h`, not AM's owner records (readiness Q5-8), and each
-    owner's last pass shown with its age in `osoe-stat` (Q5-9);
+  - ~~the backend's own threads named to the deadlock detector through
+    `internode-backend.h`, not AM's owner records (readiness Q5-8)~~ - done
+    2026-10-20 (P28: `transport.h`'s `backend_thread`, which AM answers from its
+    owner records), and each owner's last pass shown with its age in
+    `osoe-stat` (Q5-9);
   - a lead with helpers writing a death twice, its agent's line and a helper's,
     and "this PE was not waiting in the library" said of a PE in
     `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are) -
