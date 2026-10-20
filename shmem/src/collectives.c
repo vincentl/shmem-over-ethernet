@@ -280,9 +280,10 @@ static struct osoe_symmetric_location split_words_at(const struct osoe_team *t)
     return at;
 }
 
-_Static_assert((OSOE_MAX_TEAMS_HIGHEST + 63) / 64 + 1 <=
+_Static_assert((OSOE_MAX_TEAMS_HIGHEST + 63) / 64 + 3 <=
                    OSOE_INTERNAL_SPLIT_LINES * OSOE_INTERNAL_LINE_BYTES / sizeof(uint64_t),
-               "a split's lines hold the largest free mask and its marks word");
+               "a split's lines hold the largest free mask, its marks word and its "
+               "arguments' word and inverse");
 
 uint64_t *osoe_team_split_words(const struct osoe_team *t)
 {

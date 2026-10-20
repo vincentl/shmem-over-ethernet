@@ -3654,6 +3654,35 @@ add_test(NAME shmem.team-split.stale-handle.L2
 set_tests_properties(shmem.team-split.stale-handle.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed. the number names another team since"
   FAIL_REGULAR_EXPRESSION "CHECK[(]")
+# A split whose PEs pass different arguments (P6): PE 1 another size, or
+# another xrange, than the rest - each valid on its own PE - ends the job by name
+# in the split's reduction, on one node and on two, where before PE 1 left the
+# team out and the others waited. Its pass the job's end, named, as the stale
+# handle's.
+foreach(case_expect
+    "divergent|start 0, stride 1 and size 4"
+    "divergent-2d|xrange 2")
+  string(REPLACE "|" ";" parts "${case_expect}")
+  list(GET parts 0 mode)
+  list(GET parts 1 passed)
+  foreach(map 0,0,0,0 0,0,1,1)
+    if(map STREQUAL "0,0,1,1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+      continue()
+    endif()
+    string(REPLACE "," "-" label "${map}")
+    add_test(NAME shmem.team-split.${mode}.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=${mode} SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_team-split>)
+    set_tests_properties(shmem.team-split.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "osoe: PE 0: shmem_team_split_[a-z2]+: the parent team's PEs called it with different arguments, which spec .*same on every PE. this PE passed ${passed}"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    if(map STREQUAL "0,0,1,1")
+      osoe_internode_label(shmem.team-split.${mode}.${label})
+    endif()
+  endforeach()
+endforeach()
+
 # A handle's generation past 32 bits (P5): eight splits under one number from
 # OSOE_TEST_TEAM_GENERATION=2^32 - 4, then the first handle, destroyed - its
 # end the stale handle's, named. At 32 bits the job ended at the fourth split.

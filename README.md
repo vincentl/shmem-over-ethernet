@@ -1277,6 +1277,9 @@ specification or takes a choice the specification leaves open.
   counts get wrong results with nothing said; given counts on either side of
   the line, they end the job by name or wait until the deadlock detector ends
   it.
+- **A team split is compared, by contrast**: every parent PE's start, stride
+  and size - or `xrange` - go into the split's reduction, and PEs that passed
+  others end the job by name, naming what each passed.
 - **Nor is a `shmem_malloc` that the PEs call with different sizes**, which the
   specification leaves undefined too: the next object then starts at another
   place on the PE that differed, puts to it land in the wrong place, and

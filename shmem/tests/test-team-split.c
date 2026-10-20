@@ -67,6 +67,9 @@
  *   2^32 (P5): the world again eight times under one number, its generation
  *   crossing 32 bits - every handle another, and the first, destroyed, still
  *   ending the job by name;
+ * - OSOE_TEST_SPLIT=divergent and divergent-2d (P6): PE 1 passing another
+ *   size, or another xrange, than the other PEs - undefined - ends the job by
+ *   name in the split's reduction, on every parent PE;
  * - OSOE_TEST_SPLIT=reuse: the world again, destroyed, and then a team of
  *   every PE but world PE 0, whose lead on PE 0's node is another PE: on that
  *   node the second team takes the first's block under another name, at
@@ -745,6 +748,26 @@ static void generations(void)
 }
 
 /*
+ * OSOE_TEST_SPLIT=divergent and divergent-2d (P6): the world split with PE 1
+ * passing a size one less than the other PEs' - or, in two dimensions, an
+ * xrange of 1 where the others pass 2 - which the specification leaves
+ * undefined. Every argument is valid on its own PE, so every PE reaches the
+ * split's reduction, which compares them and ends the job by name; before,
+ * PE 1 left the new team out of its view of it and the others waited.
+ */
+static void divergent(bool two_dimensions)
+{
+    shmem_team_t a = SHMEM_TEAM_INVALID, b = SHMEM_TEAM_INVALID;
+    shmem_barrier_all();
+    if (two_dimensions)
+        (void)shmem_team_split_2d(SHMEM_TEAM_WORLD, me == 1 ? 1 : 2, NULL, 0, &a, NULL, 0, &b);
+    else
+        (void)shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, me == 1 ? npes - 1 : npes, NULL,
+                                       0, &a);
+    CHECK(!"a split whose PEs passed different arguments returned");
+}
+
+/*
  * OSOE_TEST_SPLIT=reuse: the world again, its block on each node noted, then
  * destroyed; then every PE but world PE 0, whose lead on PE 0's node is the
  * node's next PE - so that, on a node of several PEs, the second team's name
@@ -847,6 +870,10 @@ int main(void)
         dry();
     } else if (mode && strcmp(mode, "stale-handle") == 0) {
         stale_handle();
+    } else if (mode && strcmp(mode, "divergent") == 0) {
+        divergent(false);
+    } else if (mode && strcmp(mode, "divergent-2d") == 0) {
+        divergent(true);
     } else if (mode && strcmp(mode, "generations") == 0) {
         generations();
     } else if (mode && strcmp(mode, "reuse") == 0) {

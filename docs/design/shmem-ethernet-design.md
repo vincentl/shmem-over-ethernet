@@ -5679,7 +5679,12 @@ on world PE 0 and the broadcast, in two lines of the parent number's words in
 the internal region (§5.8): every member of a team the call creates contributes
 its *free mask* - a bit for each number it holds no team under and under which
 no block is mapped in its own name on its node - and every other parent PE all
-ones, beside a word of marks written inverted so that the one AND carries them.
+ones, beside a word of marks written inverted so that the one AND carries them;
+and since P6 (2026-10-20) a word mixing the call's arguments that the
+specification requires to be the same on every PE (§9.4.6's start, stride and
+size, §9.4.7's xrange) and its inverse, every parent PE's alike: a bit some PE
+has and another has not is 0 in both ANDs, and the split ends the job by name
+on every parent PE, where PEs that passed others had waited or split apart.
 Every parent PE reads the same result: `split_strided` takes the lowest bit,
 `split_2d` the lowest for every row and the next for every column, since rows
 share no PE, nor columns. Before contributing, the would-be local lead of each
