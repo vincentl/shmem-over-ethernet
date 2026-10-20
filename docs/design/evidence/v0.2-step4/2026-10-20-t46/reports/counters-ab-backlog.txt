@@ -1,0 +1,59 @@
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts fast_retrans retrans attempt_fails listen_overflows listen_drops netem
+ab-backlog/run-01               0   1979   128    484 518    0   72    20       0       0       0       0       0       0              0                   0           0        0            1    3736            96                0            0     0
+ab-backlog/run-02               0   1793   128    396 424    0   70    20       0       0       0       0       0       0              0                   0           0        0            1    2947           704                0            0     0
+ab-backlog/run-03               0   1845   128    439 474    0   71    20       0       0       0       0       0       0              0                   0           0        0            0    2486           864                0            0     0
+ab-backlog/run-04               0   1760   128    399 440    0   71    18       0       0       0       0       0       0              0                   0           0        0            0    2833           320                0            0     0
+ab-backlog/run-05               0   1734   128    420 445    0   72    21       0       0       0       0       0       0              0                   0           0        0            0    3408          1152                0            0     0
+ab-backlog/run-06               0   1724   128    432 465    0   72    21       0       0       0       0       0       0              0                   0           0        0            1    2756            32                0            0     0
+
+ab-backlog/run-01: the slowest ten leads, node:ms: 46:518 80:517 45:516 21:515 54:515 28:512 99:512 52:512 94:511 121:509; median 484 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=16480 TcpAttemptFails=96 TcpExtDelayedACKLost=3735 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=3735 TcpExtTCPOFOQueue=1 TcpOutRsts=100 TcpPassiveOpens=16384 TcpRetransSegs=3736
+  arp_cache: allocs=16256 destroys=0 lookups=1057941 hits=518942 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,0 0,0 0,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+ab-backlog/run-02: the slowest ten leads, node:ms: 18:424 8:421 23:421 51:419 62:418 36:418 52:417 9:417 24:415 63:414; median 396 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=17087 TcpAttemptFails=704 TcpExtDelayedACKLost=2946 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=2946 TcpExtTCPOFOQueue=5 TcpOutRsts=709 TcpPassiveOpens=16383 TcpRetransSegs=2947
+  arp_cache: allocs=16256 destroys=0 lookups=1057420 hits=519830 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,0 0,0 0,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+ab-backlog/run-03: the slowest ten leads, node:ms: 2:474 83:472 3:472 82:470 84:467 37:466 23:464 10:464 7:463 98:462; median 439 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=17247 TcpAttemptFails=864 TcpExtDelayedACKLost=2485 TcpExtTCPLossProbes=2486 TcpOutRsts=869 TcpPassiveOpens=16385 TcpRetransSegs=2486
+  arp_cache: allocs=16256 destroys=0 lookups=1057550 hits=520724 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,0 0,0 0,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+ab-backlog/run-04: the slowest ten leads, node:ms: 56:440 50:440 70:440 53:439 43:437 35:435 29:435 63:433 39:433 42:432; median 399 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=16703 TcpAttemptFails=320 TcpExtDelayedACKLost=2833 TcpExtTCPLossProbes=2833 TcpOutRsts=320 TcpPassiveOpens=16383 TcpRetransSegs=2833
+  arp_cache: allocs=16256 destroys=0 lookups=1057290 hits=521731 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,0 0,0 0,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+ab-backlog/run-05: the slowest ten leads, node:ms: 0:445 55:442 58:442 35:440 72:440 100:439 65:438 34:437 120:437 30:437; median 420 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=17535 TcpAttemptFails=1152 TcpExtDelayedACKLost=3404 TcpExtTCPLossProbes=3408 TcpOutRsts=1158 TcpPassiveOpens=16383 TcpRetransSegs=3408
+  arp_cache: allocs=16256 destroys=0 lookups=1057680 hits=520415 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,0 0,0 0,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+ab-backlog/run-06: the slowest ten leads, node:ms: 22:465 67:463 47:462 14:460 0:459 17:457 38:457 35:457 26:455 66:455; median 432 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=16415 TcpAttemptFails=32 TcpExtDelayedACKLost=2756 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=2755 TcpExtTCPOFOQueue=4 TcpExtTCPSACKReorder=5 TcpExtTCPTSReorder=1 TcpOutRsts=34 TcpPassiveOpens=16384 TcpRetransSegs=2756
+  arp_cache: allocs=16256 destroys=0 lookups=1057290 hits=520627 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,0 0,0 0,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+The nodes of 6 runs, late or on time, against what moved in their namespaces:
+                                late, did  late, not on time, did on time, not
+TcpExtTCPSynRetrans > 0                 0          0            0          768
+TcpExtTCPTimeouts > 0                   0          0            0          768
+TcpRetransSegs > 0                      0          0          690           78
+TcpAttemptFails > 0                     0          0           98          670
+link0 tx_dropped > 0                    0          0            0          768
+link0 rx_dropped > 0                    0          0            0          768
+ListenOverflows or Drops > 0            0          0            0          768

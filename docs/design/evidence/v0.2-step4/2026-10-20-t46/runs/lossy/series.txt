@@ -1,0 +1,9 @@
+found: gc_thresh1=128 gc_thresh2=512 gc_thresh3=1024 netdev_max_backlog=1000
+set:   gc_thresh1=128 gc_thresh2=32768 gc_thresh3=65536 netdev_max_backlog=1000
+series: label=lossy shape=lossy nodes=128 runs=3 from=1 capture=0 backlog=default null=0 portloss=none static=0
+kernel: 6.12.95+deb13-cloud-arm64  cpus: 4  2026-10-19 23:26:24
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts retrans attempt_fails abandoned listen_overflows listen_drops netem
+lossy/run-01                    0  27848   128    538 1513   23   38    12     437       0     219     218     218     219              0                   0           5        6    3290          1655        38                0            0   422
+lossy/run-02                    0  20924   128    505 1500   21   39    12    1156       0       0    1156    1156       0              0                   0           2        2    4000          1057        31                0            0   407
+lossy/run-03                    0  24617   128    517 1642    9   38    13    2827       0      12    2679    2815      12              0                   0           2        4    3017           482        26                0            0   437
+series done 23:27:44; namespaces left behind: 0

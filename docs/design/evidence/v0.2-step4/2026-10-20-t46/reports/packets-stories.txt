@@ -1,0 +1,443 @@
+smoke/run-01: 1766 events, # total kept 1766 dropped 0
+arp request: 122 sent, 122 received, 0 sent and not received
+arp reply: 122 sent, 122 received, 0 sent and not received
+arp: 122 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 319 sent, 319 received; SYN-ACK 255 sent, 255 received; 130 RST frames
+tcp: 64 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 0 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 0 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+causes: none
+late leads: none
+late leads accounted for by a slow connection or ARP pair: 0 of 0
+
+capture/run-01: 98394 events, # total kept 98394 dropped 0
+arp request: 8142 sent, 8142 received, 0 sent and not received
+arp reply: 8142 sent, 8142 received, 0 sent and not received
+arp: 8142 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 16455 sent, 16455 received; SYN-ACK 16393 sent, 16385 received; 138 RST frames
+tcp: 64 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 8 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 8 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+connection 8:34264 -> 14:44105, never answered: the first SYN-ACK was lost in transit
+    syn sent at 231.0 (received 231.1)
+    syn-ack sent at 231.2 (NOT received)
+connection 8:34280 -> 14:44105, never answered: the first SYN-ACK was lost in transit
+    syn sent at 231.0 (received 231.1)
+    syn-ack sent at 231.2 (NOT received)
+connection 8:46618 -> 42:41481, never answered: the first SYN-ACK was lost in transit
+    syn sent at 231.0 (received 231.1)
+    syn-ack sent at 231.2 (NOT received)
+connection 8:46634 -> 42:41481, never answered: the first SYN-ACK was lost in transit
+    syn sent at 231.0 (received 231.1)
+    syn-ack sent at 231.2 (NOT received)
+connection 48:54522 -> 62:44589, never answered: the first SYN-ACK was lost in transit
+    syn sent at 422.7 (received 422.7)
+    syn-ack sent at 422.9 (NOT received)
+connection 48:54530 -> 62:44589, never answered: the first SYN-ACK was lost in transit
+    syn sent at 422.7 (received 422.7)
+    syn-ack sent at 422.9 (NOT received)
+connection 51:60410 -> 62:44589, answered after 1023.4 ms, too late: the caller had closed it and sent an RST: the first SYN-ACK was lost in transit
+    syn sent at 231.0 (received 231.1)
+    syn-ack sent at 231.2 (NOT received), 1254.2 (received 1254.4)
+connection 51:60414 -> 62:44589, answered after 1023.4 ms, too late: the caller had closed it and sent an RST: the first SYN-ACK was lost in transit
+    syn sent at 231.0 (received 231.1)
+    syn-ack sent at 231.2 (NOT received), 1254.2 (received 1254.4)
+redial: 8 -> 14:44105 from port 34264 at 231.0 ms, again from port 34290 999.4 ms later
+redial: 8 -> 14:44105 from port 34280 at 231.0 ms, again from port 34290 999.4 ms later
+redial: 8 -> 42:41481 from port 46618 at 231.0 ms, again from port 46648 999.4 ms later
+redial: 8 -> 42:41481 from port 46634 at 231.0 ms, again from port 46648 999.4 ms later
+redial: 51 -> 62:44589 from port 60410 at 231.0 ms, again from port 60430 999.4 ms later
+redial: 51 -> 62:44589 from port 60414 at 231.0 ms, again from port 60430 999.4 ms later
+redial: 48 -> 62:44589 from port 54522 at 422.7 ms, again from port 54544 1000.4 ms later
+redial: 48 -> 62:44589 from port 54530 at 422.7 ms, again from port 54544 1000.4 ms later
+causes: 8 x tcp: the first SYN-ACK was lost in transit
+late leads: 8 14 42 48 51 62
+  lead 8: 4 slow: 8->14 (the first SYN-ACK was lost in transit); 8->14 (the first SYN-ACK was lost in transit); 8->42 (the first SYN-ACK was lost in transit); 8->42 (the first SYN-ACK was lost in transit)
+  lead 14: 2 slow: 8->14 (the first SYN-ACK was lost in transit); 8->14 (the first SYN-ACK was lost in transit)
+  lead 42: 2 slow: 8->42 (the first SYN-ACK was lost in transit); 8->42 (the first SYN-ACK was lost in transit)
+  lead 48: 2 slow: 48->62 (the first SYN-ACK was lost in transit); 48->62 (the first SYN-ACK was lost in transit)
+  lead 51: 2 slow: 51->62 (the first SYN-ACK was lost in transit); 51->62 (the first SYN-ACK was lost in transit)
+  lead 62: 4 slow: 48->62 (the first SYN-ACK was lost in transit); 48->62 (the first SYN-ACK was lost in transit); 51->62 (the first SYN-ACK was lost in transit); 51->62 (the first SYN-ACK was lost in transit)
+late leads accounted for by a slow connection or ARP pair: 6 of 6
+
+capture/run-02: 99219 events, # total kept 99219 dropped 0
+arp request: 8134 sent, 8134 received, 0 sent and not received
+arp reply: 8134 sent, 8134 received, 0 sent and not received
+arp: 8134 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 16671 sent, 16671 received; SYN-ACK 16384 sent, 16383 received; 574 RST frames
+tcp: 287 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 1 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 1 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+connection 17:56460 -> 2:24713, never answered: the first SYN-ACK was lost in transit
+    syn sent at 3.2 (received 3.2)
+    syn-ack sent at 3.3 (NOT received)
+redial: 17 -> 2:24713 from port 56460 at 3.2 ms, again from port 45536 1010.1 ms later
+causes: 1 x tcp: the first SYN-ACK was lost in transit
+late leads: none
+late leads accounted for by a slow connection or ARP pair: 0 of 0
+
+capture/run-03: 99271 events, # total kept 99271 dropped 0
+arp request: 8138 sent, 8137 received, 1 sent and not received
+arp reply: 8137 sent, 8137 received, 0 sent and not received
+arp: 8138 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 16676 sent, 16674 received; SYN-ACK 16386 sent, 16384 received; 602 RST frames
+tcp: 288 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 4 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 4 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+connection 4:42580 -> 17:32949, never answered: the first SYN was lost in transit
+    syn sent at 253.8 (NOT received)
+    syn-ack sent at -
+connection 4:42592 -> 17:32949, never answered: the first SYN was lost in transit
+    syn sent at 253.8 (NOT received)
+    syn-ack sent at -
+connection 93:41928 -> 115:40233, never answered: the first SYN-ACK was lost in transit
+    syn sent at 93.5 (received 93.5)
+    syn-ack sent at 93.7 (NOT received)
+connection 93:41940 -> 115:40233, never answered: the first SYN-ACK was lost in transit
+    syn sent at 93.5 (received 93.5)
+    syn-ack sent at 93.7 (NOT received)
+redial: 93 -> 115:40233 from port 41928 at 93.5 ms, again from port 41954 1000.5 ms later
+redial: 93 -> 115:40233 from port 41940 at 93.5 ms, again from port 41954 1000.5 ms later
+redial: 4 -> 17:32949 from port 42580 at 253.8 ms, again from port 42604 1000.5 ms later
+redial: 4 -> 17:32949 from port 42592 at 253.8 ms, again from port 42604 1000.5 ms later
+causes: 2 x tcp: the first SYN was lost in transit; 2 x tcp: the first SYN-ACK was lost in transit
+late leads: 4 17 93 115
+  lead 4: 2 slow: 4->17 (the first SYN was lost in transit); 4->17 (the first SYN was lost in transit)
+  lead 17: 2 slow: 4->17 (the first SYN was lost in transit); 4->17 (the first SYN was lost in transit)
+  lead 93: 2 slow: 93->115 (the first SYN-ACK was lost in transit); 93->115 (the first SYN-ACK was lost in transit)
+  lead 115: 2 slow: 93->115 (the first SYN-ACK was lost in transit); 93->115 (the first SYN-ACK was lost in transit)
+late leads accounted for by a slow connection or ARP pair: 4 of 4
+
+capture/run-04: 103592 events, # total kept 103592 dropped 0
+arp request: 8135 sent, 8135 received, 0 sent and not received
+arp reply: 8135 sent, 8135 received, 0 sent and not received
+arp: 8135 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 17761 sent, 17761 received; SYN-ACK 16385 sent, 16385 received; 2760 RST frames
+tcp: 1376 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 0 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 0 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+causes: none
+late leads: none
+late leads accounted for by a slow connection or ARP pair: 0 of 0
+
+capture/run-05: 98869 events, # total kept 98869 dropped 0
+arp request: 8136 sent, 8135 received, 1 sent and not received
+arp reply: 8135 sent, 8135 received, 0 sent and not received
+arp: 8136 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 16578 sent, 16578 received; SYN-ACK 16386 sent, 16386 received; 400 RST frames
+tcp: 192 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 0 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 0 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+causes: none
+late leads: none
+late leads accounted for by a slow connection or ARP pair: 0 of 0
+
+capture/run-06: 101312 events, # total kept 101312 dropped 0
+arp request: 8142 sent, 8142 received, 0 sent and not received
+arp reply: 8142 sent, 8142 received, 0 sent and not received
+arp: 8142 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 17183 sent, 17183 received; SYN-ACK 16383 sent, 16383 received; 1612 RST frames
+tcp: 800 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 0 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 0 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+causes: none
+late leads: none
+late leads accounted for by a slow connection or ARP pair: 0 of 0
+
+capture/run-07: 100542 events, # total kept 100542 dropped 0
+arp request: 8131 sent, 8131 received, 0 sent and not received
+arp reply: 8131 sent, 8131 received, 0 sent and not received
+arp: 8131 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 16999 sent, 16999 received; SYN-ACK 16391 sent, 16391 received; 1238 RST frames
+tcp: 608 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 0 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 0 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+causes: none
+late leads: none
+late leads accounted for by a slow connection or ARP pair: 0 of 0
+
+capture/run-08: 100388 events, # total kept 100388 dropped 0
+arp request: 8136 sent, 8136 received, 0 sent and not received
+arp reply: 8136 sent, 8136 received, 0 sent and not received
+arp: 8136 pairs asked, 0 asked more than once, 0 took 200.0 ms or more to be resolved or never were
+tcp: SYN 16963 sent, 16961 received; SYN-ACK 16385 sent, 16383 received; 1152 RST frames
+tcp: 576 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 4 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 0 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 4 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+connection 55:34526 -> 81:44017, never answered: the first SYN-ACK was lost in transit
+    syn sent at 150.8 (received 150.8)
+    syn-ack sent at 150.9 (NOT received)
+connection 55:34532 -> 81:44017, never answered: the first SYN-ACK was lost in transit
+    syn sent at 150.8 (received 150.8)
+    syn-ack sent at 150.9 (NOT received)
+connection 109:55442 -> 37:38061, never answered: the first SYN was lost in transit
+    syn sent at 438.6 (NOT received)
+    syn-ack sent at -
+connection 109:55444 -> 37:38061, never answered: the first SYN was lost in transit
+    syn sent at 438.6 (NOT received)
+    syn-ack sent at -
+redial: 55 -> 81:44017 from port 34526 at 150.8 ms, again from port 34534 999.7 ms later
+redial: 55 -> 81:44017 from port 34532 at 150.8 ms, again from port 34534 999.7 ms later
+redial: 109 -> 37:38061 from port 55442 at 438.6 ms, again from port 55448 1000.5 ms later
+redial: 109 -> 37:38061 from port 55444 at 438.6 ms, again from port 55448 1000.5 ms later
+causes: 2 x tcp: the first SYN-ACK was lost in transit; 2 x tcp: the first SYN was lost in transit
+late leads: 37 55 81 109
+  lead 37: 2 slow: 109->37 (the first SYN was lost in transit); 109->37 (the first SYN was lost in transit)
+  lead 55: 2 slow: 55->81 (the first SYN-ACK was lost in transit); 55->81 (the first SYN-ACK was lost in transit)
+  lead 81: 2 slow: 55->81 (the first SYN-ACK was lost in transit); 55->81 (the first SYN-ACK was lost in transit)
+  lead 109: 2 slow: 109->37 (the first SYN was lost in transit); 109->37 (the first SYN was lost in transit)
+late leads accounted for by a slow connection or ARP pair: 4 of 4
+
+portloss/run-01: 126349 events, # total kept 126349 dropped 0
+arp request: 13798 sent, 13738 received, 60 sent and not received
+arp reply: 13738 sent, 13720 received, 18 sent and not received
+arp: 13721 pairs asked, 76 asked more than once, 22 took 200.0 ms or more to be resolved or never were
+tcp: SYN 17837 sent, 17834 received; SYN-ACK 16396 sent, 16390 received; 2898 RST frames
+tcp: 1439 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 8 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 33 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 8 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+connection 0:33424 -> 5:35093, never answered: the first SYN was lost in transit
+    syn sent at 1457.9 (NOT received)
+    syn-ack sent at -
+connection 5:50374 -> 63:44711, never answered: the first SYN-ACK was lost in transit
+    syn sent at 1274.9 (received 1275.0)
+    syn-ack sent at 1275.1 (NOT received)
+connection 5:57920 -> 47:45227, never answered: the first SYN-ACK was lost in transit
+    syn sent at 1193.4 (received 1193.5)
+    syn-ack sent at 1193.6 (NOT received)
+connection 51:36160 -> 70:34121, never answered: the first SYN was lost in transit
+    syn sent at 1261.5 (NOT received)
+    syn-ack sent at -
+connection 70:36516 -> 4:37737, never answered: the first SYN-ACK was lost in transit
+    syn sent at 1417.1 (received 1417.1)
+    syn-ack sent at 1417.3 (NOT received)
+connection 70:50310 -> 98:43401, never answered: the first SYN-ACK was lost in transit
+    syn sent at 1265.5 (received 1265.6)
+    syn-ack sent at 1265.7 (NOT received), 2295.8 (NOT received)
+connection 70:58168 -> 101:39595, never answered: the first SYN-ACK was lost in transit
+    syn sent at 1319.8 (received 1319.9)
+    syn-ack sent at 1320.0 (NOT received)
+connection 90:51420 -> 5:35093, never answered: the first SYN was lost in transit
+    syn sent at 1522.5 (NOT received)
+    syn-ack sent at -
+arp 7 -> 107: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.8 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 24 -> 110: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.4 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.2 (received 7513.2)
+arp 24 -> 126: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.7 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 27 -> 10: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.8 ms
+    requests sent at 6493.7 (NOT received), 7512.9 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 36 -> 10: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.9 ms
+    requests sent at 6493.7 (NOT received), 7512.9 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 37 -> 6: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.9 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 44 -> 5: resolved by the reply, the first request lost in transit, after 1014.2 ms
+    requests sent at 33.5 (NOT received), 1047.3 (received 1047.4)
+    replies sent at 1047.7 (received 1047.7)
+arp 61 -> 45: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.9 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 61 -> 46: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.5 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 69 -> 17: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.6 ms
+    requests sent at 6493.7 (NOT received), 7512.9 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 72 -> 55: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.2 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 75 -> 17: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.7 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 78 -> 50: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.3 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 97 -> 68: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.0 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.7)
+    replies sent at 7511.8 (received 7511.9)
+arp 97 -> 80: resolved by a request the target broadcast for another node, the first request lost in transit, after 249.7 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.2 (received 7513.2)
+arp 101 -> 53: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.0 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 114 -> 81: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.0 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 119 -> 93: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.3 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.7)
+    replies sent at 7511.9 (received 7511.9)
+arp 122 -> 103: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.0 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 124 -> 110: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.4 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+arp 125 -> 97: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.0 ms
+    requests sent at 6493.7 (NOT received), 7513.0 (received 7513.0)
+    replies sent at 7513.1 (received 7513.2)
+arp 125 -> 110: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.4 ms
+    requests sent at 6493.7 (NOT received), 7511.6 (received 7511.6)
+    replies sent at 7511.8 (received 7511.9)
+redial: 51 -> 70:34121 from port 36160 at 1261.5 ms, again from port 36174 1001.2 ms later
+redial: 5 -> 47:45227 from port 57920 at 1193.4 ms, again from port 57930 1000.4 ms later
+redial: 70 -> 98:43401 from port 50310 at 1265.5 ms, again from port 50320 1000.7 ms later
+redial: 5 -> 63:44711 from port 50374 at 1274.9 ms, again from port 50396 1000.5 ms later
+redial: 70 -> 101:39595 from port 58168 at 1319.8 ms, again from port 58174 1000.7 ms later
+redial: 70 -> 4:37737 from port 36516 at 1417.1 ms, again from port 36532 1000.8 ms later
+redial: 0 -> 5:35093 from port 33424 at 1457.9 ms, again from port 33444 1001.4 ms later
+redial: 90 -> 5:35093 from port 51420 at 1522.5 ms, again from port 51432 999.9 ms later
+causes: 21 x arp: resolved by a request the target broadcast for another node, the first request lost in transit; 5 x tcp: the first SYN-ACK was lost in transit; 3 x tcp: the first SYN was lost in transit; 1 x arp: resolved by the reply, the first request lost in transit
+late leads: 0 4 5 47 51 63 70 90 98 101
+  lead 0: 1 slow: 0->5 (the first SYN was lost in transit)
+  lead 4: 1 slow: 70->4 (the first SYN-ACK was lost in transit)
+  lead 5: 5 slow: 0->5 (the first SYN was lost in transit); 5->63 (the first SYN-ACK was lost in transit); 5->47 (the first SYN-ACK was lost in transit); 90->5 (the first SYN was lost in transit)
+  lead 47: 1 slow: 5->47 (the first SYN-ACK was lost in transit)
+  lead 51: 1 slow: 51->70 (the first SYN was lost in transit)
+  lead 63: 1 slow: 5->63 (the first SYN-ACK was lost in transit)
+  lead 70: 4 slow: 51->70 (the first SYN was lost in transit); 70->4 (the first SYN-ACK was lost in transit); 70->98 (the first SYN-ACK was lost in transit); 70->101 (the first SYN-ACK was lost in transit)
+  lead 90: 1 slow: 90->5 (the first SYN was lost in transit)
+  lead 98: 1 slow: 70->98 (the first SYN-ACK was lost in transit)
+  lead 101: 2 slow: 70->101 (the first SYN-ACK was lost in transit); arp 101->53 (resolved by a request the target broadcast for another node, the first request lost in transit)
+late leads accounted for by a slow connection or ARP pair: 10 of 10
+
+portloss/run-02: 124261 events, # total kept 124261 dropped 0
+arp request: 13795 sent, 13768 received, 27 sent and not received
+arp reply: 13768 sent, 13750 received, 18 sent and not received
+arp: 13750 pairs asked, 44 asked more than once, 17 took 200.0 ms or more to be resolved or never were
+tcp: SYN 17297 sent, 17288 received; SYN-ACK 16395 sent, 16390 received; 1810 RST frames
+tcp: 893 connections were refused with an RST; 0 sent their SYN more than once (same port, same sequence number); 14 took 200.0 ms or more from the first SYN to the SYN-ACK, or got none
+tcp: 7 connections sent their first SYN within 20 ms of a slow ARP resolution ending
+tcp: 11 dials made again from a new port 0.9 to 1.5 s after one no SYN-ACK answered
+connection 5:37658 -> 54:42053, never answered: the first SYN-ACK was lost in transit
+    syn sent at 3242.0 (received 3242.0)
+    syn-ack sent at 3242.1 (NOT received)
+connection 17:49262 -> 70:34445, never answered: the first SYN was lost in transit
+    syn sent at 3498.5 (NOT received)
+    syn-ack sent at -
+connection 26:60008 -> 70:34445, never answered: the first SYN was lost in transit
+    syn sent at 3402.2 (NOT received)
+    syn-ack sent at -
+connection 35:36888 -> 70:34445, never answered: the first SYN was lost in transit
+    syn sent at 3121.6 (NOT received)
+    syn-ack sent at -
+connection 41:35876 -> 5:25209, never answered: the first SYN was lost in transit
+    syn sent at 2025.9 (NOT received)
+    syn-ack sent at -
+connection 41:43146 -> 5:25366, never answered: the first SYN was lost in transit
+    syn sent at 1021.1 (NOT received)
+    syn-ack sent at -
+connection 41:58860 -> 5:21804, never answered: the first SYN was lost in transit
+    syn sent at 18.6 (NOT received)
+    syn-ack sent at -
+connection 56:48834 -> 70:34445, never answered: the first SYN was lost in transit
+    syn sent at 3177.4 (NOT received)
+    syn-ack sent at -
+connection 70:37180 -> 71:34589, never answered: the first SYN-ACK was lost in transit
+    syn sent at 3259.3 (received 3259.3)
+    syn-ack sent at 3259.5 (NOT received)
+connection 70:41172 -> 86:34319, never answered: the first SYN-ACK was lost in transit
+    syn sent at 3173.0 (received 3173.1)
+    syn-ack sent at 3173.2 (NOT received)
+connection 70:47594 -> 5:40243, never answered: the first SYN-ACK was lost in transit
+    syn sent at 3471.5 (received 3471.7)
+    syn-ack sent at 3471.8 (NOT received)
+connection 70:56616 -> 106:45969, never answered: the first SYN-ACK was lost in transit
+    syn sent at 3268.8 (received 3268.8)
+    syn-ack sent at 3269.0 (NOT received)
+connection 115:47700 -> 5:40243, never answered: the first SYN was lost in transit
+    syn sent at 3167.2 (NOT received)
+    syn-ack sent at -
+connection 122:40616 -> 5:40243, never answered: the first SYN was lost in transit
+    syn sent at 3417.5 (NOT received)
+    syn-ack sent at -
+arp 1 -> 114: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.2 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 4 -> 119: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.7 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 11 -> 124: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.7 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 18 -> 103: resolved by a request the target broadcast for another node, the first request lost in transit, after 254.3 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 36 -> 12: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.1 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 41 -> 118: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.7 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 41 -> 126: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.1 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 55 -> 42: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.9 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 59 -> 16: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.0 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 63 -> 61: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.4 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 65 -> 40: resolved by a request the target broadcast for another node, the first request lost in transit, after 254.4 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 70 -> 82: resolved by the reply, the first reply lost in transit, after 1017.2 ms
+    requests sent at 3572.1 (received 3572.1), 4588.9 (received 4589.0)
+    replies sent at 3572.3 (NOT received), 4589.3 (received 4589.3)
+arp 70 -> 102: resolved by the reply, the first reply lost in transit, after 1028.5 ms
+    requests sent at 3561.0 (received 3561.0), 4588.9 (received 4589.1)
+    replies sent at 3561.2 (NOT received), 4589.4 (received 4589.4)
+arp 74 -> 31: resolved by a request the target broadcast for another node, the first request lost in transit, after 250.6 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 95 -> 80: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.1 ms
+    requests sent at 8529.5 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 100 -> 72: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.0 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+arp 100 -> 79: resolved by a request the target broadcast for another node, the first request lost in transit, after 251.4 ms
+    requests sent at 8529.6 (NOT received), 9547.9 (received 9547.9)
+    replies sent at 9548.1 (received 9548.1)
+redial: 35 -> 70:34445 from port 36888 at 3121.6 ms, again from port 46364 1000.2 ms later
+redial: 115 -> 5:40243 from port 47700 at 3167.2 ms, again from port 59090 1000.5 ms later
+redial: 70 -> 86:34319 from port 41172 at 3173.0 ms, again from port 33962 1000.0 ms later
+redial: 56 -> 70:34445 from port 48834 at 3177.4 ms, again from port 38912 1000.1 ms later
+redial: 5 -> 54:42053 from port 37658 at 3242.0 ms, again from port 45384 1001.9 ms later
+redial: 70 -> 71:34589 from port 37180 at 3259.3 ms, again from port 55228 1000.3 ms later
+redial: 70 -> 106:45969 from port 56616 at 3268.8 ms, again from port 53968 1000.6 ms later
+redial: 26 -> 70:34445 from port 60008 at 3402.2 ms, again from port 43828 1000.5 ms later
+redial: 122 -> 5:40243 from port 40616 at 3417.5 ms, again from port 60026 1000.2 ms later
+redial: 70 -> 5:40243 from port 47594 at 3471.5 ms, again from port 36412 1000.1 ms later
+redial: 17 -> 70:34445 from port 49262 at 3498.5 ms, again from port 58700 1001.0 ms later
+causes: 15 x arp: resolved by a request the target broadcast for another node, the first request lost in transit; 9 x tcp: the first SYN was lost in transit; 5 x tcp: the first SYN-ACK was lost in transit; 2 x arp: resolved by the reply, the first reply lost in transit
+late leads: 2 5 17 26 35 54 56 70 71 82 86 87 100 102 106 115 122
+  lead 2: no slow connection or ARP pair of its own seen
+  lead 5: 7 slow: 5->54 (the first SYN-ACK was lost in transit); 41->5 (the first SYN was lost in transit); 41->5 (the first SYN was lost in transit); 41->5 (the first SYN was lost in transit)
+  lead 17: 1 slow: 17->70 (the first SYN was lost in transit)
+  lead 26: 1 slow: 26->70 (the first SYN was lost in transit)
+  lead 35: 1 slow: 35->70 (the first SYN was lost in transit)
+  lead 54: 1 slow: 5->54 (the first SYN-ACK was lost in transit)
+  lead 56: 1 slow: 56->70 (the first SYN was lost in transit)
+  lead 70: 10 slow: 17->70 (the first SYN was lost in transit); 26->70 (the first SYN was lost in transit); 35->70 (the first SYN was lost in transit); 56->70 (the first SYN was lost in transit)
+  lead 71: 1 slow: 70->71 (the first SYN-ACK was lost in transit)
+  lead 82: 1 slow: arp 70->82 (resolved by the reply, the first reply lost in transit)
+  lead 86: 1 slow: 70->86 (the first SYN-ACK was lost in transit)
+  lead 87: no slow connection or ARP pair of its own seen
+  lead 100: 2 slow: arp 100->72 (resolved by a request the target broadcast for another node, the first request lost in transit); arp 100->79 (resolved by a request the target broadcast for another node, the first request lost in transit)
+  lead 102: 1 slow: arp 70->102 (resolved by the reply, the first reply lost in transit)
+  lead 106: 1 slow: 70->106 (the first SYN-ACK was lost in transit)
+  lead 115: 1 slow: 115->5 (the first SYN was lost in transit)
+  lead 122: 1 slow: 122->5 (the first SYN was lost in transit)
+late leads accounted for by a slow connection or ARP pair: 15 of 17
+

@@ -1,0 +1,8 @@
+found: gc_thresh1=128 gc_thresh2=512 gc_thresh3=1024 netdev_max_backlog=1000
+set:   gc_thresh1=128 gc_thresh2=32768 gc_thresh3=65536 netdev_max_backlog=1000
+series: label=portloss shape=pi nodes=128 runs=2 from=1 capture=1 backlog=default null=0 portloss=5:2%,70:2% static=0
+kernel: 6.12.95+deb13-cloud-arm64  cpus: 4  2026-10-19 23:27:44
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts retrans attempt_fails abandoned listen_overflows listen_drops netem
+portloss/run-01                 0  19870   128    501 1400    6   39    13    1111       0      14    1097    1097      14              0                   0           1        8    3736          1440         8                0            0     0
+portloss/run-02                 0  23942   128    512 1505    7   38    13    4613       0       0    4553    4613       0              0                   0           0        4    3771           896        14                0            0     0
+series done 23:28:37; namespaces left behind: 0

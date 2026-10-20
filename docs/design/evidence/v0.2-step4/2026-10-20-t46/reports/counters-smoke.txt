@@ -1,0 +1,19 @@
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts fast_retrans retrans attempt_fails listen_overflows listen_drops netem
+smoke/run-01                    0   2413    16     29  38    0   26     4       0       5       0       0       0       0              0                   0           0        0            2       3            64                0            0     0
+
+smoke/run-01: the slowest ten leads, node:ms: 8:38 3:35 0:34 12:32 7:31 4:31 9:30 13:30 2:28 10:24; median 29 ms
+  late (median + 400 ms or more): 0 leads
+  summed over the nodes: TcpActiveOpens=319 TcpAttemptFails=64 TcpExtDelayedACKLost=2 TcpExtTCPFastRetrans=2 TcpExtTCPLossProbes=1 TcpExtTCPOFOQueue=3 TcpExtTCPSACKReorder=1 TcpOutRsts=65 TcpPassiveOpens=256 TcpRetransSegs=3
+  arp_cache: allocs=241 destroys=0 lookups=2196 hits=927 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 0,1 0,2 0,1 0,1
+  neighbour entries after, node 0: {"complete": 15, "incomplete": 0}
+
+The nodes of 1 runs, late or on time, against what moved in their namespaces:
+                                late, did  late, not on time, did on time, not
+TcpExtTCPSynRetrans > 0                 0          0            0           16
+TcpExtTCPTimeouts > 0                   0          0            0           16
+TcpRetransSegs > 0                      0          0            2           14
+TcpAttemptFails > 0                     0          0            2           14
+link0 tx_dropped > 0                    0          0            0           16
+link0 rx_dropped > 0                    0          0            0           16
+ListenOverflows or Drops > 0            0          0            0           16

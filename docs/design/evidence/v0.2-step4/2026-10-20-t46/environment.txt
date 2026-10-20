@@ -1,0 +1,50 @@
+plan started 2026-10-19 23:23:24 on lima-osoe
+Linux lima-osoe 6.12.95+deb13-cloud-arm64 #1 SMP Debian 6.12.95-1 (2026-07-04) aarch64 GNU/Linux
+CPU(s):                                  4
+Model name:                              -
+Thread(s) per core:                      1
+Core(s) per cluster:                     4
+Socket(s):                               -
+               total        used        free      shared  buff/cache   available
+Mem:            7939        3604        3612        2532        3520        4335
+Swap:              0           0           0
+ 23:23:24 up 25 days, 18:59,  1 user,  load average: 1.85, 4.76, 6.35
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0      0 3699072  53288 3551288    0    0     4     7 4630   29  9  2 86  2  0  0
+ 0  0      0 3699020  53288 3551240    0    0     0     0  241  347  0  0 100  0  0  0
+ 0  0      0 3699020  53288 3551240    0    0     0     0   51   31  0  0 100  0  0  0
+CONFIG_HZ=250
+CONFIG_NF_CONNTRACK=m
+CONFIG_BRIDGE=m
+CONFIG_NET_SCH_NETEM=m
+CONFIG_RPS=y
+CONFIG_VETH=m
+ip: ip utility, iproute2-6.15.0, libbpf 1.5.0  tc: tc utility, iproute2-6.15.0, libbpf 1.5.0  python: Python 3.13.5
+net.ipv4.neigh.default.gc_thresh1 = 128
+net.ipv4.neigh.default.gc_thresh2 = 512
+net.ipv4.neigh.default.gc_thresh3 = 1024
+net.ipv4.neigh.default.gc_interval = 30
+net.ipv4.neigh.default.retrans_time_ms = 1000
+net.ipv4.neigh.default.mcast_solicit = 3
+net.ipv4.neigh.default.unres_qlen_bytes = 212992
+net.ipv4.neigh.default.proxy_qlen = 64
+net.core.netdev_max_backlog = 1000
+net.core.netdev_budget = 300
+net.core.netdev_budget_usecs = 8000
+net.core.dev_weight = 64
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 512
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_syn_retries = 6
+net.ipv4.tcp_synack_retries = 5
+net.ipv4.ip_local_port_range = 32768	60999
+net.ipv4.conf.all.arp_ignore = 0
+net.ipv4.conf.all.arp_accept = 0
+net.ipv4.conf.default.arp_accept = 0
+dmesg tail:
+[2179417.934462] port1: left promiscuous mode
+[2179417.934497] bridge: port 2(port1) entered disabled state
+[2179417.936505] port0: left allmulticast mode
+[2179417.936515] port0: left promiscuous mode
+[2179417.936531] bridge: port 1(port0) entered disabled state

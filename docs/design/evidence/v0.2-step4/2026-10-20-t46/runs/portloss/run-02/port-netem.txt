@@ -1,0 +1,8 @@
+port5, loss 2%:
+qdisc netem fbf4: root refcnt 5 limit 1000 loss 2% seed 1318681321574408775
+ Sent 1054068 bytes 14908 pkt (dropped 307, overlimits 0 requeues 0) 
+ backlog 0b 0p requeues 0
+port70, loss 2%:
+qdisc netem fbf5: root refcnt 5 limit 1000 loss 2% seed 8831494399963477180
+ Sent 628208 bytes 11308 pkt (dropped 231, overlimits 0 requeues 0) 
+ backlog 0b 0p requeues 0
