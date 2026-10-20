@@ -129,6 +129,28 @@ count.
 
 ## 1. Setup
 
+**First, wait for the machines' own start - by systemd's state, not by `ps`.**
+On the author's machines (his Terraform, `scratch/main.tf`, outside the tree)
+each machine runs a startup script at boot that installs the packages below
+but `linux-perf`, sets the TCP settings §2 records, and shares `/shared` from
+the head node by NFS, which the kit does not use. On 2026-10-20 it took 2.5 to
+3.6 minutes on every machine, all nine done within four minutes of the head
+node's boot. Until it is done, `apt-get` here fails on dpkg's lock. From the
+head node, a machine is ready when its line says `ActiveState=inactive` and
+`Result=success`; `activating` is still running, and another `Result` failed:
+
+```sh
+{ hostname -s; cat NODES; } | while read m; do echo "$m: $(ssh -n -o StrictHostKeyChecking=accept-new $m \
+    systemctl show -p ActiveState -p Result -p ExecMainExitTimestamp google-startup-scripts.service |
+    paste -sd' ' -)"; done
+```
+
+Not by `pgrep -f` on the script's name: a pattern given through `ssh` or
+`bash -c` is in that shell's own command line, which `pgrep -f` matches, so
+the check says "running" for ever. That waited nine minutes of the second
+session's window on two machines whose scripts had finished. A wait that
+passes its expected time is checked by another means before it goes on.
+
 The kit is this file's directory, `docs/fast-link/`. On the first node, which
 also runs Slurm's controller - or on a head node off the list, which runs the
 controller, the builds and the lead's `ssh` so that no measured node does - as a
@@ -137,7 +159,7 @@ user with `sudo`:
 ```sh
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential cmake pkg-config \
-    liburing-dev git rsync ethtool iperf3
+    liburing-dev git rsync ethtool iperf3 linux-perf
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends slurm-wlm munge
 ```
 
@@ -153,7 +175,7 @@ with the plugin removed alone it still did (round nine's review, R2):
 ```sh
 for n in $(grep -vxF "$(hostname -s)" NODES); do ssh -o StrictHostKeyChecking=accept-new $n \
     "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-     build-essential cmake pkg-config liburing-dev rsync ethtool iperf3 &&
+     build-essential cmake pkg-config liburing-dev rsync ethtool iperf3 linux-perf &&
      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
      slurm-wlm munge"; done
 ```
