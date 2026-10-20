@@ -1277,6 +1277,9 @@ specification or takes a choice the specification leaves open.
   counts get wrong results with nothing said; given counts on either side of
   the line, they end the job by name or wait until the deadlock detector ends
   it.
+- **A team split is compared, by contrast**: every parent PE's start, stride
+  and size - or `xrange` - go into the split's reduction, and PEs that passed
+  others end the job by name, naming what each passed.
 - **Nor is a `shmem_malloc` that the PEs call with different sizes**, which the
   specification leaves undefined too: the next object then starts at another
   place on the PE that differed, puts to it land in the wrong place, and
@@ -1734,6 +1737,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_TEST_MESH_HOLD` | `NODE:MS`: node `NODE`'s lead reaches its mesh `MS` milliseconds late, `1` to `60000`, its callers waiting in its listener's backlog meanwhile - the schedule's late lead (`shmem.mesh.hold`). Refused by name when it names no node of the job or no time. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_PRINT_LINK` | `1`: rank 0 prints the link it measured at the end of `shmem_init`, as the three `OSOE_LINK_*` settings that pin it, so that a test that failed on the shapes that link chose can be run again on them; nothing where the link is set by hand, the shape is `fixed` or the job has one node. Every test of more than one node in the suite sets it. Refused by name when it is not `0` or `1`. |
+| `OSOE_TEST_TEAM_GENERATION` | A whole number: every team number a PE may create is taken as if that many times already, so that a test crosses a team handle's 2^32nd generation in a few splits (`shmem.team-split.generations`). Each PE's own; refused by name above the most generations a handle can carry, about 2^45 at the most team numbers. |
 | `OSOE_WIRE_UNSENT_BYTES` | About the most the kernel may hold unsent on a connection's data wire, which its puts and gets go by (a control wire keeps the system's own): `0` leaves the system's own (`net.ipv4.tcp_notsent_lowat`, no limit by default); otherwise taken as given, however small, up to `1073741824`. Unset, the link's bandwidth times 128 µs, at least 16 KiB - 16 KiB on a gigabit - set at the end of `shmem_init` from the link, measured or set. `OSOE_COLLECTIVE_SHAPE=fixed` measures none, so there it is 16 KiB on any link unless the three `OSOE_LINK_*` give the bandwidth - less than the rule gives a link faster than a gigabit. Uncapped, as at v0.2 step 3, a fetch-add behind a put stream on the Pi cluster waited 17 to 20 ms; at 16 KiB, 3.3 to 3.9 ms, the stream at line rate either way. |
 | `OSOE_WIRE_SPLIT`, `OSOE_WIRE_SEED` | A rate per 10,000 at which sends and receives are cut short, and the seed that makes a failing pattern repeat. |
 

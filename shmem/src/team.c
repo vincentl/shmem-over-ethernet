@@ -130,6 +130,7 @@
 #include "allocator.h"
 #include "barrier.h"
 #include "base/deadline.h"
+#include "base/environment.h"
 #include "base/futex.h"
 #include "base/sweep.h"
 #include "blocked.h"
@@ -177,6 +178,9 @@ static uint32_t numbered_count;
  */
 static struct osoe_team *created;
 static uint32_t created_count;
+/* The most generations a created team's handle can carry (handle_of), from
+ * where the array lies: about 2^45 takes of one number at the most numbers. */
+static uint64_t generation_most;
 
 /*
  * The numbers this PE holds (D1): bit t set from the moment a split agrees t
@@ -568,9 +572,8 @@ static void take_number(struct osoe_team *t)
  * generation times the array's size - an address past the array's end once
  * the number has been taken twice, never dereferenced, and never 0, 1 or 2,
  * the predefined handles, being at least the array's own. The arithmetic is on
- * integers: osoe runs on 64-bit address spaces, where a generation's 32 bits
- * times an array of at most 1,021 descriptors stays below 2^63 past any heap
- * address.
+ * integers: osoe runs on 64-bit address spaces, and a generation is at most
+ * generation_most, so that the sum stays below 2^64 for every descriptor.
  */
 static shmem_team_t handle_of(const struct osoe_team *t)
 {
@@ -597,7 +600,8 @@ static uint32_t created_number(shmem_team_t team, uint64_t *generation)
  * (osoe_team_of). The number stays held until the caller gives it back. */
 static void forget(struct osoe_team *t)
 {
-    uint32_t number = t->number, generation = t->generation;
+    uint32_t number = t->number;
+    uint64_t generation = t->generation;
     atomic_store_explicit(&numbered[number], NULL, memory_order_release);
     free((void *)t->local_ids);
     free((void *)t->local_ranks);
@@ -623,6 +627,18 @@ void osoe_team_start(void)
     pending = calloc(numbered_count, sizeof *pending);
     if (!numbered || !created || !held || !pending)
         osoe_fatal("out of memory for %u teams", numbered_count);
+    generation_most = (UINTPTR_MAX - (uintptr_t)(created + created_count)) /
+                      ((uintptr_t)created_count * sizeof *created);
+    /* OSOE_TEST_TEAM_GENERATION (P5): every created number taken that many
+     * times already, so that a test crosses 2^32 in a few splits. */
+    uint64_t start = 0;
+    if (osoe_environment_u64("OSOE_TEST_TEAM_GENERATION", &start) == OSOE_ENVIRONMENT_INVALID ||
+        start >= generation_most)
+        osoe_fatal("OSOE_TEST_TEAM_GENERATION='%s' is not a generation from 0 to %llu",
+                   getenv("OSOE_TEST_TEAM_GENERATION"),
+                   (unsigned long long)generation_most - 1);
+    for (uint32_t i = 0; i < created_count; i++)
+        created[i].generation = start;
     for (uint32_t number = 0; number < OSOE_PREDEFINED_TEAMS; number++)
         atomic_fetch_or_explicit(&held[number / 64], UINT64_C(1) << (number % 64),
                                  memory_order_seq_cst);
@@ -1147,10 +1163,10 @@ static void unshape(struct membership *m)
 static struct osoe_team *finish(struct membership *m, uint32_t number)
 {
     struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
-    uint32_t generation = t->generation;
-    if (generation == UINT32_MAX)
-        osoe_fatal("this PE has taken team number %u %u times, every generation a handle can "
-                   "name", number, generation);
+    uint64_t generation = t->generation;
+    if (generation >= generation_most)
+        osoe_fatal("this PE has taken team number %u %llu times, every generation a handle can "
+                   "name", number, (unsigned long long)generation);
     *t = m->shape;
     t->number = number;
     t->generation = generation + 1;
@@ -1338,6 +1354,36 @@ static void numbers_used_up(const char *routine, uint32_t numbers)
 }
 
 /*
+ * What a split's caller passed that the specification requires every parent
+ * PE to pass alike (§9.4.6's start, stride and size, §9.4.7's xrange; not the
+ * configurations, which it does not): a word mixing them, which the split's
+ * reduction compares with its inverse, so that PEs that passed others end the
+ * job by name rather than wait or split apart (P6) - and the words for the
+ * message, each PE's own.
+ */
+struct split_arguments {
+    uint64_t word;
+    const char *section;
+    char text[64];
+};
+
+/* A word of the kind of split and up to three of its arguments, any one of
+ * which changing changes it but once in 2^64: splitmix64's finalizer, a
+ * part at a time. */
+static uint64_t arguments_word(uint64_t kind, int a, int b, int c)
+{
+    const uint64_t parts[] = { kind, (uint32_t)a, (uint32_t)b, (uint32_t)c };
+    uint64_t h = 0;
+    for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {
+        h += parts[i] + UINT64_C(0x9e3779b97f4a7c15);
+        h = (h ^ (h >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        h = (h ^ (h >> 27)) * UINT64_C(0x94d049bb133111eb);
+        h ^= h >> 31;
+    }
+    return h;
+}
+
+/*
  * The protocol of the file's comment, from step 2, over parent `parent` for a
  * call agreeing `numbers` numbers - split_strided's one, split_2d's two - of
  * whose teams this PE sees `mine`: split_strided's one, split_2d's row and
@@ -1346,7 +1392,8 @@ static void numbers_used_up(const char *routine, uint32_t numbers)
  * parent PE reads their results alike, and so runs as many.
  */
 static int split(const char *routine, struct osoe_team *parent, uint32_t numbers,
-                 struct membership *mine, uint32_t mine_count)
+                 struct membership *mine, uint32_t mine_count,
+                 const struct split_arguments *arguments)
 {
     osoe_count(OSOE_C_SHMEM_TEAM_SPLIT_CALLS, 1);
     bool member = false;
@@ -1392,7 +1439,16 @@ static int split(const char *routine, struct osoe_team *parent, uint32_t numbers
             marks = round == 0 || osoe_node_team_returning(&osoe.node) ? MARK_NOT_DRY
                                                                          : MARK_NOT_BUSY;
         words[mask_words] = marks | (concurrent ? 0 : MARK_NOT_CONCURRENT);
-        osoe_team_split_and(routine, parent, mask_words + 1);
+        words[mask_words + 1] = arguments->word;
+        words[mask_words + 2] = ~arguments->word;
+        osoe_team_split_and(routine, parent, mask_words + 3);
+        /* Every parent PE reads the same AND, and so ends here alike: a bit of
+         * the arguments' word that some PE has and another has not is 0 in
+         * both the word's AND and its inverse's (P6). */
+        if ((words[mask_words + 1] | words[mask_words + 2]) != UINT64_MAX)
+            osoe_fatal("%s: the parent team's PEs called it with different arguments, which "
+                       "spec %s requires to be the same on every PE; this PE passed %s",
+                       routine, arguments->section, arguments->text);
         marks = words[mask_words];
         if (!(marks & MARK_NOT_BUSY)) {
             osoe_count(OSOE_C_SHMEM_TEAM_SPLIT_BUSY_ROUNDS, 1);
@@ -1506,7 +1562,10 @@ OSOE_API int pshmem_team_split_strided(shmem_team_t parent_team, int start, int 
         .handle = new_team,
     };
     m.member = is_member(&m.ranks, parent->me);
-    return split(routine, parent, 1, &m, 1);
+    struct split_arguments arguments = { arguments_word(1, start, stride, size), "§9.4.6", "" };
+    snprintf(arguments.text, sizeof arguments.text, "start %d, stride %d and size %d", start,
+             stride, size);
+    return split(routine, parent, 1, &m, 1, &arguments);
 }
 
 /*
@@ -1548,7 +1607,9 @@ OSOE_API int pshmem_team_split_2d(shmem_team_t parent_team, int xrange,
           .ranks = { x, columns, (members - x + columns - 1) / columns },
           .num_contexts = y_contexts, .handle = yaxis_team },
     };
-    return split(routine, parent, 2, m, 2);
+    struct split_arguments arguments = { arguments_word(2, xrange, 0, 0), "§9.4.7", "" };
+    snprintf(arguments.text, sizeof arguments.text, "xrange %d", xrange);
+    return split(routine, parent, 2, m, 2, &arguments);
 }
 
 /*

@@ -176,8 +176,10 @@ struct osoe_team {
      * one it holds now counted: a created team's handle carries it (team.c,
      * osoe_team_of), so that a handle of a destroyed team never names the
      * team holding its number since. Not the block's generation (node.h),
-     * which is the node's and counts every team the block has held. */
-    uint32_t generation;
+     * which is the node's and counts every team the block has held. 64 bits
+     * (P5): 32 ended the job at the 2^32nd take of one number, which a program
+     * splitting and destroying in a loop reaches in hours. */
+    uint64_t generation;
     /* This node's block for the team (node.h): since step D a block of the
      * node's pool, found through the map by the team's name - its local lead's
      * local id here and its number - after the split's sync; the predefined

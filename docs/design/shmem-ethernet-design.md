@@ -5679,7 +5679,12 @@ on world PE 0 and the broadcast, in two lines of the parent number's words in
 the internal region (§5.8): every member of a team the call creates contributes
 its *free mask* - a bit for each number it holds no team under and under which
 no block is mapped in its own name on its node - and every other parent PE all
-ones, beside a word of marks written inverted so that the one AND carries them.
+ones, beside a word of marks written inverted so that the one AND carries them;
+and since P6 (2026-10-20) a word mixing the call's arguments that the
+specification requires to be the same on every PE (§9.4.6's start, stride and
+size, §9.4.7's xrange) and its inverse, every parent PE's alike: a bit some PE
+has and another has not is 0 in both ANDs, and the split ends the job by name
+on every parent PE, where PEs that passed others had waited or split apart.
 Every parent PE reads the same result: `split_strided` takes the lowest bit,
 `split_2d` the lowest for every row and the next for every column, since rows
 share no PE, nor columns. Before contributing, the would-be local lead of each
@@ -5745,7 +5750,9 @@ descriptor's generation - how many times the PE has taken the number - times
 the size of the process's pool of descriptors, an integer never dereferenced,
 recovered by division, and accepted while the descriptor is live at that
 generation; a handle of a destroyed team is named as such, the more so when its
-number names another team since. **Under `SHMEM_THREAD_MULTIPLE`** (D7;
+number names another team since. The generation is 64 bits since P5
+(2026-10-20), bounded by what the sum can carry below 2^64 - about 2^45 takes
+of one number - where 32 ended the job at the 2^32nd. **Under `SHMEM_THREAD_MULTIPLE`** (D7;
 `tools/modelcheck/split_numbers_model.py`) a PE's free mask is one resource,
 which two splits' reductions can read at once and agree the same number from.
 Nothing is held across the split's first reduction, which waits for every
