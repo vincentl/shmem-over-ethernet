@@ -86,7 +86,8 @@ static const char *const plant_names[PACER_PLANTS] = {
     "collectives-timed", "collectives-timed-data", "memory-granted", "print-fold", "print-route",
     "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
     "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
-    "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back"
+    "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back",
+    "threads-pieces"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -97,7 +98,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
     "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
     "deprecated", "deprecated", "deprecated", "deprecated", "deprecated", "waits", "teams",
-    "teams"
+    "teams", "threads"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -171,6 +172,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 misreads one count a _some form returned",
     "PE 1 misreads the status of one renewal's split",
     "PE 1 misreads the status of the split that follows the exhaust's destroys",
+    "PE 1 changes a word at the end of every large get's pieces",
 };
 
 static void usage(FILE *out)

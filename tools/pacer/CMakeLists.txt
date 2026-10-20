@@ -312,13 +312,23 @@ if(OSOE_INTERNODE)
     pacer_plant(mailbox-round-trip mailbox
       "mailbox round=0 round_trip ping from PE 1: signal 2, expected 1"
       "mailbox round=0 round_trip ping from PE 1: 1 of 4 words wrong. the first, word 2, is [0-9a-f]+")
-    # threads' three and teams' three; the exhaust plant needs its mode.
+    # threads' four and teams' three; the exhaust plant needs its mode.
     pacer_plant(threads-row threads
       "threads round=0 private row: thread 0 read back word 3 as [0-9a-f]+, not [0-9a-f]+")
     pacer_plant(threads-table threads
       "threads round=0 [a-z]+ table: thread [0-9]+ got word 5 of PE 1's row [0-9]+ as [0-9a-f]+")
     pacer_plant(threads-count threads
       "threads round=0 counter [0-9]+: holds [0-9]+, and [0-9]+ were added")
+    # The large get's check: one word of the array PE 0 reads, the last that
+    # any worker's get covers and one the get's last piece delivers, is wrong,
+    # and each of PE 0's 4 workers' gets of it, on each of the 4 contexts in
+    # each of the 8 quick slices, finds exactly that one word: 128 failures.
+    # (A checkpoint keeps only its first 8 failure lines, and a worker reaches
+    # the private context first, so that is the one line named; the count says
+    # that no other context's get went unchecked.)
+    pacer_plant(threads-pieces threads
+      "threads round=0 private pieces: thread [0-9]+ read 1 of 2560 words of PE 1's array wrong, words [0-9]+ to [0-9]+ of the get, the last [0-9a-f]+, not [0-9a-f]+"
+      "osoe-pacer failures=128 ")
     pacer_plant(teams-query teams
       "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+"
       "teams [a-z]+: rank 0 translates to world PE [0-9]+, expected [0-9]+"

@@ -20,6 +20,17 @@
  *              back: a quiet on a shared context must complete this thread's
  *              puts whatever the others issue and quiet meanwhile, the
  *              promise OSOE_CHECK_QUIET checks inside the library;
+ *   a large    one blocking get of LARGE_WORDS words - 20 KiB, three pieces at
+ *   get        the tests' landing zone of 8 KiB (OSOE_GET_LANDING_BYTES) - of
+ *              an array the next PE wrote once, from a start of this thread's
+ *              own, into a buffer of its own, poisoned first and checked word
+ *              by word, the last word first. A blocking get's pieces go out
+ *              together, and any thread of the PE that finds no room for its
+ *              own copies a landed one out, into the waiting thread's buffer:
+ *              a get that returns before that copy is done - a piece counted
+ *              before it is copied - shows as stale words at the buffer's end
+ *              (the adversarial read of v0.2's blocking gets, C9-4: `mix` ran
+ *              60 s clean with that defect built in);
  *   a table    nonblocking gets of a table the next PE wrote once, completed
  *              by one quiet, checked word by word;
  *   counters   fetch-adds on counters spread over every PE, each thread
@@ -44,7 +55,14 @@
 #include "exercise.h"
 #include "random.h"
 
-enum { ROW = 16, TABLE = 16, GETS = 4, COUNTERS = 8, ADDS = 4, CONTEXTS = 4 };
+/* LARGE_WORDS longs are 20 KiB: three pieces at a landing zone of 8 KiB, as
+ * shmem.multiple's blocking get of several pieces is. A worker's start in the
+ * array is LARGE_STARTS of its own, moving one word a slice, so that no two
+ * workers of a slice read the same words and a piece copied into another
+ * thread's buffer reads wrong there. OPERATIONS is a slice's on one context:
+ * two puts, the row's get, the large get, the table's gets, the adds. */
+enum { ROW = 16, TABLE = 16, GETS = 4, COUNTERS = 8, ADDS = 4, CONTEXTS = 4,
+       LARGE_WORDS = 2560, LARGE_STARTS = 8, OPERATIONS = 4 + GETS + ADDS };
 enum kind { PRIVATE, SERIALIZED, DEFAULT, TEAM };
 static const char *const context_names[CONTEXTS] = { "private", "serialized", "default", "team" };
 static const char *const phase_names[] = { "private", "serialized", "default", "team", NULL };
@@ -54,6 +72,7 @@ struct worker {
     int index;
     shmem_ctx_t own[2];             /* private, serialized */
     uint64_t *added;                /* [n][COUNTERS]: what this thread added where */
+    uint64_t *large_buffer;         /* [LARGE_WORDS]: where its large get lands */
     double operations, seconds[CONTEXTS];
     int failed_to_start;
 };
@@ -62,7 +81,7 @@ static struct {
     /* the plan */
     int count;                      /* T */
     uint64_t seed;
-    int plant_row, plant_table, plant_count;
+    int plant_row, plant_table, plant_count, plant_pieces;
     /* the team, and the world reversed for the team context */
     shmem_team_t team, reversed;
     shmem_ctx_t team_context;
@@ -76,9 +95,11 @@ static struct {
     uint64_t *rows;                 /* [T][CONTEXTS][ROW], written by the previous PE */
     uint64_t *rows_back;            /* the same, written by the next PE */
     uint64_t *table;                /* [T][TABLE], written once */
+    uint64_t *large;                /* [LARGE_WORDS + T * LARGE_STARTS], written once */
     uint64_t *counters;             /* [COUNTERS] */
     uint64_t *reduce_source, *reduce_total;   /* [n][COUNTERS] */
     /* private */
+    uint64_t *large_expected;       /* the next PE's `large`, as it wrote it */
     uint64_t *added;                /* [n][COUNTERS], every thread's since the start */
     struct worker *workers;
     pthread_mutex_t lock;
@@ -91,8 +112,10 @@ static uint64_t threads_memory(int npes, const struct pacer_options *options, ch
                                size_t size)
 {
     uint64_t n = (uint64_t)npes, t = (uint64_t)options->threads;
-    uint64_t symmetric = 8 * (2 * t * CONTEXTS * ROW + t * TABLE + COUNTERS + 2 * n * COUNTERS);
-    uint64_t private_bytes = 8 * (t + 1) * n * COUNTERS + 8 * n;
+    uint64_t large = 8 * (LARGE_WORDS + t * LARGE_STARTS);  /* the array, and its mirror here */
+    uint64_t symmetric = 8 * (2 * t * CONTEXTS * ROW + t * TABLE + COUNTERS + 2 * n * COUNTERS) +
+                         large;
+    uint64_t private_bytes = 8 * (t + 1) * n * COUNTERS + 8 * n + large + 8 * t * LARGE_WORDS;
     if (symmetric > options->memory || private_bytes > options->memory) {
         snprintf(fields, size, "%d threads on %d PEs need %llu bytes", options->threads, npes,
                  (unsigned long long)(symmetric > private_bytes ? symmetric : private_bytes));
@@ -103,8 +126,10 @@ static uint64_t threads_memory(int npes, const struct pacer_options *options, ch
     threads.plant_row = options->plant == PACER_PLANT_THREADS_ROW;
     threads.plant_table = options->plant == PACER_PLANT_THREADS_TABLE;
     threads.plant_count = options->plant == PACER_PLANT_THREADS_COUNT;
-    snprintf(fields, size, "threads=%d contexts=private,serialized,default,team row=%d gets=%d "
-             "counters=%d", threads.count, ROW * 8, GETS, COUNTERS);
+    threads.plant_pieces = options->plant == PACER_PLANT_THREADS_PIECES;
+    snprintf(fields, size, "threads=%d contexts=private,serialized,default,team row=%d "
+             "large_get=%d gets=%d counters=%d", threads.count, ROW * 8, LARGE_WORDS * 8, GETS,
+             COUNTERS);
     return symmetric;
 }
 
@@ -121,7 +146,49 @@ static uint64_t row_word(int pe, int thread, int context, long slice, int i)
                       ((uint64_t)slice << 8) | (uint64_t)i);
 }
 
+static uint64_t large_word(int pe, size_t i)
+{
+    return random_mix(threads.seed ^ random_name("pieces"), (uint64_t)pe, (uint64_t)i, 0);
+}
+
 /* ---- one slice of one worker, on one context -------------------------------- */
+
+/*
+ * The large get: LARGE_WORDS words of the next PE's array into this worker's
+ * buffer, from a start of its own for the slice, on the default context by
+ * both spellings in turn and on the others by the context form. The buffer is
+ * poisoned first, so that a word the get did not deliver cannot pass for one
+ * it did, and checked from its last word back against the mirror of what the
+ * next PE wrote - not words made on the spot, which would cost the time that
+ * a get returning too early leaves the check: a piece another thread copies
+ * out is counted last, and the buffer's end is where a get that returns before
+ * the copy is done has not been written yet.
+ */
+static void large_get(struct worker *w, enum kind k, shmem_ctx_t ctx, int next, long slice)
+{
+    size_t start = (size_t)w->index * LARGE_STARTS + (size_t)(slice % LARGE_STARTS);
+    uint64_t *buffer = w->large_buffer;
+    memset(buffer, 0xa5, sizeof *buffer * LARGE_WORDS);
+    if (k == DEFAULT && slice % 2)
+        shmem_getmem(buffer, threads.large + start, sizeof *buffer * LARGE_WORDS,
+                     threads.next_world);
+    else
+        shmem_ctx_getmem(ctx, buffer, threads.large + start, sizeof *buffer * LARGE_WORDS, next);
+    const uint64_t *expected = threads.large_expected + start;
+    size_t wrong = 0, lowest = 0, highest = 0;
+    for (size_t i = LARGE_WORDS; i-- > 0;)
+        if (buffer[i] != expected[i]) {
+            if (wrong++ == 0)
+                highest = i;
+            lowest = i;
+        }
+    if (wrong)
+        pacer_failure("threads round=%ld %s pieces: thread %d read %zu of %d words of PE %d's "
+                      "array wrong, words %zu to %zu of the get, the last %016llx, not %016llx",
+                      slice, context_names[k], w->index, wrong, LARGE_WORDS, threads.next_world,
+                      lowest, highest, (unsigned long long)buffer[highest],
+                      (unsigned long long)expected[highest]);
+}
 
 static void on_context(struct worker *w, enum kind k, shmem_ctx_t ctx, long slice,
                        uint64_t *state)
@@ -159,6 +226,11 @@ static void on_context(struct worker *w, enum kind k, shmem_ctx_t ctx, long slic
             break;
         }
 
+    /* The large get: a blocking get of several pieces, whose landed pieces any
+     * thread of the PE may copy out into this one's buffer - one whose own
+     * issue, the table's gets below among them, finds no room in the zone. */
+    large_get(w, k, ctx, next, slice);
+
     /* The table: several nonblocking gets, one quiet. The table never changes,
      * so what lands is cleared first: a get the quiet left in flight must not
      * pass on the last slice's words. */
@@ -194,7 +266,7 @@ static void on_context(struct worker *w, enum kind k, shmem_ctx_t ctx, long slic
         }
         w->added[(size_t)target * COUNTERS + (size_t)counter] += amount;
     }
-    w->operations += 3 + GETS + ADDS;
+    w->operations += (double)OPERATIONS;
     w->seconds[k] += pacer_now() - started;
 }
 
@@ -202,7 +274,7 @@ static void slice_of(struct worker *w, long slice)
 {
     uint64_t state = random_mix(threads.seed, random_name("threads"),
                                 (uint64_t)threads.me_world, ((uint64_t)w->index << 40) | (uint64_t)slice);
-    shmem_ctx_session_config_t config = { .total_ops = 3 + GETS + ADDS };
+    shmem_ctx_session_config_t config = { .total_ops = OPERATIONS };
     shmem_ctx_session_start(w->own[0], SHMEM_CTX_SESSION_BATCH, &config,
                             SHMEM_CTX_SESSION_TOTAL_OPS);
     on_context(w, PRIVATE, w->own[0], slice, &state);
@@ -278,19 +350,30 @@ static int threads_setup(shmem_team_t team, const struct pacer_options *options)
     threads.rows = shmem_calloc(rows, sizeof *threads.rows);
     threads.rows_back = shmem_calloc(rows, sizeof *threads.rows_back);
     threads.table = shmem_malloc(sizeof *threads.table * (size_t)t * TABLE);
+    size_t large_words = LARGE_WORDS + (size_t)t * LARGE_STARTS;
+    threads.large = shmem_malloc(sizeof *threads.large * large_words);
+    threads.large_expected = malloc(sizeof *threads.large_expected * large_words);
     threads.counters = shmem_calloc(COUNTERS, sizeof *threads.counters);
     threads.reduce_source = shmem_malloc(sizeof *threads.reduce_source * (size_t)n * COUNTERS);
     threads.reduce_total = shmem_malloc(sizeof *threads.reduce_total * (size_t)n * COUNTERS);
-    if (!threads.rows || !threads.rows_back || !threads.table || !threads.counters ||
-        !threads.reduce_source || !threads.reduce_total)
+    if (!threads.rows || !threads.rows_back || !threads.table || !threads.large ||
+        !threads.large_expected || !threads.counters || !threads.reduce_source ||
+        !threads.reduce_total)
         return -1;
     for (int th = 0; th < t; th++)
         for (int i = 0; i < TABLE; i++)
             threads.table[(size_t)th * TABLE + i] = table_word(threads.me_world, th, i);
     if (threads.plant_table && threads.me_world == 1)
         threads.table[5] ^= 1;      /* the planted defect: one word of the table */
+    for (size_t i = 0; i < large_words; i++) {
+        threads.large[i] = large_word(threads.me_world, i);
+        threads.large_expected[i] = large_word(threads.next_world, i);
+    }
+    if (threads.plant_pieces && threads.me_world == 1)
+        threads.large[LARGE_WORDS - 1] ^= 1;    /* the planted defect: a word at the end of
+                                                 * every large get's last piece */
     shmem_quiet();
-    shmem_team_sync(team);          /* every table written before any worker reads one */
+    shmem_team_sync(team);          /* every array written before any worker reads one */
 
     pthread_mutex_init(&threads.lock, NULL);
     pthread_cond_init(&threads.start, NULL);
@@ -301,7 +384,8 @@ static int threads_setup(shmem_team_t team, const struct pacer_options *options)
         struct worker *w = &threads.workers[th];
         w->index = th;
         w->added = calloc((size_t)n * COUNTERS, sizeof *w->added);
-        if (!w->added || pthread_create(&w->thread, NULL, worker_main, w) != 0)
+        w->large_buffer = malloc(sizeof *w->large_buffer * LARGE_WORDS);
+        if (!w->added || !w->large_buffer || pthread_create(&w->thread, NULL, worker_main, w) != 0)
             return -1;
     }
     return 0;
@@ -369,6 +453,7 @@ static void threads_teardown(void)
     pthread_mutex_unlock(&threads.lock);
     for (int th = 0; th < threads.count; th++) {
         pthread_join(threads.workers[th].thread, NULL);
+        free(threads.workers[th].large_buffer);
         free(threads.workers[th].added);
     }
     pthread_cond_destroy(&threads.done);
@@ -381,10 +466,12 @@ static void threads_teardown(void)
     shmem_free(threads.reduce_total);
     shmem_free(threads.reduce_source);
     shmem_free(threads.counters);
+    shmem_free(threads.large);
     shmem_free(threads.table);
     shmem_free(threads.rows_back);
     shmem_free(threads.rows);
     free(threads.workers);
+    free(threads.large_expected);
     free(threads.added);
     free(threads.reversed_of);
     free(threads.world);
