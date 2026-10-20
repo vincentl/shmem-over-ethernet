@@ -717,18 +717,21 @@ or return in the same bitmap word moves it to a word chosen by the claiming
 PE's local id, where before it tried the top word again - so that leads
 claiming at once spread over the pool. Its contention needs many PEs claiming
 at once on one node, which four vCPUs do not make; this times it before and
-after, on the list's first node alone. `claims` (`claims.c`): every PE splits
-`SHMEM_TEAM_SELF` - a team of its own, which it leads on its node and so
-claims a block for - `KEEP` times at a start PE 0 sets 2 ms ahead, so that the
-claims begin together rather than as a barrier lets the PEs go, 1,000 times;
-it prints the last PE's splits done after the start and a split's time a
-claim, each the job's median and percentiles. The tree before the change
-(`BEFORE`, `821a6dfb`) is written by `git archive`, so this runs where the
-checkout has its `.git`, as §16 does, and built on the first node with
-`claims.c` compiled by its own `oshcc`; then 16, 32 and 64 PEs, one, two and
-four a vCPU, at one and at eight blocks a PE, the two builds in another order
-each round, three rounds: 36 jobs of a few seconds, and the build, about ten
-minutes.
+after, on the list's first node alone. `claims` (`claims.c`): each PE makes a
+team of its own - OpenSHMEM 1.5 has none, so its row of a split of the world
+with rows of one PE (`shmem_team_split_2d`, an `xrange` of 1) - and then every
+PE splits its own `KEEP` times, a split whose parent is itself and whose new
+team it leads, and so claims a block for, at a start PE 0 sets 2 ms ahead, so
+that the claims begin together rather than as a barrier lets the PEs go, 1,000
+times; it prints the last PE's splits done after the start and a split's time,
+each the job's median and percentiles. A split of a team of one took about a
+microsecond in the development VM, so the claim is most of what is shared. The
+tree before the change (`BEFORE`, `821a6dfb`) is written by `git archive`, so
+this runs where the checkout has its `.git`, as §16 does, and built on the
+first node with `claims.c` compiled by its own `oshcc`; then 16, 32 and 64 PEs,
+one, two and four a vCPU, at one and at eight blocks a PE, the two builds in
+another order each round, three rounds: 36 jobs of a few seconds, and the
+build, about ten minutes.
 
 ## 19. The link's measurement on two and three nodes (H14)
 

@@ -1,18 +1,22 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 /*
  * Leads claiming team blocks at once (docs/fast-link.md, §18; P9 of
- * docs/prompts/v0.2-open-items.md). Every PE splits SHMEM_TEAM_SELF KEEP times
- * - a team of its own, which it leads on its node, and so claims a block of
- * the node's pool for (node.c, osoe_node_team_claim) - all of a node's PEs at
- * once, ITERATIONS times, and destroys them between iterations. Before P9 every
- * claim tried the pool's top word first and again after each lost swap; since,
- * a lost swap moves it to a word chosen by the PE's local id.
+ * docs/prompts/v0.2-open-items.md). OpenSHMEM 1.5 has no team of one PE, so
+ * each PE first makes its own, its row of a split of the world in two
+ * dimensions with rows of one PE (shmem_team_split_2d, xrange 1). Then every
+ * PE splits its own team of one KEEP times - a split whose parent is itself,
+ * and whose new team it leads on its node and so claims a block of the
+ * node's pool for (node.c, osoe_node_team_claim) - all of a node's PEs at
+ * once, ITERATIONS times, the teams destroyed between iterations. Before P9
+ * every claim tried the pool's top word first and again after each lost swap;
+ * since, a lost swap moves it to a word chosen by the PE's local id.
  *
  * Each iteration starts at a time PE 0 sets 2 ms ahead, which every PE waits
  * for by the clock, so that the splits begin together and not in the order a
  * barrier lets the PEs go. A PE's time is from that start to its last split's
  * return; an iteration's, the last PE's. PE 0 prints the median and the 90th
- * percentile of the iterations' times, and of every PE's split time a claim.
+ * percentile of the iterations' times, and percentiles of every PE's time a
+ * split.
  *
  * usage: claims ITERATIONS KEEP
  */
@@ -22,7 +26,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-enum { KEEP_MOST = 64 };
+enum { KEEP_MOST = 8 };   /* 576 of a default pool's 1,021 blocks at 64 PEs */
 
 static double now(void)
 {
@@ -63,7 +67,13 @@ int main(int argc, char **argv)
         fprintf(stderr, "claims: PE %d: no room for %ld iterations\n", me, iterations);
         shmem_global_exit(1);
     }
-    shmem_team_t teams[KEEP_MOST];
+    shmem_team_t alone, column, teams[KEEP_MOST];
+    if (shmem_team_split_2d(SHMEM_TEAM_WORLD, 1, NULL, 0, &alone, NULL, 0, &column) != 0 ||
+        alone == SHMEM_TEAM_INVALID) {
+        fprintf(stderr, "claims: PE %d: no team of its own\n", me);
+        shmem_global_exit(1);
+    }
+    shmem_team_destroy(column);
     for (long i = 0; i < iterations; i++) {
         if (me == 0)
             start = now() + 0.002;
@@ -73,7 +83,7 @@ int main(int argc, char **argv)
             ;
         double t0 = now();
         for (int k = 0; k < keep; k++)
-            if (shmem_team_split_strided(SHMEM_TEAM_SELF, 0, 1, 1, NULL, 0, &teams[k]) != 0 ||
+            if (shmem_team_split_strided(alone, 0, 1, 1, NULL, 0, &teams[k]) != 0 ||
                 teams[k] == SHMEM_TEAM_INVALID) {
                 fprintf(stderr, "claims: PE %d: split %d of iteration %ld failed\n", me, k, i);
                 shmem_global_exit(1);
@@ -101,6 +111,7 @@ int main(int argc, char **argv)
                at(splits, all, 0.99) * 1e6);
     }
     shmem_barrier_all();
+    shmem_team_destroy(alone);
     shmem_free(splits);
     shmem_free(last);
     shmem_free(ends);

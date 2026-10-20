@@ -2,15 +2,16 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # docs/fast-link.md §18: P9's timing (docs/prompts/v0.2-open-items.md) - leads
 # claiming team blocks of one node's pool at once, before P9's change and after
-# it. Every PE of one node splits SHMEM_TEAM_SELF KEEP times at a start PE 0
-# sets, and so claims KEEP blocks (claims.c), ITERATIONS times. BEFORE is the
-# commit the change was built on: its tree is written into TREES/BEFORE by git
-# archive from this checkout, which needs its .git, copied to the list's first
-# node unless this is it, and built there alone, as trees.sh builds Part 0's,
-# with claims.c compiled by that tree's own oshcc; BUILD=0 takes the tree TREES
-# holds, built, and BEFORE empty runs the kit's build alone. Then on the first
-# node, at each count of PES_PER_NODE and each of KEEPS, the builds in another
-# order each round, ROUNDS rounds; each case's files carry "before" or "after".
+# it. Every PE of one node splits a team of its own KEEP times at a start PE 0
+# sets, and so claims KEEP blocks, one a new team it leads (claims.c),
+# ITERATIONS times. BEFORE is the commit the change was built on: its tree is
+# written into TREES/BEFORE by git archive from this checkout, which needs its
+# .git, copied to the list's first node unless this is it, and built there
+# alone, as trees.sh builds Part 0's, with claims.c compiled by that tree's own
+# oshcc; BUILD=0 takes the tree TREES holds, built, and BEFORE empty runs the
+# kit's build alone. Then on the first node, at each count of PES_PER_NODE and
+# each of KEEPS, the builds in another order each round, ROUNDS rounds; each
+# case's files carry "before" or "after".
 #   BEFORE (821a6dfb), TREES (build/trees under the repository), BUILD (1),
 #   ROUNDS (3), PES_PER_NODE ("16 32 64"), KEEPS ("1 8"), ITERATIONS (1000)
 # usage: claims.sh NODES OUTDIR
