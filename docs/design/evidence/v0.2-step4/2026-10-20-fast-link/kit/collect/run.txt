@@ -1,0 +1,49 @@
+# 2026-10-20T02:02:47Z collect.sh on slurm-controller
+# kit 992979725c567de53409df6c579534451cd62368
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+02:02:48 exit 0 places-totals-pes8-r1.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:49 exit 0 places-members-pes8-r1.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:50 exit 0 places-link-pes8-r1.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:51 exit 0 places-exchange-pes8-r1.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:52 exit 0 places-scan-pes8-r1.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:53 exit 0 places-totals-pes16-r1.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:54 exit 0 places-members-pes16-r1.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:55 exit 0 places-link-pes16-r1.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:56 exit 0 places-exchange-pes16-r1.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:57 exit 0 places-scan-pes16-r1.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:58 exit 0 places-totals-pes32-r1.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:02:59 exit 0 places-members-pes32-r1.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:00 exit 0 places-link-pes32-r1.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:01 exit 0 places-exchange-pes32-r1.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:03 exit 0 places-scan-pes32-r1.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:03 exit 0 places-scan-pes8-r2.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:04 exit 0 places-exchange-pes8-r2.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:05 exit 0 places-link-pes8-r2.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:06 exit 0 places-members-pes8-r2.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:07 exit 0 places-totals-pes8-r2.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:08 exit 0 places-scan-pes16-r2.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:09 exit 0 places-exchange-pes16-r2.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:10 exit 0 places-link-pes16-r2.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:11 exit 0 places-members-pes16-r2.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:12 exit 0 places-totals-pes16-r2.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:13 exit 0 places-scan-pes32-r2.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:14 exit 0 places-exchange-pes32-r2.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:16 exit 0 places-link-pes32-r2.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:17 exit 0 places-members-pes32-r2.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:18 exit 0 places-totals-pes32-r2.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:19 exit 0 places-exchange-pes8-r3.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:20 exit 0 places-scan-pes8-r3.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:21 exit 0 places-totals-pes8-r3.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:22 exit 0 places-members-pes8-r3.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:22 exit 0 places-link-pes8-r3.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:23 exit 0 places-exchange-pes16-r3.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:24 exit 0 places-scan-pes16-r3.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:25 exit 0 places-totals-pes16-r3.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:26 exit 0 places-members-pes16-r3.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:27 exit 0 places-link-pes16-r3.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:29 exit 0 places-exchange-pes32-r3.txt: OSOE_COLLECTIVE_PLACES=exchange ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:30 exit 0 places-scan-pes32-r3.txt: OSOE_COLLECTIVE_PLACES=scan ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:31 exit 0 places-totals-pes32-r3.txt: OSOE_COLLECTIVE_PLACES=totals ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:32 exit 0 places-members-pes32-r3.txt: OSOE_COLLECTIVE_PLACES=members ~/osoe/build/release/tools/bench/osoe-bench places quick
+02:03:33 exit 0 places-link-pes32-r3.txt: OSOE_COLLECTIVE_PLACES=link ~/osoe/build/release/tools/bench/osoe-bench places quick
+# done 02:03:33

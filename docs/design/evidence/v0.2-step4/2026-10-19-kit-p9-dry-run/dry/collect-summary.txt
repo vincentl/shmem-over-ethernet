@@ -1,0 +1,25 @@
+== ~/kit-p9/dry/collect
+jobs: 5, of which 0 failed (run.txt)
+
+places: collect's median microseconds by each way and the default (link), the
+median of the rounds' (range, count); then each default job's link and the way
+shape_timing.py's choose_places takes on it
+  pes=2 lengths=equal
+    members   229 (n=1)
+    totals    236 (n=1)
+    scan      284 (n=1)
+    exchange  266 (n=1)
+    link      190 (n=1)
+  pes=2 lengths=large
+    members   342 (n=1)
+    totals    253 (n=1)
+    scan      354 (n=1)
+    exchange  314 (n=1)
+    link      315 (n=1)
+  pes=2 lengths=zeros
+    members   234 (n=1)
+    totals    237 (n=1)
+    scan      316 (n=1)
+    exchange  296 (n=1)
+    link      296 (n=1)
+  the default at pes=2, 5 nodes: link (16355, 2210, 4573741603), the model's way exchange

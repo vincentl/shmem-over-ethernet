@@ -1,0 +1,10 @@
+Tue Oct 20 00:40:25 2026
+NODELIST       NODES PARTITION       STATE CPUS    S:C:T MEMORY TMP_DISK WEIGHT AVAIL_FE REASON              
+slurm-node-01      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-02      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-03      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-04      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-05      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-06      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-07      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-08      1     main*        idle 16      1:8:2  59760        0      1   (null) none                

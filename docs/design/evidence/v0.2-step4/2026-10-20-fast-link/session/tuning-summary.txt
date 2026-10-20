@@ -1,0 +1,180 @@
+== out/tuning
+jobs: 25, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+mailbox: messages a second (median, range)
+  mailbox-default pes=8 h=None  936350 (891535-942304, n=3)
+    link 2590 (1734-3120) MiB/s, hop 43.6 (43.6-49.8) us, message 42.6 (37.5-47.5) us; unsent limit 347594 (232800-418718) B
+  mailbox-tuned pes=8 h=None  839523 (834516-873995, n=3)
+    link 2364 (2113-2724) MiB/s, hop 57.3 (48.6-103) us, message 47.1 (34.2-48.5) us; unsent limit 317339 (283572-365646) B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  bench-default pes=None h=-
+    barrier                  87.3 (87.2-97.4, n=3)
+    link 1781 (1152-3036) MiB/s, hop 144 (48.7-193) us, message 0 us; unsent limit 238983 (154594-407444) B
+  bench-tuned pes=None h=-
+    barrier                  88.0 (87.1-97.8, n=3)
+    link 1475 (1357-2044) MiB/s, hop 142 (104-184) us, message 0 us; unsent limit 197962 (182175-274391) B
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-default                alone  median 86.0 (75.0-86.0, n=3)  p99 162 (147-204, n=3)    
+  hol-default                stream median 605 (581-618, n=3)     p99 865 (777-1020, n=3)    stream 2705 (2702-2705, n=3)
+                             link 2309 (2279-3184) MiB/s, hop 54.2 (47.7-112) us, message 0 us; unsent limit 309847 (305874-427336) B
+  hol-tuned                  alone  median 87.0 (85.0-89.0, n=3)  p99 184 (104-187, n=3)    
+  hol-tuned                  stream median 587 (548-643, n=3)     p99 932 (845-967, n=3)     stream 2708 (2707-2709, n=3)
+                             link 2243 (1441-3691) MiB/s, hop 50.7 (45.4-107) us, message 0 us; unsent limit 301087 (193412-495380) B
+
+ping: the average round trip, milliseconds (median, range, count)
+  ping-default             0.229 (0.204-0.237, n=3)
+  ping-tuned               0.211 (0.210-0.245, n=3)
+
+outcomes
+  mailbox-default-pes8-r1.txt: osoe-pacer failures=0 seconds=20.1
+  mailbox-default-pes8-r2.txt: osoe-pacer failures=0 seconds=20.0
+  mailbox-default-pes8-r3.txt: osoe-pacer failures=0 seconds=20.1
+  mailbox-tuned-pes8-r1.txt: osoe-pacer failures=0 seconds=19.7
+  mailbox-tuned-pes8-r2.txt: osoe-pacer failures=0 seconds=20.4
+  mailbox-tuned-pes8-r3.txt: osoe-pacer failures=0 seconds=20.1
+
+bench-default-r1.txt
+  salloc: Granted job allocation 352
+  salloc: Nodes slurm-node-[01-02] are ready for job
+  osoe: node 0 connected its mesh in 1011 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 918 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=84.7 fastest_us=65.8
+  latency get target=1 where=remote bytes=8 median_us=84.8 fastest_us=60.7
+  latency put+quiet target=1 where=remote bytes=64 median_us=84.2 fastest_us=60.4
+  latency get target=1 where=remote bytes=64 median_us=84.5 fastest_us=53.3
+  latency put+quiet target=1 where=remote bytes=512 median_us=85.7 fastest_us=62.3
+  latency get target=1 where=remote bytes=512 median_us=86.0 fastest_us=56.2
+  latency put+quiet target=1 where=remote bytes=4096 median_us=89.3 fastest_us=57.3
+  latency get target=1 where=remote bytes=4096 median_us=89.5 fastest_us=67.2
+  latency put+quiet target=1 where=remote bytes=32768 median_us=124.5 fastest_us=90.1
+  latency get target=1 where=remote bytes=32768 median_us=107.9 fastest_us=83.5
+  latency put+quiet target=1 where=remote bytes=262144 median_us=202.4 fastest_us=159.8
+  latency get target=1 where=remote bytes=262144 median_us=168.8 fastest_us=139.2
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=488.0 fastest_us=455.2
+  latency get target=1 where=remote bytes=1048576 median_us=464.4 fastest_us=426.8
+  atomic fetch-add target=1 where=remote median_us=84.2 fastest_us=54.9
+  salloc: Relinquishing job allocation 352
+
+bench-default-r2.txt
+  salloc: Granted job allocation 357
+  salloc: Nodes slurm-node-[01-02] are ready for job
+  osoe: node 0 connected its mesh in 816 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 915 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=94.8 fastest_us=64.8
+  latency get target=1 where=remote bytes=8 median_us=87.4 fastest_us=63.9
+  latency put+quiet target=1 where=remote bytes=64 median_us=87.0 fastest_us=52.9
+  latency get target=1 where=remote bytes=64 median_us=86.8 fastest_us=54.5
+  latency put+quiet target=1 where=remote bytes=512 median_us=87.6 fastest_us=58.6
+  latency get target=1 where=remote bytes=512 median_us=88.9 fastest_us=65.8
+  latency put+quiet target=1 where=remote bytes=4096 median_us=93.3 fastest_us=72.0
+  latency get target=1 where=remote bytes=4096 median_us=89.0 fastest_us=65.2
+  latency put+quiet target=1 where=remote bytes=32768 median_us=124.2 fastest_us=91.1
+  latency get target=1 where=remote bytes=32768 median_us=107.1 fastest_us=80.4
+  latency put+quiet target=1 where=remote bytes=262144 median_us=197.5 fastest_us=157.3
+  latency get target=1 where=remote bytes=262144 median_us=176.9 fastest_us=146.0
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=496.9 fastest_us=470.7
+  latency get target=1 where=remote bytes=1048576 median_us=479.0 fastest_us=447.7
+  atomic fetch-add target=1 where=remote median_us=95.1 fastest_us=57.8
+  salloc: Relinquishing job allocation 357
+
+bench-default-r3.txt
+  salloc: Granted job allocation 372
+  salloc: Nodes slurm-node-[01-02] are ready for job
+  osoe: node 0 connected its mesh in 570 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 605 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=88.6 fastest_us=65.1
+  latency get target=1 where=remote bytes=8 median_us=88.5 fastest_us=64.8
+  latency put+quiet target=1 where=remote bytes=64 median_us=87.8 fastest_us=59.9
+  latency get target=1 where=remote bytes=64 median_us=95.1 fastest_us=57.2
+  latency put+quiet target=1 where=remote bytes=512 median_us=96.4 fastest_us=71.5
+  latency get target=1 where=remote bytes=512 median_us=89.2 fastest_us=65.4
+  latency put+quiet target=1 where=remote bytes=4096 median_us=92.6 fastest_us=64.9
+  latency get target=1 where=remote bytes=4096 median_us=93.2 fastest_us=66.9
+  latency put+quiet target=1 where=remote bytes=32768 median_us=124.7 fastest_us=85.5
+  latency get target=1 where=remote bytes=32768 median_us=106.6 fastest_us=80.6
+  latency put+quiet target=1 where=remote bytes=262144 median_us=201.3 fastest_us=159.9
+  latency get target=1 where=remote bytes=262144 median_us=184.0 fastest_us=142.5
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=500.0 fastest_us=473.0
+  latency get target=1 where=remote bytes=1048576 median_us=472.6 fastest_us=439.9
+  atomic fetch-add target=1 where=remote median_us=82.1 fastest_us=53.9
+  salloc: Relinquishing job allocation 372
+
+bench-tuned-r1.txt
+  salloc: Granted job allocation 347
+  salloc: Nodes slurm-node-[01-02] are ready for job
+  osoe: node 0 connected its mesh in 654 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 627 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=95.6 fastest_us=62.7
+  latency get target=1 where=remote bytes=8 median_us=95.6 fastest_us=64.5
+  latency put+quiet target=1 where=remote bytes=64 median_us=95.0 fastest_us=64.4
+  latency get target=1 where=remote bytes=64 median_us=95.3 fastest_us=53.3
+  latency put+quiet target=1 where=remote bytes=512 median_us=96.9 fastest_us=65.7
+  latency get target=1 where=remote bytes=512 median_us=97.0 fastest_us=65.8
+  latency put+quiet target=1 where=remote bytes=4096 median_us=100.8 fastest_us=60.6
+  latency get target=1 where=remote bytes=4096 median_us=91.9 fastest_us=69.9
+  latency put+quiet target=1 where=remote bytes=32768 median_us=113.4 fastest_us=70.6
+  latency get target=1 where=remote bytes=32768 median_us=115.2 fastest_us=80.0
+  latency put+quiet target=1 where=remote bytes=262144 median_us=188.7 fastest_us=143.6
+  latency get target=1 where=remote bytes=262144 median_us=157.3 fastest_us=129.0
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=460.4 fastest_us=437.0
+  latency get target=1 where=remote bytes=1048576 median_us=445.1 fastest_us=413.9
+  atomic fetch-add target=1 where=remote median_us=86.4 fastest_us=72.0
+  salloc: Relinquishing job allocation 347
+
+bench-tuned-r2.txt
+  salloc: Granted job allocation 362
+  salloc: Nodes slurm-node-[01-02] are ready for job
+  osoe: node 1 connected its mesh in 1019 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 0 connected its mesh in 934 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=86.9 fastest_us=62.5
+  latency get target=1 where=remote bytes=8 median_us=86.9 fastest_us=55.2
+  latency put+quiet target=1 where=remote bytes=64 median_us=86.6 fastest_us=64.5
+  latency get target=1 where=remote bytes=64 median_us=86.7 fastest_us=56.0
+  latency put+quiet target=1 where=remote bytes=512 median_us=87.7 fastest_us=53.7
+  latency get target=1 where=remote bytes=512 median_us=88.0 fastest_us=65.2
+  latency put+quiet target=1 where=remote bytes=4096 median_us=92.4 fastest_us=58.6
+  latency get target=1 where=remote bytes=4096 median_us=91.5 fastest_us=66.5
+  latency put+quiet target=1 where=remote bytes=32768 median_us=113.7 fastest_us=78.7
+  latency get target=1 where=remote bytes=32768 median_us=107.1 fastest_us=72.2
+  latency put+quiet target=1 where=remote bytes=262144 median_us=187.2 fastest_us=149.6
+  latency get target=1 where=remote bytes=262144 median_us=159.2 fastest_us=133.6
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=439.0 fastest_us=406.7
+  latency get target=1 where=remote bytes=1048576 median_us=418.1 fastest_us=397.6
+  atomic fetch-add target=1 where=remote median_us=81.4 fastest_us=57.6
+  salloc: Relinquishing job allocation 362
+
+bench-tuned-r3.txt
+  salloc: Granted job allocation 367
+  salloc: Nodes slurm-node-[01-02] are ready for job
+  osoe: node 1 connected its mesh in 705 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 0 connected its mesh in 847 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=87.0 fastest_us=63.5
+  latency get target=1 where=remote bytes=8 median_us=87.1 fastest_us=62.7
+  latency put+quiet target=1 where=remote bytes=64 median_us=87.7 fastest_us=69.8
+  latency get target=1 where=remote bytes=64 median_us=88.4 fastest_us=64.3
+  latency put+quiet target=1 where=remote bytes=512 median_us=87.7 fastest_us=62.7
+  latency get target=1 where=remote bytes=512 median_us=88.0 fastest_us=61.3
+  latency put+quiet target=1 where=remote bytes=4096 median_us=91.4 fastest_us=62.3
+  latency get target=1 where=remote bytes=4096 median_us=91.2 fastest_us=62.6
+  latency put+quiet target=1 where=remote bytes=32768 median_us=112.9 fastest_us=72.1
+  latency get target=1 where=remote bytes=32768 median_us=107.5 fastest_us=72.9
+  latency put+quiet target=1 where=remote bytes=262144 median_us=186.3 fastest_us=141.6
+  latency get target=1 where=remote bytes=262144 median_us=165.6 fastest_us=136.3
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=464.5 fastest_us=435.2
+  latency get target=1 where=remote bytes=1048576 median_us=445.0 fastest_us=408.8
+  atomic fetch-add target=1 where=remote median_us=92.6 fastest_us=68.8
+  salloc: Relinquishing job allocation 367

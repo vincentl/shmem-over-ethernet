@@ -1,0 +1,17 @@
+# 01:59:37 nodes=8 pes_per_node=1 
+# bash ~/osoe/docs/fast-link/tuning-node.sh off 50 slurm-node-01
+salloc: Pending job allocation 375
+salloc: job 375 queued and waiting for resources
+salloc: job 375 has been allocated resources
+salloc: Granted job allocation 375
+salloc: Nodes slurm-node-[01-08] are ready for job
+slurm-node-02 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-01 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-04 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-03 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-07 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-06 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-08 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+slurm-node-05 tuning: ens3: rx-usecs 20 tx-usecs 50 busy_read 0, busy_poll 0
+salloc: Relinquishing job allocation 375
+# exit 0

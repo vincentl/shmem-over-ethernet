@@ -1,0 +1,60 @@
+# lock taken 2026-10-20T00:05:05Z; 0.52 3.98 4.94
+build.sh: 0; warnings in the release build: 0
+claims
+fan-in
+get-pieces
+hol
+multistream
+shapes
+startup
+static: 100% tests passed, 0 tests failed out of 17
+the scripts parse
+dry-run.sh: 0
+== facts 00:06:08
+exit 0, jobs that failed: 0
+== floor 00:06:32
+exit 0, jobs that failed: 0
+== helpers 00:06:41
+exit 0, jobs that failed: 0
+== ladder 00:07:25
+exit 0, jobs that failed: 0
+== zero-copy 00:08:21
+exit 0, jobs that failed: 0
+== gets 00:08:38
+exit 0, jobs that failed: 0
+== fan-in 00:08:46
+exit 0, jobs that failed: 0
+== scale 00:08:48
+exit 0, jobs that failed: 0
+== collect 00:09:17
+exit 0, jobs that failed: 0
+== behind 00:09:19
+exit 0, jobs that failed: 0
+== window 00:12:01
+exit 0, jobs that failed: 0
+== tuning 00:12:12
+exit 0, jobs that failed: 0
+== trees 00:13:02
+exit 1, jobs that failed: 0
+== claims 00:13:02
+exit 0, jobs that failed: 0
+== link-cost 00:13:03
+exit 0, jobs that failed: 0
+DONE 00:13:04
+before tree: 0 warnings 0
+claims.sh: 0; jobs that failed: 0
+== ~/kit-p9/claims
+jobs: 16, of which 0 failed (run.txt)
+
+claims (P9): microseconds - the last PE's splits done after the start, and a
+split's time a claim; each the job's median or percentile, median (range) over
+the rounds
+  claims-after-keep1 pes=2  last_us 0.600 (0.600-0.600, n=2)  last_p90_us 1.05 (1.00-1.10, n=2)  split_us 0.580 (0.580-0.580, n=2)  split_p90_us 0.940 (0.920-0.960, n=2)  split_p99_us 1.81 (1.71-1.92, n=2)
+  claims-after-keep1 pes=4  last_us 1.40 (1.40-1.40, n=2)  last_p90_us 3.05 (2.20-3.90, n=2)  split_us 1.10 (1.08-1.13, n=2)  split_p90_us 1.71 (1.54-1.87, n=2)  split_p99_us 10.3 (3.25-17.4, n=2)
+  claims-after-keep2 pes=2  last_us 1.50 (1.50-1.50, n=2)  last_p90_us 1.85 (1.70-2.00, n=2)  split_us 0.580 (0.580-0.580, n=2)  split_p90_us 0.820 (0.770-0.870, n=2)  split_p99_us 2.62 (2.02-3.23, n=2)
+  claims-after-keep2 pes=4  last_us 1.85 (1.80-1.90, n=2)  last_p90_us 2.90 (2.90-2.90, n=2)  split_us 0.810 (0.790-0.830, n=2)  split_p90_us 1.01 (1.00-1.02, n=2)  split_p99_us 3.56 (3.37-3.75, n=2)
+  claims-before-keep1 pes=2  last_us 0.850 (0.700-1.00, n=2)  last_p90_us 1.25 (1.00-1.50, n=2)  split_us 0.600 (0.580-0.620, n=2)  split_p90_us 0.975 (0.870-1.08, n=2)  split_p99_us 2.81 (2.04-3.58, n=2)
+  claims-before-keep1 pes=4  last_us 1.30 (1.30-1.30, n=2)  last_p90_us 1.80 (1.70-1.90, n=2)  split_us 1.08 (1.08-1.08, n=2)  split_p90_us 1.38 (1.37-1.38, n=2)  split_p99_us 2.81 (2.46-3.17, n=2)
+  claims-before-keep2 pes=2  last_us 1.20 (1.20-1.20, n=2)  last_p90_us 1.55 (1.50-1.60, n=2)  split_us 0.540 (0.540-0.540, n=2)  split_p90_us 0.730 (0.730-0.730, n=2)  split_p99_us 2.72 (2.65-2.79, n=2)
+  claims-before-keep2 pes=4  last_us 1.85 (1.80-1.90, n=2)  last_p90_us 2.50 (2.40-2.60, n=2)  split_us 0.830 (0.830-0.830, n=2)  split_p90_us 1.03 (1.00-1.06, n=2)  split_p99_us 3.06 (3.04-3.08, n=2)
+# done 2026-10-20T00:13:40Z

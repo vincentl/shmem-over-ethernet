@@ -1,0 +1,31 @@
+# 01:57:12 nodes=2 pes_per_node=1 
+# ~/osoe/build/release/tools/bench/osoe-bench quick latency atomic barrier
+salloc: Granted job allocation 357
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 connected its mesh in 816 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 connected its mesh in 915 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.357.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 192617 ns, a message cost of 0 ns, 1867060449 bytes a second (10030 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 238983
+osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.357.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 192617 ns, a message cost of 0 ns, 1867060449 bytes a second (9856 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 238983
+osoe-bench pes=2 remote_target=1 local_target=-1
+latency put+quiet target=1 where=remote bytes=8 median_us=94.8 fastest_us=64.8
+latency get target=1 where=remote bytes=8 median_us=87.4 fastest_us=63.9
+latency put+quiet target=1 where=remote bytes=64 median_us=87.0 fastest_us=52.9
+latency get target=1 where=remote bytes=64 median_us=86.8 fastest_us=54.5
+latency put+quiet target=1 where=remote bytes=512 median_us=87.6 fastest_us=58.6
+latency get target=1 where=remote bytes=512 median_us=88.9 fastest_us=65.8
+latency put+quiet target=1 where=remote bytes=4096 median_us=93.3 fastest_us=72.0
+latency get target=1 where=remote bytes=4096 median_us=89.0 fastest_us=65.2
+latency put+quiet target=1 where=remote bytes=32768 median_us=124.2 fastest_us=91.1
+latency get target=1 where=remote bytes=32768 median_us=107.1 fastest_us=80.4
+latency put+quiet target=1 where=remote bytes=262144 median_us=197.5 fastest_us=157.3
+latency get target=1 where=remote bytes=262144 median_us=176.9 fastest_us=146.0
+latency put+quiet target=1 where=remote bytes=1048576 median_us=496.9 fastest_us=470.7
+latency get target=1 where=remote bytes=1048576 median_us=479.0 fastest_us=447.7
+atomic fetch-add target=1 where=remote median_us=95.1 fastest_us=57.8
+barrier pes=2 median_us=87.2 fastest_us=64.9
+salloc: Relinquishing job allocation 357
+# exit 0

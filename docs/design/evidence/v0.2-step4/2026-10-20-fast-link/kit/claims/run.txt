@@ -1,0 +1,41 @@
+# 2026-10-20T01:03:04Z claims.sh on slurm-controller
+# kit 992979725c567de53409df6c579534451cd62368
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+slurm-node-01: 821a6dfb: built, 0 warnings
+01:03:21 exit 0 claims-after-keep1-pes16-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:03:23 exit 0 claims-after-keep8-pes16-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:03:26 exit 0 claims-after-keep1-pes32-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:03:28 exit 0 claims-after-keep8-pes32-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:03:31 exit 0 claims-after-keep1-pes64-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:03:33 exit 0 claims-after-keep8-pes64-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:03:35 exit 0 claims-before-keep1-pes16-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:03:38 exit 0 claims-before-keep8-pes16-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:03:40 exit 0 claims-before-keep1-pes32-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:03:42 exit 0 claims-before-keep8-pes32-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:03:45 exit 0 claims-before-keep1-pes64-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:03:47 exit 0 claims-before-keep8-pes64-r1.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:03:50 exit 0 claims-before-keep1-pes16-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:03:52 exit 0 claims-before-keep8-pes16-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:03:54 exit 0 claims-before-keep1-pes32-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:03:56 exit 0 claims-before-keep8-pes32-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:03:59 exit 0 claims-before-keep1-pes64-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:04:01 exit 0 claims-before-keep8-pes64-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:04:04 exit 0 claims-after-keep1-pes16-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:04:06 exit 0 claims-after-keep8-pes16-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:04:08 exit 0 claims-after-keep1-pes32-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:04:11 exit 0 claims-after-keep8-pes32-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:04:13 exit 0 claims-after-keep1-pes64-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:04:16 exit 0 claims-after-keep8-pes64-r2.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:04:18 exit 0 claims-after-keep1-pes16-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:04:20 exit 0 claims-after-keep8-pes16-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:04:22 exit 0 claims-after-keep1-pes32-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:04:25 exit 0 claims-after-keep8-pes32-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:04:27 exit 0 claims-after-keep1-pes64-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 1
+01:04:30 exit 0 claims-after-keep8-pes64-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/release/kit/claims 1000 8
+01:04:32 exit 0 claims-before-keep1-pes16-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:04:34 exit 0 claims-before-keep8-pes16-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:04:37 exit 0 claims-before-keep1-pes32-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:04:39 exit 0 claims-before-keep8-pes32-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+01:04:41 exit 0 claims-before-keep1-pes64-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 1
+01:04:44 exit 0 claims-before-keep8-pes64-r3.txt: SHMEM_SYMMETRIC_SIZE=16m ~/osoe/build/trees/821a6dfb/build/release/kit/claims 1000 8
+# done 01:04:44

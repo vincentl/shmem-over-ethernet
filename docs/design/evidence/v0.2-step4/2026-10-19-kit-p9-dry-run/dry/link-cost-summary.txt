@@ -1,0 +1,14 @@
+== ~/kit-p9/dry/link-cost
+jobs: 9, of which 0 failed (run.txt)
+
+start-up: shmem_init, milliseconds - the slowest PE's, the launcher's spread
+with it, and the fastest's, nearer init's own cost
+  link-first pes=None  slowest 61.2 (n=1)  fastest 60.8 (n=1)
+  startup-measured-nodes2 pes=1  slowest 47.6 (n=1)  fastest 47.6 (n=1)
+  startup-measured-nodes2 pes=2  slowest 57.1 (n=1)  fastest 56.5 (n=1)
+  startup-measured-nodes3 pes=1  slowest 50.9 (n=1)  fastest 50.7 (n=1)
+  startup-measured-nodes3 pes=2  slowest 54.4 (n=1)  fastest 53.8 (n=1)
+  startup-set-nodes2 pes=1  slowest 49.8 (n=1)  fastest 49.8 (n=1)
+  startup-set-nodes2 pes=2  slowest 54.1 (n=1)  fastest 48.9 (n=1)
+  startup-set-nodes3 pes=1  slowest 43.2 (n=1)  fastest 43.1 (n=1)
+  startup-set-nodes3 pes=2  slowest 54.6 (n=1)  fastest 47.1 (n=1)

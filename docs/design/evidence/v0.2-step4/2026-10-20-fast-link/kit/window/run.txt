@@ -1,0 +1,46 @@
+# 2026-10-20T02:03:33Z window.sh on slurm-controller
+# kit 992979725c567de53409df6c579534451cd62368
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 180 s
+02:03:40 exit 0 shapes-tree-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=tree ~/osoe/build/release/kit/shapes 100
+02:03:45 exit 0 shapes-link-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=link ~/osoe/build/release/kit/shapes 100
+02:03:52 exit 0 shapes-fixed-k8-d8-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:04:00 exit 0 shapes-fixed-k8-d4-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:04:10 exit 0 shapes-fixed-k8-d2-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:04:28 exit 0 shapes-fixed-k8-d1-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:04:34 exit 0 shapes-fixed-k4-d8-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:04:42 exit 0 shapes-fixed-k4-d4-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:04:58 exit 0 shapes-fixed-k4-d2-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:05:26 exit 0 shapes-fixed-k4-d1-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:05:33 exit 0 shapes-fixed-k2-d8-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:05:44 exit 0 shapes-fixed-k2-d4-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:06:04 exit 0 shapes-fixed-k2-d2-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:06:41 exit 0 shapes-fixed-k2-d1-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:07:17 exit 0 shapes-fixed-k2-d1-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:07:37 exit 0 shapes-fixed-k2-d2-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:07:48 exit 0 shapes-fixed-k2-d4-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:07:55 exit 0 shapes-fixed-k2-d8-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:08:22 exit 0 shapes-fixed-k4-d1-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:08:39 exit 0 shapes-fixed-k4-d2-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:08:47 exit 0 shapes-fixed-k4-d4-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:08:53 exit 0 shapes-fixed-k4-d8-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:09:12 exit 0 shapes-fixed-k8-d1-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:09:22 exit 0 shapes-fixed-k8-d2-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:09:30 exit 0 shapes-fixed-k8-d4-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:09:36 exit 0 shapes-fixed-k8-d8-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:09:43 exit 0 shapes-link-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=link ~/osoe/build/release/kit/shapes 100
+02:09:51 exit 0 shapes-tree-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=tree ~/osoe/build/release/kit/shapes 100
+02:10:11 exit 0 shapes-fixed-k2-d2-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:10:47 exit 0 shapes-fixed-k2-d1-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:10:55 exit 0 shapes-tree-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=tree ~/osoe/build/release/kit/shapes 100
+02:11:02 exit 0 shapes-link-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=link ~/osoe/build/release/kit/shapes 100
+02:11:09 exit 0 shapes-fixed-k8-d8-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:11:16 exit 0 shapes-fixed-k8-d4-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:11:27 exit 0 shapes-fixed-k8-d2-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:11:45 exit 0 shapes-fixed-k8-d1-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=8 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:11:50 exit 0 shapes-fixed-k4-d8-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:11:59 exit 0 shapes-fixed-k4-d4-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+02:12:14 exit 0 shapes-fixed-k4-d2-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=2 ~/osoe/build/release/kit/shapes 100
+02:12:41 exit 0 shapes-fixed-k4-d1-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=1 ~/osoe/build/release/kit/shapes 100
+02:12:48 exit 0 shapes-fixed-k2-d8-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=8 ~/osoe/build/release/kit/shapes 100
+02:12:59 exit 0 shapes-fixed-k2-d4-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=4 ~/osoe/build/release/kit/shapes 100
+# done 02:12:59

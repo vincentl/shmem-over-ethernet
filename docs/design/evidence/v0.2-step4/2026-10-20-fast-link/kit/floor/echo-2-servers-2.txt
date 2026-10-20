@@ -1,0 +1,4 @@
+srun: job 13 queued and waiting for resources
+srun: job 13 has been allocated resources
+small enobufs=251 rearms=251
+small enobufs=249 rearms=249

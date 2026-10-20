@@ -1,0 +1,63 @@
+== out/collect
+jobs: 45, of which 0 failed (run.txt)
+
+places: collect's median microseconds by each way and the default (link), the
+median of the rounds' (range, count); then each default job's link and the way
+shape_timing.py's choose_places takes on it
+  pes=8 lengths=equal
+    members   450 (437-452, n=3)
+    totals    440 (439-454, n=3)
+    scan      434 (429-452, n=3)
+    exchange  408 (382-440, n=3)
+    link      412 (402-420, n=3)
+  pes=8 lengths=large
+    members   616 (593-633, n=3)
+    totals    636 (613-636, n=3)
+    scan      602 (588-623, n=3)
+    exchange  575 (549-576, n=3)
+    link      595 (585-605, n=3)
+  pes=8 lengths=zeros
+    members   426 (426-443, n=3)
+    totals    440 (437-449, n=3)
+    scan      429 (428-452, n=3)
+    exchange  411 (392-432, n=3)
+    link      406 (404-407, n=3)
+  pes=16 lengths=equal
+    members   461 (442-466, n=3)
+    totals    433 (421-449, n=3)
+    scan      445 (426-446, n=3)
+    exchange  433 (419-433, n=3)
+    link      424 (420-437, n=3)
+  pes=16 lengths=large
+    members   648 (639-667, n=3)
+    totals    635 (597-638, n=3)
+    scan      628 (610-634, n=3)
+    exchange  594 (564-616, n=3)
+    link      590 (578-603, n=3)
+  pes=16 lengths=zeros
+    members   439 (416-453, n=3)
+    totals    447 (434-462, n=3)
+    scan      423 (409-443, n=3)
+    exchange  418 (412-421, n=3)
+    link      409 (407-415, n=3)
+  pes=32 lengths=equal
+    members   520 (519-543, n=3)
+    totals    471 (468-484, n=3)
+    scan      481 (474-491, n=3)
+    exchange  460 (456-461, n=3)
+    link      454 (451-468, n=3)
+  pes=32 lengths=large
+    members   692 (685-717, n=3)
+    totals    678 (662-681, n=3)
+    scan      661 (645-682, n=3)
+    exchange  650 (643-656, n=3)
+    link      649 (646-654, n=3)
+  pes=32 lengths=zeros
+    members   524 (503-526, n=3)
+    totals    462 (458-475, n=3)
+    scan      470 (466-494, n=3)
+    exchange  442 (438-449, n=3)
+    link      453 (448-456, n=3)
+  the default at pes=8, 8 nodes: link (47525, 964, 2911050734), the model's way exchange
+  the default at pes=16, 8 nodes: link (50760, 15519, 2455160184), the model's way exchange
+  the default at pes=32, 8 nodes: link (50560, 17285, 2891315377), the model's way exchange

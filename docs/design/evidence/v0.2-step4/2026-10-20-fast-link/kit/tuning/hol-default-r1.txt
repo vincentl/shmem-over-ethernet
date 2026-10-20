@@ -1,0 +1,18 @@
+# 01:56:37 nodes=2 pes_per_node=2 
+# ~/osoe/build/release/kit/hol 10
+salloc: Granted job allocation 353
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 1 connected its mesh in 389 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 connected its mesh in 431 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.353.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 112160 ns, a message cost of 0 ns, 2389644484 bytes a second (6265 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.353.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 112160 ns, a message cost of 0 ns, 2389644484 bytes a second (8003 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 305874
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.353.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 112160 ns, a message cost of 0 ns, 2389644484 bytes a second (8314 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 305874
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.353.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 112160 ns, a message cost of 0 ns, 2389644484 bytes a second (1735 us of this start)
+hol phase=alone op=fetch-add bytes=8 operations=9795 median_us=86 p90_us=95 p99_us=204 max_us=328 stream_mib_per_s=0
+hol phase=stream op=fetch-add bytes=8 operations=16921 median_us=581 p90_us=672 p99_us=1020 max_us=1727 stream_mib_per_s=2702
+salloc: Relinquishing job allocation 353
+# exit 0

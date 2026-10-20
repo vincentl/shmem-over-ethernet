@@ -141,3 +141,205 @@ leaves as it is (A11, H24 and H25 to measure small sizes).
 (§10, H11), many PEs a node (H12), `collect`'s crossover (H25), the helpers under
 a site's binding (H26), latency tuning (H27), and B8's rest - SOS at 4 x 2, the
 single-node build on Rocky 9, and the 13 models not run here.
+
+## The second session (2026-10-20)
+
+**The machines.** The first session's again, made anew by the author's
+Terraform: eight `c4-standard-16` and the head node in `us-central1-a`, and §2's
+facts the same on every node - the Xeon Platinum 8581C, Linux 6.12.111, `gve` at
+23,000 Mbit/s, the MTU 8896, the TCP settings, interrupt coalescing at 20 µs
+receiving and 50 sending, liburing 2.9, `RemoveIPC=no`, locked memory unlimited
+- so that the two sessions' numbers compare. New beside them: each machine's
+startup script, the author's, installs the runbook's packages and shares
+`/shared` from the head node by NFS, which the kit does not use; and
+`kernel.perf_event_paranoid` is 3, so §13's profile needs `PERF="sudo -n
+perf"`. The tree was `9929797`, P9 merged.
+
+**Setup (§1 to §3).** About six minutes of work: the packages and the clone in
+12 s, `slurm-setup.sh` in 58 s (eight nodes of 16 CPUs and 59,760 MB),
+`build.sh` in 29 s (all eight without a warning), the facts, the probe on
+every node (thirteen facilities each, the zero-copy send's opcode supported)
+and a job of 256 PEs, 32 a node, whose slowest PE started in 110 ms; tier 2
+passed 885 of 885 on one node in 117 s. Nine minutes more went to waiting on
+the machines' startup scripts by a `pgrep -f` that matched itself; §1 now says
+how to wait for them.
+
+**The floor and the bare stream (§4).** As the first session's: `iperf3` both
+ways at once 5,436 MiB/s, 2,718 a node each way, which one stream each way
+reaches; osoe's stream at 0.999 of the bare stream's rate; the fastest get,
+put-and-quiet and fetch-add 1.61, 1.51 and 1.48 times the floor's round trip
+(1.48, 1.48 and 1.50 in the first), a put-and-quiet or a fetch-add 1.02 and
+1.03 times a get. Seventeen minutes.
+
+**P9: leads claiming team blocks at once (§18).** Every PE of one node splitting
+a team of its own at a start PE 0 set, 1,000 times, the tree before P9
+(`821a6dfb`) beside it, three rounds - microseconds, the median of the rounds'
+medians:
+
+| PEs on the node | Claims a PE | A split, before → after | The last PE done, before → after |
+|---|---|---|---|
+| 16 | 1 | 1.56 → 1.47 | 2.1 → 1.9 |
+| 16 | 8 | 1.35 → 1.33 | 12.6 → 12.3 |
+| 32 | 1 | 1.38 → 1.38 | 18.9 → 20.1 |
+| 32 | 8 | 1.31 → 1.22 | 40.7 → 40.2 |
+| 64 | 1 | 1.50 → 1.50 | 42.6 → 40.1 |
+| 64 | 8 | 1.47 → 1.41 | 81.9 → 79.2 |
+
+Where the most claims meet at once - one PE a vCPU each claiming once, and
+eight claims a PE at two a vCPU - the change takes about a tenth of a
+microsecond off a split, 6 to 7%, the rounds' ranges apart; elsewhere the two
+builds match within their ranges, and past one PE a vCPU the scheduler sets
+the last PE's time. Nothing costs more, and the 257 leads of the finding are
+not to be had on 16 vCPUs.
+
+**H14: the link's measurement on two and three nodes (§19).** The start-up
+probe with the link measured and set to what a first job measured, five rounds
+- the fastest PE's `shmem_init`, milliseconds, median:
+
+| Nodes | PEs a node | Measured | Set |
+|---|---|---|---|
+| 2 | 1 | 47.3 | 44.0 |
+| 2 | 8 | 55.2 | 49.7 |
+| 3 | 1 | 53.9 | 50.5 |
+| 3 | 8 | 52.5 | 47.7 |
+
+The measurement costs 3 to 5 ms of a start here (27 ms on the Pi's gigabit).
+What it measures is less steady than what it costs: the hop 43 to 53 µs every
+time, but the bandwidth 1.9 to 5.1 GB/s from job to job on a link that gives
+2.85 - its streams of 128 and 512 KiB too short to time 23 Gbit/s - and every
+data wire's unsent limit is set from it; and the message cost 0 on two nodes,
+whose root has one child to time it by, and 0 to 159 µs on three, where
+Träff's choice reads it.
+
+**H4: the progress helpers (§5).** 180 jobs, three rounds, in 34 minutes - the
+whole job's rate over eight nodes, MiB/s, whose ceiling is Google's egress,
+8 × 2,718 = 21,744; the median of the rounds:
+
+| PEs a node | Put 1 MiB at 0 / 1 / 2 / 4 helpers | Get 1 MiB at 0 / 1 / 2 / 4 |
+|---|---|---|
+| 8 | 17,407 / 17,520 / 21,502 / 21,680 | 15,100 / 14,897 / 19,770 / 19,967 |
+| 16 | 15,777 / 16,040 / 21,343 / 21,678 | 14,009 / 13,828 / 18,906 / 19,391 |
+| 32 | 14,567 / 14,887 / 21,204 / 21,696 | 11,308 / 11,494 / 18,536 / 19,992 |
+
+The 64 KiB put stream as the 1 MiB one, within 4%. Two helpers bring every
+case to 97 to 99% of the ceiling, where one thread a node held 67 to 80% of it,
+less the more PEs a node; one helper is no helper, every data wire still one
+thread's; four add 1 to 2% to the puts and up to 8% to the gets. The progress
+threads' CPU a GiB: 0.46 to 0.52 s at none, 0.59 to 0.65 at two, 0.77 to 0.82 at
+four.
+
+The collectives, microseconds, at 0 and 2 helpers (4 beside where it differs):
+
+| PEs a node | Barrier | Reduce 64 KiB | Broadcast 64 KiB | Alltoall 8 B | Alltoall 4 KiB |
+|---|---|---|---|---|---|
+| 8 | 132 → 130 | 453 → 401 | 344 → 313 | 477 → 398 (364) | 1,321 → 1,014 (896) |
+| 16 | 146 → 147 | 478 → 439 | 353 → 327 | 760 → 644 (525) | 4,562 → 3,323 (2,917) |
+| 32 | 184 → 186 | 566 → 516 | 351 → 345 | 1,493 → 1,133 (898) | 17,314 → 13,210 (10,817) |
+
+The 8-byte reduction and broadcast and the fcollects within a few percent. On
+the Pi two helpers made a 64 KiB broadcast and a 4 KiB alltoall slower; here,
+unbound, nothing is slower and the alltoalls are a quarter faster.
+
+The mailbox, messages a second, at 0 / 1 / 2 / 4 helpers:
+
+| PEs a node | Messages a second |
+|---|---|
+| 8 | 920,000 / 916,000 / 1,255,000 / 1,370,000 |
+| 16 | 1,213,000 / 1,223,000 / 1,277,000 / 979,000 |
+| 32 | 1,371,000 / 1,349,000 / 617,000 / 597,000 |
+
+The one loss: with more PEs than vCPUs, helpers halve the mailbox, and four
+already take a fifth off it at one PE a vCPU.
+
+**H8: the zero-copy send (§7).** 48 jobs in nine minutes, at 8 PEs a node, the
+send off and on from 16 KiB (the default threshold), 64 KiB and 256 KiB - the
+job's MiB/s and the progress threads' CPU seconds a GiB, the median of three
+rounds:
+
+| Helpers | Blocks | Off | On, 16 KiB | On, 64 KiB | On, 256 KiB |
+|---|---|---|---|---|---|
+| 0 | 1 MiB | 17,326, 0.470 | 18,568, 0.439 | 18,500, 0.441 | 18,636, 0.437 |
+| 0 | 64 KiB | 16,708, 0.483 | 18,508, 0.443 | 18,665, 0.439 | 18,025, 0.454 |
+| 2 | 1 MiB | 21,504, 0.602 | 21,451, 0.612 | 21,456, 0.614 | 21,506, 0.609 |
+| 2 | 64 KiB | 21,656, 0.622 | 21,593, 0.643 | 21,652, 0.639 | 21,632, 0.625 |
+
+Where one thread a node is what holds the rate back, the zero-copy send raises
+it 7 to 12% and takes 6 to 9% off its CPU; where two helpers already reach the
+ceiling it changes neither the rate nor - by 1 to 3%, the wrong way - the CPU.
+Every send by reference had its notification, none was copied after all, and
+none was refused for locked memory, which is unlimited on these nodes; the
+threshold matters little between 16 and 64 KiB. Nothing here asks for a third
+buffer: no case stalled behind its notifications.
+
+**H27: latency tuning (§15).** Interrupt coalescing off (`rx-usecs` and
+`tx-usecs` 0; `gve` has no adaptive coalescing to turn off, and refused the
+flags) and busy polling on (`busy_read` and `busy_poll` 50 µs) on every node,
+against the image's settings, three rounds in four minutes, the floor left out
+(`FLOOR=0`); every node's settings read back afterwards as the image's:
+
+| Case | The image's | Tuned |
+|---|---|---|
+| `ping`'s average round trip, ms | 0.229 | 0.211 |
+| osoe-bench put and quiet, get, fetch-add, 8 B, µs | 88.6, 87.4, 84.2 | 87.0, 87.1, 86.4 |
+| osoe-bench barrier, two PEs, µs | 87.3 | 88.0 |
+| hol's fetch-add alone, µs | 86 | 87 |
+| hol's fetch-add behind a stream, median (p99), µs | 605 (865) | 587 (932) |
+| the mailbox, 8 PEs a node, messages a second | 936,000 | 840,000 |
+
+The tuning takes 8% off a `ping` and nothing off osoe's small operations, and
+costs the mailbox a tenth. The likely reason: the two sysctls govern a
+socket's blocking reads and `poll`/`epoll`, and osoe's receives go through
+io_uring, which polls a device only when a ring registers for it
+(`IORING_REGISTER_NAPI`, Linux 6.9 and later) - a code change, not a setting.
+
+**H25: `collect`'s places (§12).** 45 jobs, three rounds - a `collect` over the
+world by each way forced and by the default, `link`, microseconds, the median of
+the rounds; each node's 8 bytes (`equal`), PE 0's 64 KiB beside the others' 8
+(`large`), and every sixteenth PE's alone (`zeros`):
+
+| PEs a node | Lengths | Members | Totals | Scan | Exchange | `link` |
+|---|---|---|---|---|---|---|
+| 8 | equal | 450 | 440 | 434 | 408 | 412 |
+| 8 | large | 616 | 636 | 602 | 575 | 595 |
+| 8 | zeros | 426 | 440 | 429 | 411 | 406 |
+| 16 | equal | 461 | 433 | 445 | 433 | 424 |
+| 16 | large | 648 | 635 | 628 | 594 | 590 |
+| 16 | zeros | 439 | 447 | 423 | 418 | 409 |
+| 32 | equal | 520 | 471 | 481 | 460 | 454 |
+| 32 | large | 692 | 678 | 661 | 650 | 649 |
+| 32 | zeros | 524 | 462 | 470 | 442 | 453 |
+
+On eight nodes the leads' exchange is the fastest way in every case and the
+default takes it, within the rounds' ranges but at 8 PEs a node with one
+large block (595 against 575); the slowest way is within a fifth of the
+fastest, the members' vector the slowest at 32 PEs a node. P35's cap of 16 nodes
+stands at eight; past eight nodes this cluster cannot say.
+
+**H13: the pipeline's window and the chooser (§14).** 42 jobs, three rounds,
+8 PEs a node - a reduction's and a broadcast's microseconds by the chooser
+(`link`), by its trees alone (`tree`) and by the best of the twelve fixed
+shapes (fan-outs 2, 4 and 8, windows 1, 2, 4 and 8):
+
+| Bytes | Reduce: `link`, `tree`, best fixed | Broadcast: `link`, `tree`, best fixed |
+|---|---|---|
+| 64 KiB | 515, 507, 489 (fan-out 8, window 8) | 353, 365, 357 (8, 4) |
+| 256 KiB | 1,626, 1,625, 1,343 (4, 8) | 1,182, 1,174, 934 (4, 8) |
+| 1 MiB | 6,256, 6,499, 4,788 (4, 8) | 4,326, 4,397, 3,359 (4, 8) |
+| 4 MiB | 25,125, 25,990, 19,081 (4, 8) | 17,261, 17,571, 12,825 (4, 8) |
+
+From 256 KiB a fixed fan-out of 4 with a window of 8 is 17 to 26% faster than
+what the chooser takes, and the chooser within 4% of its trees alone - and
+the fixed shapes ran with each data wire's unsent limit at its 16 KiB floor,
+since no link is measured under `fixed`, where the chooser's jobs had about
+335 KB. The chooser's costs were fitted to the Pi's table (`shape_timing.py`):
+on this link they are off, most likely in the window.
+
+**H6, H15 to H19, H26, H28, H11 and B8's rest** did not run: the author's window
+closed after H13 (the session ran from 00:27 to 02:13 UTC, about $13).
+
+**What the numbers point at**, for the decisions to come, not taken here: the
+helpers' default (A2) - two pay everywhere but in the mailbox at more PEs than
+vCPUs, which H26 is to check under a site's binding; the zero-copy send's
+(A3), which pays only where helpers do not run; the chooser's costs, refitted
+to a fast link; the link's measurement, steadier on a fast link; and
+io_uring's own device polling, which a site's latency tuning cannot reach.

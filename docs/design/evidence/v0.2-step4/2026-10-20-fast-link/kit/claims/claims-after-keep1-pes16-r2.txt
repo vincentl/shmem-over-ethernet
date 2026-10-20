@@ -1,0 +1,23 @@
+# 01:04:01 nodes=1 pes_per_node=16 SHMEM_SYMMETRIC_SIZE=16m
+# ~/osoe/build/release/kit/claims 1000 1
+salloc: Granted job allocation 57
+salloc: Nodes slurm-node-01 are ready for job
+osoe: PE 4 of 16 (local 4 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 10 of 16 (local 10 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 14 of 16 (local 14 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 0 of 16 (local 0 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 1 of 16 (local 1 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 2 of 16 (local 2 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 3 of 16 (local 3 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 5 of 16 (local 5 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 6 of 16 (local 6 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 7 of 16 (local 7 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 8 of 16 (local 8 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 9 of 16 (local 9 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 11 of 16 (local 11 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 12 of 16 (local 12 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 13 of 16 (local 13 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 15 of 16 (local 15 of 16): segment /dev/shm/osoe.57.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+claims pes=16 keep=1 iterations=1000 last_us=1.8 last_p90_us=2.1 split_us=1.43 split_p90_us=1.72 split_p99_us=2.08
+salloc: Relinquishing job allocation 57
+# exit 0

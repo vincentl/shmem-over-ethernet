@@ -1,0 +1,105 @@
+# 02:12:41 nodes=8 pes_per_node=8 OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=2 OSOE_COLLECTIVE_PIPELINE=8
+# ~/osoe/build/release/kit/shapes 100
+salloc: Pending job allocation 461
+salloc: job 461 queued and waiting for resources
+salloc: job 461 has been allocated resources
+salloc: Granted job allocation 461
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 1 connected its mesh in 592 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 8 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 16384
+osoe: node 7 connected its mesh in 811 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 connected its mesh in 898 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 56 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 16384
+osoe: node 5 connected its mesh in 1039 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 16384
+osoe: node 3 connected its mesh in 1305 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 connected its mesh in 1184 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: PE 40 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: node 4 connected its mesh in 1133 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 16384
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 16 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 32 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 16384
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 16384
+osoe: PE 24 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: node 6 connected its mesh in 1518 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 16384
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 48 of 64 (local 0 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 16384
+osoe: PE 37 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 36 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 38 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 39 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 34 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 35 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 33 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8
+osoe: PE 9 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 10 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 13 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 15 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 11 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 14 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 12 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8
+osoe: PE 63 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 58 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 60 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 61 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 57 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 62 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 59 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8
+osoe: PE 19 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 55 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 43 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 20 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 49 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 42 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 21 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 52 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 46 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 17 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 54 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 45 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 3 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 18 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 50 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 41 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 6 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 23 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 51 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 44 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 7 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 22 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8
+osoe: PE 53 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8
+osoe: PE 47 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8
+osoe: PE 5 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 2 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 4 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 1 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8
+osoe: PE 28 of 64 (local 4 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: PE 29 of 64 (local 5 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: PE 27 of 64 (local 3 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: PE 30 of 64 (local 6 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: PE 31 of 64 (local 7 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: PE 26 of 64 (local 2 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+osoe: PE 25 of 64 (local 1 of 8): segment /dev/shm/osoe.461.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8
+reduce pes=64 bytes=65536 median_us=682.8 fastest_us=567.9
+broadcast pes=64 bytes=65536 median_us=534.7 fastest_us=441.4
+reduce pes=64 bytes=262144 median_us=1580.0 fastest_us=1358.3
+broadcast pes=64 bytes=262144 median_us=1176.1 fastest_us=1057.7
+reduce pes=64 bytes=1048576 median_us=5385.4 fastest_us=4824.6
+broadcast pes=64 bytes=1048576 median_us=4128.2 fastest_us=3658.3
+reduce pes=64 bytes=4194304 median_us=21225.4 fastest_us=19829.8
+broadcast pes=64 bytes=4194304 median_us=15638.6 fastest_us=14637.3
+salloc: Relinquishing job allocation 461
+# exit 0

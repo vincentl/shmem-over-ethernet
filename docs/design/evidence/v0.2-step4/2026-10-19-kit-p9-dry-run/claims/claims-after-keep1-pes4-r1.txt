@@ -1,0 +1,8 @@
+# 00:13:37 nodes=1 pes_per_node=4 SHMEM_SYMMETRIC_SIZE=16m
+# ~/kit-p9/src/build/release/kit/claims 100 1
+osoe: PE 0 of 4 (local 0 of 4): segment /dev/shm/osoe.712327.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 3 of 4 (local 3 of 4): segment /dev/shm/osoe.712327.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 4 (local 1 of 4): segment /dev/shm/osoe.712327.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 2 of 4 (local 2 of 4): segment /dev/shm/osoe.712327.0.0.0, heap 16777216 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+claims pes=4 keep=1 iterations=100 last_us=1.4 last_p90_us=3.9 split_us=1.13 split_p90_us=1.87 split_p99_us=17.37
+# exit 0

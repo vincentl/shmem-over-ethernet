@@ -1,0 +1,21 @@
+# 01:58:27 nodes=2 pes_per_node=2 
+# ~/osoe/build/release/kit/hol 10
+salloc: Pending job allocation 368
+salloc: job 368 queued and waiting for resources
+salloc: job 368 has been allocated resources
+salloc: Granted job allocation 368
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 connected its mesh in 238 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 89 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.368.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 50746 ns, a message cost of 0 ns, 2352248663 bytes a second (257 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 301087
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.368.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 50746 ns, a message cost of 0 ns, 2352248663 bytes a second (6349 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.368.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 50746 ns, a message cost of 0 ns, 2352248663 bytes a second (6681 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 301087
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.368.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 50746 ns, a message cost of 0 ns, 2352248663 bytes a second (294 us of this start)
+hol phase=alone op=fetch-add bytes=8 operations=20316 median_us=89 p90_us=98 p99_us=187 max_us=356 stream_mib_per_s=0
+hol phase=stream op=fetch-add bytes=8 operations=16743 median_us=587 p90_us=674 p99_us=845 max_us=3102 stream_mib_per_s=2709
+salloc: Relinquishing job allocation 368
+# exit 0

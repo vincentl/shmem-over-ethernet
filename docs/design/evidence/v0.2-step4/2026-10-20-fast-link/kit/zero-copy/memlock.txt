@@ -1,0 +1,14 @@
+# 01:43:16 nodes=8 pes_per_node=1 
+# bash -c echo "$(hostname) ulimit -l $(ulimit -l)"
+salloc: Granted job allocation 296
+salloc: Nodes slurm-node-[01-08] are ready for job
+slurm-node-02 ulimit -l unlimited
+slurm-node-01 ulimit -l unlimited
+slurm-node-05 ulimit -l unlimited
+slurm-node-03 ulimit -l unlimited
+slurm-node-04 ulimit -l unlimited
+slurm-node-06 ulimit -l unlimited
+slurm-node-07 ulimit -l unlimited
+slurm-node-08 ulimit -l unlimited
+salloc: Relinquishing job allocation 296
+# exit 0

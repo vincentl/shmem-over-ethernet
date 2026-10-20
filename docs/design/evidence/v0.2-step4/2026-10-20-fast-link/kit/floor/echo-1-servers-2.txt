@@ -1,0 +1,3 @@
+srun: job 9 queued and waiting for resources
+srun: job 9 has been allocated resources
+small enobufs=240 rearms=240

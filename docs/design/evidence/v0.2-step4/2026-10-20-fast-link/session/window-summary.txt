@@ -1,0 +1,149 @@
+== out/window
+jobs: 42, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  shapes-fixed-k2-d1 pes=8 h=-
+    reduce bytes=65536       1985 (1963-1996, n=3)
+    broadcast bytes=65536    1544 (1536-1586, n=3)
+    reduce bytes=262144      8252 (7905-8399, n=3)
+    broadcast bytes=262144   5874 (5849-6568, n=3)
+    reduce bytes=1048576     32422 (31330-32672, n=3)
+    broadcast bytes=1048576  23603 (23500-23997, n=3)
+    reduce bytes=4194304     129527 (128361-129602, n=3)
+    broadcast bytes=4194304  94632 (93484-95056, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k2-d2 pes=8 h=-
+    reduce bytes=65536       1139 (1115-1152, n=3)
+    broadcast bytes=65536    898 (854-903, n=3)
+    reduce bytes=262144      4326 (4240-4332, n=3)
+    broadcast bytes=262144   3395 (3269-3487, n=3)
+    reduce bytes=1048576     17153 (16804-17298, n=3)
+    broadcast bytes=1048576  13410 (13285-14264, n=3)
+    reduce bytes=4194304     68507 (68401-69173, n=3)
+    broadcast bytes=4194304  52767 (52192-53242, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k2-d4 pes=8 h=-
+    reduce bytes=65536       706 (697-710, n=3)
+    broadcast bytes=65536    515 (501-518, n=3)
+    reduce bytes=262144      2410 (2392-2440, n=3)
+    broadcast bytes=262144   1891 (1851-1934, n=3)
+    reduce bytes=1048576     9362 (9205-9523, n=3)
+    broadcast bytes=1048576  7358 (7086-7383, n=3)
+    reduce bytes=4194304     37562 (37275-37703, n=3)
+    broadcast bytes=4194304  28631 (28615-29067, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k2-d8 pes=8 h=-
+    reduce bytes=65536       700 (683-706, n=3)
+    broadcast bytes=65536    526 (495-535, n=3)
+    reduce bytes=262144      1550 (1489-1580, n=3)
+    broadcast bytes=262144   1171 (1138-1176, n=3)
+    reduce bytes=1048576     5568 (5385-5756, n=3)
+    broadcast bytes=1048576  4220 (4128-4307, n=3)
+    reduce bytes=4194304     22120 (21225-23542, n=3)
+    broadcast bytes=4194304  15765 (15639-15995, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k4-d1 pes=8 h=-
+    reduce bytes=65536       1545 (1536-1554, n=3)
+    broadcast bytes=65536    1158 (1146-1168, n=3)
+    reduce bytes=262144      6180 (5950-6413, n=3)
+    broadcast bytes=262144   4596 (4448-4939, n=3)
+    reduce bytes=1048576     24287 (24180-24822, n=3)
+    broadcast bytes=1048576  17852 (17633-18555, n=3)
+    reduce bytes=4194304     95892 (94966-96124, n=3)
+    broadcast bytes=4194304  69791 (69459-70808, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k4-d2 pes=8 h=-
+    reduce bytes=65536       905 (890-910, n=3)
+    broadcast bytes=65536    688 (662-709, n=3)
+    reduce bytes=262144      3310 (3270-3350, n=3)
+    broadcast bytes=262144   2577 (2510-2593, n=3)
+    reduce bytes=1048576     13062 (12783-13598, n=3)
+    broadcast bytes=1048576  9833 (9656-10997, n=3)
+    reduce bytes=4194304     51722 (51451-54670, n=3)
+    broadcast bytes=4194304  38510 (38267-40070, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k4-d4 pes=8 h=-
+    reduce bytes=65536       577 (570-612, n=3)
+    broadcast bytes=65536    418 (409-431, n=3)
+    reduce bytes=262144      1920 (1897-1996, n=3)
+    broadcast bytes=262144   1484 (1465-1516, n=3)
+    reduce bytes=1048576     7417 (7364-7614, n=3)
+    broadcast bytes=1048576  5643 (5526-5748, n=3)
+    reduce bytes=4194304     29354 (29306-30512, n=3)
+    broadcast bytes=4194304  22054 (21868-22188, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k4-d8 pes=8 h=-
+    reduce bytes=65536       574 (573-579, n=3)
+    broadcast bytes=65536    406 (399-451, n=3)
+    reduce bytes=262144      1343 (1301-1368, n=3)
+    broadcast bytes=262144   934 (882-945, n=3)
+    reduce bytes=1048576     4788 (4745-4877, n=3)
+    broadcast bytes=1048576  3359 (3281-3400, n=3)
+    reduce bytes=4194304     19081 (18618-19400, n=3)
+    broadcast bytes=4194304  12825 (12512-13071, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k8-d1 pes=8 h=-
+    reduce bytes=65536       1010 (983-1018, n=3)
+    broadcast bytes=65536    765 (731-779, n=3)
+    reduce bytes=262144      3956 (3479-4022, n=3)
+    broadcast bytes=262144   2957 (2911-3044, n=3)
+    reduce bytes=1048576     15932 (15319-16531, n=3)
+    broadcast bytes=1048576  11715 (11624-11940, n=3)
+    reduce bytes=4194304     63122 (61204-63374, n=3)
+    broadcast bytes=4194304  47312 (47129-49312, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k8-d2 pes=8 h=-
+    reduce bytes=65536       624 (602-674, n=3)
+    broadcast bytes=65536    488 (477-491, n=3)
+    reduce bytes=262144      2285 (2275-2369, n=3)
+    broadcast bytes=262144   1748 (1719-1763, n=3)
+    reduce bytes=1048576     8831 (8698-9064, n=3)
+    broadcast bytes=1048576  6833 (6716-6965, n=3)
+    reduce bytes=4194304     36571 (35162-37366, n=3)
+    broadcast bytes=4194304  26441 (25760-26979, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k8-d4 pes=8 h=-
+    reduce bytes=65536       567 (482-582, n=3)
+    broadcast bytes=65536    357 (342-364, n=3)
+    reduce bytes=262144      1646 (1564-1687, n=3)
+    broadcast bytes=262144   1152 (1149-1153, n=3)
+    reduce bytes=1048576     6212 (6171-6394, n=3)
+    broadcast bytes=1048576  4321 (4303-4525, n=3)
+    reduce bytes=4194304     26419 (25898-27057, n=3)
+    broadcast bytes=4194304  17300 (16518-18947, n=3)
+    unsent limit 16384 B
+  shapes-fixed-k8-d8 pes=8 h=-
+    reduce bytes=65536       489 (482-539, n=3)
+    broadcast bytes=65536    375 (360-380, n=3)
+    reduce bytes=262144      1484 (1441-1530, n=3)
+    broadcast bytes=262144   963 (943-1018, n=3)
+    reduce bytes=1048576     6244 (6175-6350, n=3)
+    broadcast bytes=1048576  3861 (3597-3956, n=3)
+    reduce bytes=4194304     25245 (25120-26278, n=3)
+    broadcast bytes=4194304  14126 (14015-14158, n=3)
+    unsent limit 16384 B
+  shapes-link pes=8 h=-
+    reduce bytes=65536       515 (462-517, n=3)
+    broadcast bytes=65536    353 (348-508, n=3)
+    reduce bytes=262144      1626 (1015-1640, n=3)
+    broadcast bytes=262144   1182 (1116-1209, n=3)
+    reduce bytes=1048576     6256 (3182-6722, n=3)
+    broadcast bytes=1048576  4326 (4204-4464, n=3)
+    reduce bytes=4194304     25125 (12293-25898, n=3)
+    broadcast bytes=4194304  17261 (16153-17470, n=3)
+    link 2500 (1719-2787) MiB/s, hop 47.1 (42.4-49.0) us, message 20.0 (3.15-27.8) us; unsent limit 335562 (230688-374104) B
+  shapes-tree pes=8 h=-
+    reduce bytes=65536       507 (488-541, n=3)
+    broadcast bytes=65536    365 (352-372, n=3)
+    reduce bytes=262144      1625 (1614-1731, n=3)
+    broadcast bytes=262144   1174 (1168-1214, n=3)
+    reduce bytes=1048576     6499 (6340-6666, n=3)
+    broadcast bytes=1048576  4397 (4315-4567, n=3)
+    reduce bytes=4194304     25990 (25866-26220, n=3)
+    broadcast bytes=4194304  17571 (16669-17598, n=3)
+    link 3383 (2068-4762) MiB/s, hop 48.1 (45.9-53.9) us, message 19.8 (16.3-20.6) us; unsent limit 454109 (277593-639148) B
