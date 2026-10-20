@@ -5745,7 +5745,9 @@ descriptor's generation - how many times the PE has taken the number - times
 the size of the process's pool of descriptors, an integer never dereferenced,
 recovered by division, and accepted while the descriptor is live at that
 generation; a handle of a destroyed team is named as such, the more so when its
-number names another team since. **Under `SHMEM_THREAD_MULTIPLE`** (D7;
+number names another team since. The generation is 64 bits since P5
+(2026-10-20), bounded by what the sum can carry below 2^64 - about 2^45 takes
+of one number - where 32 ended the job at the 2^32nd. **Under `SHMEM_THREAD_MULTIPLE`** (D7;
 `tools/modelcheck/split_numbers_model.py`) a PE's free mask is one resource,
 which two splits' reductions can read at once and agree the same number from.
 Nothing is held across the split's first reduction, which waits for every

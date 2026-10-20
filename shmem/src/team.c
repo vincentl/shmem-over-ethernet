@@ -130,6 +130,7 @@
 #include "allocator.h"
 #include "barrier.h"
 #include "base/deadline.h"
+#include "base/environment.h"
 #include "base/futex.h"
 #include "base/sweep.h"
 #include "blocked.h"
@@ -177,6 +178,9 @@ static uint32_t numbered_count;
  */
 static struct osoe_team *created;
 static uint32_t created_count;
+/* The most generations a created team's handle can carry (handle_of), from
+ * where the array lies: about 2^45 takes of one number at the most numbers. */
+static uint64_t generation_most;
 
 /*
  * The numbers this PE holds (D1): bit t set from the moment a split agrees t
@@ -568,9 +572,8 @@ static void take_number(struct osoe_team *t)
  * generation times the array's size - an address past the array's end once
  * the number has been taken twice, never dereferenced, and never 0, 1 or 2,
  * the predefined handles, being at least the array's own. The arithmetic is on
- * integers: osoe runs on 64-bit address spaces, where a generation's 32 bits
- * times an array of at most 1,021 descriptors stays below 2^63 past any heap
- * address.
+ * integers: osoe runs on 64-bit address spaces, and a generation is at most
+ * generation_most, so that the sum stays below 2^64 for every descriptor.
  */
 static shmem_team_t handle_of(const struct osoe_team *t)
 {
@@ -597,7 +600,8 @@ static uint32_t created_number(shmem_team_t team, uint64_t *generation)
  * (osoe_team_of). The number stays held until the caller gives it back. */
 static void forget(struct osoe_team *t)
 {
-    uint32_t number = t->number, generation = t->generation;
+    uint32_t number = t->number;
+    uint64_t generation = t->generation;
     atomic_store_explicit(&numbered[number], NULL, memory_order_release);
     free((void *)t->local_ids);
     free((void *)t->local_ranks);
@@ -623,6 +627,18 @@ void osoe_team_start(void)
     pending = calloc(numbered_count, sizeof *pending);
     if (!numbered || !created || !held || !pending)
         osoe_fatal("out of memory for %u teams", numbered_count);
+    generation_most = (UINTPTR_MAX - (uintptr_t)(created + created_count)) /
+                      ((uintptr_t)created_count * sizeof *created);
+    /* OSOE_TEST_TEAM_GENERATION (P5): every created number taken that many
+     * times already, so that a test crosses 2^32 in a few splits. */
+    uint64_t start = 0;
+    if (osoe_environment_u64("OSOE_TEST_TEAM_GENERATION", &start) == OSOE_ENVIRONMENT_INVALID ||
+        start >= generation_most)
+        osoe_fatal("OSOE_TEST_TEAM_GENERATION='%s' is not a generation from 0 to %llu",
+                   getenv("OSOE_TEST_TEAM_GENERATION"),
+                   (unsigned long long)generation_most - 1);
+    for (uint32_t i = 0; i < created_count; i++)
+        created[i].generation = start;
     for (uint32_t number = 0; number < OSOE_PREDEFINED_TEAMS; number++)
         atomic_fetch_or_explicit(&held[number / 64], UINT64_C(1) << (number % 64),
                                  memory_order_seq_cst);
@@ -1147,10 +1163,10 @@ static void unshape(struct membership *m)
 static struct osoe_team *finish(struct membership *m, uint32_t number)
 {
     struct osoe_team *t = &created[number - OSOE_PREDEFINED_TEAMS];
-    uint32_t generation = t->generation;
-    if (generation == UINT32_MAX)
-        osoe_fatal("this PE has taken team number %u %u times, every generation a handle can "
-                   "name", number, generation);
+    uint64_t generation = t->generation;
+    if (generation >= generation_most)
+        osoe_fatal("this PE has taken team number %u %llu times, every generation a handle can "
+                   "name", number, (unsigned long long)generation);
     *t = m->shape;
     t->number = number;
     t->generation = generation + 1;

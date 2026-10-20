@@ -63,6 +63,10 @@
  * - OSOE_TEST_SPLIT=stale-handle: a destroyed team's handle used after its
  *   number names another team ends the job by name, rather than reaching the
  *   new team;
+ * - OSOE_TEST_SPLIT=generations, under OSOE_TEST_TEAM_GENERATION just below
+ *   2^32 (P5): the world again eight times under one number, its generation
+ *   crossing 32 bits - every handle another, and the first, destroyed, still
+ *   ending the job by name;
  * - OSOE_TEST_SPLIT=reuse: the world again, destroyed, and then a team of
  *   every PE but world PE 0, whose lead on PE 0's node is another PE: on that
  *   node the second team takes the first's block under another name, at
@@ -709,6 +713,38 @@ static void stale_handle(void)
 }
 
 /*
+ * OSOE_TEST_SPLIT=generations, under OSOE_TEST_TEAM_GENERATION=4294967292,
+ * 2^32 - 4 (P5): the world again and destroyed eight times under one number,
+ * the lowest free, its generation - which a handle carries (team.c,
+ * handle_of) - from 2^32 - 3 to 2^32 + 4. Each team works and has a handle no
+ * other had; the first's, destroyed, then names a number another team holds,
+ * which ends the job by name, as stale-handle's does below 2^32. A generation
+ * of 32 bits ended the job at the fourth split instead, and one that wrapped
+ * would have given the first team's handle to the seventh.
+ */
+static void generations(void)
+{
+    enum { CYCLES = 8 };
+    shmem_team_t handle[CYCLES];
+    for (int i = 0; i < CYCLES; i++) {
+        handle[i] = SHMEM_TEAM_INVALID;
+        check_made(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &handle[i]),
+                   handle[i]);
+        exercise(handle[i], &world_expected);
+        for (int j = 0; j < i; j++)
+            CHECK(handle[i] != handle[j]);
+        if (i < CYCLES - 1)
+            shmem_team_destroy(handle[i]);
+    }
+    shmem_barrier_all();
+    if (me == 0 && CHECK_DONE() == 0)
+        fprintf(stderr, "PE 0: every check before the stale handle passed\n");
+    shmem_barrier_all();
+    (void)shmem_team_my_pe(handle[0]);
+    CHECK(!"a destroyed handle was accepted");
+}
+
+/*
  * OSOE_TEST_SPLIT=reuse: the world again, its block on each node noted, then
  * destroyed; then every PE but world PE 0, whose lead on PE 0's node is the
  * node's next PE - so that, on a node of several PEs, the second team's name
@@ -811,6 +847,8 @@ int main(void)
         dry();
     } else if (mode && strcmp(mode, "stale-handle") == 0) {
         stale_handle();
+    } else if (mode && strcmp(mode, "generations") == 0) {
+        generations();
     } else if (mode && strcmp(mode, "reuse") == 0) {
         reuse();
     } else if (mode && strcmp(mode, "full") == 0) {

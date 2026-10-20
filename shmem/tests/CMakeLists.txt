@@ -1046,7 +1046,9 @@ endforeach()
 # OSOE_TEST_PRINT_LINK, which every PE reads at bootstrap and refuses unless it
 # is 0 or 1 - a value that is no number, and a number past 1; and H23's
 # OSOE_MESH_SLOT past its 100,000 microseconds or no number, and its hook
-# OSOE_TEST_MESH_HOLD without a time or naming a node the job has not.
+# OSOE_TEST_MESH_HOLD without a time or naming a node the job has not; and
+# P5's OSOE_TEST_TEAM_GENERATION no number, or past the generations a handle
+# can carry.
 foreach(case_expect
     "am-chunk|OSOE_AM_CHUNK|abc|OSOE_AM_CHUNK='abc' is not a decimal byte count"
     "am-buffer|OSOE_AM_BUFFER|abc|OSOE_AM_BUFFER='abc' is not a decimal byte count"
@@ -1066,7 +1068,9 @@ foreach(case_expect
     "mesh-slot|OSOE_MESH_SLOT|abc|OSOE_MESH_SLOT='abc' is not a whole number of microseconds from 0 to 100000"
     "mesh-slot-large|OSOE_MESH_SLOT|100001|OSOE_MESH_SLOT='100001' is not a whole number of microseconds from 0 to 100000"
     "test-mesh-hold|OSOE_TEST_MESH_HOLD|3|OSOE_TEST_MESH_HOLD='3' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds"
-    "test-mesh-hold-node|OSOE_TEST_MESH_HOLD|1:100|OSOE_TEST_MESH_HOLD='1:100' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds")
+    "test-mesh-hold-node|OSOE_TEST_MESH_HOLD|1:100|OSOE_TEST_MESH_HOLD='1:100' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds"
+    "test-team-generation|OSOE_TEST_TEAM_GENERATION|abc|OSOE_TEST_TEAM_GENERATION='abc' is not a generation from 0 to [0-9]+"
+    "test-team-generation-large|OSOE_TEST_TEAM_GENERATION|18446744073709551615|OSOE_TEST_TEAM_GENERATION='18446744073709551615' is not a generation from 0 to [0-9]+")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 label)
   list(GET parts 1 variable)
@@ -3648,6 +3652,16 @@ add_test(NAME shmem.team-split.stale-handle.L2
   COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=stale-handle SHMEM_SYMMETRIC_SIZE=16m
           $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
 set_tests_properties(shmem.team-split.stale-handle.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
+  PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed. the number names another team since"
+  FAIL_REGULAR_EXPRESSION "CHECK[(]")
+# A handle's generation past 32 bits (P5): eight splits under one number from
+# OSOE_TEST_TEAM_GENERATION=2^32 - 4, then the first handle, destroyed - its
+# end the stale handle's, named. At 32 bits the job ended at the fourth split.
+add_test(NAME shmem.team-split.generations.L2
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_SPLIT=generations
+          OSOE_TEST_TEAM_GENERATION=4294967292 SHMEM_SYMMETRIC_SIZE=16m
+          $<TARGET_FILE:osoe-launch> -n 2 -t 60 -- $<TARGET_FILE:shmem_test_team-split>)
+set_tests_properties(shmem.team-split.generations.L2 PROPERTIES LABELS "tier2" TIMEOUT 90
   PASS_REGULAR_EXPRESSION "every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed. the number names another team since"
   FAIL_REGULAR_EXPRESSION "CHECK[(]")
 if(OSOE_INTERNODE)
