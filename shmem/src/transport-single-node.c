@@ -133,6 +133,12 @@ bool osoe_internode_backend_node_idle(uint64_t *applied)
     unreachable("osoe_internode_backend_node_idle");
 }
 
+bool osoe_internode_backend_owns_thread(int32_t tid)
+{
+    (void)tid;
+    unreachable("osoe_internode_backend_owns_thread");
+}
+
 bool osoe_internode_backend_node_quiet(uint64_t *applied)
 {
     (void)applied;

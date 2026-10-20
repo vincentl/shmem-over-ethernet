@@ -187,6 +187,11 @@ void osoe_internode_backend_agent_abort(void);
 bool osoe_internode_backend_node_idle(uint64_t *applied);
 bool osoe_internode_backend_node_quiet(uint64_t *applied);
 void osoe_internode_backend_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m);
+/* Whether thread `tid` of this node's lead's process is one of the backend's
+ * own (transport.h, backend_thread): on AM a progress helper, which names
+ * itself in its owner record before its first turn; a backend on RDMA, the
+ * threads it starts. */
+bool osoe_internode_backend_owns_thread(int32_t tid);
 
 /* ---- Contexts (§4.11) ------------------------------------------------- */
 

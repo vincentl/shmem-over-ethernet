@@ -4002,6 +4002,21 @@ foreach(case IN LISTS deadlock_cases)
     osoe_internode_label(shmem.deadlock.${mode}.${label})
   endif()
 endforeach()
+# The same deadlock on two nodes with two progress helpers each (P28): the
+# lead's helpers are threads of its process that the detector must count as
+# the library's, which it asks the backend (transport.h, backend_thread) -
+# counted as the program's, the lead never sleeps in the library entire, and
+# the deadlock is never proved.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  add_test(NAME shmem.deadlock.waits.helpers.0-0-1-1
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1 OSOE_PROGRESS_HELPERS=2
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+            $<TARGET_FILE:shmem_test_deadlock> waits)
+  set_tests_properties(shmem.deadlock.waits.helpers.0-0-1-1 PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
+  osoe_internode_label(shmem.deadlock.waits.helpers.0-0-1-1)
+endif()
 foreach(case "computing|0,0,0,0" "computing|0,0,1,1" "sleeping|0,0,0,0" "sleeping|0,0,1,1"
              "helper|0,0,0,0"
              "helper|0,0,1,1" "busy|0,0,0,0" "busy|0,0,1,1")

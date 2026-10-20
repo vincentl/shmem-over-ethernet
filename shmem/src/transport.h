@@ -298,11 +298,18 @@ void osoe_transport_agent_abort(void);
  * deadlock_send: carry `m` to `node`'s lead, whose backend hands it to
  * osoe_deadlock_message there. Not application work: it counts in neither the
  * sender's nor the receiver's activity, nor needs applying for quiet.
+ *
+ * backend_thread: is thread `tid`, of this node's lead's process, one of the
+ * backend's own - on AM a progress helper - which the detector counts as the
+ * library's, as it does the agent, and not as the program's? A job of one
+ * node has none. Through the backend (P28), so that the detector reads no
+ * record of AM's.
  */
 struct osoe_deadlock_message;
 bool osoe_transport_agent_node_idle(uint64_t *applied);
 bool osoe_transport_agent_node_quiet(uint64_t *applied);
 void osoe_transport_agent_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m);
+bool osoe_transport_agent_backend_thread(int32_t tid);
 
 /* ---- Locality -------------------------------------------------------- */
 

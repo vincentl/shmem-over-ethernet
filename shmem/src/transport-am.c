@@ -237,6 +237,12 @@ bool osoe_transport_agent_node_idle(uint64_t *applied)
     return true;
 }
 
+/* A job of one node has no backend threads (transport.h). */
+bool osoe_transport_agent_backend_thread(int32_t tid)
+{
+    return internode && osoe_internode_backend_owns_thread(tid);
+}
+
 bool osoe_transport_agent_node_quiet(uint64_t *applied)
 {
     if (internode)

@@ -428,6 +428,18 @@ bool osoe_internode_backend_node_quiet(uint64_t *applied)
     return osoe_progress_host_quiet(applied);
 }
 
+/* AM's own threads beside the agent: the progress helpers, owners 1 on of the
+ * node's owner records (node.h, layout 36), each of which names itself there
+ * before its first turn - one not named yet counts as the program's, and a
+ * sample that sees it awake fails, as for any thread of the program's. */
+bool osoe_internode_backend_owns_thread(int32_t tid)
+{
+    for (uint32_t o = 1; o < osoe.node.owner_count; o++)
+        if (atomic_load_explicit(&osoe.node.owner_metrics[o].tid, memory_order_acquire) == tid)
+            return true;
+    return false;
+}
+
 void osoe_internode_backend_deadlock_send(uint32_t node, const struct osoe_deadlock_message *m)
 {
     osoe_progress_host_deadlock_send(node, m);
