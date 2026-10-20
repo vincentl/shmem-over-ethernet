@@ -3657,11 +3657,12 @@ set_tests_properties(shmem.team-split.stale-handle.L2 PROPERTIES LABELS "tier2" 
 # A split whose PEs pass different arguments (P6): PE 1 another size, or
 # another xrange, than the rest - each valid on its own PE - ends the job by name
 # in the split's reduction, on one node and on two, where before PE 1 left the
-# team out and the others waited. Its pass the job's end, named, as the stale
-# handle's.
+# team out and the others waited. Its pass the job's end, named by whichever PE
+# ends it first - on one node the launcher can end the rest before they print -
+# as the stale handle's.
 foreach(case_expect
-    "divergent|start 0, stride 1 and size 4"
-    "divergent-2d|xrange 2")
+    "divergent|start 0, stride 1 and size [34]"
+    "divergent-2d|xrange [12]")
   string(REPLACE "|" ";" parts "${case_expect}")
   list(GET parts 0 mode)
   list(GET parts 1 passed)
@@ -3675,7 +3676,7 @@ foreach(case_expect
               $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
               $<TARGET_FILE:shmem_test_team-split>)
     set_tests_properties(shmem.team-split.${mode}.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
-      PASS_REGULAR_EXPRESSION "osoe: PE 0: shmem_team_split_[a-z2]+: the parent team's PEs called it with different arguments, which spec .*same on every PE. this PE passed ${passed}"
+      PASS_REGULAR_EXPRESSION "osoe: PE [0-3]: shmem_team_split_[a-z2]+: the parent team's PEs called it with different arguments, which spec .*same on every PE. this PE passed ${passed}"
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     if(map STREQUAL "0,0,1,1")
       osoe_internode_label(shmem.team-split.${mode}.${label})
