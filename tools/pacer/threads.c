@@ -37,6 +37,25 @@
  *              keeping what it added where: at each checkpoint the sums over
  *              the team of what was added must be what the counters hold.
  *
+ * and, after the four contexts, a fifth phase that is not a context:
+ *
+ *   collectives  a team of the thread's own. Each slice a thread splits its own
+ *              copy of the exercise's team, made at setup, into a team of a
+ *              shape of its own - all the PEs, all but the first, the even
+ *              ones, the order reversed - and on it makes a sum, an inclusive
+ *              scan, a broadcast from a turning root and an exclusive scan;
+ *              then on the copy a large sum and a large inclusive and
+ *              exclusive scan, and on the team a second sum, and destroys the
+ *              team. The sizes, 64 to 40,000 bytes, lie either side of the
+ *              library's class line, so that a thread's collectives are small
+ *              and large, and a large one goes through the lane its thread
+ *              lends (design §5.8). Each result is poisoned first and checked
+ *              against the sum of the members' words. No other phase, and no
+ *              other exercise, has two threads of a PE lead collectives at
+ *              once, so that a lane shared by threads - which the library's
+ *              shmem.lanes.threads sees - was invisible to `mix`,
+ *              `collectives` and `teams` (round six's correctness H1, T25).
+ *
  * The driver stays on the main thread: step releases the workers for `units`
  * slices each and waits for all of them; checkpoint, the oracle's reduction
  * and parallel_print run with the workers parked. Initialized with
@@ -65,15 +84,36 @@ enum { ROW = 16, TABLE = 16, GETS = 4, COUNTERS = 8, ADDS = 4, CONTEXTS = 4,
        LARGE_WORDS = 2560, LARGE_STARTS = 8, OPERATIONS = 4 + GETS + ADDS };
 enum kind { PRIVATE, SERIALIZED, DEFAULT, TEAM };
 static const char *const context_names[CONTEXTS] = { "private", "serialized", "default", "team" };
-static const char *const phase_names[] = { "private", "serialized", "default", "team", NULL };
+
+/*
+ * The collectives phase. Its sizes, in 8-byte words, either side of the
+ * library's class line (OSOE_SMALL_COLLECTIVE_BYTES, 1 KiB by default): 8 and
+ * 128 are small; 129 is large in one piece, 2,048 (16 KiB) in two and 5,000
+ * (40,000 bytes) in three. A broadcast of a size's words takes 3 bytes fewer,
+ * so that its end is not a whole word. COLLECTIVE_WORDS is the largest, and a
+ * phase is timed beside the contexts' four, so PHASES.
+ */
+enum { COLLECTIVES_PHASE = CONTEXTS, PHASES, COLLECTIVE_WORDS = 5000, COLLECTIVE_SIZES = 5,
+       COLLECTIVE_SHAPES = 4 };
+static const size_t collective_sizes[COLLECTIVE_SIZES] = { 8, 128, 129, 2048, COLLECTIVE_WORDS };
+static const char *const phase_names[] = { "private", "serialized", "default", "team",
+                                           "collectives", NULL };
+enum collective_kind { SUM, INSCAN, BROADCAST, EXSCAN, COLLECTIVE_KINDS };
+static const char *const collective_names[COLLECTIVE_KINDS] = {
+    "sum_reduce", "sum_inscan", "broadcast", "sum_exscan"
+};
 
 struct worker {
     pthread_t thread;
     int index;
     shmem_ctx_t own[2];             /* private, serialized */
+    shmem_team_t parent;            /* its own copy of the team, which its collectives split */
     uint64_t *added;                /* [n][COUNTERS]: what this thread added where */
     uint64_t *large_buffer;         /* [LARGE_WORDS]: where its large get lands */
-    double operations, seconds[CONTEXTS];
+    uint64_t *source, *dest;        /* symmetric, [COLLECTIVE_WORDS]: a sum's or scan's */
+    unsigned char *broadcast_source, *broadcast_dest;   /* symmetric, 8 * COLLECTIVE_WORDS */
+    uint64_t *expected;             /* [COLLECTIVE_WORDS]: what `dest` must hold, or as bytes */
+    double operations, seconds[PHASES];
     int failed_to_start;
 };
 
@@ -82,6 +122,7 @@ static struct {
     int count;                      /* T */
     uint64_t seed;
     int plant_row, plant_table, plant_count, plant_pieces;
+    int plant_collective[COLLECTIVE_KINDS];     /* a result still to be changed, by kind */
     /* the team, and the world reversed for the team context */
     shmem_team_t team, reversed;
     shmem_ctx_t team_context;
@@ -113,9 +154,14 @@ static uint64_t threads_memory(int npes, const struct pacer_options *options, ch
 {
     uint64_t n = (uint64_t)npes, t = (uint64_t)options->threads;
     uint64_t large = 8 * (LARGE_WORDS + t * LARGE_STARTS);  /* the array, and its mirror here */
+    /* A thread's collectives: a source and a result of words, and the same of
+     * bytes for a broadcast, all symmetric; privately, the words that the result
+     * must hold. */
+    uint64_t collectives = 8 * t * 4 * COLLECTIVE_WORDS;
     uint64_t symmetric = 8 * (2 * t * CONTEXTS * ROW + t * TABLE + COUNTERS + 2 * n * COUNTERS) +
-                         large;
-    uint64_t private_bytes = 8 * (t + 1) * n * COUNTERS + 8 * n + large + 8 * t * LARGE_WORDS;
+                         large + collectives;
+    uint64_t private_bytes = 8 * (t + 1) * n * COUNTERS + 8 * n + large + 8 * t * LARGE_WORDS +
+                             8 * t * COLLECTIVE_WORDS;
     if (symmetric > options->memory || private_bytes > options->memory) {
         snprintf(fields, size, "%d threads on %d PEs need %llu bytes", options->threads, npes,
                  (unsigned long long)(symmetric > private_bytes ? symmetric : private_bytes));
@@ -127,9 +173,12 @@ static uint64_t threads_memory(int npes, const struct pacer_options *options, ch
     threads.plant_table = options->plant == PACER_PLANT_THREADS_TABLE;
     threads.plant_count = options->plant == PACER_PLANT_THREADS_COUNT;
     threads.plant_pieces = options->plant == PACER_PLANT_THREADS_PIECES;
+    for (int k = 0; k < COLLECTIVE_KINDS; k++)
+        threads.plant_collective[k] = options->plant == PACER_PLANT_THREADS_COLLECTIVE;
     snprintf(fields, size, "threads=%d contexts=private,serialized,default,team row=%d "
-             "large_get=%d gets=%d counters=%d", threads.count, ROW * 8, LARGE_WORDS * 8, GETS,
-             COUNTERS);
+             "large_get=%d gets=%d counters=%d collectives=sum,inscan,broadcast,exscan "
+             "collective_bytes=%d..%d", threads.count, ROW * 8, LARGE_WORDS * 8, GETS, COUNTERS,
+             (int)(8 * collective_sizes[0]), 8 * COLLECTIVE_WORDS);
     return symmetric;
 }
 
@@ -269,6 +318,224 @@ static void on_context(struct worker *w, enum kind k, shmem_ctx_t ctx, long slic
     w->seconds[k] += pacer_now() - started;
 }
 
+/* ---- one slice of one worker: collectives on a team of its own --------------- */
+
+/*
+ * A team a thread splits from its own copy of the exercise's team: a
+ * progression of the copy's ranks, so that the oracle knows its members without
+ * asking the library.
+ */
+struct collective_team {
+    shmem_team_t handle;            /* SHMEM_TEAM_INVALID where this PE is not a member */
+    const char *shape;              /* named in a failure line */
+    int start, stride, size;        /* member j is the copy's rank start + j * stride */
+    int rank;                       /* this PE's place in it, or -1 */
+};
+
+/*
+ * The shape of thread `thread`'s team in slice `slice`: all the PEs; all but the
+ * first; the even ones; the order reversed. Every PE works it out alike, since
+ * the split is a call that every PE of the copy makes. All but the first is
+ * empty on one PE, and is then all.
+ */
+static struct collective_team shape_of(int thread, long slice, int n, int me)
+{
+    int shape = (int)((slice + thread) % COLLECTIVE_SHAPES);
+    struct collective_team team = { SHMEM_TEAM_INVALID, "all", 0, 1, n, -1 };
+    if (shape == 1 && n > 1) {
+        team.shape = "all-but-first";
+        team.start = 1;
+        team.size = n - 1;
+    } else if (shape == 2) {
+        team.shape = "even";
+        team.stride = 2;
+        team.size = (n + 1) / 2;
+    } else if (shape == 3) {
+        team.shape = "reversed";
+        team.start = n - 1;
+        team.stride = -1;
+    }
+    int offset = me - team.start;
+    if (offset % team.stride == 0 && offset / team.stride >= 0 && offset / team.stride < team.size)
+        team.rank = offset / team.stride;
+    return team;
+}
+
+/*
+ * What a PE gives stage `stage` of a slice: word i is the finalized sum of a
+ * base, which only the PE, the thread, the slice and the stage determine, and i.
+ * A stage's words are its own, so that a piece of another stage's collective, or
+ * another thread's, cannot pass for this one's.
+ */
+static uint64_t collective_base(int pe, int thread, long slice, int stage)
+{
+    return random_mix(threads.seed ^ random_name("collectives"), (uint64_t)pe,
+                      ((uint64_t)thread << 48) | ((uint64_t)stage << 40) | (uint64_t)slice, 0);
+}
+
+static uint64_t collective_word(uint64_t base, size_t i)
+{
+    return random_finalize(base + (uint64_t)i * UINT64_C(0x9e3779b97f4a7c15));
+}
+
+/* `bytes` bytes of those words, a word's lowest byte first. */
+static void collective_bytes(unsigned char *out, size_t bytes, uint64_t base)
+{
+    for (size_t i = 0; i < bytes; i += 8) {
+        uint64_t word = collective_word(base, i / 8);
+        for (size_t b = 0; b < 8 && i + b < bytes; b++)
+            out[i + b] = (unsigned char)(word >> (8 * b));
+    }
+}
+
+/* The planted defect, once for each kind: thread 0 of PE 1 reads a bit of the
+ * first result of that kind it checks wrong. */
+static int plant_result(const struct worker *w, enum collective_kind kind)
+{
+    if (w->index != 0 || threads.me_world != 1 || !threads.plant_collective[kind])
+        return 0;
+    threads.plant_collective[kind] = 0;
+    return 1;
+}
+
+/*
+ * One sum or scan of `count` words on `team`: the result poisoned first, so that
+ * a word the call did not write cannot pass for one it did, the status checked,
+ * and then every word against the sum of the members' words that it must hold -
+ * all the members', those up to this rank and this rank's, or those before it.
+ */
+static void words_stage(struct worker *w, long slice, int stage, enum collective_kind kind,
+                        const struct collective_team *team, size_t count)
+{
+    uint64_t mine = collective_base(threads.me_world, w->index, slice, stage);
+    for (size_t i = 0; i < count; i++)
+        w->source[i] = collective_word(mine, i);
+    memset(w->dest, 0xa5, sizeof *w->dest * count);
+    int status = kind == SUM ? shmem_uint64_sum_reduce(team->handle, w->dest, w->source, count)
+                 : kind == INSCAN ? shmem_uint64_sum_inscan(team->handle, w->dest, w->source, count)
+                 : shmem_uint64_sum_exscan(team->handle, w->dest, w->source, count);
+    w->operations += 1;
+    if (plant_result(w, kind))
+        w->dest[0] ^= 1;            /* the planted defect: a bit of the result wrong */
+    if (status != 0) {
+        pacer_failure("threads round=%ld collectives: thread %d %s of %zu words on team %s of %d "
+                      "returned %d", slice, w->index, collective_names[kind], count, team->shape,
+                      team->size, status);
+        return;
+    }
+    int last = kind == SUM ? team->size - 1 : kind == INSCAN ? team->rank : team->rank - 1;
+    memset(w->expected, 0, sizeof *w->expected * count);
+    for (int j = 0; j <= last; j++) {
+        uint64_t base = collective_base(threads.world[team->start + j * team->stride], w->index,
+                                        slice, stage);
+        for (size_t i = 0; i < count; i++)
+            w->expected[i] += collective_word(base, i);
+    }
+    for (size_t i = 0; i < count; i++)
+        if (w->dest[i] != w->expected[i]) {
+            pacer_failure("threads round=%ld collectives: thread %d %s of %zu words on team %s of "
+                          "%d: element %zu is %016llx, expected %016llx", slice, w->index,
+                          collective_names[kind], count, team->shape, team->size, i,
+                          (unsigned long long)w->dest[i], (unsigned long long)w->expected[i]);
+            return;
+        }
+}
+
+/*
+ * One broadcast of `bytes` bytes on `team`, from the rank the slice turns to:
+ * every member's, the root's included, must hold the root's bytes.
+ */
+static void broadcast_stage(struct worker *w, long slice, int stage,
+                            const struct collective_team *team, size_t bytes)
+{
+    int root = (int)(slice % team->size);
+    collective_bytes(w->broadcast_source, bytes,
+                     collective_base(threads.me_world, w->index, slice, stage));
+    memset(w->broadcast_dest, 0xee, bytes);
+    int status = shmem_broadcastmem(team->handle, w->broadcast_dest, w->broadcast_source, bytes,
+                                    root);
+    w->operations += 1;
+    if (plant_result(w, BROADCAST))
+        w->broadcast_dest[0] ^= 1;  /* the planted defect: a bit of the result wrong */
+    if (status != 0) {
+        pacer_failure("threads round=%ld collectives: thread %d broadcast of %zu bytes on team %s "
+                      "of %d returned %d", slice, w->index, bytes, team->shape, team->size, status);
+        return;
+    }
+    unsigned char *expected = (unsigned char *)w->expected;
+    int root_pe = threads.world[team->start + root * team->stride];
+    collective_bytes(expected, bytes, collective_base(root_pe, w->index, slice, stage));
+    for (size_t i = 0; i < bytes; i++)
+        if (w->broadcast_dest[i] != expected[i]) {
+            pacer_failure("threads round=%ld collectives: thread %d broadcast of %zu bytes on team "
+                          "%s of %d from rank %d: byte %zu is %02x, expected %02x", slice,
+                          w->index, bytes, team->shape, team->size, root, i, w->broadcast_dest[i],
+                          expected[i]);
+            return;
+        }
+}
+
+/*
+ * The slice's collectives: a split of the thread's copy into a team of this
+ * slice's shape; on it a sum, an inclusive scan, a broadcast and an exclusive
+ * scan; on the copy a large sum and a large inclusive and exclusive scan; a
+ * second sum on the team; the team's destroy. So the thread's one lane serves
+ * reductions, broadcasts and scans of two teams in turn while the PE's other
+ * threads use theirs. The team's two sizes turn with the slice and the thread
+ * through collective_sizes, two places apart, so that a thread's first and
+ * second are on either side of the class line in turn. The copy's are always
+ * large, and every thread's copy is the same team: in every slice the PE's
+ * threads have large scans of one tree in flight at once. The teams' scans, whose
+ * shapes differ from thread to thread, meet by chance, and a scan through a lane
+ * that another thread's scan shares fails only when they do (T25: the teams'
+ * scans alone missed that mutant in 3 runs of 25).
+ */
+static void collectives_round(struct worker *w, long slice)
+{
+    double started = pacer_now();
+    int n = threads.n;
+    struct collective_team team = shape_of(w->index, slice, n, threads.me);
+    size_t first = collective_sizes[(slice + w->index) % COLLECTIVE_SIZES];
+    size_t second = collective_sizes[(slice + w->index + 2) % COLLECTIVE_SIZES];
+
+    int status = shmem_team_split_strided(w->parent, team.start, team.stride, team.size, NULL, 0,
+                                          &team.handle);
+    w->operations += 1;
+    int usable = 0;
+    if (status != 0) {
+        pacer_failure("threads round=%ld collectives: thread %d split of team %s returned %d",
+                      slice, w->index, team.shape, status);
+    } else if ((team.handle != SHMEM_TEAM_INVALID) != (team.rank >= 0)) {
+        pacer_failure("threads round=%ld collectives: thread %d split of team %s %s", slice,
+                      w->index, team.shape, team.rank >= 0 ? "gave this member no team"
+                                                           : "gave a team to a PE outside it");
+    } else if (team.rank >= 0) {
+        usable = 1;
+        int size = shmem_team_n_pes(team.handle), rank = shmem_team_my_pe(team.handle);
+        if (size != team.size || rank != team.rank)
+            pacer_failure("threads round=%ld collectives: thread %d team %s: team_n_pes %d and "
+                          "team_my_pe %d, expected %d and %d", slice, w->index, team.shape, size,
+                          rank, team.size, team.rank);
+    }
+    if (usable) {
+        words_stage(w, slice, 0, SUM, &team, first);
+        words_stage(w, slice, 1, INSCAN, &team, second);
+        broadcast_stage(w, slice, 2, &team, second * 8 - 3);
+        words_stage(w, slice, 3, EXSCAN, &team, first);
+    }
+    struct collective_team copy = { w->parent, "copy", 0, 1, n, threads.me };
+    words_stage(w, slice, 4, SUM, &copy, 2048 + (size_t)(slice % 3));
+    words_stage(w, slice, 5, INSCAN, &copy, COLLECTIVE_WORDS);
+    words_stage(w, slice, 6, EXSCAN, &copy, 2048 + (size_t)((slice + 1) % 3));
+    if (usable)
+        words_stage(w, slice, 7, SUM, &team, second);
+    if (team.handle != SHMEM_TEAM_INVALID) {
+        shmem_team_destroy(team.handle);
+        w->operations += 1;
+    }
+    w->seconds[COLLECTIVES_PHASE] += pacer_now() - started;
+}
+
 static void slice_of(struct worker *w, long slice)
 {
     uint64_t state = random_mix(threads.seed, random_name("threads"),
@@ -281,6 +548,7 @@ static void slice_of(struct worker *w, long slice)
     on_context(w, SERIALIZED, w->own[1], slice, &state);
     on_context(w, DEFAULT, SHMEM_CTX_DEFAULT, slice, &state);
     on_context(w, TEAM, threads.team_context, slice, &state);
+    collectives_round(w, slice);
 }
 
 static void *worker_main(void *argument)
@@ -371,6 +639,21 @@ static int threads_setup(shmem_team_t team, const struct pacer_options *options)
     if (threads.plant_pieces && threads.me_world == 1)
         threads.large[LARGE_WORDS - 1] ^= 1;    /* the planted defect: a word at the end of
                                                  * every large get's last piece */
+    /* Each thread's collectives: buffers of its own, and its own copy of the
+     * team to split. Two threads may not make calls on one team at once, so each
+     * splits a copy, made here with the symmetric allocations, on the main
+     * thread. */
+    for (int th = 0; th < t; th++) {
+        struct worker *w = &threads.workers[th];
+        w->source = shmem_malloc(sizeof *w->source * COLLECTIVE_WORDS);
+        w->dest = shmem_malloc(sizeof *w->dest * COLLECTIVE_WORDS);
+        w->broadcast_source = shmem_malloc(8 * COLLECTIVE_WORDS);
+        w->broadcast_dest = shmem_malloc(8 * COLLECTIVE_WORDS);
+        w->expected = malloc(sizeof *w->expected * COLLECTIVE_WORDS);
+        if (!w->source || !w->dest || !w->broadcast_source || !w->broadcast_dest || !w->expected ||
+            shmem_team_split_strided(team, 0, 1, n, NULL, 0, &w->parent) != 0)
+            return -1;
+    }
     shmem_quiet();
     shmem_team_sync(team);          /* every array written before any worker reads one */
 
@@ -415,14 +698,14 @@ static void threads_checkpoint(struct pacer_counters *counters)
 {
     int n = threads.n;
     size_t cells = (size_t)n * COUNTERS;
-    double seconds[CONTEXTS] = { 0 }, operations = 0;
+    double seconds[PHASES] = { 0 }, operations = 0;
     for (int th = 0; th < threads.count; th++) {
         struct worker *w = &threads.workers[th];
         for (size_t c = 0; c < cells; c++) {
             threads.added[c] += w->added[c];
             w->added[c] = 0;
         }
-        for (int k = 0; k < CONTEXTS; k++) {
+        for (int k = 0; k < PHASES; k++) {
             seconds[k] += w->seconds[k];
             w->seconds[k] = 0;
         }
@@ -440,7 +723,7 @@ static void threads_checkpoint(struct pacer_counters *counters)
                           (unsigned long long)want);
     }
     counters->work = operations;
-    for (int k = 0; k < CONTEXTS; k++)
+    for (int k = 0; k < PHASES; k++)
         counters->phase_seconds[k] = seconds[k];
 }
 
@@ -452,6 +735,7 @@ static void threads_teardown(void)
     pthread_mutex_unlock(&threads.lock);
     for (int th = 0; th < threads.count; th++) {
         pthread_join(threads.workers[th].thread, NULL);
+        free(threads.workers[th].expected);
         free(threads.workers[th].large_buffer);
         free(threads.workers[th].added);
     }
@@ -462,6 +746,15 @@ static void threads_teardown(void)
     shmem_team_sync(threads.team);
     shmem_ctx_destroy(threads.team_context);
     shmem_team_destroy(threads.reversed);
+    for (int th = 0; th < threads.count; th++)
+        shmem_team_destroy(threads.workers[th].parent);
+    for (int th = threads.count; th-- > 0;) {
+        struct worker *w = &threads.workers[th];
+        shmem_free(w->broadcast_dest);
+        shmem_free(w->broadcast_source);
+        shmem_free(w->dest);
+        shmem_free(w->source);
+    }
     shmem_free(threads.reduce_total);
     shmem_free(threads.reduce_source);
     shmem_free(threads.counters);

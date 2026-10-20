@@ -61,6 +61,10 @@
  * OSOE_DEFAULT_SYMMETRIC_SIZE, which is internal. */
 #define DEFAULT_HEAP (UINT64_C(256) << 20)
 
+/* The library's default OSOE_MAX_TEAMS, bootstrap.h's OSOE_MAX_TEAMS_DEFAULT,
+ * which is internal too. */
+#define DEFAULT_MAX_TEAMS 256
+
 enum { FAILURE_LINES = 8, FAILURE_LINE = 320, DISTINCT_FAILURES = 16 };
 #define MOST_UNITS (1L << 24)
 
@@ -87,7 +91,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
     "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
     "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back",
-    "threads-pieces"
+    "threads-pieces", "threads-collective"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -98,7 +102,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
     "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
     "deprecated", "deprecated", "deprecated", "deprecated", "deprecated", "waits", "teams",
-    "teams", "threads"
+    "teams", "threads", "threads"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -173,6 +177,7 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 misreads the status of one renewal's split",
     "PE 1 misreads the status of the split that follows the exhaust's destroys",
     "PE 1 changes a word at the end of every large get's pieces",
+    "PE 1's thread 0 changes a bit of the first result of each kind of collective it checks",
 };
 
 static void usage(FILE *out)
@@ -199,7 +204,8 @@ static void usage(FILE *out)
 "  collectives\n"
 "            every collective on every type, and each timed from 8 B to\n"
 "            1 MiB on the world and on a strided team\n"
-"  threads   worker threads on private, serialized, default and team contexts;\n"
+"  threads   worker threads on private, serialized, default and team contexts,\n"
+"            and each leading sums, scans and broadcasts on teams of its own;\n"
 "            only when named, since it runs under SHMEM_THREAD_MULTIPLE\n"
 "  print     parallel_print checking its own lines; only when named\n"
 "  deprecated\n"
@@ -636,6 +642,18 @@ static int parse(int argc, char **argv)
             if ((!text || (end != text && !*end)) && options.threads + 1 > most)
                 return refuse("--threads %d: with the main thread, more than OSOE_MAX_THREADS=%ld "
                               "admits; raise it, to 1023 at most", options.threads, most);
+            /* And OSOE_MAX_TEAMS teams a PE may be in at once (README): the
+             * collectives of each thread hold two numbers, its copy of the
+             * team and the team it splits from the copy, beside the three the
+             * library keeps and the one the team context's team holds. */
+            text = getenv("OSOE_MAX_TEAMS");
+            end = NULL;
+            long teams = text ? strtol(text, &end, 10) : DEFAULT_MAX_TEAMS;
+            if ((!text || (end != text && !*end)) && 2L * options.threads + 4 > teams)
+                return refuse("--threads %d: the collectives of each thread hold two team numbers, "
+                              "more than OSOE_MAX_TEAMS=%ld admits beside the library's three and "
+                              "the exercise's one; raise it, to 1024 at most", options.threads,
+                              teams);
         }
     return 0;
 }

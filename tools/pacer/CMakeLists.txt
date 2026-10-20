@@ -347,6 +347,17 @@ if(OSOE_INTERNODE)
     pacer_plant(threads-pieces threads
       "threads round=0 private pieces: thread [0-9]+ read 1 of 2560 words of PE 1's array wrong, words [0-9]+ to [0-9]+ of the get, the last [0-9a-f]+, not [0-9a-f]+"
       "osoe-pacer failures=128 ")
+    # The collectives phase's checks, one bit of the first result of each kind
+    # that PE 1's thread 0 checks: on its first slice's team of all four PEs, the
+    # first sum (8 words), the inclusive scan (129, a large one), the broadcast
+    # (1,029 bytes, from rank 0) and the exclusive scan (8). Each is a line of PE
+    # 1's alone, and nothing else is wrong: 4 failures.
+    pacer_plant(threads-collective threads
+      "threads round=0 collectives: thread 0 sum_reduce of 8 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
+      "threads round=0 collectives: thread 0 sum_inscan of 129 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
+      "threads round=0 collectives: thread 0 broadcast of 1029 bytes on team all of 4 from rank 0: byte 0 is [0-9a-f]+, expected [0-9a-f]+"
+      "threads round=0 collectives: thread 0 sum_exscan of 8 words on team all of 4: element 0 is [0-9a-f]+, expected [0-9a-f]+"
+      "osoe-pacer failures=4 ")
     pacer_plant(teams-query teams
       "teams [a-z]+: team_n_pes [0-9]+ and team_my_pe [0-9]+, expected [0-9]+ and [0-9]+"
       "teams [a-z]+: rank 0 translates to world PE [0-9]+, expected [0-9]+"
@@ -613,7 +624,24 @@ endif()
 # 0, one PE a node, where every writer of a PE's memory is a thread of the
 # process tsan sees - 0 so that the single-node build runs it there too (the
 # v0.2 step 1 review, correctness K1).
-set(pacer_threads_maps 0,0,0,0 0,1,2,3 0,0,0,1,1,2 0,1,0,1 0,1,2,0,1,0)
+#
+# Its collectives phase, in which each thread leads sums, scans and broadcasts
+# on teams of its own (T25; round six's H1), is why 0,1,2,3 and 0,0,1,1,2,2 are
+# here: the maps of the library's shmem.lanes.threads and its two-a-node twin,
+# one PE a logical node, where every PE is a lead, and two a node, where a node
+# has a lead and a PE that is not. A lane shared by threads - own_lane in
+# internode-generic.c returning 0, or the scans' lane bound to 0 - passed
+# the pacer's other exercises, mix, collectives and teams among them, because
+# none of them has two threads of a PE lead collectives at once (the review; and
+# the rest of this file's tests pass under either mutant, 2026-10-20). These
+# fail it: 20 runs of 20 on each of the five maps of more than one node, for
+# each mutant, the first by the library's own message that a piece is another
+# collective's or nothing, the second by wrong prefix sums with status 0, which
+# the team's scans alone missed in 3 runs of 25 and the copy's large scans do not.
+# 0,0,1,1,2,2 is not run under tsan, as shmem.lanes.threads.two-a-node is not: a
+# lead's agent writes its node-mate's heap from another process, which tsan
+# cannot see ordered.
+set(pacer_threads_maps 0,0,0,0 0,1,2,3 0,0,0,1,1,2 0,1,0,1 0,1,2,0,1,0 0,0,1,1,2,2)
 if(CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set(pacer_threads_maps 0,1 0)
 endif()
