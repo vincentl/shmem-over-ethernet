@@ -1377,7 +1377,7 @@ static int split(const char *routine, struct osoe_team *parent, uint32_t numbers
         dry = false;
         for (uint32_t i = 0; i < mine_count; i++)
             if (leads(&mine[i]) && mine[i].block == UINT32_MAX) {
-                mine[i].block = osoe_node_team_claim(&osoe.node);
+                mine[i].block = osoe_node_team_claim(&osoe.node, osoe.bootstrap.local_id);
                 dry |= mine[i].block == UINT32_MAX;
             }
         uint64_t *words = osoe_team_split_words(parent);

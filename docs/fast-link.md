@@ -704,3 +704,51 @@ builds whose choice was an environment variable, and merged none
 so `main` has no setting that turns them on, and no commit holds the
 experiments. A section for them waits for that setting, which is the author's
 to ask for.
+
+## 18. Leads claiming team blocks at once (P9)
+
+```sh
+docs/fast-link/claims.sh NODES out/claims
+```
+
+P9's change (`docs/decisions/2026-10-19.md`): a team block's claim takes the
+highest free block of its node's pool, and a swap lost to another lead's claim
+or return in the same bitmap word moves it to a word chosen by the claiming
+PE's local id, where before it tried the top word again - so that leads
+claiming at once spread over the pool. Its contention needs many PEs claiming
+at once on one node, which four vCPUs do not make; this times it before and
+after, on the list's first node alone. `claims` (`claims.c`): each PE makes a
+team of its own - OpenSHMEM 1.5 has none, so its row of a split of the world
+with rows of one PE (`shmem_team_split_2d`, an `xrange` of 1) - and then every
+PE splits its own `KEEP` times, a split whose parent is itself and whose new
+team it leads, and so claims a block for, at a start PE 0 sets 2 ms ahead, so
+that the claims begin together rather than as a barrier lets the PEs go, 1,000
+times; it prints the last PE's splits done after the start and a split's time,
+each the job's median and percentiles. A split of a team of one took about a
+microsecond in the development VM, so the claim is most of what is shared. The
+tree before the change (`BEFORE`, `821a6dfb`) is written by `git archive`, so
+this runs where the checkout has its `.git`, as §16 does, and built on the
+first node with `claims.c` compiled by its own `oshcc`; then 16, 32 and 64 PEs,
+one, two and four a vCPU, at one and at eight blocks a PE, the two builds in
+another order each round, three rounds: 36 jobs of a few seconds, and the
+build, about ten minutes.
+
+## 19. The link's measurement on two and three nodes (H14)
+
+```sh
+docs/fast-link/link-cost.sh NODES out/link-cost
+```
+
+H14: the link's measurement at start-up - fifteen round trips of a small put,
+fifteen tries of a put to each of the root's first children and three streams
+of 128 KiB and 512 KiB, about 27 ms of a start on the Pi's gigabit
+(`link-measure.c`) - was found running on two and three nodes, where every
+fan-out builds one tree and so no choice read it (the step 2 adversarial read,
+finding 12). Since then the chooser's Träff's on three nodes and every data
+wire's unsent limit at any count read it; what is left to know is its cost on
+a fast link. The start-up probe (`startup`, §10's) on the list's first two and
+three nodes at 1 and 8 PEs a node, with the link measured - the default - and
+set by `OSOE_LINK_*` to what a first job measured, so that the two do the same
+but the measurement, five rounds in another order each: the fastest PE's
+`shmem_init`, nearer init's own cost, measured against set. 41 jobs of a few
+seconds: about five minutes.

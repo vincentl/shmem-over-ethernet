@@ -3536,6 +3536,26 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   endif()
 endif()
 
+# A team block's claim from its node's pool (P9; test-team-claim.c): the
+# highest free first, uncontended; a swap lost to the library's rival moving
+# the claim to the word the local id names, and on round to the top; dry when
+# the rival took the last. One PE, white-box, like internal-region's: at the
+# default pool of 16 words, at 200 blocks - four, the top one partly the
+# pool's - and at 40, one.
+add_executable(shmem_test_team-claim test-team-claim.c ${osoe_library_sources})
+target_include_directories(shmem_test_team-claim PRIVATE ../src ../include)
+target_link_libraries(shmem_test_team-claim PRIVATE osoe_base rt Threads::Threads
+  ${OSOE_LIBURING_LINK})
+osoe_warnings(shmem_test_team-claim)
+foreach(blocks 1024 200 40)
+  add_test(NAME shmem.team-claim.${blocks}
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_TEAM_BLOCKS=${blocks}
+            $<TARGET_FILE:osoe-launch> -n 1 -t 60 -- $<TARGET_FILE:shmem_test_team-claim>)
+  set_tests_properties(shmem.team-claim.${blocks} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "TEAM CLAIMS: a pool of ${blocks} blocks in [0-9]+ words?, 0 failures"
+    FAIL_REGULAR_EXPRESSION "CHECK[(]")
+endforeach()
+
 if(OSOE_INTERNODE)
   # The generic gather's own checks, each ending the job by name before a byte
   # of the gather lands (test-gather-misuse.c; phase 1 step 5 slice 6): a collect

@@ -16,7 +16,7 @@
 : "${KIT_TIMEOUT:=1800}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "${OUT:-$REPOSITORY/build/fast-link}"
-PROBES="multistream hol get-pieces fan-in startup shapes"
+PROBES="multistream hol get-pieces fan-in startup shapes claims"
 build_here() {
     { cmake --preset release && cmake --build build/release -j"$(nproc)"; } > build-release.txt 2>&1 \
         || { rm -rf build/release

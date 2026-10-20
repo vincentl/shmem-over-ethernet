@@ -1367,10 +1367,19 @@ static inline uint32_t osoe_node_team_find(const struct osoe_node *n, uint32_t l
  * nothing, and then the block's members zeroed (osoe_team_name). From the top
  * of the pool down, so that a created team's block index is seldom its number
  * - a mix-up of the two shows at once rather than on some node of some map. A
- * block claimed and never named - its split failed - goes back with
- * osoe_node_team_return.
+ * swap lost to another lead's claim or return in the same word moves the claim
+ * to the word that `local_id`, the claiming PE's, names, and on down from
+ * there round to the top (P9): leads claiming at once spread over the pool
+ * instead of all trying the top word again. A block claimed and never named -
+ * its split failed - goes back with osoe_node_team_return.
  */
-uint32_t osoe_node_team_claim(struct osoe_node *n);
+uint32_t osoe_node_team_claim(struct osoe_node *n, uint32_t local_id);
+
+/* A white-box test's rival lead (test-team-claim.c; P9): while set, a claim
+ * loses its next swap - the highest free block of the word it loaded taken
+ * first, as by a lead claiming at once - and clears it. The library never
+ * sets it. */
+extern bool osoe_node_team_claim_rival;
 
 /* Give back a block claimed and not named (osoe_node_team_claim): one atomic
  * or of its bit into the free bitmap. */
