@@ -1,0 +1,16 @@
+found: gc_thresh1=128 gc_thresh2=512 gc_thresh3=1024 netdev_max_backlog=1000
+set:   gc_thresh1=128 gc_thresh2=32768 gc_thresh3=65536 netdev_max_backlog=1000
+series: label=base shape=pi nodes=128 runs=10 from=1 capture=0 backlog=default null=0 portloss=none static=0
+kernel: 6.12.95+deb13-cloud-arm64  cpus: 4  2026-10-19 23:24:11
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts retrans attempt_fails abandoned listen_overflows listen_drops netem
+base/run-01                     0   9761   128   2212 2430    0   65    19       0     124       0       0       0       0              0                   0           0        0    1077           576       -12                0            0     0
+base/run-02                     0   2851   128    701 817    0   77    20     157       2       0      97     157       0              0                   0           0        0    3189           224        -1                0            0     0
+base/run-03                     0   2508   128    608 702    0   75    21     286       0       0     286     286       0              0                   0           0        0    3012           544         0                0            0     0
+base/run-04                     0   3245   128    474 550    0   60    16     324       0       0     324     324       0              0                   0           0        0    2523           702         0                0            0     0
+base/run-05                     0   2524   128    538 599    0   72    18     448       0       0     439     448       0              0                   0           0        0    2631           384         0                0            0     0
+base/run-06                     0   2921   128    503 1178    0   63    17     571       0       0     571     571       0              0                   0           0        0    2568            32         4                0            0     0
+base/run-07                     0   2064   128    470 509    0   70    19     457       0       0     457     457       0              0                   0           0        0    2573           640        -1                0            0     0
+base/run-08                     0   2614   128    457 1052    0   62    16    1388       0       0    1388    1388       0              0                   0           0        0    2700             0         1                0            0     0
+base/run-09                     0   2710   128    479 1239    0   59    16     600       0       0     600     600       0              0                   0           0        0    2706            96         0                0            0     0
+base/run-10                     0   3188   128    452 1371    4   58    15     914       0       0     914     914       0              0                   0           0        0    3503          1856         6                0            0     0
+series done 23:25:24; namespaces left behind: 0

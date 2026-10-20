@@ -1,0 +1,42 @@
+23:23:26 building the tier3 preset
+23:23:32 built, 0 warnings
+23:23:32 series smoke pi 16 1 capture=1
+23:23:36 series smoke ended with status 0
+23:23:36 series null pi 128 2 null=4
+23:24:11 series null ended with status 0
+23:24:11 series base pi 128 10
+23:25:24 series base ended with status 0
+23:25:24 series capture pi 128 8 capture=1
+23:26:24 series capture ended with status 0
+23:26:24 series lossy lossy 128 3
+23:27:44 series lossy ended with status 0
+23:27:44 series portloss pi 128 2 capture=1 portloss=5:2%,70:2%
+23:28:37 series portloss ended with status 0
+23:28:37 series ab-default pi 128 1 start=1
+23:28:42 series ab-default ended with status 0
+23:28:42 series ab-backlog pi 128 1 backlog=65536 start=1
+23:28:46 series ab-backlog ended with status 0
+23:28:47 series ab-default pi 128 1 start=2
+23:28:51 series ab-default ended with status 0
+23:28:51 series ab-backlog pi 128 1 backlog=65536 start=2
+23:28:55 series ab-backlog ended with status 0
+23:28:55 series ab-default pi 128 1 start=3
+23:28:59 series ab-default ended with status 0
+23:28:59 series ab-backlog pi 128 1 backlog=65536 start=3
+23:29:03 series ab-backlog ended with status 0
+23:29:03 series ab-default pi 128 1 start=4
+23:29:08 series ab-default ended with status 0
+23:29:08 series ab-backlog pi 128 1 backlog=65536 start=4
+23:29:11 series ab-backlog ended with status 0
+23:29:11 series ab-default pi 128 1 start=5
+23:29:16 series ab-default ended with status 0
+23:29:16 series ab-backlog pi 128 1 backlog=65536 start=5
+23:29:20 series ab-backlog ended with status 0
+23:29:20 series ab-default pi 128 1 start=6
+23:29:25 series ab-default ended with status 0
+23:29:25 series ab-backlog pi 128 1 backlog=65536 start=6
+23:29:28 series ab-backlog ended with status 0
+23:29:28 series static pi 128 6 static=1
+23:29:54 series static ended with status 0
+23:29:54 plan done; namespaces left behind: 0
+23:29:54 settings put back: gc_thresh1 128, gc_thresh2 512, gc_thresh3 1024, netdev_max_backlog 1000 (found 128, 512, 1024, 1000)

@@ -1,0 +1,12 @@
+found: gc_thresh1=128 gc_thresh2=512 gc_thresh3=1024 netdev_max_backlog=1000
+set:   gc_thresh1=128 gc_thresh2=32768 gc_thresh3=65536 netdev_max_backlog=1000
+series: label=static shape=pi nodes=128 runs=6 from=1 capture=0 backlog=default null=0 portloss=none static=1
+kernel: 6.12.95+deb13-cloud-arm64  cpus: 4  2026-10-19 23:29:28
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts retrans attempt_fails abandoned listen_overflows listen_drops netem
+static/run-01                   0   1760   128    249 271    0   64    13     191       1       0     137     191       0              0                   0           0        0    3228           288         0                0            0     0
+static/run-02                   0   1521   128    249 269    0   70    15     299       0       0     299     299       0              0                   0           0        0    4144           288         0                0            0     0
+static/run-03                   0   1598   128    248 376    0   67    14     566       0       0     566     566       0              0                   0           0        0    3803           800         0                0            0     0
+static/run-04                   0   1498   128    238 259    0   70    13     934       0       0     934     934       0              0                   0           0        0    3637             0         0                0            0     0
+static/run-05                   0   2272   128    245 1078    3   58    13     573       0       0     573     573       0              0                   0           0        0    3101           864         4                0            0     0
+static/run-06                   0   1557   128    263 290    0   71    14     299       0       0     299     299       0              0                   0           0        0    3267           416        -1                0            0     0
+series done 23:29:54; namespaces left behind: 0

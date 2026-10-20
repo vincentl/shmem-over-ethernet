@@ -1,0 +1,9 @@
+The nodes of 5 runs, late or on time, against what moved in their namespaces:
+                                late, did  late, not on time, did on time, not
+TcpExtTCPSynRetrans > 0                10        179            0          451
+TcpExtTCPTimeouts > 0                  12        177           10          441
+TcpRetransSegs > 0                    183          6          421           30
+TcpAttemptFails > 0                    53        136          109          342
+link0 tx_dropped > 0                   50        139           59          392
+link0 rx_dropped > 0                  188          1          451            0
+ListenOverflows or Drops > 0            0        189            0          451

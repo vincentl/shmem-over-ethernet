@@ -1,0 +1,197 @@
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts fast_retrans retrans attempt_fails listen_overflows listen_drops netem
+lossy/run-01                    0  27848   128    538 1513   60   38    12     437       0     219     218     218     219              0                   0           5        6           46    3290          1655                0            0   422
+lossy/run-02                    0  20924   128    505 1500   51   39    12    1156       0       0    1156    1156       0              0                   0           2        2           41    4000          1057                0            0   407
+lossy/run-03                    0  24617   128    517 1642   51   38    13    2827       0      12    2679    2815      12              0                   0           2        4           32    3017           482                0            0   437
+
+lossy/run-01: the slowest ten leads, node:ms: 2:1513 45:1505 18:1485 124:1452 114:1449 37:1447 9:1440 19:1439 32:1428 79:1412; median 538 ms
+  late (median + 400 ms or more): 60 leads: 0 2 3 4 5 6 9 10 12 13 18 19 20 21 25 28 30 32 36 37 39 41 42 43 44 45 47 49 51 52 53 54 58 60 67 70 74 75 76 77 79 83 84 88 90 93 99 100 105 107 110 114 115 117 118 119 121 123 124 125
+  node 0     1392 ms  TcpActiveOpens=128 TcpAttemptFails=1 TcpExtDelayedACKLost=19 TcpExtEmbryonicRsts=1 TcpExtTCPLossProbeRecovery=8 TcpExtTCPLossProbes=30 TcpOutRsts=351 TcpPassiveOpens=134 TcpRetransSegs=30 link_rx_dropped=3 netem_dropped=11
+  node 2     1513 ms  TcpActiveOpens=194 TcpAttemptFails=66 TcpExtDelayedACKLost=39 TcpExtEmbryonicRsts=2 TcpExtTCPLossProbeRecovery=4 TcpExtTCPLossProbes=58 TcpExtTCPOFOMerge=1 TcpExtTCPOFOQueue=2 TcpOutRsts=64 TcpPassiveOpens=134 TcpRetransSegs=58 link_rx_dropped=4 link_tx_dropped=2 netem_dropped=9
+  node 3     1133 ms  TcpActiveOpens=194 TcpAttemptFails=63 TcpExtDelayedACKLost=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=109 TcpExtTCPOFOQueue=1 TcpExtTCPSackFailures=1 TcpExtTCPSlowStartRetrans=1 TcpExtTCPTimeouts=1 TcpExtTcpTimeoutRehash=1 TcpOutRsts=247 TcpPassiveOpens=142 TcpRetransSegs=111 link_rx_dropped=4 link_tx_dropped=1 netem_dropped=9
+  node 4     1390 ms  TcpActiveOpens=163 TcpAttemptFails=31 TcpExtDelayedACKLost=40 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbeRecovery=6 TcpExtTCPLossProbes=23 TcpOutRsts=218 TcpPassiveOpens=142 TcpRetransSegs=23 link_rx_dropped=3 link_tx_dropped=2 netem_dropped=12
+  node 5     1130 ms  TcpActiveOpens=195 TcpAttemptFails=64 TcpExtDelayedACKLost=44 TcpExtTCPAbortOnData=1 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=6 TcpExtTCPLossProbes=13 TcpOutRsts=1 TcpPassiveOpens=135 TcpRetransSegs=14 link_rx_dropped=3 link_tx_dropped=2 netem_dropped=10
+  node 6     1176 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=20 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=17 TcpOutRsts=192 TcpPassiveOpens=134 TcpRetransSegs=17 link_rx_dropped=3 link_tx_dropped=2 netem_dropped=7
+  node 9     1440 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=61 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=8 TcpExtTCPLossProbes=19 TcpPassiveOpens=134 TcpRetransSegs=20 link_rx_dropped=3 netem_dropped=13
+  node 10    1244 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=63 TcpExtTCPLossProbeRecovery=7 TcpExtTCPLossProbes=10 TcpExtTCPOFOQueue=2 TcpOutRsts=287 TcpPassiveOpens=134 TcpRetransSegs=10 link_rx_dropped=3 link_tx_dropped=4 netem_dropped=11
+  node 12    1332 ms  TcpActiveOpens=131 TcpExtDelayedACKLost=66 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=6 TcpExtTCPLossProbes=22 TcpExtTCPOFOQueue=1 TcpPassiveOpens=134 TcpRetransSegs=23 link_rx_dropped=3 link_tx_dropped=1 netem_dropped=15
+  node 13    1387 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=3 TcpExtTCPFastRetrans=3 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=88 TcpExtTCPOFOQueue=2 TcpPassiveOpens=134 TcpRetransSegs=91 link_rx_dropped=4 link_tx_dropped=3 netem_dropped=8
+  node 18    1485 ms  TcpActiveOpens=129 TcpAttemptFails=2 TcpExtDelayedACKLost=17 TcpExtEmbryonicRsts=2 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=32 TcpExtTCPOFOQueue=2 TcpOutRsts=1 TcpPassiveOpens=126 TcpRetransSegs=32 link_rx_dropped=1 link_tx_dropped=3 netem_dropped=1
+  node 19    1439 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=42 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=3 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=4 link_rx_dropped=2 link_tx_dropped=2 netem_dropped=1
+  node 20    1253 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=34 TcpExtTCPLossProbes=10 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=10 link_rx_dropped=1 link_tx_dropped=7 netem_dropped=2
+  node 21    1013 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=17 TcpExtTCPLossProbes=14 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=14 link_rx_dropped=3 link_tx_dropped=4 netem_dropped=2
+  node 25    1268 ms  TcpActiveOpens=162 TcpAttemptFails=31 TcpExtDelayedACKLost=24 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=3 TcpExtTCPOFOQueue=2 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=3 link_rx_dropped=1 link_tx_dropped=4 netem_dropped=5
+  node 28    1284 ms  TcpActiveOpens=163 TcpAttemptFails=29 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbes=92 TcpExtTCPOFOQueue=1 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=92 link_rx_dropped=4 netem_dropped=4
+  node 30    1355 ms  TcpActiveOpens=161 TcpAttemptFails=31 TcpExtDelayedACKLost=25 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbes=21 TcpExtTCPOFOQueue=1 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=21 link_rx_dropped=1
+  node 32    1428 ms  TcpActiveOpens=161 TcpAttemptFails=31 TcpExtDelayedACKLost=16 TcpExtTCPAbortOnData=2 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=39 TcpExtTCPOFOQueue=1 TcpOutRsts=3 TcpPassiveOpens=127 TcpRetransSegs=39 link_rx_dropped=1 netem_dropped=2
+  node 36    1245 ms  TcpActiveOpens=161 TcpAttemptFails=31 TcpExtDelayedACKLost=14 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=18 TcpExtTCPOFOQueue=1 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=18 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=3
+  node 37    1447 ms  TcpActiveOpens=163 TcpAttemptFails=31 TcpExtDelayedACKLost=19 TcpExtTCPAbortOnData=1 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=91 TcpExtTCPOFOQueue=2 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=92 link_rx_dropped=2 link_tx_dropped=1 netem_dropped=5
+  node 39    1260 ms  TcpActiveOpens=161 TcpAttemptFails=31 TcpExtDelayedACKLost=19 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=21 TcpExtTCPOFOQueue=3 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=21 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=5
+  node 41    1240 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=15 TcpExtTCPLossProbes=25 TcpExtTCPOFOQueue=2 TcpPassiveOpens=126 TcpRetransSegs=25 link_rx_dropped=3 link_tx_dropped=1 netem_dropped=3
+  node 42    1124 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=17 TcpExtTCPAbortOnData=2 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=21 TcpExtTCPOFOQueue=1 TcpOutRsts=2 TcpPassiveOpens=128 TcpRetransSegs=21 link_rx_dropped=2 netem_dropped=1
+  node 43    1049 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=20 TcpExtTCPLossProbes=13 TcpExtTCPOFOQueue=2 TcpPassiveOpens=126 TcpRetransSegs=13 link_tx_dropped=1
+  node 44    1143 ms  TcpActiveOpens=130 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=75 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=75 link_rx_dropped=1 link_tx_dropped=6 netem_dropped=2
+  node 45    1505 ms  TcpActiveOpens=132 TcpExtDelayedACKLost=24 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=33 TcpExtTCPOFOQueue=1 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=33 link_rx_dropped=1 netem_dropped=2
+  node 47    1260 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=15 TcpExtTCPLossProbes=18 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=18 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=3
+  node 49    1347 ms  TcpActiveOpens=162 TcpAttemptFails=32 TcpExtDelayedACKLost=22 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=2 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=2 link_rx_dropped=2 link_tx_dropped=6 netem_dropped=3
+  node 51    1143 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=15 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=21 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=22 link_rx_dropped=1 netem_dropped=2
+  node 52    1365 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=24 TcpExtTCPLossProbes=17 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=17 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=1
+  node 53    1023 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=17 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=38 TcpExtTCPOFOQueue=1 TcpOutRsts=2 TcpPassiveOpens=126 TcpRetransSegs=38 link_rx_dropped=2 link_tx_dropped=1 netem_dropped=3
+  node 54    1052 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=26 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=2 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=3 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=4
+  node 58    1353 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=24 TcpPassiveOpens=126 link_rx_dropped=1 link_tx_dropped=1
+  node 60    1189 ms  TcpActiveOpens=163 TcpAttemptFails=32 TcpExtDelayedACKLost=15 TcpExtTCPLossProbes=30 TcpExtTCPOFOQueue=1 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpExtTcpTimeoutRehash=1 TcpOutRsts=1 TcpPassiveOpens=126 TcpRetransSegs=31 link_rx_dropped=1 link_tx_dropped=3 netem_dropped=2
+  node 67     964 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=15 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=52 TcpPassiveOpens=128 TcpRetransSegs=52 link_rx_dropped=1 link_tx_dropped=3 netem_dropped=4
+  node 70    1229 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=30 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=1 TcpOutRsts=1 TcpPassiveOpens=128 TcpRetransSegs=1 link_rx_dropped=2 link_tx_dropped=4 netem_dropped=1
+  node 74    1293 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=41 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=5 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=5 link_rx_dropped=1 netem_dropped=4
+  node 75    1341 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=38 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=6 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=6 link_rx_dropped=1 netem_dropped=5
+  node 76    1048 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=43 TcpExtTCPLossProbes=1 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=1 link_rx_dropped=2 link_tx_dropped=2 netem_dropped=3
+  node 77    1189 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=22 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbes=15 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=15 link_rx_dropped=1 link_tx_dropped=5 netem_dropped=2
+  node 79    1412 ms  TcpActiveOpens=127 TcpAttemptFails=2 TcpExtDelayedACKLost=32 TcpExtEmbryonicRsts=2 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=1 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=2 link_rx_dropped=1 link_tx_dropped=7 netem_dropped=2
+  node 83    1324 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=31 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=15 TcpExtTCPOFOQueue=3 TcpOutRsts=2 TcpPassiveOpens=128 TcpRetransSegs=16 link_rx_dropped=1 link_tx_dropped=2 netem_dropped=3
+  node 84    1358 ms  TcpActiveOpens=160 TcpAttemptFails=32 TcpExtDelayedACKLost=47 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=5 TcpExtTCPOFOQueue=2 TcpOutRsts=1 TcpPassiveOpens=128 TcpRetransSegs=5 link_rx_dropped=1 netem_dropped=3
+  node 88    1184 ms  TcpActiveOpens=160 TcpAttemptFails=32 TcpExtDelayedACKLost=38 TcpExtTCPLossProbes=15 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=128 TcpRetransSegs=15 link_rx_dropped=1 netem_dropped=1
+  node 90    1305 ms  TcpActiveOpens=128 TcpAttemptFails=1 TcpExtDelayedACKLost=25 TcpExtEmbryonicRsts=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=2 TcpExtTCPOFOQueue=2 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpPassiveOpens=128 TcpRetransSegs=3 link_rx_dropped=2 link_tx_dropped=3 netem_dropped=6
+  node 93    1333 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=20 TcpExtTCPLossProbes=45 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=45 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=1
+  node 99    1317 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=15 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=26 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=128 TcpRetransSegs=27 link_rx_dropped=1 netem_dropped=6
+  node 100   1349 ms  TcpActiveOpens=128 TcpAttemptFails=1 TcpExtDelayedACKLost=17 TcpExtEmbryonicRsts=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=49 TcpExtTCPOFOQueue=1 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpPassiveOpens=128 TcpRetransSegs=50 link_rx_dropped=2 netem_dropped=3
+  node 105   1402 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=21 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=28 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=29 link_rx_dropped=1 link_tx_dropped=5 netem_dropped=4
+  node 107   1301 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=29 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=3 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=3 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=3
+  node 110   1031 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=31 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=6 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=6 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=1
+  node 114   1449 ms  TcpActiveOpens=128 TcpAttemptFails=1 TcpExtDelayedACKLost=28 TcpExtEmbryonicRsts=1 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpPassiveOpens=128 TcpRetransSegs=1 link_rx_dropped=3 link_tx_dropped=1 netem_dropped=3
+  node 115   1226 ms  TcpActiveOpens=128 TcpAttemptFails=1 TcpExtDelayedACKLost=13 TcpExtEmbryonicRsts=1 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=25 TcpPassiveOpens=128 TcpRetransSegs=26 link_rx_dropped=3 link_tx_dropped=3 netem_dropped=4
+  node 117   1286 ms  TcpActiveOpens=129 TcpAttemptFails=1 TcpExtDelayedACKLost=17 TcpExtEmbryonicRsts=1 TcpExtTCPLossProbes=31 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpOutRsts=2 TcpPassiveOpens=129 TcpRetransSegs=32 link_rx_dropped=2 link_tx_dropped=2 netem_dropped=2
+  node 118    958 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=13 TcpExtTCPLossProbes=10 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=10 link_rx_dropped=1 link_tx_dropped=2 netem_dropped=5
+  node 119   1134 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=17 TcpPassiveOpens=128 link_rx_dropped=1 netem_dropped=1
+  node 121   1345 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=24 TcpExtTCPLossProbes=1 TcpOutRsts=2 TcpPassiveOpens=128 TcpRetransSegs=1 link_rx_dropped=1 link_tx_dropped=4 netem_dropped=2
+  node 123   1390 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=19 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=2 TcpPassiveOpens=128 TcpRetransSegs=2 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=3
+  node 124   1452 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=19 TcpExtTCPLossProbeRecovery=4 TcpExtTCPLossProbes=41 TcpExtTCPOFOQueue=9 TcpPassiveOpens=128 TcpRetransSegs=41 link_rx_dropped=3 netem_dropped=6
+  node 125   1281 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=21 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=6 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=7 link_rx_dropped=1 link_tx_dropped=1 netem_dropped=3
+  summed over the nodes: TcpActiveOpens=18104 TcpAttemptFails=1655 TcpExtDelayedACKLost=3054 TcpExtEmbryonicRsts=12 TcpExtTCPAbortOnData=23 TcpExtTCPFastRetrans=46 TcpExtTCPLossProbeRecovery=141 TcpExtTCPLossProbes=3237 TcpExtTCPOFOMerge=1 TcpExtTCPOFOQueue=137 TcpExtTCPSACKDiscard=11 TcpExtTCPSACKReorder=76 TcpExtTCPSackFailures=1 TcpExtTCPSlowStartRetrans=1 TcpExtTCPSpuriousRtxHostQueues=76 TcpExtTCPSynRetrans=5 TcpExtTCPTimeouts=6 TcpExtTcpTimeoutRehash=2 TcpOutRsts=1708 TcpPassiveOpens=16411 TcpRetransSegs=3290 link_rx_dropped=218 link_tx_dropped=219 netem_dropped=422
+  arp_cache: allocs=16256 destroys=1 lookups=1074532 hits=533047 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 159,0 15,0 263,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+lossy/run-02: the slowest ten leads, node:ms: 42:1500 21:1495 14:1449 108:1445 111:1423 38:1421 88:1404 69:1400 90:1396 114:1389; median 505 ms
+  late (median + 400 ms or more): 51 leads: 3 8 11 13 14 15 16 18 21 23 25 26 29 30 32 34 38 40 42 44 54 57 59 63 64 66 67 69 71 79 81 82 83 84 88 90 95 96 102 103 104 105 106 108 111 113 114 115 117 118 124
+  node 3     1259 ms  TcpActiveOpens=193 TcpAttemptFails=64 TcpExtDelayedACKLost=33 TcpExtTCPLossProbeRecovery=3 TcpExtTCPLossProbes=13 TcpPassiveOpens=134 TcpRetransSegs=13 link_rx_dropped=15 netem_dropped=6
+  node 8     1230 ms  TcpActiveOpens=162 TcpAttemptFails=32 TcpExtDelayedACKLost=22 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=4 TcpExtTCPLossProbes=16 TcpExtTCPOFOQueue=1 TcpPassiveOpens=134 TcpRetransSegs=17 link_rx_dropped=16 netem_dropped=9
+  node 11    1174 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=19 TcpExtTCPLossProbeRecovery=4 TcpExtTCPLossProbes=84 TcpPassiveOpens=134 TcpRetransSegs=84 link_rx_dropped=15 netem_dropped=10
+  node 13    1114 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=35 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=17 TcpOutRsts=2 TcpPassiveOpens=135 TcpRetransSegs=17 link_rx_dropped=15 netem_dropped=4
+  node 14    1449 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=29 TcpExtTCPLossProbeRecovery=8 TcpExtTCPLossProbes=57 TcpExtTCPOFOQueue=1 TcpPassiveOpens=134 TcpRetransSegs=57 link_rx_dropped=15 netem_dropped=12
+  node 15    1331 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=33 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=8 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=134 TcpRetransSegs=8 link_rx_dropped=10 netem_dropped=4
+  node 16    1372 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=37 TcpExtTCPLossProbes=24 TcpPassiveOpens=126 TcpRetransSegs=24 link_rx_dropped=9 netem_dropped=2
+  node 18    1063 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=3 TcpExtTCPLossProbes=88 TcpPassiveOpens=126 TcpRetransSegs=88 link_rx_dropped=9
+  node 21    1495 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=10 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=86 TcpPassiveOpens=126 TcpRetransSegs=86 link_rx_dropped=8 netem_dropped=4
+  node 23    1007 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=21 TcpExtTCPLossProbes=6 TcpPassiveOpens=126 TcpRetransSegs=6 link_rx_dropped=9 netem_dropped=2
+  node 25    1128 ms  TcpActiveOpens=131 TcpExtDelayedACKLost=34 TcpExtTCPLossProbes=1 TcpPassiveOpens=126 TcpRetransSegs=1 link_rx_dropped=9 netem_dropped=2
+  node 26    1131 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=18 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=14 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=14 link_rx_dropped=8 netem_dropped=4
+  node 29    1362 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=60 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=2 TcpPassiveOpens=126 TcpRetransSegs=3 link_rx_dropped=7 netem_dropped=3
+  node 30    1388 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=60 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=6 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=7 link_rx_dropped=9 netem_dropped=3
+  node 32    1237 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=64 TcpExtTCPLossProbes=1 TcpPassiveOpens=126 TcpRetransSegs=1 link_rx_dropped=8 netem_dropped=5
+  node 34    1117 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=55 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=8 TcpPassiveOpens=126 TcpRetransSegs=8 link_rx_dropped=8 netem_dropped=2
+  node 38    1421 ms  TcpActiveOpens=130 TcpAttemptFails=1 TcpExtDelayedACKLost=47 TcpExtEmbryonicRsts=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=10 TcpExtTCPOFOQueue=1 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpPassiveOpens=126 TcpRetransSegs=11 link_rx_dropped=8 netem_dropped=5
+  node 40    1162 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=6 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=81 TcpOutRsts=1 TcpPassiveOpens=127 TcpRetransSegs=82 link_rx_dropped=8 netem_dropped=3
+  node 42    1500 ms  TcpActiveOpens=161 TcpAttemptFails=31 TcpExtDelayedACKLost=1 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=103 TcpPassiveOpens=126 TcpRetransSegs=104 link_rx_dropped=8 netem_dropped=4
+  node 44    1166 ms  TcpActiveOpens=161 TcpAttemptFails=31 TcpExtDelayedACKLost=1 TcpExtTCPLossProbes=108 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpExtTcpTimeoutRehash=1 TcpPassiveOpens=126 TcpRetransSegs=109 link_rx_dropped=10 netem_dropped=2
+  node 54    1322 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=47 TcpExtTCPLossProbes=13 TcpPassiveOpens=126 TcpRetransSegs=13 link_rx_dropped=6 netem_dropped=1
+  node 57    1008 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=31 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=37 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=37 link_rx_dropped=10 netem_dropped=3
+  node 59    1321 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=30 TcpExtTCPLossProbes=3 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=3 link_rx_dropped=9 netem_dropped=1
+  node 63    1141 ms  TcpActiveOpens=162 TcpAttemptFails=32 TcpExtDelayedACKLost=30 TcpExtTCPLossProbes=7 TcpPassiveOpens=126 TcpRetransSegs=7 link_rx_dropped=8 netem_dropped=2
+  node 64    1360 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=50 TcpExtTCPLossProbes=48 TcpExtTCPOFOQueue=2 TcpPassiveOpens=128 TcpRetransSegs=48 link_rx_dropped=8 netem_dropped=1
+  node 66    1069 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=39 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=3 TcpExtTCPLossProbes=17 TcpPassiveOpens=128 TcpRetransSegs=18 link_rx_dropped=8 netem_dropped=6
+  node 67    1185 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=50 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=17 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=17 link_rx_dropped=9 netem_dropped=2
+  node 69    1400 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=54 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=7 TcpPassiveOpens=128 TcpRetransSegs=8 link_rx_dropped=7 netem_dropped=4
+  node 71    1161 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=38 TcpExtTCPFastRetrans=2 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=1 TcpPassiveOpens=128 TcpRetransSegs=3 link_rx_dropped=8 netem_dropped=6
+  node 79    1382 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=3 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=71 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=72 link_rx_dropped=8 netem_dropped=4
+  node 81    1357 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=66 TcpExtTCPLossProbes=3 TcpPassiveOpens=128 TcpRetransSegs=3 link_rx_dropped=8 netem_dropped=2
+  node 82    1194 ms  TcpActiveOpens=160 TcpAttemptFails=32 TcpExtDelayedACKLost=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=89 TcpPassiveOpens=128 TcpRetransSegs=89 link_rx_dropped=6 netem_dropped=4
+  node 83     990 ms  TcpActiveOpens=159 TcpAttemptFails=32 TcpExtDelayedACKLost=25 TcpExtTCPLossProbes=1 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=1 link_rx_dropped=8 netem_dropped=3
+  node 84    1181 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=32 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=19 TcpPassiveOpens=128 TcpRetransSegs=20 link_rx_dropped=8 netem_dropped=3
+  node 88    1404 ms  TcpActiveOpens=159 TcpAttemptFails=32 TcpExtDelayedACKLost=16 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=54 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=54 link_rx_dropped=9 netem_dropped=4
+  node 90    1396 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=37 TcpExtTCPLossProbes=10 TcpOutRsts=2 TcpPassiveOpens=128 TcpRetransSegs=10 link_rx_dropped=8 netem_dropped=1
+  node 95    1224 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=30 TcpExtTCPLossProbes=46 TcpExtTCPOFOQueue=2 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=46 link_rx_dropped=8 netem_dropped=2
+  node 96    1373 ms  TcpActiveOpens=127 TcpAttemptFails=2 TcpExtDelayedACKLost=37 TcpExtEmbryonicRsts=2 TcpExtTCPLossProbes=10 TcpPassiveOpens=128 TcpRetransSegs=10 link_rx_dropped=9 netem_dropped=1
+  node 102   1307 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=28 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=12 TcpPassiveOpens=128 TcpRetransSegs=13 link_rx_dropped=9 netem_dropped=6
+  node 103   1123 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=5 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=101 TcpPassiveOpens=128 TcpRetransSegs=101 link_rx_dropped=8 netem_dropped=4
+  node 104   1168 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=22 TcpExtTCPLossProbes=36 TcpPassiveOpens=128 TcpRetransSegs=36 link_rx_dropped=8 netem_dropped=2
+  node 105   1168 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=24 TcpExtTCPLossProbes=16 TcpPassiveOpens=128 TcpRetransSegs=16 link_rx_dropped=8 netem_dropped=3
+  node 106   1177 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=27 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=27 TcpPassiveOpens=128 TcpRetransSegs=28 link_rx_dropped=9 netem_dropped=4
+  node 108   1445 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=34 TcpExtTCPLossProbes=18 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=18 link_rx_dropped=8 netem_dropped=4
+  node 111   1423 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=32 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=51 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 TcpRetransSegs=52 link_rx_dropped=8 netem_dropped=3
+  node 113   1165 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=25 TcpExtTCPLossProbes=21 TcpPassiveOpens=128 TcpRetransSegs=21 link_rx_dropped=8
+  node 114   1389 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=21 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=37 TcpPassiveOpens=128 TcpRetransSegs=38 link_rx_dropped=8 netem_dropped=4
+  node 115   1286 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=19 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=49 TcpPassiveOpens=128 TcpRetransSegs=49 link_rx_dropped=8 netem_dropped=3
+  node 117   1074 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=20 TcpExtTCPLossProbes=56 TcpExtTCPOFOQueue=2 TcpPassiveOpens=128 TcpRetransSegs=56 link_rx_dropped=8 netem_dropped=2
+  node 118   1203 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=22 TcpExtTCPAbortOnData=1 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=49 TcpOutRsts=2 TcpPassiveOpens=130 TcpRetransSegs=50 link_rx_dropped=8 netem_dropped=6
+  node 124   1141 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=37 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=30 TcpPassiveOpens=128 TcpRetransSegs=31 link_rx_dropped=9 netem_dropped=3
+  summed over the nodes: TcpActiveOpens=17486 TcpAttemptFails=1057 TcpExtDelayedACKLost=3782 TcpExtEmbryonicRsts=3 TcpExtTCPAbortOnData=6 TcpExtTCPFastRetrans=41 TcpExtTCPLossProbeRecovery=123 TcpExtTCPLossProbes=3958 TcpExtTCPOFOQueue=41 TcpExtTCPSACKReorder=1 TcpExtTCPSynRetrans=2 TcpExtTCPTimeouts=2 TcpExtTcpTimeoutRehash=1 TcpOutRsts=1075 TcpPassiveOpens=16398 TcpRetransSegs=4000 link_rx_dropped=1156 netem_dropped=407
+  arp_cache: allocs=16256 destroys=0 lookups=1076377 hits=533068 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 557,0 584,0 15,0 0,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+lossy/run-03: the slowest ten leads, node:ms: 42:1642 72:1448 37:1402 3:1391 97:1359 119:1358 25:1352 26:1319 57:1318 90:1315; median 517 ms
+  late (median + 400 ms or more): 51 leads: 1 3 12 17 19 20 24 25 26 32 34 35 37 39 42 43 47 51 52 53 57 61 63 64 66 69 72 75 76 79 87 90 91 92 93 94 97 99 103 105 106 107 108 114 115 117 119 120 121 123 124
+  node 1     1053 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=26 TcpExtTCPLossProbeRecovery=4 TcpExtTCPLossProbes=14 TcpPassiveOpens=134 TcpRetransSegs=14 link_rx_dropped=34 netem_dropped=13
+  node 3     1391 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=21 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=7 TcpExtTCPLossProbes=23 TcpOutRsts=192 TcpPassiveOpens=134 TcpRetransSegs=24 link_rx_dropped=34 netem_dropped=13
+  node 12    1073 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=26 TcpExtTCPLossProbeRecovery=3 TcpExtTCPLossProbes=10 TcpPassiveOpens=134 TcpRetransSegs=10 link_rx_dropped=34 netem_dropped=10
+  node 17    1221 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=33 TcpExtTCPLossProbes=1 TcpPassiveOpens=126 TcpRetransSegs=1 link_rx_dropped=21 netem_dropped=2
+  node 19    1183 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=14 TcpExtTCPLossProbes=10 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=10 link_rx_dropped=21 netem_dropped=2
+  node 20    1224 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=21 TcpExtTCPLossProbes=4 TcpPassiveOpens=126 TcpRetransSegs=4 link_rx_dropped=22 netem_dropped=2
+  node 24    1161 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=36 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=1 TcpOutRsts=1 TcpPassiveOpens=126 TcpRetransSegs=1 link_rx_dropped=21 netem_dropped=2
+  node 25    1352 ms  TcpActiveOpens=161 TcpAttemptFails=32 TcpExtDelayedACKLost=1 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=82 TcpPassiveOpens=126 TcpRetransSegs=83 link_rx_dropped=20 netem_dropped=1
+  node 26    1319 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=3 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=58 TcpPassiveOpens=126 TcpRetransSegs=58 link_rx_dropped=20 netem_dropped=4
+  node 32    1148 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=22 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=8 TcpPassiveOpens=126 TcpRetransSegs=9 link_rx_dropped=20 netem_dropped=4
+  node 34    1262 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=27 TcpExtTCPLossProbes=4 TcpPassiveOpens=126 TcpRetransSegs=4 link_rx_dropped=20 netem_dropped=3
+  node 35    1218 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=18 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=15 TcpPassiveOpens=126 TcpRetransSegs=15 link_rx_dropped=19 link_tx_dropped=1 netem_dropped=2
+  node 37    1402 ms  TcpActiveOpens=131 TcpExtDelayedACKLost=20 TcpExtTCPLossProbes=15 TcpPassiveOpens=126 TcpRetransSegs=15 link_rx_dropped=21 netem_dropped=5
+  node 39    1062 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=7 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=45 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=126 TcpRetransSegs=46 link_rx_dropped=20 netem_dropped=2
+  node 42    1642 ms  TcpActiveOpens=129 TcpAttemptFails=3 TcpExtDelayedACKLost=22 TcpExtEmbryonicRsts=3 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=5 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpPassiveOpens=126 TcpRetransSegs=6 link_rx_dropped=20 netem_dropped=7
+  node 43    1161 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=25 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=127 link_rx_dropped=20 netem_dropped=1
+  node 47    1126 ms  TcpActiveOpens=131 TcpExtDelayedACKLost=27 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=14 TcpPassiveOpens=126 TcpRetransSegs=14 link_rx_dropped=21 netem_dropped=4
+  node 51    1111 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=25 TcpExtTCPLossProbes=1 TcpPassiveOpens=126 TcpRetransSegs=1 link_rx_dropped=20
+  node 52    1282 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=23 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=15 TcpExtTCPOFOQueue=1 TcpPassiveOpens=126 TcpRetransSegs=15 link_rx_dropped=18 netem_dropped=3
+  node 53    1218 ms  TcpActiveOpens=131 TcpExtDelayedACKLost=31 TcpExtTCPLossProbes=1 TcpPassiveOpens=126 TcpRetransSegs=1 link_rx_dropped=20 link_tx_dropped=1 netem_dropped=3
+  node 57    1318 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=25 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=4 TcpOutRsts=1 TcpPassiveOpens=126 TcpRetransSegs=5 link_rx_dropped=20 netem_dropped=5
+  node 61    1187 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=27 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=17 TcpPassiveOpens=126 TcpRetransSegs=17 link_rx_dropped=18 netem_dropped=4
+  node 63    1163 ms  TcpActiveOpens=130 TcpExtDelayedACKLost=13 TcpExtTCPLossProbes=22 TcpPassiveOpens=126 TcpRetransSegs=22 link_rx_dropped=18 netem_dropped=2
+  node 64    1209 ms  TcpActiveOpens=129 TcpAttemptFails=1 TcpExtDelayedACKLost=1 TcpExtEmbryonicRsts=1 TcpExtTCPLossProbes=75 TcpExtTCPSynRetrans=1 TcpExtTCPTimeouts=1 TcpPassiveOpens=128 TcpRetransSegs=76 link_rx_dropped=18 netem_dropped=6
+  node 66    1209 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=24 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=6 TcpPassiveOpens=128 TcpRetransSegs=7 link_rx_dropped=18 netem_dropped=5
+  node 69    1060 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=5 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=54 TcpPassiveOpens=129 TcpRetransSegs=55 link_rx_dropped=20 netem_dropped=3
+  node 72    1448 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=27 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=37 TcpPassiveOpens=128 TcpRetransSegs=37 link_rx_dropped=18 netem_dropped=5
+  node 75    1079 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=10 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=26 TcpPassiveOpens=128 TcpRetransSegs=27 link_rx_dropped=21 netem_dropped=3
+  node 76    1165 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=11 TcpExtTCPLossProbes=25 TcpPassiveOpens=128 TcpRetransSegs=25 link_rx_dropped=18 netem_dropped=2
+  node 79    1280 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=3 TcpExtTCPLossProbes=28 TcpPassiveOpens=128 TcpRetransSegs=28 link_rx_dropped=18 netem_dropped=2
+  node 87    1180 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=19 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=44 TcpPassiveOpens=128 TcpRetransSegs=44 link_rx_dropped=18 netem_dropped=3
+  node 90    1315 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=57 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 link_rx_dropped=20 netem_dropped=1
+  node 91    1045 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=31 TcpExtTCPLossProbes=39 TcpPassiveOpens=128 TcpRetransSegs=39 link_rx_dropped=17 link_tx_dropped=2 netem_dropped=3
+  node 92    1125 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=22 TcpExtTCPAbortOnData=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=49 TcpOutRsts=2 TcpPassiveOpens=130 TcpRetransSegs=49 link_rx_dropped=19 link_tx_dropped=1 netem_dropped=3
+  node 93    1231 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=10 TcpExtTCPLossProbes=16 TcpPassiveOpens=128 TcpRetransSegs=16 link_rx_dropped=19
+  node 94     988 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=34 TcpExtTCPLossProbes=2 TcpPassiveOpens=128 TcpRetransSegs=2 link_rx_dropped=18 link_tx_dropped=1 netem_dropped=1
+  node 97    1359 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=22 TcpExtTCPAbortOnData=1 TcpExtTCPFastRetrans=2 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=5 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=129 TcpRetransSegs=7 link_rx_dropped=18 netem_dropped=8
+  node 99    1182 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=27 TcpExtTCPLossProbes=14 TcpPassiveOpens=128 TcpRetransSegs=14 link_rx_dropped=18 netem_dropped=4
+  node 103   1075 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=10 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=51 TcpPassiveOpens=128 TcpRetransSegs=51 link_rx_dropped=19 link_tx_dropped=1 netem_dropped=3
+  node 105   1109 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=10 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbes=49 TcpPassiveOpens=128 TcpRetransSegs=50 link_rx_dropped=18 netem_dropped=3
+  node 106   1040 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=21 TcpExtTCPLossProbes=16 TcpPassiveOpens=128 TcpRetransSegs=16 link_rx_dropped=18 netem_dropped=4
+  node 107   1191 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=26 TcpExtTCPOFOQueue=1 TcpPassiveOpens=128 link_rx_dropped=18 netem_dropped=2
+  node 108   1028 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=22 TcpExtTCPLossProbeRecovery=4 TcpExtTCPLossProbes=20 TcpPassiveOpens=128 TcpRetransSegs=20 link_rx_dropped=20 netem_dropped=5
+  node 114   1207 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=22 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=21 TcpPassiveOpens=128 TcpRetransSegs=22 link_rx_dropped=19 netem_dropped=2
+  node 115   1045 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=34 TcpExtTCPLossProbes=27 TcpPassiveOpens=128 TcpRetransSegs=27 link_rx_dropped=18 netem_dropped=3
+  node 117   1045 ms  TcpActiveOpens=127 TcpExtDelayedACKLost=17 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=3 TcpPassiveOpens=128 TcpRetransSegs=4 link_rx_dropped=18 netem_dropped=7
+  node 119   1358 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=14 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=45 TcpPassiveOpens=129 TcpRetransSegs=45 link_rx_dropped=18 netem_dropped=5
+  node 120   1170 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=27 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=50 TcpOutRsts=1 TcpPassiveOpens=128 TcpRetransSegs=50 link_rx_dropped=20 netem_dropped=5
+  node 121   1185 ms  TcpActiveOpens=128 TcpExtDelayedACKLost=19 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=2 TcpExtTCPLossProbes=78 TcpExtTCPOFOQueue=1 TcpOutRsts=1 TcpPassiveOpens=128 TcpRetransSegs=79 link_rx_dropped=18 netem_dropped=4
+  node 123   1312 ms  TcpActiveOpens=129 TcpExtDelayedACKLost=40 TcpExtTCPFastRetrans=1 TcpExtTCPLossProbeRecovery=1 TcpExtTCPLossProbes=13 TcpOutRsts=2 TcpPassiveOpens=128 TcpRetransSegs=14 link_rx_dropped=19 netem_dropped=5
+  node 124   1251 ms  TcpActiveOpens=128 TcpExtTCPLossProbes=120 TcpPassiveOpens=128 TcpRetransSegs=120 link_rx_dropped=18 netem_dropped=2
+  summed over the nodes: TcpActiveOpens=16908 TcpAttemptFails=482 TcpExtDelayedACKLost=2791 TcpExtEmbryonicRsts=4 TcpExtTCPAbortOnData=11 TcpExtTCPFastRetrans=32 TcpExtTCPLossProbeRecovery=139 TcpExtTCPLossProbes=2981 TcpExtTCPOFOQueue=32 TcpExtTCPSynRetrans=2 TcpExtTCPTimeouts=4 TcpExtTcpTimeoutRehash=2 TcpOutRsts=500 TcpPassiveOpens=16400 TcpRetransSegs=3017 link_rx_dropped=2679 link_tx_dropped=12 netem_dropped=437
+  arp_cache: allocs=16257 destroys=0 lookups=1075286 hits=530668 res_failed=0 rcv_probes_mcast=0 rcv_probes_ucast=0 forced_gc_runs=0 unresolved_discards=0 table_fulls=0
+  softnet per CPU, dropped,squeeze: 269,0 587,0 1956,0 15,0
+  neighbour entries after, node 0: {"complete": 127, "incomplete": 0}
+
+The nodes of 3 runs, late or on time, against what moved in their namespaces:
+                                late, did  late, not on time, did on time, not
+TcpExtTCPSynRetrans > 0                 9        153            0          222
+TcpExtTCPTimeouts > 0                  10        152            2          220
+TcpRetransSegs > 0                    157          5          219            3
+TcpAttemptFails > 0                    46        116           53          169
+link0 tx_dropped > 0                   50        112           51          171
+link0 rx_dropped > 0                  161          1          222            0
+ListenOverflows or Drops > 0            0        162            0          222

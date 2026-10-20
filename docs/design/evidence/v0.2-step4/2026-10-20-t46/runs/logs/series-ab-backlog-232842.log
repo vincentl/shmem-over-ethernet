@@ -1,0 +1,8 @@
+found: gc_thresh1=128 gc_thresh2=512 gc_thresh3=1024 netdev_max_backlog=1000
+set:   gc_thresh1=128 gc_thresh2=32768 gc_thresh3=65536 netdev_max_backlog=65536
+series: label=ab-backlog shape=pi nodes=128 runs=1 from=1 capture=0 backlog=65536 null=0 portloss=none static=0
+kernel: 6.12.95+deb13-cloud-arm64  cpus: 4  2026-10-19 23:28:42
+run                        status job_ms leads median max late cpu% sirq% dropped squeeze link_tx link_rx port_tx port_rx resolve_failed unresolved_discards syn_retrans timeouts retrans attempt_fails abandoned listen_overflows listen_drops netem
+ab-backlog/run-01               0   1979   128    484 518    0   72    20       0       0       0       0       0       0              0                   0           0        0    3736            96         0                0            0     0
+series done 23:28:46; namespaces left behind: 0
+restored: gc_thresh1=128 gc_thresh2=512 gc_thresh3=1024 netdev_max_backlog=1000

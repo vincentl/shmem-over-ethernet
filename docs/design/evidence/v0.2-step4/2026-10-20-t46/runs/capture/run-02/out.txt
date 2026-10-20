@@ -1,0 +1,2 @@
+osoe-bench pes=128 remote_target=1 local_target=-1
+barrier pes=128 median_us=2343.3 fastest_us=1527.3

@@ -1,0 +1,4 @@
+run             events capture_dropped arp_requests arp_requests_lost arp_replies arp_replies_lost arp_slow_pairs syn syn_lost synack synack_lost refused same_port_resends slow_connections redials late_leads late_accounted
+portloss/run-01 126349               0        13798                60       13738               18             22 17837        3  16396           6    1439                 0                8       8         10             10
+portloss/run-02 124261               0        13795                27       13768               18             17 17297        9  16395           5     893                 0               14      11         17             15
+total           250610               0        27593                87       27506               36             39 35134       12  32791          11    2332                 0               22      19         27             25

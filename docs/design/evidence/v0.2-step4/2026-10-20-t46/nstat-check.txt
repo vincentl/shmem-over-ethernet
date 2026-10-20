@@ -1,0 +1,4 @@
+nstat-check: nstat printed 383 counters, the snapshot kept 34 nonzero ones
+  17 counters differ; 17 of them are IPv6 counters from /proc/net/snmp6 (Icmp6OutMLDv2Reports Icmp6OutMsgs Icmp6OutNeighborSolicits Icmp6OutRouterSolicits Icmp6OutType133 Icmp6OutType135 Icmp6OutType143 Ip6InMcastOctets Ip6InMcastPkts Ip6InNoECTPkts Ip6InOctets Ip6InReceives Ip6OutMcastOctets Ip6OutMcastPkts Ip6OutOctets Ip6OutRequests Ip6OutTransmits)
+  differing and not IPv6: none
+  in the snapshot and not in nstat's output (settings, not counters): IpDefaultTTL IpForwarding TcpMaxConn TcpRtoAlgorithm TcpRtoMax TcpRtoMin
