@@ -562,7 +562,10 @@ static void diverge(uint64_t smallest)
     npes = shmem_n_pes();
     CHECK_FATAL(smallest != 0);
     size_t n = (size_t)smallest * 4 + (me == 1);
-    uint8_t *source = shmem_malloc(n + 1), *dest = shmem_malloc(n + 1);
+    /* Room for the larger on every PE: allocations of different sizes end the
+     * job by name before the reduction is reached (P23). */
+    size_t room = (size_t)smallest * 4 + 2;
+    uint8_t *source = shmem_malloc(room), *dest = shmem_malloc(room);
     CHECK_FATAL(source && dest);
     memset(source, 1, n);
     shmem_uint8_sum_reduce(SHMEM_TEAM_WORLD, dest, source, n);
