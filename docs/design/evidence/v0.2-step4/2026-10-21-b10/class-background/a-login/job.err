@@ -1,0 +1,13 @@
+1792559303.502 rank 0: calling shmem_init
+1792559303.502 rank 1: sleeping 25 s before shmem_init
+1792559303.502 rank 2: calling shmem_init
+1792559303.503 rank 3: calling shmem_init
+1792559328.505 rank 1: calling shmem_init
+1792559328.507 rank 1: shmem_init returned, PE 1 of 4
+1792559328.507 rank 2: shmem_init returned, PE 2 of 4
+1792559328.507 rank 3: shmem_init returned, PE 3 of 4
+1792559328.507 rank 0: shmem_init returned, PE 0 of 4
+1792559328.507 rank 3: ring ok
+1792559328.507 rank 0: ring ok
+1792559328.507 rank 1: ring ok
+1792559328.507 rank 2: ring ok

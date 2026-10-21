@@ -1,0 +1,2 @@
+logind.conf restored and logind restarted: as shipped again
+RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no

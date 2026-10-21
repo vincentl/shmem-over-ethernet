@@ -1218,7 +1218,16 @@ specification or takes a choice the specification leaves open.
   done - but a start caught in those seconds can wait for ever. Setting
   `RemoveIPC=no` in `logind.conf` on compute nodes, as PostgreSQL's
   documentation also advises, or enabling lingering (`loginctl enable-linger`)
-  for the users who run jobs, should prevent it; neither has been tried here.
+  for the users who run jobs, prevents it, as the development VM showed (Debian
+  13, systemd 257): a job of four PEs, one of them 25 s late in calling
+  `shmem_init`, was started just after its user's only login ended. With the
+  defaults the names were gone ten seconds after the login ended, and the
+  launcher's timeout ended the job still waiting for that PE; with lingering
+  enabled, and with `RemoveIPC=no`, it started and finished. A job the login
+  itself started in the background was not caught: logind keeps that login's
+  session until the job's processes are gone, with `KillUserProcesses` off, as
+  it is on Debian 13. The record is
+  `docs/design/evidence/v0.2-step4/2026-10-21-b10/`.
 
 **Failures**
 

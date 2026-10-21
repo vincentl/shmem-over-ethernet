@@ -1,0 +1,7 @@
+label	mode	configuration	times_from	names_seen_s	names_gone_s	late_pe_calls_s	launcher_exit	pes_through_init	outcome
+a-service	service	logind as shipped: RemoveIPC=yes, no lingering	session's end	0.2	10.2	25.0	1	0	stalled
+a-login	login	logind as shipped: RemoveIPC=yes, no lingering	session's end	-1.9	23.0	23.0	0	4	completed
+d-held	held	logind as shipped: RemoveIPC=yes, no lingering, the session held open for the whole job	job's start	0.1	25.1	25.0	0	4	completed
+b-service	service	lingering enabled, RemoveIPC=yes	session's end	0.2	25.1	25.0	0	4	completed
+c-service	service	RemoveIPC=no in logind.conf, logind restarted, no lingering	session's end	0.1	25.2	25.0	0	4	completed
+e-service	service	logind.conf restored and logind restarted: as shipped again	session's end	0.2	10.3	25.0	1	0	stalled

@@ -1,0 +1,22 @@
+id: uid=1000(osoe-b10) gid=1001(osoe-b10) groups=1001(osoe-b10)
+XDG_SESSION_ID=c2
+--- cgroup of this shell
+0::/user.slice/user-1000.slice/session-c2.scope
+--- list-sessions
+22 1000 osoe-b10 - 2910336 manager - no -
+ 4  501 vincent  - 1193    user    - no -
+c2 1000 osoe-b10 - 2910332 user    - no -
+--- session-status
+c2 - osoe-b10 (1000)
+  Since: Wed 2026-10-21 01:22:31 EDT; 93ms ago
+  State: active
+ Leader: 2910332 (su)
+ Remote: user root
+Service: su-l
+   Type: unspecified
+  Class: user
+   Idle: no
+   Unit: session-c2.scope
+         ├─2910332 su -l osoe-b10 -c "/tmp/b10-out/login-body.sh service /tmp/b10-out/user-class/check 25 40"
+         ├─2910348 /bin/sh /tmp/b10-out/login-body.sh service /tmp/b10-out/user-class/check 25 40
+         └─2910357 loginctl session-status c2 --no-pager
