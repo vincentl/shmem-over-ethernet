@@ -1,0 +1,2 @@
+lingering enabled, RemoveIPC=yes
+RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=yes

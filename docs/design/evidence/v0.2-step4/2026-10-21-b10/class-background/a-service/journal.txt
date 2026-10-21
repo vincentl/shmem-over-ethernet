@@ -1,0 +1,19 @@
+Oct 21 01:07:39.653461 lima-osoe systemd[1]: b10-job-smoke.service: Deactivated successfully.
+Oct 21 01:07:39.691345 lima-osoe systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:07:39.692791 lima-osoe systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:07:39.734669 lima-osoe systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:07:39.735831 lima-osoe systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Oct 21 01:07:39.741662 lima-osoe systemd-logind[743]: New session 16 of user osoe-b10.
+Oct 21 01:07:39.807498 lima-osoe systemd[1]: Started user@1000.service - User Manager for UID 1000.
+Oct 21 01:07:39.808615 lima-osoe systemd[1]: Started session-c8.scope - Session c8 of User osoe-b10.
+Oct 21 01:07:41.827202 lima-osoe systemd[1]: session-c8.scope: Deactivated successfully.
+Oct 21 01:07:41.841123 lima-osoe systemd[1]: Started b10-job-a-service.service - [systemd-run] /tmp/b10-out/job.sh /tmp/b10-out/a-service 25 40.
+Oct 21 01:07:51.896228 lima-osoe systemd[1]: Stopping user@1000.service - User Manager for UID 1000...
+Oct 21 01:07:51.954641 lima-osoe systemd-logind[743]: Removed session 16.
+Oct 21 01:07:51.956413 lima-osoe systemd[1]: user@1000.service: Deactivated successfully.
+Oct 21 01:07:51.956757 lima-osoe systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+Oct 21 01:07:51.958880 lima-osoe systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:07:51.983640 lima-osoe systemd[1]: user-runtime-dir@1000.service: Deactivated successfully.
+Oct 21 01:07:51.983822 lima-osoe systemd[1]: Stopped user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:07:51.985156 lima-osoe systemd[1]: Removed slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:08:21.885641 lima-osoe systemd[1]: b10-job-a-service.service: Deactivated successfully.

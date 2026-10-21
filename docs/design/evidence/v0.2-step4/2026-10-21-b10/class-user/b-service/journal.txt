@@ -1,0 +1,7 @@
+Oct 21 01:24:30.671859 lima-osoe systemd-logind[2888395]: New session c6 of user osoe-b10.
+Oct 21 01:24:30.701783 lima-osoe systemd[1]: Started session-c6.scope - Session c6 of User osoe-b10.
+Oct 21 01:24:32.715290 lima-osoe systemd[1]: session-c6.scope: Deactivated successfully.
+Oct 21 01:24:32.716616 lima-osoe systemd-logind[2888395]: Session c6 logged out. Waiting for processes to exit.
+Oct 21 01:24:32.718380 lima-osoe systemd-logind[2888395]: Removed session c6.
+Oct 21 01:24:32.723129 lima-osoe systemd[1]: Started b10-job-b-service.service - [systemd-run] /tmp/b10-out/job.sh /tmp/b10-out/user-class/b-service 25 40.
+Oct 21 01:24:57.753055 lima-osoe systemd[1]: b10-job-b-service.service: Deactivated successfully.

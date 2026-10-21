@@ -1,0 +1,2 @@
+logind as shipped; no PE late, every PE holds 30 s after shmem_init
+RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no

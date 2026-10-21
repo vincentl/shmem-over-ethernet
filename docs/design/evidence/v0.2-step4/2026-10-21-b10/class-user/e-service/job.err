@@ -1,0 +1,14 @@
+1792560330.448 rank 0: calling shmem_init
+1792560330.448 rank 1: sleeping 25 s before shmem_init
+1792560330.448 rank 2: calling shmem_init
+1792560330.448 rank 3: calling shmem_init
+1792560355.458 rank 1: calling shmem_init
+osoe: PE 0: shmem_init on node 0 has waited 30 s for local PEs to join the node (call shmem_init): 3 of 4 have; still waiting for local id 1 (rank 1)
+osoe-launch: timeout after 40 s; killing 4 process(es) of job 2921567; -t sets the timeout
+osoe-launch: where job 2921567 waits, by osoe-stat --summary 2921567:
+node 0   lima-osoe        collective shape link; link not set
+node 0   lima-osoe         3/4  live  world      epoch 0/0   own no  children 0/0  next 0    parent 0     rank 0 shmem_init (PE 1) 40.003 s
+osoe-launch: rank 0 killed by signal 9
+osoe-launch: rank 1 killed by signal 9
+osoe-launch: rank 3 killed by signal 9
+osoe-launch: rank 2 killed by signal 9

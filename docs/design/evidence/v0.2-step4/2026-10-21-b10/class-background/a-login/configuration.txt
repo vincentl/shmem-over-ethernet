@@ -1,0 +1,2 @@
+logind as shipped: RemoveIPC=yes, no lingering
+RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no

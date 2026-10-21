@@ -1,0 +1,2 @@
+label	mode	configuration	times_from	names_seen_s	names_gone_s	late_pe_calls_s	launcher_exit	pes_through_init	outcome
+f-running	service	logind as shipped; no PE late, every PE holds 30 s after shmem_init	session's end	-	-	0.0	0	4	completed
