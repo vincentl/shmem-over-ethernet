@@ -2799,7 +2799,7 @@ endif()
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
 # The one-node quiet's fence (T35; test-quiet-litmus.c): a store-buffering
-# litmus through shmem_quiet, two PEs of one node, 500,000 rounds. It can show
+# litmus through shmem_quiet, two PEs of one node, 20 million rounds. It can show
 # the fence's absence only where the library's acquire loads are ldapr - a build
 # configured by hand with -DCMAKE_C_FLAGS=-march=armv8.3-a on a CPU that has
 # them - or on x86-64, and skips everywhere else, every preset on aarch64 among

@@ -20,7 +20,10 @@
  * elsewhere skips (77) saying why. No preset builds it so (the author,
  * 2026-10-20): configure by hand, as the README's "How osoe is tested" says.
  *
- *   test-quiet-litmus [ROUNDS]     500,000 by default
+ *   test-quiet-litmus [ROUNDS]     20 million by default: built for Armv8.3 in
+ *                                  the VM, without the fence, 500,000 rounds
+ *                                  found 0, 2 and 3 forbidden outcomes in three
+ *                                  runs, and a round takes about 80 ns
  */
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -68,7 +71,7 @@ static void meet(_Atomic unsigned long *word, unsigned long round)
 
 int main(int argc, char **argv)
 {
-    unsigned long rounds = argc > 1 ? strtoul(argv[1], NULL, 10) : 500000;
+    unsigned long rounds = argc > 1 ? strtoul(argv[1], NULL, 10) : 20000000;
     shmem_init();
     int me = shmem_my_pe();
     CHECK_FATAL(shmem_n_pes() == 2);
