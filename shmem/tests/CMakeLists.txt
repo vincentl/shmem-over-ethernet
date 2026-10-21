@@ -1133,7 +1133,7 @@ if(OSOE_INTERNODE)
   osoe_refusal_test(shmem.rendezvous.not-this-host.0-1 2 1
     LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NODELIST=127.0.0.1,192.0.2.1
     PATTERNS "osoe: PE 1: node 1 cannot listen on 192.0.2.1, the address its host list entry names: it is not an address of this host"
-             "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+             "shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
     PROGRAM $<TARGET_FILE:shmem_test_barrier>)
   osoe_internode_label(shmem.rendezvous.not-this-host.0-1)
   # A non-lead whose OSOE_AM_BUFFER made a larger connection area than its lead's
