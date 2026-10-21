@@ -322,7 +322,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 576 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 577 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -1218,7 +1218,16 @@ specification or takes a choice the specification leaves open.
   done - but a start caught in those seconds can wait for ever. Setting
   `RemoveIPC=no` in `logind.conf` on compute nodes, as PostgreSQL's
   documentation also advises, or enabling lingering (`loginctl enable-linger`)
-  for the users who run jobs, should prevent it; neither has been tried here.
+  for the users who run jobs, prevents it, as the development VM showed (Debian
+  13, systemd 257): a job of four PEs, one of them 25 s late in calling
+  `shmem_init`, was started just after its user's only login ended. With the
+  defaults the names were gone ten seconds after the login ended, and the
+  launcher's timeout ended the job still waiting for that PE; with lingering
+  enabled, and with `RemoveIPC=no`, it started and finished. A job the login
+  itself started in the background was not caught: logind keeps that login's
+  session until the job's processes are gone, with `KillUserProcesses` off, as
+  it is on Debian 13. The record is
+  `docs/design/evidence/v0.2-step4/2026-10-21-b10/`.
 
 **Failures**
 
@@ -1502,6 +1511,23 @@ that one could be added without touching the OpenSHMEM layer.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
   well as at none, by the environment `ctest` passes on to every test, in every
   preset.
+- **A build by hand for the one-node quiet's fence.** On aarch64 the counters a
+  `shmem_quiet` bumps keep a store before a later load in the hardware, at the
+  compiler's default `-march`, so nothing there fails without the fence that is
+  all of quiet in a job of one node; built for Armv8.3, whose acquire loads are
+  `ldapr`, a store-buffering litmus through `shmem_quiet` finds the forbidden
+  outcome without it. `shmem.quiet.litmus.L2` runs that litmus, and skips where
+  it cannot show the fence - every preset on aarch64 - so on a CPU with
+  `ldapr`:
+
+  ```sh
+  cmake --preset release -B build/armv8.3 -DCMAKE_C_FLAGS=-march=armv8.3-a
+  cmake --build build/armv8.3 -j4
+  ctest --test-dir build/armv8.3 -R '^shmem[.]quiet[.]litmus'
+  ```
+
+  On x86-64, where only the fence's `mfence` orders the two, it runs in every
+  preset.
 - **The measured link.** Every test of more than one node runs with
   `OSOE_TEST_PRINT_LINK=1`, so that its output gives the link the job measured
   as it started, as the three `OSOE_LINK_*` settings that run it again on the
@@ -1520,7 +1546,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 323 of the 576 tests labelled `internode`, `shmem.internode`'s
+  leaves out 324 of the 577 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1552,11 +1578,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  576 tests labelled `internode` - those of a job of more than one node, of
+  577 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 568 of the full build's 1,145 tests in
+  development VM with liburing hidden: 569 of the full build's 1,147 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1741,7 +1767,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |
-| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. On eight nodes of Google Cloud's 23 Gbit/s link (2026-10-20) it raised a stream 7 to 12% and took 6 to 9% off the progress threads' CPU where one thread a node held the rate back, and changed nothing where two helpers already reached the provider's ceiling; no send was copied after all and none waited behind its notification (`docs/fast-link-results.md`). So it stays off by default, with two buffers a connection (the author, 2026-10-20). Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". `shmem_init` raises the soft limit to the hard one ([What `shmem_init` changes in the process](#what-shmem_init-changes-in-the-process)), so to keep sending by reference past that, the hard limit must be raised - an administrator's change, or Slurm's, whose steps on the Pi cluster have no hard limit. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
+| `OSOE_WIRE_ZERO_COPY`, `OSOE_WIRE_ZERO_COPY_BYTES` | `off`, `16384` | `on` sends each connection buffer to the kernel by reference (`IORING_OP_SEND_ZC`) wherever a send carries at least `OSOE_WIRE_ZERO_COPY_BYTES`, and the buffer is not written again until the kernel has let go of it - over TCP, once the peer has acknowledged its bytes - so only one of a connection's two buffers goes by reference at a time, the other copying meanwhile; `off` copies, as before. Off by default, since it loses wherever a copy is cheap: over loopback the kernel copies anyway and adds a notification a send, and a stream ran at about 60% of the copying send's; below about 10 KB, by the kernel's own documentation, pinning the pages costs more than the copy; on the Pi cluster's gigabit a quarter of a stream's sends went by reference and the sending agent's CPU a byte was the copying send's - lending both buffers at once saved a third of it, but left a quiet waiting about half a second at a time for the peer's delayed TCP acknowledgement; and on a fast link a buffer lent is the kernel's until acknowledged, so a peer's stream sends at most one buffer by reference a round trip, the other turning over by copy meanwhile. On eight nodes of Google Cloud's 23 Gbit/s link (2026-10-20) it raised a stream 7 to 12% and took 6 to 9% off the progress threads' CPU where one thread a node held the rate back, and changed nothing where two helpers already reached the provider's ceiling; no send was copied after all and none waited behind its notification (`docs/fast-link-results.md`). So it stays off by default, with two buffers a connection (the author, 2026-10-20). Each send by reference is charged the length it offers, and two pages, until its notification comes, to one count of locked memory for every process of the user on a host, which io_uring holds to each process's own limit (`ulimit -l`; 8 MiB by default): a send the limit refuses goes again by copy, and the connection that met it copies from then on, which a notice naming the limit says once a process - sixteen logical nodes on an emulated gigabit link, each PE putting to every other, met the default, and until this fallback ended "Cannot allocate memory". Sixty-four logical nodes of one PE each on one host, every process held to the default 8 MiB, soft and hard, and every PE putting to every other, met refusals on every node in 20 runs of 20, and each job ended well with every byte right (`shmem.zero-copy-refusals.64-nodes`). `shmem_init` raises the soft limit to the hard one ([What `shmem_init` changes in the process](#what-shmem_init-changes-in-the-process)), so to keep sending by reference past that, the hard limit must be raised - an administrator's change, or Slurm's, whose steps on the Pi cluster have no hard limit. On Linux 6.14 and later io_uring charges its rings to the same count, zero copy or not, so a ring that cannot be made says the limit too. `OSOE_WIRE_ZERO_COPY_BYTES` from `1` up; with it on, a job of more than 3,274 nodes is refused at the defaults with no helpers - the completion queue of the ring that holds the data wires, which more `OSOE_WIRE_BUFFERS` fill sooner and helpers share out. `osoe-stat` counts the sends by reference, a refused one among them, their notifications, and those the kernel did not send by reference after all, a refused one's among them. Each node's own. |
 
 **For testing**
 

@@ -1704,6 +1704,39 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     SKIP_REGULAR_EXPRESSION "SKIPPED: a PE may lock memory")
   osoe_internode_label(shmem.internode.zero-copy-refused.0-1-2)
 endif()
+
+# The zero-copy send at the limit a site has, among many peers (T39; the scale
+# review of v0.2 before Part 4, S8; test-zero-copy-refusals.c and
+# zero-copy-refusals.sh): sixty-four logical nodes of one PE each, every
+# process's locked-memory limit 8 MiB, soft and hard, and every PE putting
+# 128 KiB to every other, four times, with OSOE_WIRE_ZERO_COPY=on. A node's
+# sixty-three connections each lend a buffer at a time, far more than the count
+# allows a host, so sends are refused on many of them - on every node in 20 runs
+# of 20 - and the job must still end well with every byte right, the notice said
+# by at least half of the processes (the last argument), and "Cannot allocate
+# memory", which a refusal ended a job with before the wire copied after one,
+# nowhere. Skipped where a process may lock memory whatever its limit
+# (CAP_IPC_LOCK), where the user's hard limit is below 8 MiB, and where the
+# rings of sixty-four nodes alone pass it (a kernel from 6.14 charges them).
+# Not under a sanitizer: sixty-four PEs outgrow the VM's memory under
+# AddressSanitizer (as the shapes' 64 do), and ThreadSanitizer leaves out the
+# tests across nodes (the README, How osoe is tested). Run alone, as the other
+# jobs of 32 to 70 PEs are (below).
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_executable(shmem_test_zero-copy-refusals test-zero-copy-refusals.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_zero-copy-refusals PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_zero-copy-refusals PRIVATE osoe rt)
+  osoe_warnings(shmem_test_zero-copy-refusals)
+  add_test(NAME shmem.zero-copy-refusals.64-nodes
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/zero-copy-refusals.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_zero-copy-refusals> 64 8192 128 4 32)
+  set_tests_properties(shmem.zero-copy-refusals.64-nodes PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "ZERO COPY REFUSALS OK" SKIP_REGULAR_EXPRESSION "SKIPPED: ")
+  osoe_internode_label(shmem.zero-copy-refusals.64-nodes)
+endif()
+
 # The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the
 # launcher's variables as srun does, SLURM_ in place of OSOE_. One node, one PE
 # a node, the block map, and the cyclic one, whose ranks are not contiguous per
@@ -2798,6 +2831,19 @@ if(OSOE_INTERNODE)
 endif()
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
+# The one-node quiet's fence (T35; test-quiet-litmus.c): a store-buffering
+# litmus through shmem_quiet, two PEs of one node, 20 million rounds. It can show
+# the fence's absence only where the library's acquire loads are ldapr - a build
+# configured by hand with -DCMAKE_C_FLAGS=-march=armv8.3-a on a CPU that has
+# them - or on x86-64, and skips everywhere else, every preset on aarch64 among
+# them (the author, 2026-10-20: no preset).
+add_executable(shmem_test_quiet-litmus test-quiet-litmus.c)
+target_link_libraries(shmem_test_quiet-litmus PRIVATE osoe)
+osoe_warnings(shmem_test_quiet-litmus)
+add_test(NAME shmem.quiet.litmus.L2
+  COMMAND osoe-launch -n 2 -t 150 -- $<TARGET_FILE:shmem_test_quiet-litmus>)
+set_tests_properties(shmem.quiet.litmus.L2 PROPERTIES LABELS "tier2" TIMEOUT 180
+  SKIP_RETURN_CODE 77)
 osoe_tier2_test(malloc)
 osoe_tier2_test(set-range)
 osoe_tier2_test(rma)
@@ -5709,7 +5755,8 @@ endif()
 # registers none of them.
 foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33
              shmem.shape.chosen.pi.64 shmem.shape.chosen.loopback.64
-             shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes)
+             shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes
+             shmem.zero-copy-refusals.64-nodes)
   if(TEST ${test})
     set_tests_properties(${test} PROPERTIES RUN_SERIAL TRUE)
   endif()

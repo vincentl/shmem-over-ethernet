@@ -1,0 +1,49 @@
+1792559245.846004752  holding /tmp/osoe-vm.lock
+1792559245.850082069  other work at the start (waited 0 s): none
+1792559245.927044338  created: uid=1000(osoe-b10) gid=1001(osoe-b10) groups=1001(osoe-b10); osoe-b10:x:1000:1001::/home/osoe-b10:/bin/bash
+id: uid=1000(osoe-b10) gid=1001(osoe-b10) groups=1001(osoe-b10)
+XDG_SESSION_ID=c7
+--- cgroup of this shell
+0::/user.slice/user-1000.slice/session-c7.scope
+--- list-sessions
+15 1000 osoe-b10 - 2877275 manager    - no -
+ 4  501 vincent  - 1193    user       - no -
+c7 1000 osoe-b10 - 2877271 background - no -
+--- session-status
+c7 - osoe-b10 (1000)
+  Since: Wed 2026-10-21 01:07:26 EDT; 194ms ago
+  State: active
+ Leader: 2877271 (su)
+ Remote: user root
+Service: su-l
+   Type: unspecified
+  Class: background
+   Idle: no
+   Unit: session-c7.scope
+         ├─2877271 su -l osoe-b10 -c "/tmp/b10-out/login-body.sh service /tmp/b10-out/check 25 40"
+         ├─2877286 /bin/sh /tmp/b10-out/login-body.sh service /tmp/b10-out/check 25 40
+         └─2877295 loginctl session-status c7 --no-pager
+1792559248.237823091  logind counts the account's session
+1792559259.664040310  the smoke job completed
+1792559259.685245273  == a-service (service): logind as shipped: RemoveIPC=yes, no lingering
+1792559303.390580216  a-service: stalled; from the session's end: names first seen +0.2 s, gone +10.2 s, late PE calls shmem_init +25.0 s; launcher exit 1; 0 PEs left shmem_init
+1792559303.410658711  == a-login (login): logind as shipped: RemoveIPC=yes, no lingering
+1792559329.822480637  a-login: completed; from the session's end: names first seen +-1.9 s, gone +23.0 s, late PE calls shmem_init +23.0 s; launcher exit 0; 4 PEs left shmem_init
+1792559339.132653009  == d-held (held): logind as shipped: RemoveIPC=yes, no lingering, the session held open for the whole job
+1792559365.333328004  d-held: completed; from the job's start: names first seen +0.1 s, gone +25.1 s, late PE calls shmem_init +25.0 s; launcher exit 0; 4 PEs left shmem_init
+1792559365.350546228  lingering enabled: -rw-r--r-- 1 root root 0 Oct 21 01:09 /var/lib/systemd/linger/osoe-b10
+1792559365.370263633  == b-service (service): lingering enabled, RemoveIPC=yes
+1792559393.813159548  b-service: completed; from the session's end: names first seen +0.2 s, gone +25.1 s, late PE calls shmem_init +25.0 s; launcher exit 0; 4 PEs left shmem_init
+1792559394.345923810  logind.conf: 50:RemoveIPC=no
+1792559394.527041209  logind restarted: RemoveIPC=false UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no
+1792559394.556856628  == c-service (service): RemoveIPC=no in logind.conf, logind restarted, no lingering
+1792559423.095638936  c-service: completed; from the session's end: names first seen +0.1 s, gone +25.2 s, late PE calls shmem_init +25.0 s; launcher exit 0; 4 PEs left shmem_init
+1792559423.100113336  logind.conf restored: root:root 644 1785 bytes, modified 2026-04-13 15:38:05.000000000 -0400
+1792559423.227753796  logind restarted: RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no
+1792559423.242447169  == e-service (service): logind.conf restored and logind restarted: as shipped again
+1792559466.488493186  e-service: stalled; from the session's end: names first seen +0.2 s, gone +10.3 s, late PE calls shmem_init +25.0 s; launcher exit 1; 0 PEs left shmem_init
+1792559466.501770091  undo: begin; RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no
+userdel: osoe-b10 mail spool (/var/mail/osoe-b10) not found
+1792559467.588827540  account removed: userdel exit 0
+1792559467.597711255  undo: end; RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no
+1792559467.621413884  finished with status 0

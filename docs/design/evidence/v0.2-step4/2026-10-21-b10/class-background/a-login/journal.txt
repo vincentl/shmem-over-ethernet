@@ -1,0 +1,8 @@
+Oct 21 01:08:23.419690 lima-osoe systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:08:23.420989 lima-osoe systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:08:23.450782 lima-osoe systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:08:23.452425 lima-osoe systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Oct 21 01:08:23.457777 lima-osoe systemd-logind[743]: New session 17 of user osoe-b10.
+Oct 21 01:08:23.491840 lima-osoe systemd[1]: Started user@1000.service - User Manager for UID 1000.
+Oct 21 01:08:23.492407 lima-osoe systemd[1]: Started session-c9.scope - Session c9 of User osoe-b10.
+Oct 21 01:08:48.511340 lima-osoe systemd[1]: session-c9.scope: Deactivated successfully.

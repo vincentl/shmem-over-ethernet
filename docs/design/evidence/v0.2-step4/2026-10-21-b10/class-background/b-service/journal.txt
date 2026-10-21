@@ -1,0 +1,4 @@
+Oct 21 01:09:25.402153 lima-osoe systemd[1]: Started session-c11.scope - Session c11 of User osoe-b10.
+Oct 21 01:09:27.428952 lima-osoe systemd[1]: session-c11.scope: Deactivated successfully.
+Oct 21 01:09:27.445313 lima-osoe systemd[1]: Started b10-job-b-service.service - [systemd-run] /tmp/b10-out/job.sh /tmp/b10-out/b-service 25 40.
+Oct 21 01:09:52.484526 lima-osoe systemd[1]: b10-job-b-service.service: Deactivated successfully.
