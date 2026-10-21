@@ -3737,6 +3737,60 @@ foreach(case_expect
   endforeach()
 endforeach()
 
+# A symmetric-heap call whose PEs pass different arguments (P23): PE 1 another
+# size, hints, count and size of the same product, alignment, realloc size or
+# block to free than the rest - each valid on its own PE - ends the job by name
+# in the call's check, every routine on one node and malloc and free on two;
+# its pass the job's end, named by whichever PE ends it first, as the
+# divergent splits'. And the calls the specification makes the same - realloc
+# of a null pointer and malloc, realloc to size 0 and free - pass it.
+add_executable(shmem_test_malloc-divergent test-malloc-divergent.c)
+target_link_libraries(shmem_test_malloc-divergent PRIVATE osoe)
+osoe_warnings(shmem_test_malloc-divergent)
+foreach(case_expect
+    "malloc|shmem_malloc|size (1000|1008)|0-0-0-0 0-0-1-1"
+    "hints|shmem_malloc_with_hints|size 1000 and hints [0-9]+|0-0-0-0"
+    "calloc|shmem_calloc|count (2 and size 500|4 and size 250)|0-0-0-0"
+    "align|shmem_align|alignment (16|64) and size 1000|0-0-0-0"
+    "realloc|shmem_realloc|the block at offset [0-9]+ of the symmetric heap and size (2000|3000)|0-0-0-0"
+    "free|shmem_free|the block at offset [0-9]+ of the symmetric heap|0-0-0-0 0-0-1-1")
+  string(REGEX MATCH "^([^|]*)[|]([^|]*)[|](.*)[|]([^|]*)$" matched "${case_expect}")
+  set(mode ${CMAKE_MATCH_1})
+  set(routine ${CMAKE_MATCH_2})
+  set(passed ${CMAKE_MATCH_3})
+  string(REPLACE " " ";" labels "${CMAKE_MATCH_4}")
+  foreach(label IN LISTS labels)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+      continue()
+    endif()
+    string(REPLACE "-" "," map "${label}")
+    add_test(NAME shmem.malloc.divergent.${mode}.${label}
+      COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_malloc-divergent> ${mode})
+    set_tests_properties(shmem.malloc.divergent.${mode}.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "osoe: PE [0-3]: ${routine}: the PEs called it with different arguments, which spec .*same on every PE. this PE passed ${passed}"
+      FAIL_REGULAR_EXPRESSION "CHECK[(];every check passed")
+    if(label STREQUAL "0-0-1-1")
+      osoe_internode_label(shmem.malloc.divergent.${mode}.${label})
+    endif()
+  endforeach()
+endforeach()
+foreach(label 0-0-0-0 0-0-1-1)
+  if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+    continue()
+  endif()
+  string(REPLACE "-" "," map "${label}")
+  add_test(NAME shmem.malloc.equivalent.${label}
+    COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_malloc-divergent> equivalent)
+  set_tests_properties(shmem.malloc.equivalent.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "every check passed")
+  if(label STREQUAL "0-0-1-1")
+    osoe_internode_label(shmem.malloc.equivalent.${label})
+  endif()
+endforeach()
+
 # A handle's generation past 32 bits (P5): eight splits under one number from
 # OSOE_TEST_TEAM_GENERATION=2^32 - 4, then the first handle, destroyed - its
 # end the stale handle's, named. At 32 bits the job ended at the fourth split.

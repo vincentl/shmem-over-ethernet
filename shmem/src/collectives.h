@@ -9,6 +9,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <shmem.h>
 
@@ -59,6 +60,27 @@ int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void
 struct osoe_team;
 uint64_t *osoe_team_split_words(const struct osoe_team *t);
 void osoe_team_split_and(const char *routine, struct osoe_team *t, uint32_t count);
+
+/*
+ * A word of a call's kind and up to three of its arguments, any one of which
+ * changing changes it but once in 2^64: splitmix64's finalizer, a part at a
+ * time. Its AND over the PEs beside its inverse's says whether they all passed
+ * the same (P6's splits, team.c; P23's allocations, malloc.c): a bit some PE
+ * has and another has not is 0 in both, where the word's AND alone would let a
+ * PE whose word is a bit-subset of another's pass.
+ */
+static inline uint64_t osoe_arguments_word(uint64_t kind, uint64_t a, uint64_t b, uint64_t c)
+{
+    const uint64_t parts[] = { kind, a, b, c };
+    uint64_t h = 0;
+    for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {
+        h += parts[i] + UINT64_C(0x9e3779b97f4a7c15);
+        h = (h ^ (h >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+        h = (h ^ (h >> 27)) * UINT64_C(0x94d049bb133111eb);
+        h ^= h >> 31;
+    }
+    return h;
+}
 
 /*
  * A prefix sum of nelems elements of `element` over `team` (spec §9.10.10):
