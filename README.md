@@ -1502,6 +1502,23 @@ that one could be added without touching the OpenSHMEM layer.
 - **Progress helpers.** The suite runs at `OSOE_PROGRESS_HELPERS=2` and `3` as
   well as at none, by the environment `ctest` passes on to every test, in every
   preset.
+- **A build by hand for the one-node quiet's fence.** On aarch64 the counters a
+  `shmem_quiet` bumps keep a store before a later load in the hardware, at the
+  compiler's default `-march`, so nothing there fails without the fence that is
+  all of quiet in a job of one node; built for Armv8.3, whose acquire loads are
+  `ldapr`, a store-buffering litmus through `shmem_quiet` finds the forbidden
+  outcome without it. `shmem.quiet.litmus.L2` runs that litmus, and skips where
+  it cannot show the fence - every preset on aarch64 - so on a CPU with
+  `ldapr`:
+
+  ```sh
+  cmake --preset release -B build/armv8.3 -DCMAKE_C_FLAGS=-march=armv8.3-a
+  cmake --build build/armv8.3 -j4
+  ctest --test-dir build/armv8.3 -R '^shmem[.]quiet[.]litmus'
+  ```
+
+  On x86-64, where only the fence's `mfence` orders the two, it runs in every
+  preset.
 - **The measured link.** Every test of more than one node runs with
   `OSOE_TEST_PRINT_LINK=1`, so that its output gives the link the job measured
   as it started, as the three `OSOE_LINK_*` settings that run it again on the

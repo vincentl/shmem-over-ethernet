@@ -2798,6 +2798,19 @@ if(OSOE_INTERNODE)
 endif()
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
+# The one-node quiet's fence (T35; test-quiet-litmus.c): a store-buffering
+# litmus through shmem_quiet, two PEs of one node, 20 million rounds. It can show
+# the fence's absence only where the library's acquire loads are ldapr - a build
+# configured by hand with -DCMAKE_C_FLAGS=-march=armv8.3-a on a CPU that has
+# them - or on x86-64, and skips everywhere else, every preset on aarch64 among
+# them (the author, 2026-10-20: no preset).
+add_executable(shmem_test_quiet-litmus test-quiet-litmus.c)
+target_link_libraries(shmem_test_quiet-litmus PRIVATE osoe)
+osoe_warnings(shmem_test_quiet-litmus)
+add_test(NAME shmem.quiet.litmus.L2
+  COMMAND osoe-launch -n 2 -t 150 -- $<TARGET_FILE:shmem_test_quiet-litmus>)
+set_tests_properties(shmem.quiet.litmus.L2 PROPERTIES LABELS "tier2" TIMEOUT 180
+  SKIP_RETURN_CODE 77)
 osoe_tier2_test(malloc)
 osoe_tier2_test(set-range)
 osoe_tier2_test(rma)
