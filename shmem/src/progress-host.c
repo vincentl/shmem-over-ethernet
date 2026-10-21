@@ -708,6 +708,17 @@ void osoe_progress_host_start(uint32_t session)
         return;
 
     uint32_t peers = osoe.job.node_count - 1, helpers = osoe_am.area.helpers;
+    /* Said under SHMEM_DEBUG where the rule gave the count (P36,
+     * shmem.helpers.auto.*): the count the area was laid out for, and why. */
+    const struct osoe_bootstrap *b = &osoe.bootstrap;
+    if (b->debug && b->progress_helpers_auto)
+        osoe_print_line("osoe: node %u runs %u progress helpers (OSOE_PROGRESS_HELPERS=auto): "
+                        "the job's nodes %u, this node's PEs %u and CPUs online %u%s\n",
+                        b->node, helpers, b->node_count, b->local_count, b->online_cpus,
+                        b->node_count < OSOE_PROGRESS_HELPERS_AUTO_NODES
+                            ? " - two need three nodes or more"
+                        : b->local_count > b->online_cpus ? " - two need no more PEs than CPUs"
+                                                          : "");
     /* The test hook (OSOE_TEST_DEAF_HELPER): a helper that never answers its
      * stop, which the agent must end the job naming (wait_acknowledged). */
     deaf_helper = 0;
