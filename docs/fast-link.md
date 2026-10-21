@@ -774,3 +774,10 @@ set by `OSOE_LINK_*` to what a first job measured, so that the two do the same
 but the measurement, five rounds in another order each: the fastest PE's
 `shmem_init`, nearer init's own cost, measured against set. 41 jobs of a few
 seconds: about five minutes.
+
+Since the second session (P38, 2026-10-20), a link on which the long stream's
+bytes beyond the short one's take less than a millisecond gets streams that
+much longer, and each child comes to a timed message from the same idle; run
+again, the section shows whether the bandwidth and the message cost now hold
+from job to job - the second session's read 1.9 to 5.1 GB/s, and 0 to 159 µs
+on three nodes.
