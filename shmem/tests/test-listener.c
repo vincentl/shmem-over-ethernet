@@ -133,7 +133,7 @@ int main(void)
     memcpy(node0.secret, "sixteen byte key", 16);
     struct osoe_bootstrap node1 = node0;
     node1.node = 1;
-    osoe_listener_open_any_port(&lead, &node0, 0, &loopback);
+    osoe_listener_open_told_port(&lead, &node0, 0);
     pthread_t t;
 
     /* 1. A stranger: every field of its hello is right, and none of them is

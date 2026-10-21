@@ -435,17 +435,22 @@ No PMI plugin is involved: each node's *lead* - its first PE, whose progress
 thread does all of the node's networking once the job has started - finds the
 others over TCP, on a port it derives from the job, step and node ids
 (`OSOE_PORT_RANGE`, default 17000-26999), and then connects to each on a port
-the kernel chooses, so TCP must be open between the nodes, not only that range.
+the kernel chooses, so TCP must be open between the nodes, not only that range -
+or, for a firewall that opens ports by range, on a port of `OSOE_MESH_PORT_RANGE`.
 A program may finalize and initialize again as often as it likes: a session's
 lead listens on its port though the last session's connections still hold it
 (`SO_REUSEADDR`), where the 33rd session within a minute once found every one
 of its candidate ports taken.
 Every node must resolve the names in the step's node list, each name to an
-address at which the other nodes reach that node: a lead listens at the address
-its own host resolves its name to - or, where that is a loopback address, as
-Debian's `/etc/hosts` makes it, at the address its host would send from toward
-another node - and the others dial the address they resolve it to. So osoe uses
-whichever network those names resolve to; there is no setting for an interface,
+address at which the other nodes reach that node. A lead listens on every
+address of its host, and the others find it for the rendezvous at the address
+they resolve its name to, so a host with several addresses may have its name
+resolve to different ones from node to node. For the connections that follow,
+a lead tells the others the address its own host resolves its name to - which
+must be one of its own, or the lead refuses to start, naming it - or, where
+that is a loopback address, as Debian's `/etc/hosts` makes it, the address its
+host would send from toward another node. So osoe uses whichever network those
+names resolve to; there is no setting for an interface,
 and a cluster that wants its data network used maps the node names to that
 network's addresses. `srun` runs the same path on every node, so the program
 must be at that path on each.
@@ -1697,6 +1702,7 @@ both are set the `SHMEM_` one controls.
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_MESH_SLOT` | `100` | Microseconds between the slots of the mesh's start-up schedule, `0` to `100000`: each lead calls one place further round the circle a slot, its calls of a slot begun no earlier than the slot's time, counted from the rendezvous's release, so that each lead is called by about one other at a time; `0`, no slots, each call as soon as fewer than eight are in flight. The schedule's ⌈(n - 1)/2⌉ slots are 3.2 ms at 64 nodes and 0.2 s at 4,097 at the default, the least it takes; calls slower than a slot's share of the eight in flight set the pace instead. Nodes may differ. |
 | `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
+| `OSOE_MESH_PORT_RANGE` | not set | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the connections between nodes, which it tells the others in the rendezvous, so nodes need not agree on it - for a site whose firewall opens the nodes' ports by range. Not set, the kernel chooses the port, as it chooses a connection's own. A lead takes the first free port of the range from one its job and node pick, and refuses to start naming the range where none is free; best apart from `OSOE_PORT_RANGE`, whose candidates it may otherwise take. `SHMEM_DEBUG` has each lead say the port it took. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. A value that is not 32 hexadecimal digits is refused by name, but an empty one is taken as unset, without a word: a wrapper whose secret came out empty starts the job unsecured. *Checked* between nodes: where one node has a secret and another has none, or a different one, the node that sees it ends naming the variable and both nodes; a node's PEs are not compared, and only its lead's is used. |
 | `OSOE_HEAP_BASE` | chosen | The address every PE maps its heap at, a multiple of the page size, in place of the library's own candidates - digits, in decimal or after `0x` in hexadecimal, with no sign: a node whose lead cannot map its heap there refuses to start, naming the address and the kernel's reason - or, under ThreadSanitizer, the tool's: it refuses an address outside its application memory, as it does the library's first candidates, which the lead passes over. The node's first PE's value is the node's. |
 | `OSOE_SHM_CAPACITY_CHECK` | `1` | `0`: a node whose heaps would not fit `/dev/shm`'s free space is warned, not refused. |

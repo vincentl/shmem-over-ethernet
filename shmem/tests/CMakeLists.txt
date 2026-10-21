@@ -1046,9 +1046,10 @@ endforeach()
 # OSOE_TEST_PRINT_LINK, which every PE reads at bootstrap and refuses unless it
 # is 0 or 1 - a value that is no number, and a number past 1; and H23's
 # OSOE_MESH_SLOT past its 100,000 microseconds or no number, and its hook
-# OSOE_TEST_MESH_HOLD without a time or naming a node the job has not; and
-# P5's OSOE_TEST_TEAM_GENERATION no number, or past the generations a handle
-# can carry.
+# OSOE_TEST_MESH_HOLD without a time or naming a node the job has not; P18's
+# OSOE_MESH_PORT_RANGE among the privileged ports; and P5's
+# OSOE_TEST_TEAM_GENERATION no number, or past the generations a handle can
+# carry.
 foreach(case_expect
     "am-chunk|OSOE_AM_CHUNK|abc|OSOE_AM_CHUNK='abc' is not a decimal byte count"
     "am-buffer|OSOE_AM_BUFFER|abc|OSOE_AM_BUFFER='abc' is not a decimal byte count"
@@ -1065,6 +1066,7 @@ foreach(case_expect
     "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not auto or a number of threads from 0 to 64"
     "test-print-link|OSOE_TEST_PRINT_LINK|yes|OSOE_TEST_PRINT_LINK='yes' is not 0 or 1"
     "test-print-link-large|OSOE_TEST_PRINT_LINK|2|OSOE_TEST_PRINT_LINK='2' is not 0 or 1"
+    "mesh-port-range|OSOE_MESH_PORT_RANGE|80-90|OSOE_MESH_PORT_RANGE='80-90' is not LOW-HIGH with 1024 <= LOW <= HIGH <= 65535"
     "mesh-slot|OSOE_MESH_SLOT|abc|OSOE_MESH_SLOT='abc' is not a whole number of microseconds from 0 to 100000"
     "mesh-slot-large|OSOE_MESH_SLOT|100001|OSOE_MESH_SLOT='100001' is not a whole number of microseconds from 0 to 100000"
     "test-mesh-hold|OSOE_TEST_MESH_HOLD|3|OSOE_TEST_MESH_HOLD='3' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds"
@@ -1099,6 +1101,41 @@ if(OSOE_INTERNODE)
       PASS_REGULAR_EXPRESSION "MESH START OK")
     osoe_internode_label(shmem.mesh.${mode})
   endforeach()
+  # OSOE_MESH_PORT_RANGE (P18; mesh-ports.sh): three leads each on a port of the
+  # range, as their SHMEM_DEBUG lines say; and a range of one port for two
+  # logical nodes of one host, which share its ports - one takes it, the other
+  # refuses to start naming the range, and the first waits for it.
+  add_test(NAME shmem.mesh.port-range.0-1-2
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/mesh-ports.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_barrier> 0,1,2 27100 27199)
+  set_tests_properties(shmem.mesh.port-range.0-1-2 PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "MESH PORTS OK")
+  osoe_internode_label(shmem.mesh.port-range.0-1-2)
+  osoe_refusal_test(shmem.mesh.port-range.one-port.0-1 2 1
+    ENV OSOE_MESH_PORT_RANGE=27150-27150
+    LAUNCH -n 2 -m 0,1
+    PATTERNS "osoe: PE [01]: node [01] found no port of OSOE_MESH_PORT_RANGE=27150-27150 free for its mesh; choose a range this host does not use"
+    PROGRAM $<TARGET_FILE:shmem_test_barrier>)
+  osoe_internode_label(shmem.mesh.port-range.one-port.0-1)
+  # The rendezvous listens on every address of a lead's host (P20): node 1
+  # resolves node 0's name to 127.0.0.3, another of this host's addresses, where
+  # node 0 resolves it to 127.0.0.1 - a host of several addresses whose name the
+  # site's resolvers give differently - and finds its parent there all the same,
+  # where a listener on node 0's own entry's address alone left node 1 calling
+  # ports nothing listened on (the release review's portability N4). And a lead
+  # whose own entry names no address of its host refuses to start naming it,
+  # checked apart from the listener, its parent waiting for it.
+  add_test(NAME shmem.rendezvous.alias.0-1
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 20
+            -e 1:OSOE_STEP_NODELIST=127.0.0.3,127.0.0.2 -- $<TARGET_FILE:shmem_test_barrier>)
+  set_tests_properties(shmem.rendezvous.alias.0-1 PROPERTIES LABELS "tier2" TIMEOUT 60)
+  osoe_internode_label(shmem.rendezvous.alias.0-1)
+  osoe_refusal_test(shmem.rendezvous.not-this-host.0-1 2 1
+    LAUNCH -n 2 -m 0,1 -e 1:OSOE_STEP_NODELIST=127.0.0.1,192.0.2.1
+    PATTERNS "osoe: PE 1: node 1 cannot listen on 192.0.2.1, the address its host list entry names: it is not an address of this host"
+             "osoe_notice: shmem_init on node 0 has waited [0-9]+ s for node 1, its child in the rendezvous tree, to call it on port [0-9]+"
+    PROGRAM $<TARGET_FILE:shmem_test_barrier>)
+  osoe_internode_label(shmem.rendezvous.not-this-host.0-1)
   # A non-lead whose OSOE_AM_BUFFER made a larger connection area than its lead's
   # once waited for ever for the object to grow, which the lead sizes in one step.
   # It refuses at once, by name, and the job ends: the other PE of its node by the
