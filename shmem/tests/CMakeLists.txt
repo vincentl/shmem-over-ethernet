@@ -1061,8 +1061,8 @@ foreach(case_expect
     "wire-unsent-bytes-large|OSOE_WIRE_UNSENT_BYTES|2000000000|OSOE_WIRE_UNSENT_BYTES='2000000000' is more than 1073741824 bytes"
     "wire-zero-copy|OSOE_WIRE_ZERO_COPY|yes|OSOE_WIRE_ZERO_COPY=yes: on, to send connection buffers by reference"
     "wire-zero-copy-bytes|OSOE_WIRE_ZERO_COPY_BYTES|0|OSOE_WIRE_ZERO_COPY_BYTES='0' is not a byte count of at least 1"
-    "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not a number of threads from 0 to 64"
-    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not a number of threads from 0 to 64"
+    "progress-helpers|OSOE_PROGRESS_HELPERS|abc|OSOE_PROGRESS_HELPERS='abc' is not auto or a number of threads from 0 to 64"
+    "progress-helpers-many|OSOE_PROGRESS_HELPERS|65|OSOE_PROGRESS_HELPERS='65' is not auto or a number of threads from 0 to 64"
     "test-print-link|OSOE_TEST_PRINT_LINK|yes|OSOE_TEST_PRINT_LINK='yes' is not 0 or 1"
     "test-print-link-large|OSOE_TEST_PRINT_LINK|2|OSOE_TEST_PRINT_LINK='2' is not 0 or 1"
     "mesh-slot|OSOE_MESH_SLOT|abc|OSOE_MESH_SLOT='abc' is not a whole number of microseconds from 0 to 100000"
@@ -2005,6 +2005,27 @@ if(OSOE_INTERNODE)
   osoe_internode_label(shmem.keepalive.loopback-off.0-1)
   osoe_internode_label(shmem.keepalive.set-on.0-1)
 endif()
+# OSOE_PROGRESS_HELPERS=auto, the author's rule (P36; helpers-auto.sh), as each
+# node's lead says it under SHMEM_DEBUG: two on three nodes, none on two, and
+# none on a node whose PEs outnumber its CPUs (OSOE_TEST_ONLINE_CPUS) beside two
+# on its peers, data moving between every pair of PEs. And the hook refused
+# where it is no count of CPUs.
+if(OSOE_INTERNODE)
+  foreach(mode three two crowded)
+    add_test(NAME shmem.helpers.auto.${mode}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/helpers-auto.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_rma> ${mode})
+    set_tests_properties(shmem.helpers.auto.${mode} PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "HELPERS AUTO OK")
+    osoe_internode_label(shmem.helpers.auto.${mode})
+  endforeach()
+endif()
+osoe_refusal_test(shmem.start-up.test-online-cpus.invalid 2 0
+  ENV OSOE_PROGRESS_HELPERS=auto OSOE_TEST_ONLINE_CPUS=0
+  LAUNCH -n 2
+  PATTERNS "osoe: PE 0: OSOE_TEST_ONLINE_CPUS='0' is not a count of CPUs from 1 to 65536"
+           "osoe: PE 1: OSOE_TEST_ONLINE_CPUS='0' is not a count of CPUs from 1 to 65536"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
 # shmem_finalize naming it, found by its turns: nothing waits for time to pass.

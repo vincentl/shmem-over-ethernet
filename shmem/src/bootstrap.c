@@ -68,6 +68,27 @@ static uint32_t need_u32(const char *name)
 
 void (*osoe_bootstrap_identified)(const struct osoe_bootstrap *b);
 
+/* The CPUs online that OSOE_PROGRESS_HELPERS=auto counts (bootstrap.h): the
+ * machine's, or OSOE_TEST_ONLINE_CPUS's. 0 where the system cannot say, which
+ * no node's PEs fit. */
+static uint32_t online_cpus(void)
+{
+    uint32_t cpus = 0;
+    switch (osoe_environment_u32("OSOE_TEST_ONLINE_CPUS", &cpus)) {
+    case OSOE_ENVIRONMENT_OK:
+        if (cpus >= 1 && cpus <= OSOE_TEST_ONLINE_CPUS_HIGHEST)
+            return cpus;
+        /* fall through */
+    case OSOE_ENVIRONMENT_INVALID:
+        osoe_fatal("OSOE_TEST_ONLINE_CPUS='%s' is not a count of CPUs from 1 to %u",
+                   getenv("OSOE_TEST_ONLINE_CPUS"), OSOE_TEST_ONLINE_CPUS_HIGHEST);
+    case OSOE_ENVIRONMENT_UNSET:
+        break;
+    }
+    long online = sysconf(_SC_NPROCESSORS_ONLN);
+    return online > 0 && online <= UINT32_MAX ? (uint32_t)online : 0;
+}
+
 void osoe_bootstrap_read(struct osoe_bootstrap *b)
 {
     *b = (struct osoe_bootstrap){ 0 };
@@ -326,13 +347,25 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
 
     /* OSOE_PROGRESS_HELPERS (bootstrap.h): by every PE, refused past 64 before
      * anything is laid out by it - an owner past the 64th has no bit in a PE's
-     * mask (the adversarial read of Part 1, N5). */
+     * mask (the adversarial read of Part 1, N5). Or `auto`, the author's rule
+     * (OSOE_PROGRESS_HELPERS_AUTO), from what every PE of the node counts
+     * alike before anything is laid out: the job's nodes, the node's PEs and
+     * its CPUs online. */
     b->progress_helpers = 0;
-    if (osoe_environment_u32("OSOE_PROGRESS_HELPERS", &b->progress_helpers) ==
-            OSOE_ENVIRONMENT_INVALID ||
-        b->progress_helpers > OSOE_PROGRESS_HELPERS_HIGHEST)
-        osoe_fatal("OSOE_PROGRESS_HELPERS='%s' is not a number of threads from 0 to %u",
-                   getenv("OSOE_PROGRESS_HELPERS"), OSOE_PROGRESS_HELPERS_HIGHEST);
+    const char *helpers = getenv("OSOE_PROGRESS_HELPERS");
+    if (helpers && strcmp(helpers, "auto") == 0) {
+        b->progress_helpers_auto = true;
+        b->online_cpus = online_cpus();
+        b->progress_helpers = b->node_count >= OSOE_PROGRESS_HELPERS_AUTO_NODES &&
+                                      b->local_count <= b->online_cpus
+                                  ? OSOE_PROGRESS_HELPERS_AUTO
+                                  : 0;
+    } else if (osoe_environment_u32("OSOE_PROGRESS_HELPERS", &b->progress_helpers) ==
+                   OSOE_ENVIRONMENT_INVALID ||
+               b->progress_helpers > OSOE_PROGRESS_HELPERS_HIGHEST) {
+        osoe_fatal("OSOE_PROGRESS_HELPERS='%s' is not auto or a number of threads from 0 to %u",
+                   helpers, OSOE_PROGRESS_HELPERS_HIGHEST);
+    }
 
     /*
      * How many pieces of a data collective each lead of the internode tree

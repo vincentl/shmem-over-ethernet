@@ -44,7 +44,11 @@ struct osoe_bootstrap {
                                  * the library, the main one included (§3.14) */
     uint32_t progress_helpers;  /* OSOE_PROGRESS_HELPERS: the threads beside the lead's agent
                                  * that own the data wires (owner-map.h; v0.2 step 4) */
-    uint32_t collective_pipeline;   /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
+    bool progress_helpers_auto; /* OSOE_PROGRESS_HELPERS=auto gave that count by its rule
+                                 * (OSOE_PROGRESS_HELPERS_AUTO; P36) */
+    uint32_t online_cpus;       /* the CPUs online the rule counted on this node, or
+                                 * OSOE_TEST_ONLINE_CPUS's; 0 where nothing asked */
+    uint32_t collective_pipeline;  /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
                                      * pieces in flight per level of the tree (§5.8) */
     uint32_t small_collective_bytes;    /* OSOE_SMALL_COLLECTIVE_BYTES: the largest data
                                          * collective through a team's own slots (§5.8) */
@@ -279,6 +283,23 @@ static inline const char *osoe_collective_places_name(uint32_t places)
  * the node's own rendezvous checks that they do (node.c); nodes need not.
  */
 #define OSOE_PROGRESS_HELPERS_HIGHEST 64u
+
+/*
+ * OSOE_PROGRESS_HELPERS=auto: the author's rule of 2026-10-20 (A2, P36) -
+ * two helpers on a job of three nodes or more where the node runs no more PEs
+ * than it has CPUs online, none otherwise. Two nodes have one peer, which one
+ * helper already holds alone; and where a node's PEs outnumbered its CPUs, two
+ * helpers halved the mailbox on Google Cloud's nodes (docs/fast-link-results.md,
+ * H4). Every PE of a node counts the same nodes, PEs and CPUs, so its PEs
+ * agree. Not yet the default: that waits for the helpers measured under a
+ * site's binding (H26).
+ */
+#define OSOE_PROGRESS_HELPERS_AUTO 2u
+#define OSOE_PROGRESS_HELPERS_AUTO_NODES 3u
+
+/* OSOE_TEST_ONLINE_CPUS: the CPUs online the rule counts, 1 to this, in place
+ * of the machine's, so that a test of the rule holds on any machine. */
+#define OSOE_TEST_ONLINE_CPUS_HIGHEST 65536u
 
 /* The default SHMEM_SYMMETRIC_SIZE: 256 MiB (§4.4). */
 #define OSOE_DEFAULT_SYMMETRIC_SIZE (UINT64_C(256) << 20)

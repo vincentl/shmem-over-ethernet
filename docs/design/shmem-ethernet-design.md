@@ -1433,7 +1433,12 @@ at every helper count, a control wire and a data wire (§3.1,
   wire to the peer in slot p is owner 1 + (p mod H)'s (`owner-map.h`), so a
   peer's traffic is always one thread's and keeps a single stream's order; a
   helper with no peer is idle. A node's PEs must agree on H in a job of more
-  than one node; nodes may differ.
+  than one node; nodes may differ. `OSOE_PROGRESS_HELPERS=auto` takes H by the
+  author's rule of 2026-10-20 (A2, P36; `bootstrap.h`): 2 on a job of three
+  nodes or more where the node runs no more PEs than its machine has CPUs
+  online, 0 otherwise - each PE of a node counting the same nodes, PEs and CPUs
+  in its bootstrap, before anything is laid out by H, so its PEs agree. The
+  default stays 0 until the helpers are measured under a site's binding (H26).
 - **Writers wake the owner of their wire**, not the lead: the connection area
   holds a sleeping flag and a dirty bitmap an owner, and a helper's wake word,
   while the lead's agent sleeps on its PE slot's in the node segment, which stop
