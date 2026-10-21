@@ -312,9 +312,14 @@ static const char *descriptor_hint(int error, char *buf, size_t len)
 #define NOT_COME " - a node comes to the rendezvous once all its PEs have called " \
                  "shmem_init, and names any that has not"
 
-/* Bind and listen on address:port, or return false if the port is taken. */
-static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *address,
-                       uint16_t port)
+/* Bind and listen on every address at `port`, or return false if the port is
+ * taken. Every address, the rendezvous's as the mesh's (P20): a peer that
+ * resolves this node's name to another address of this host - a host with
+ * several, which a site's names may give differently from node to node -
+ * reaches it there, where a listener on the one address its own entry names
+ * left that peer calling a port nothing listened on (the release review's
+ * portability N4, measured). */
+static bool try_listen(struct osoe_listener *l, uint16_t port)
 {
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     if (fd < 0) {
@@ -338,8 +343,6 @@ static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *addres
         osoe_fatal("cannot set SO_REUSEADDR on a listening socket: %s", strerror(errno));
     struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons(port),
                              .sin_addr.s_addr = htonl(INADDR_ANY) };
-    if (address)
-        a.sin_addr = address->sin_addr;
     /* A backlog for every lower node at once: the eager mesh's worst case
      * (§6.2), capped by the kernel at net.core.somaxconn. */
     const struct osoe_bootstrap *b = l->bootstrap;
@@ -353,12 +356,6 @@ static bool try_listen(struct osoe_listener *l, const struct sockaddr_in *addres
     }
     int error = errno;
     close(fd);
-    if (error == EADDRNOTAVAIL) {
-        char ip[INET_ADDRSTRLEN] = "?";
-        inet_ntop(AF_INET, &a.sin_addr, ip, sizeof ip);
-        osoe_fatal("node %u cannot listen on %s, the address its host list entry names: it "
-                   "is not an address of this host", b->node, ip);
-    }
     if (error != EADDRINUSE && error != EACCES)
         osoe_fatal("cannot listen on port %u: %s", port, strerror(error));
     return false;
@@ -390,27 +387,65 @@ static void callers_open(struct osoe_listener *l)
 }
 
 void osoe_listener_open(struct osoe_listener *l, const struct osoe_bootstrap *b,
-                        uint32_t session, const struct sockaddr_in *address)
+                        uint32_t session)
 {
     *l = (struct osoe_listener){ .fd = -1, .node = b->node, .session = session,
                                  .bootstrap = b };
     callers_open(l);
     for (uint32_t i = 0; i < CANDIDATES; i++)
-        if (try_listen(l, address, osoe_listener_candidate(b, b->node, i)))
+        if (try_listen(l, osoe_listener_candidate(b, b->node, i)))
             return;
     osoe_fatal("node %u found none of its %u candidate ports free in OSOE_PORT_RANGE=%u-%u; "
                "choose a range this host does not use", b->node, CANDIDATES,
                b->port_low, b->port_high);
 }
 
-void osoe_listener_open_any_port(struct osoe_listener *l, const struct osoe_bootstrap *b,
-                                 uint32_t session, const struct sockaddr_in *address)
+void osoe_listener_open_told_port(struct osoe_listener *l, const struct osoe_bootstrap *b,
+                                  uint32_t session)
 {
     *l = (struct osoe_listener){ .fd = -1, .node = b->node, .session = session,
                                  .bootstrap = b };
     callers_open(l);
-    if (!try_listen(l, address, 0))
-        osoe_fatal("node %u could not listen on any port", b->node);
+    if (b->mesh_port_low == 0) {
+        if (!try_listen(l, 0))
+            osoe_fatal("node %u could not listen on any port", b->node);
+        return;
+    }
+    /* OSOE_MESH_PORT_RANGE (P18): every port of the range, from one this
+     * node's ids pick, so that one host's logical nodes - and jobs - do not
+     * all try the same ports first. */
+    uint32_t span = (uint32_t)b->mesh_port_high - b->mesh_port_low + 1;
+    uint32_t first = (uint32_t)(mix(b->job ^ mix(((uint64_t)b->step << 32) | b->node)) % span);
+    for (uint32_t i = 0; i < span; i++)
+        if (try_listen(l, (uint16_t)(b->mesh_port_low + (first + i) % span)))
+            return;
+    osoe_fatal("node %u found no port of OSOE_MESH_PORT_RANGE=%u-%u free for its mesh; choose a "
+               "range this host does not use", b->node, b->mesh_port_low, b->mesh_port_high);
+}
+
+void osoe_listener_check_own_address(const struct osoe_bootstrap *b,
+                                     const struct sockaddr_in *address)
+{
+    int fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    if (fd < 0) {
+        int e = errno;
+        char hint[320];
+        osoe_fatal("cannot create a socket to check this node's address: %s%s", strerror(e),
+                   descriptor_hint(e, hint, sizeof hint));
+    }
+    struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = 0, .sin_addr = address->sin_addr };
+    int bound = bind(fd, (struct sockaddr *)&a, sizeof a);
+    int error = errno;
+    close(fd);
+    if (bound == 0)
+        return;
+    char ip[INET_ADDRSTRLEN] = "?";
+    inet_ntop(AF_INET, &a.sin_addr, ip, sizeof ip);
+    if (error == EADDRNOTAVAIL)
+        osoe_fatal("node %u cannot listen on %s, the address its host list entry names: it "
+                   "is not an address of this host", b->node, ip);
+    osoe_fatal("node %u cannot check %s, the address its host list entry names: %s", b->node, ip,
+               strerror(error));
 }
 
 void osoe_listener_close(struct osoe_listener *l)

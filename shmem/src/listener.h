@@ -88,21 +88,33 @@ struct osoe_listener {
 };
 
 /*
- * Bind this lead's listener on `address` (NULL: every address): the first
+ * Bind this lead's listener on every address of this host (P20): the first
  * candidate port of (job, step, node) that is free. Fatal if none of the
  * candidates is (a host using every one of them is misconfigured, and the
  * message names the range).
  */
 void osoe_listener_open(struct osoe_listener *l, const struct osoe_bootstrap *b,
-                        uint32_t session, const struct sockaddr_in *address);
+                        uint32_t session);
 
 /*
- * The same, on a port the kernel chooses rather than the port rule's: for a
- * listener whose port is told to the callers rather than found by them - the
- * node-pair mesh's, whose port rides in the node's backend blob (§6.2).
+ * The same, on a port told to the callers rather than found by them - the
+ * node-pair mesh's, whose port rides in the node's backend blob (§6.2): the
+ * kernel's choice, or where OSOE_MESH_PORT_RANGE is set a free port of it,
+ * fatal naming the range if it has none (P18).
  */
-void osoe_listener_open_any_port(struct osoe_listener *l, const struct osoe_bootstrap *b,
-                                 uint32_t session, const struct sockaddr_in *address);
+void osoe_listener_open_told_port(struct osoe_listener *l, const struct osoe_bootstrap *b,
+                                  uint32_t session);
+
+/*
+ * That `address` - this node's own (osoe_listener_own_address), which it tells
+ * its peers - is an address of this host, or the end naming it: a socket bound
+ * to it and closed, which sends nothing. The listener's bind said so once it
+ * bound that address alone; it binds every address now (P20), and a host list
+ * naming another host would have this node tell its peers an address at which
+ * they reach someone else.
+ */
+void osoe_listener_check_own_address(const struct osoe_bootstrap *b,
+                                     const struct sockaddr_in *address);
 void osoe_listener_close(struct osoe_listener *l);
 
 /*
@@ -194,7 +206,7 @@ void osoe_listener_node_address(const struct osoe_bootstrap *b, uint32_t node,
                                 struct sockaddr_in *out);
 
 /*
- * This node's own address, to listen at and to tell its peers (§6.2): its host
+ * This node's own address, to tell its peers (§6.2): its host
  * list entry, resolved - unless that entry is a name this host resolves to a
  * loopback address, as Debian's /etc/hosts does a host's own name (127.0.1.1),
  * in a job of several nodes, which could never reach it there. Then the address

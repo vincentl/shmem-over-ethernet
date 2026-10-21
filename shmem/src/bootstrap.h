@@ -61,6 +61,8 @@ struct osoe_bootstrap {
      * than measured - all three or none; 0 when none is set. */
     uint64_t link_hop_ns, link_message_ns, link_bytes_per_second;
     uint16_t port_low, port_high;   /* OSOE_PORT_RANGE: a lead's listener (§6.2) */
+    uint16_t mesh_port_low, mesh_port_high;     /* OSOE_MESH_PORT_RANGE: the mesh's listener
+                                                 * (P18); 0 and 0 for the kernel's choice */
     /* OSOE_KEEPALIVE (§3.15): TCP keepalive on every node-pair connection, as
      * seconds idle, seconds between probes, and probes. Zero means the default,
      * so that a bootstrap built by hand, zeroed, keeps it; `keepalive_off` is

@@ -302,8 +302,8 @@ static void exec_rank(long rank, long n, const char *job, const struct placement
     /*
      * The step's hosts, in node order (§6.1). One node: this host's name. More:
      * one loopback address per logical node - all of 127.0.0.0/8 is loopback on
-     * Linux - so each node's lead listens on its own address, as on a cluster,
-     * and the rendezvous resolves a host list rather than a special case (§8.1).
+     * Linux - so each node has an address of its own, as on a cluster, and the
+     * rendezvous resolves a host list rather than a special case (§8.1).
      */
     char host[HOST_NAME_MAX + 1] = "localhost";
     gethostname(host, sizeof host);
