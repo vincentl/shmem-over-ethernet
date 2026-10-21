@@ -14,6 +14,14 @@
  * writes to it first, and that lead finds it differs from its own before it
  * puts a byte (internode-generic.c).
  *
+ * And within a node, under OSOE_CHECK_COLLECTIVES=1 (P24), the same two and
+ * three more, OSOE_TEST_DIVERGE_KIND's: `root`, the one PE broadcasting from
+ * team rank 1 where the others broadcast from 0; `count`, it reducing half the
+ * elements; `sync`, it calling shmem_barrier_all where the others reduce; and
+ * `alltoall`, it calling shmem_barrier_all where the others alltoall, whose
+ * calls meet only at the alltoall's closing sync. The node-mate that meets
+ * every member's call ends the job naming two.
+ *
  * Until phase 1 step 5 slice 6 a gather ran as an or over the reduction's tree,
  * and the gather case fcollected where the others or-reduced the same bytes,
  * told apart only by the gather's mark in the piece header. A gather is an
@@ -40,7 +48,21 @@ int main(void)
     const char *diverge = getenv("OSOE_TEST_DIVERGE");
     const char *kind = getenv("OSOE_TEST_DIVERGE_KIND");
     bool diverging = diverge && diverge[0] == '1';
-    if (kind && kind[0] == 'g') {
+    if (kind && kind[0] == 'r') {
+        shmem_long_broadcast(SHMEM_TEAM_WORLD, dst, src, COUNT, diverging ? 1 : 0);
+    } else if (kind && kind[0] == 'c') {
+        shmem_long_sum_reduce(SHMEM_TEAM_WORLD, dst, src, diverging ? COUNT / 2 : COUNT);
+    } else if (kind && kind[0] == 'a') {
+        if (diverging)
+            shmem_barrier_all();
+        else
+            shmem_long_alltoall(SHMEM_TEAM_WORLD, dst, src, 1);
+    } else if (kind && kind[0] == 's') {
+        if (diverging)
+            shmem_barrier_all();
+        else
+            shmem_long_sum_reduce(SHMEM_TEAM_WORLD, dst, src, COUNT);
+    } else if (kind && kind[0] == 'g') {
         /* dst has room for two longs from every PE, up to COUNT / 2 PEs. */
         if (shmem_n_pes() > COUNT / 2)
             return 2;
