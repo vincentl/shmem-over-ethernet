@@ -2008,9 +2008,11 @@ endif()
 # OSOE_PROGRESS_HELPERS=auto, the author's rule (P36; helpers-auto.sh), as each
 # node's lead says it under SHMEM_DEBUG: two on three nodes, none on two, and
 # none on a node whose PEs outnumber its CPUs (OSOE_TEST_ONLINE_CPUS) beside two
-# on its peers, data moving between every pair of PEs. And the hook refused
-# where it is no count of CPUs.
-if(OSOE_INTERNODE)
+# on its peers, data moving between every pair of PEs - left out under
+# ThreadSanitizer, as shmem.internode's maps are, since those puts land in a
+# heap a local thread holds through an ordering in another process (§8.2). And
+# the hook refused where it is no count of CPUs.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   foreach(mode three two crowded)
     add_test(NAME shmem.helpers.auto.${mode}
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/helpers-auto.sh $<TARGET_FILE:osoe-launch>
