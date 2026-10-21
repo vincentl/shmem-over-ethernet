@@ -470,7 +470,7 @@ struct own_places {
  */
 static int gather(const char *routine, struct osoe_team *t, void *dest, const void *source,
                   size_t block, const uint64_t *places, const struct own_places *own,
-                  uint64_t total, bool lengths)
+                  uint64_t total, bool lengths, enum osoe_call_kind kind)
 {
     if (total == 0)
         return 0;
@@ -506,9 +506,9 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
 
     bool lead = osoe.bootstrap.local_id == t->lead_local_id;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
-    /* P24: an fcollect's members pass one block size; a collect's may differ. */
-    struct osoe_call call = { places ? OSOE_CALL_COLLECT : OSOE_CALL_FCOLLECT, 0,
-                              places ? 0 : block, 0 };
+    /* P24: an fcollect's members pass one block size; a collect's may differ,
+     * and only its lead holds the places, so the caller says which it is. */
+    struct osoe_call call = { kind, 0, kind == OSOE_CALL_COLLECT ? 0 : block, 0 };
     osoe_call_say(t, k + 1, &call);
     if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * members) && !lead)
         osoe_epoch_wake_all(&b->arrived);
@@ -790,7 +790,8 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
 {
     uint64_t members = t->members;
     if (t->singleton)
-        return gather(routine, t, dest, source, block, NULL, NULL, block, false);
+        return gather(routine, t, dest, source, block, NULL, NULL, block, false,
+                      OSOE_CALL_COLLECT);
 
     struct osoe_symmetric_location length_at = team_word_at(t, OSOE_INTERNAL_COLLECT_LENGTH);
     struct osoe_symmetric_location total_at = team_word_at(t, OSOE_INTERNAL_COLLECT_TOTAL);
@@ -874,7 +875,7 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
     osoe_team_publish_epoch(t, k + 1);
     osoe_blocked_leave();
     int status = gather(routine, t, dest, source, block, places, by_scan ? &own : NULL, total,
-                        false);
+                        false, OSOE_CALL_COLLECT);
     free(places);
     return status;
 }
@@ -894,7 +895,7 @@ int osoe_collect(const char *routine, shmem_team_t team, void *dest, const void 
         osoe_fatal("%s: %u members' blocks of %zu bytes are more bytes than there are", routine,
                    t->members, block);
     return gather(routine, t, dest, source, block, NULL, NULL, (uint64_t)t->members * block,
-                  false);
+                  false, OSOE_CALL_FCOLLECT);
 }
 
 /*

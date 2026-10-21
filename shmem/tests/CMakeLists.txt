@@ -3877,7 +3877,9 @@ set_tests_properties(shmem.collective-check.unsaid.0-0-0-0 PROPERTIES LABELS "ti
   PASS_REGULAR_EXPRESSION "PE 1, of this node, said no call for .*'s collective [0-9]+ where this PE checks the node's calls [(]OSOE_CHECK_COLLECTIVES[)]")
 foreach(program reduce broadcast collect alltoall scan team)
   foreach(label 0-0-0-0 0-0-1-1)
-    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+    # test-team.c holds every PE on one node (SHMEM_TEAM_SHARED is the world)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"
+                                     OR program STREQUAL "team"))
       continue()
     endif()
     string(REPLACE "-" "," map "${label}")
