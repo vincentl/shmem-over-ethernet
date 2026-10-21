@@ -48,6 +48,7 @@ static const char *const known_settings[] = {
     "OSOE_MAX_CONTEXTS",
     "OSOE_MAX_TEAMS",
     "OSOE_MAX_THREADS",
+    "OSOE_MESH_PORT_RANGE",
     "OSOE_MESH_SLOT",
     "OSOE_NO_PROGRESS_TIMEOUT",
     "OSOE_PORT_RANGE",

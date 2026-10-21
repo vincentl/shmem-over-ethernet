@@ -345,7 +345,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
         wires[i] = (struct osoe_wire){ .fd = -1 };
     struct osoe_listener own, *l = mesh ? mesh->listener : &own;
     if (!mesh)
-        osoe_listener_open(&own, b, session, NULL);
+        osoe_listener_open(&own, b, session);
     if (b->mesh_hold_ms && b->mesh_hold_node == b->node)
         hold(b->mesh_hold_ms);
     /* The slots begin with the rendezvous's release, which reached this lead

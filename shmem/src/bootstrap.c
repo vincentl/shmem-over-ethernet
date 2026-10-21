@@ -68,6 +68,23 @@ static uint32_t need_u32(const char *name)
 
 void (*osoe_bootstrap_identified)(const struct osoe_bootstrap *b);
 
+/* A range of ports, LOW-HIGH with 1024 <= LOW <= HIGH <= 65535, from `name`
+ * if it is set; false and the bounds untouched where it is not. */
+static bool port_range(const char *name, uint16_t *low_out, uint16_t *high_out)
+{
+    const char *range = getenv(name);
+    if (!range)
+        return false;
+    unsigned low, high;
+    int used = 0;
+    if (sscanf(range, "%u-%u%n", &low, &high, &used) != 2 || range[used] != '\0' ||
+        low < 1024 || high > 65535 || low > high)
+        osoe_fatal("%s='%s' is not LOW-HIGH with 1024 <= LOW <= HIGH <= 65535", name, range);
+    *low_out = (uint16_t)low;
+    *high_out = (uint16_t)high;
+    return true;
+}
+
 /* The CPUs online that OSOE_PROGRESS_HELPERS=auto counts (bootstrap.h): the
  * machine's, or OSOE_TEST_ONLINE_CPUS's. 0 where the system cannot say, which
  * no node's PEs fit. */
@@ -485,17 +502,16 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
      */
     b->port_low = OSOE_DEFAULT_PORT_LOW;
     b->port_high = OSOE_DEFAULT_PORT_HIGH;
-    const char *range = getenv("OSOE_PORT_RANGE");
-    if (range) {
-        unsigned low, high;
-        int used = 0;
-        if (sscanf(range, "%u-%u%n", &low, &high, &used) != 2 || range[used] != '\0' ||
-            low < 1024 || high > 65535 || low > high)
-            osoe_fatal("OSOE_PORT_RANGE='%s' is not LOW-HIGH with 1024 <= LOW <= HIGH <= 65535",
-                       range);
-        b->port_low = (uint16_t)low;
-        b->port_high = (uint16_t)high;
-    }
+    port_range("OSOE_PORT_RANGE", &b->port_low, &b->port_high);
+    /*
+     * And the ports a lead's mesh listener may take (P18; the author,
+     * 2026-10-20): unset, the kernel's choice, an ephemeral port, as before;
+     * set, a free port of the range, for a site whose firewall opens the
+     * nodes' ports by range. The port is told to the callers in the node's
+     * backend blob (§6.2), so nodes need not agree on the range.
+     */
+    b->mesh_port_low = b->mesh_port_high = 0;
+    port_range("OSOE_MESH_PORT_RANGE", &b->mesh_port_low, &b->mesh_port_high);
 
     /*
      * TCP keepalive on the node-pair connections (§3.15, wire.c): "IDLE,

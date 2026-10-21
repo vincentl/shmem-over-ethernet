@@ -6810,7 +6810,9 @@ every lower node at once, capped by `net.core.somaxconn`; past 4,096 nodes a
 connection waits in SYN retries rather than failing. The listener is closed once
 the lower nodes are in, so a stranger probing a candidate afterwards is refused
 rather than left unanswered. In a job the mesh does not probe at all: each lead
-listens on a port the kernel chooses, **advertises it in its backend blob**
+listens on a port the kernel chooses - or, under `OSOE_MESH_PORT_RANGE`, a free
+port of that range, for a site whose firewall opens ports by range (P18; the
+author, 2026-10-20) - **advertises it in its backend blob**
 (`osoe_transport_advertise`, the call the blob was waiting for), and the others
 connect to the address and port the rendezvous carried (below). The port rule's
 probing remains for the rendezvous's own parent connection, and for the tests
@@ -6865,7 +6867,12 @@ asks for its own entry and its parent's, O(length of the string) each.
 decided with the author 2026-09-22). **A tree, not a star.** Node *i*'s lead
 connects to its parent, (*i* − 1)/8, in a tree of fan-out 8 over the node indices
 rooted at node 0, found by the port rule on the address its host-list entry names;
-each lead listens on its own entry's address. §6.2's star put every connection
+each lead listens on every address of its host, having checked that its own
+entry's is one of them (P20; the author, 2026-10-20) - so a child that resolves
+its parent's name to another of the parent's addresses, as a site's names may
+on a host with several, reaches it, where a listener on the one address left
+the child calling ports nothing listened on (the release review's portability
+N4, measured). §6.2's star put every connection
 into one listener and every lead's copy of the job's tables through one NIC —
 O(*N*) connections and O(*N*²) bytes out of node 0: 2.2 GB at 4,096 nodes for
 the addresses and blobs alone, even with the map compressed (2.6 GB with a
@@ -7589,11 +7596,13 @@ worth stating:
 
 A third, since phase 1 step 3, holds the same way: **an address per logical
 node.** `osoe-launch` sets `OSOE_STEP_NODELIST=127.0.0.[1-N]`, so logical node
-*i*'s lead listens on 127.0.0.*i*+1 — Linux routes all of 127/8 to `lo` with no
+*i*'s address is 127.0.0.*i*+1 — Linux routes all of 127/8 to `lo` with no
 setup — and the rendezvous and the mesh find each other by address and port, as
 they do between hosts, rather than by a probe that only a single host could
-answer. A lead that bound or dialled the wrong entry would meet nobody, so the
-tests catch it. The launcher refuses more than 254 nodes, which one bracketed
+answer. A lead that dialled the wrong entry would not meet the node it wanted,
+so the tests catch it. Since P20 every lead listens on all of the host's
+addresses, so one host's logical nodes share its ports: one whose candidate
+another holds takes its next, as two jobs on one host always did. The launcher refuses more than 254 nodes, which one bracketed
 octet cannot name.
 
 **What a logical node is now, and what that tests** (phase 1 step 3 slice 1).
@@ -7634,9 +7643,13 @@ What loopback does not test, each named so no test is mistaken for it:
 - **Names.** `osoe-launch`'s host list is numeric, so only a cluster resolves
   host names. The same parser and one `getaddrinfo` per entry a lead needs
   handle a list of names.
-- **A host with several addresses.** A lead listens on the address its entry
-  names, and refuses by name one that is not local (`EADDRNOTAVAIL`). Which
-  interface a cluster's host list names is the site's configuration.
+- **A host with several addresses.** A lead listens on every address of its
+  host, so peers that resolve its name to different ones of them all reach it
+  (P20; `shmem.rendezvous.alias`), and refuses by name an entry that names no
+  address of its own (`EADDRNOTAVAIL`, a check apart from the listener;
+  `shmem.rendezvous.not-this-host`). The address its own entry resolves to is
+  the one it tells its peers for the mesh, so that one must reach it from every
+  node; which interface that is is the site's configuration.
 - **IPv6**, which is not supported: an entry that resolves only to IPv6 is
   refused when it is resolved.
 - **Keepalive and the silent-peer check at their defaults.** A job whose every

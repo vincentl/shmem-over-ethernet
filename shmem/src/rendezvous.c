@@ -393,7 +393,8 @@ void osoe_rendezvous(const struct osoe_bootstrap *b, uint32_t session,
      * are STUCK, and shmem.job.disagree.node-count hung until its timeout.
      */
     struct osoe_listener l;
-    osoe_listener_open(&l, b, session, address);
+    osoe_listener_check_own_address(b, address);
+    osoe_listener_open(&l, b, session);
     int up = -1;
     uint32_t parent = 0;
     /* Each wait on another node here is in the PE's "blocked in" record as

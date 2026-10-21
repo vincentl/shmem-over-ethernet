@@ -682,8 +682,15 @@ static struct osoe_listener mesh_listener = { .fd = -1 };
 
 void osoe_progress_host_advertise(void *blob)
 {
-    osoe_listener_open_any_port(&mesh_listener, &osoe.bootstrap, osoe.node.hdr->session, NULL);
+    const struct osoe_bootstrap *b = &osoe.bootstrap;
+    osoe_listener_open_told_port(&mesh_listener, b, osoe.node.hdr->session);
     uint16_t port = mesh_listener.port;
+    /* Said under SHMEM_DEBUG where a range bounds it (P18,
+     * shmem.mesh.port-range.*). */
+    if (b->debug && b->mesh_port_low && b->local_id == 0)
+        osoe_print_line("osoe: node %u listens for its mesh on port %u "
+                        "(OSOE_MESH_PORT_RANGE=%u-%u)\n",
+                        b->node, (unsigned)port, b->mesh_port_low, b->mesh_port_high);
     memcpy(blob, &port, sizeof port);
 }
 
