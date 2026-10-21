@@ -24,15 +24,28 @@
  * cannot move as it moves a mean; the message cost a trimmed mean (below). On
  * the Pi's gigabit about 27 ms in all, most of it the streams' 1.9 MiB
  * (measured, 2026-10-06: 27.1 to 27.6 ms a start), so about 170 ms on a link
- * of 100 Mbit/s; on one machine's loopback a few.
+ * of 100 Mbit/s. A link fast enough that those streams take less than
+ * STREAM_DIFFERENCE_NS gets longer ones (stream_scale), which costs a start a
+ * few milliseconds whatever its speed.
  */
 enum {
     HOP_TRIPS = 15,             /* round trips of one small put for h */
     FAN_TRIES = 15,             /* one put to each of the root's first children, for o */
     STREAM_TRIES = 3,
+    STREAM_SCALE_MOST = 64,     /* the longest streams: 8 and 32 MiB */
 };
 static const uint64_t STREAM_SHORT = UINT64_C(128) * 1024;
 static const uint64_t STREAM_LONG = UINT64_C(512) * 1024;
+
+/*
+ * What the long stream's bytes beyond the short one's should take at least
+ * (P38). On Google Cloud's 23 Gbit/s link the 384 KiB between 128 and 512 KiB
+ * took about 140 us, which a few tens of microseconds at either end of a
+ * stream moved by half: the bandwidth read 1.9 to 5.1 GB/s from job to job of
+ * a link that carries 2.85 (H14, 2026-10-20), and every data wire's unsent
+ * limit is set from it.
+ */
+static const uint64_t STREAM_DIFFERENCE_NS = UINT64_C(1000000);
 
 static int compare_u64(const void *a, const void *b)
 {
@@ -127,6 +140,26 @@ static uint64_t timed_fan(struct osoe_transport_context *context, const int *lea
 }
 
 /*
+ * How many times longer than STREAM_SHORT and STREAM_LONG the streams must be
+ * for the long one's bytes beyond the short one's to take
+ * STREAM_DIFFERENCE_NS (P38), from the first long stream's time less a round
+ * trip - its bytes' time, near enough to size the next tries by. 1 where the
+ * link is slow enough already, the Pi's gigabit among them: its 384 KiB take
+ * about 3.4 ms.
+ */
+static uint64_t stream_scale(uint64_t long_time, uint64_t trip)
+{
+    uint64_t bytes_ns = long_time > trip ? long_time - trip : 0;
+    uint64_t difference_ns = bytes_ns * (STREAM_LONG - STREAM_SHORT) / STREAM_LONG;
+    if (difference_ns >= STREAM_DIFFERENCE_NS)
+        return 1;
+    if (difference_ns == 0)
+        return STREAM_SCALE_MOST;
+    uint64_t scale = (STREAM_DIFFERENCE_NS + difference_ns - 1) / difference_ns;
+    return scale < STREAM_SCALE_MOST ? scale : STREAM_SCALE_MOST;
+}
+
+/*
  * The root's lead against its first child's (the brief's "Measuring the
  * link"): h from round trips of one small put and its completion, halved;
  * B as the slope of a long stream of pieces over a short one, so that the
@@ -159,29 +192,42 @@ static struct osoe_link measure(const int *children, uint32_t fan)
         trips[i] = timed_puts(context, child, &scratch, piece, 1, word);
     uint64_t trip = median(trips, HOP_TRIPS);
 
-    /* Paired: each try's fan against the single put just before it, so that
+    /* Paired: each try's fan against the single put just after it, so that
      * a slow stretch of the run moves both. The extra a fan costs comes as a
      * few tries some 20 us late among many that cost nothing more (the Pi,
      * 2026-10-06), which a median reads as 0 or 20 by turns; the model's o is
-     * the average a level pays, so the trimmed mean. */
+     * the average a level pays, so the trimmed mean. And a fan not timed
+     * first, so that every child comes to the timed one from one round trip
+     * idle, as the first child comes to its put alone: a child that sat out
+     * the put alone came from two, and where its thread sleeps deeper for the
+     * longer idle - a virtual machine's idle CPU - its wake was counted as
+     * the message's (P38: on Google Cloud, three nodes of one PE each read o
+     * as 2 to 4 us in three jobs and 112 and 159 us in the other two, H14). */
     int64_t extra = 0;
     if (fan > 1) {
         int64_t differences[FAN_TRIES];
         for (unsigned i = 0; i < FAN_TRIES; i++) {
-            uint64_t alone = timed_fan(context, children, 1, &scratch, piece);
+            timed_fan(context, children, fan, &scratch, piece);
             uint64_t served = timed_fan(context, children, fan, &scratch, piece);
+            uint64_t alone = timed_fan(context, children, 1, &scratch, piece);
             differences[i] = (int64_t)served - (int64_t)alone;
         }
         extra = trimmed_mean(differences, FAN_TRIES);
     }
 
+    /* The first try at the lengths a slow link needs, which says how much
+     * longer a fast link's must be; a try at other lengths is not counted. */
     uint64_t short_times[STREAM_TRIES], long_times[STREAM_TRIES];
     uint64_t piece_bytes = OSOE_INTERNAL_PIECE_BYTES;
-    for (unsigned i = 0; i < STREAM_TRIES; i++) {
-        short_times[i] = timed_puts(context, child, &scratch, piece,
-                                    STREAM_SHORT / piece_bytes, piece_bytes);
-        long_times[i] = timed_puts(context, child, &scratch, piece,
-                                   STREAM_LONG / piece_bytes, piece_bytes);
+    uint64_t short_pieces = STREAM_SHORT / piece_bytes, long_pieces = STREAM_LONG / piece_bytes;
+    short_times[0] = timed_puts(context, child, &scratch, piece, short_pieces, piece_bytes);
+    long_times[0] = timed_puts(context, child, &scratch, piece, long_pieces, piece_bytes);
+    uint64_t scale = stream_scale(long_times[0], trip);
+    for (unsigned i = scale == 1 ? 1 : 0; i < STREAM_TRIES; i++) {
+        short_times[i] = timed_puts(context, child, &scratch, piece, short_pieces * scale,
+                                    piece_bytes);
+        long_times[i] = timed_puts(context, child, &scratch, piece, long_pieces * scale,
+                                   piece_bytes);
     }
     uint64_t short_time = median(short_times, STREAM_TRIES);
     uint64_t long_time = median(long_times, STREAM_TRIES);
@@ -204,8 +250,8 @@ static struct osoe_link measure(const int *children, uint32_t fan)
      * the Pi's 114 MB/s against 117 - and a slope more than four times it is
      * noise, for which the long stream's rate stands in.
      */
-    uint64_t longer = STREAM_LONG - STREAM_SHORT;
-    uint64_t rate = STREAM_LONG * UINT64_C(1000000000) / (long_time ? long_time : 1);
+    uint64_t longer = (STREAM_LONG - STREAM_SHORT) * scale;
+    uint64_t rate = STREAM_LONG * scale * UINT64_C(1000000000) / (long_time ? long_time : 1);
     uint64_t slope = long_time > short_time
                          ? longer * UINT64_C(1000000000) / (long_time - short_time)
                          : UINT64_MAX;
