@@ -40,10 +40,13 @@
  * have on one node - must not share them, or a sync on one would release a wait
  * on the other.
  */
-static void sync_team(struct osoe_team *t, const char *routine)
+static void sync_team(struct osoe_team *t, const char *routine, const struct osoe_call *call)
 {
     uint32_t k = t->epoch;
     struct osoe_team_block *b = t->block;
+    static const struct osoe_call sync = { OSOE_CALL_SYNC, 0, 0, 0 };
+    if (!call)
+        call = &sync;
 
     /*
      * A team of one (team.h): the caller is the only member, so the
@@ -56,7 +59,11 @@ static void sync_team(struct osoe_team *t, const char *routine)
         return;
     }
 
+    /* P24: the call said before the arrival, and compared by the last to
+     * arrive, whichever member it is, before the node's arrival goes on. */
+    osoe_call_say(t, k + 1, call);
     if (osoe_epoch_bump_eq(&b->arrived, (k + 1) * t->local_members)) {
+        osoe_call_compare(routine, t, k + 1, call);
         if (t->internode) {
             /*
              * §5.3's other half. This node has now arrived for every member of
@@ -135,7 +142,7 @@ static void team_sync(struct osoe_team *t, const char *routine)
     uint64_t t0 = osoe_now_ns();
     osoe_count(OSOE_C_SHMEM_BARRIER_CALLS, 1);
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, t->epoch + 1);
-    sync_team(t, routine);
+    sync_team(t, routine, NULL);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }
@@ -150,23 +157,23 @@ void osoe_barrier_all(const char *routine)
     struct osoe_team *world = osoe_team_of(routine, SHMEM_TEAM_WORLD);
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, world->epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
-    sync_team(world, routine);
+    sync_team(world, routine, NULL);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }
 
-void osoe_team_barrier(struct osoe_team *t, const char *routine)
+void osoe_team_barrier(struct osoe_team *t, const char *routine, const struct osoe_call *call)
 {
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, t->epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
-    sync_team(t, routine);
+    sync_team(t, routine, call);
     osoe_blocked_leave();
 }
 
 void osoe_team_sync(struct osoe_team *t, const char *routine)
 {
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, t->epoch + 1);
-    sync_team(t, routine);
+    sync_team(t, routine, NULL);
     osoe_blocked_leave();
 }
 
@@ -185,7 +192,7 @@ void osoe_barrier_finalize(void)
     struct osoe_team *finalize = osoe_team_finalize();
     osoe_blocked_enter("shmem_finalize", OSOE_BLOCKED_DETAIL_EPOCH, finalize->epoch + 1);
     osoe_transport_wait(osoe_transport_context_default(), NULL, 0, "shmem_quiet");
-    sync_team(finalize, "shmem_finalize");
+    sync_team(finalize, "shmem_finalize", NULL);
     osoe_blocked_leave();
     osoe_count(OSOE_C_SHMEM_BARRIER_NS, osoe_now_ns() - t0);
 }

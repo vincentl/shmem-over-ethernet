@@ -35,6 +35,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -168,6 +169,14 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
                                (int32_t)lead_local_id;
     struct osoe_symmetric_location result_at = lead_keeps_dest ? source_at : dest_at;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
+    /* P24: what every member must agree on - for a broadcast its root, and
+     * whether it is the deprecated one that keeps the root's dest. */
+    struct osoe_call call = { reduction ? OSOE_CALL_REDUCTION : OSOE_CALL_BROADCAST,
+                              reduction ? osoe_call_operation(reduction->operation,
+                                                              reduction->element)
+                                        : (uint32_t)root_keeps_dest,
+                              bytes, reduction ? 0 : (uint64_t)root };
+    osoe_call_say(t, k + 1, &call);
 
     /*
      * Arrive; the last to arrive wakes the lead, which waits for exactly that.
@@ -187,6 +196,7 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
             osoe_internode_reduce_enter(t->block_index, k + 1, nelems, reduction->operation,
                                         reduction->element, routine);
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
+        osoe_call_compare(routine, t, k + 1, &call);
         unsigned char *accumulator = member_copy(lead_local_id, result_at);
         if (reduction) {
             /* In place, the lead's source already is its dest. Then the other
@@ -266,6 +276,95 @@ static struct osoe_symmetric_location team_word_at(const struct osoe_team *t,
                                       osoe.bootstrap.small_collective_bytes, t->number,
                                       which) };
     return at;
+}
+
+/* ---- the node's calls compared (P24) ------------------------------------- */
+
+/* A call's first word: the epoch it is said for, its kind and its operation. */
+static uint64_t call_said(uint32_t epoch, const struct osoe_call *call)
+{
+    return (uint64_t)epoch << 32 | ((uint64_t)call->kind & 0xff) << 24 |
+           (call->operation & 0xffffff);
+}
+
+void osoe_call_say(const struct osoe_team *t, uint32_t epoch, const struct osoe_call *call)
+{
+    if (!osoe.bootstrap.check_collectives)
+        return;
+    uint64_t *words =
+        (uint64_t *)member_copy(osoe.bootstrap.local_id, team_word_at(t, OSOE_INTERNAL_CALL_SAID));
+    words[0] = call_said(epoch, call);
+    words[OSOE_INTERNAL_CALL_BYTES - OSOE_INTERNAL_CALL_SAID] = call->bytes;
+    words[OSOE_INTERNAL_CALL_DETAIL - OSOE_INTERNAL_CALL_SAID] = call->detail;
+}
+
+/* A call, in words, for the end that names two of them. */
+static void describe_call(uint64_t said, uint64_t bytes, uint64_t detail, char *text, size_t len)
+{
+    unsigned operation = (unsigned)(said >> 16 & 0xff), kind = (unsigned)(said >> 8 & 0xff),
+             width = (unsigned)(said & 0xff);
+    unsigned long long n = (unsigned long long)bytes;
+    switch ((enum osoe_call_kind)(said >> 24 & 0xff)) {
+    case OSOE_CALL_SYNC:
+        snprintf(text, len, "a barrier or sync");
+        break;
+    case OSOE_CALL_BROADCAST:
+        snprintf(text, len, "a broadcast of %llu bytes from team rank %llu", n,
+                 (unsigned long long)detail);
+        break;
+    case OSOE_CALL_REDUCTION:
+        snprintf(text, len, "a reduction of %llu bytes (operation %u on elements of kind %u "
+                 "and %u bytes)", n, operation, kind, width);
+        break;
+    case OSOE_CALL_FCOLLECT:
+        snprintf(text, len, "an fcollect of %llu bytes a PE", n);
+        break;
+    case OSOE_CALL_COLLECT:
+        snprintf(text, len, "a collect");
+        break;
+    case OSOE_CALL_ALLTOALL:
+        snprintf(text, len, "an alltoall of %llu bytes a pair, strides %llu and %llu", n,
+                 (unsigned long long)(detail >> 32), (unsigned long long)(detail & 0xffffffff));
+        break;
+    case OSOE_CALL_SCAN:
+        snprintf(text, len, "%s scan of %llu bytes (elements of kind %u and %u bytes)",
+                 detail ? "an inclusive" : "an exclusive", n, kind, width);
+        break;
+    default:
+        snprintf(text, len, "no call");
+    }
+}
+
+void osoe_call_compare(const char *routine, const struct osoe_team *t, uint32_t epoch,
+                       const struct osoe_call *mine)
+{
+    if (!osoe.bootstrap.check_collectives)
+        return;
+    struct osoe_symmetric_location at = team_word_at(t, OSOE_INTERNAL_CALL_SAID);
+    uint64_t said = call_said(epoch, mine);
+    for (uint32_t m = 0; m < t->local_members; m++) {
+        uint32_t local = t->local_ids[m];
+        if (local == osoe.bootstrap.local_id)
+            continue;
+        const uint64_t *words = (const uint64_t *)member_copy(local, at);
+        uint64_t theirs = words[0];
+        uint64_t bytes = words[OSOE_INTERNAL_CALL_BYTES - OSOE_INTERNAL_CALL_SAID];
+        uint64_t detail = words[OSOE_INTERNAL_CALL_DETAIL - OSOE_INTERNAL_CALL_SAID];
+        if (theirs == said && bytes == mine->bytes && detail == mine->detail)
+            continue;
+        uint32_t pe = osoe.bootstrap.gtids[local];
+        if ((uint32_t)(theirs >> 32) != epoch)
+            osoe_fatal("%s: PE %u, of this node, said no call for %s's collective %u where "
+                       "this PE checks the node's calls (OSOE_CHECK_COLLECTIVES): set it on "
+                       "every PE of a node, or on none", routine, pe, t->name, epoch);
+        char text_theirs[160], text_mine[160];
+        describe_call(theirs, bytes, detail, text_theirs, sizeof text_theirs);
+        describe_call(said, mine->bytes, mine->detail, text_mine, sizeof text_mine);
+        osoe_fatal("%s: the PEs of node %u called different collectives on %s, or the same one "
+                   "with different arguments: PE %u is in %s and PE %u in %s "
+                   "(OSOE_CHECK_COLLECTIVES)", routine, osoe.bootstrap.node, t->name, pe,
+                   text_theirs, osoe.job.me, text_mine);
+    }
 }
 
 /* A split over `t`'s words (internal-region.h): its number's split lines in
@@ -407,11 +506,16 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
 
     bool lead = osoe.bootstrap.local_id == t->lead_local_id;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
+    /* P24: an fcollect's members pass one block size; a collect's may differ. */
+    struct osoe_call call = { places ? OSOE_CALL_COLLECT : OSOE_CALL_FCOLLECT, 0,
+                              places ? 0 : block, 0 };
+    osoe_call_say(t, k + 1, &call);
     if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * members) && !lead)
         osoe_epoch_wake_all(&b->arrived);
 
     if (lead) {
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
+        osoe_call_compare(routine, t, k + 1, &call);
         unsigned char *result = dest;
         /* Each member's block at its team rank's place: member m is local id
          * local_ids[m] with rank local_ranks[m], and m = 0 is this lead. */
@@ -695,6 +799,8 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
     uint32_t k = t->epoch, local = t->local_members;
     struct osoe_team_block *b = t->block;
     *(uint64_t *)member_copy(osoe.bootstrap.local_id, length_at) = block;
+    struct osoe_call call = { OSOE_CALL_COLLECT, 0, 0, 0 };
+    osoe_call_say(t, k + 1, &call);
 
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
     if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * local) && !lead)
@@ -720,6 +826,7 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
             osoe_internode_reduce_enter(t->block_index, k + 1, summed, OSOE_REDUCTION_SUM,
                                         length, routine);
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * local, routine);
+        osoe_call_compare(routine, t, k + 1, &call);
         uint64_t count = by_scan ? local : members;
         places = calloc(count + 1, sizeof *places);
         if (!places)
@@ -848,7 +955,11 @@ int osoe_alltoall(const char *routine, shmem_team_t team, void *dest, const void
                                from + e * (uint64_t)source_stride * width, width,
                                last_block && e + 1 == nelems ? 0 : OSOE_TRANSPORT_MORE);
     }
-    osoe_team_barrier(t, routine);
+    /* P24: checked at the sync that ends it, the alltoall's only meeting -
+     * after its puts, so a mismatch there is named, not prevented. */
+    struct osoe_call call = { OSOE_CALL_ALLTOALL, 0, block,
+                              (uint64_t)dest_stride << 32 | (uint64_t)(uint32_t)source_stride };
+    osoe_team_barrier(t, routine, &call);
     return 0;
 }
 
@@ -903,10 +1014,16 @@ int osoe_scan(const char *routine, shmem_team_t team, void *dest, const void *so
     struct osoe_team_block *b = t->block;
     bool lead = osoe.bootstrap.local_id == t->lead_local_id;
     osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_EPOCH, k + 1);
+    /* P24, on one node: a team spanning nodes takes no node-level meeting
+     * (above), and so no check. */
+    struct osoe_call call = { OSOE_CALL_SCAN, osoe_call_operation(OSOE_REDUCTION_SUM, element),
+                              bytes, inclusive };
+    osoe_call_say(t, k + 1, &call);
     if (osoe_epoch_release_bump_eq(&b->arrived, (k + 1) * members) && !lead)
         osoe_epoch_wake_all(&b->arrived);
     if (lead) {
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
+        osoe_call_compare(routine, t, k + 1, &call);
         /* The members in team rank order: every one-node team lists its
          * members ascending today (team.h), and the sort keeps this from
          * depending on it - O(L^2) at worst, once a call. */

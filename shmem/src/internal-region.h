@@ -228,7 +228,14 @@ static inline uint64_t osoe_internal_words_offset(uint32_t fanout, uint32_t max_
 enum osoe_internal_team_spare {
     OSOE_INTERNAL_COLLECT_LENGTH,       /* a member's collect length, for its lead */
     OSOE_INTERNAL_COLLECT_TOTAL,        /* the lead's total of them, for its members */
+    OSOE_INTERNAL_CALL_SAID,            /* under OSOE_CHECK_COLLECTIVES, a member's call */
+    OSOE_INTERNAL_CALL_BYTES,           /* (collectives.h's struct osoe_call, P24), for */
+    OSOE_INTERNAL_CALL_DETAIL,          /* the node-mate that compares the node's calls */
+    OSOE_INTERNAL_TEAM_SPARE_WORDS,
 };
+_Static_assert(64 + 8 * OSOE_INTERNAL_TEAM_SPARE_WORDS <= OSOE_INTERNAL_LINE_BYTES,
+               "a team number's spare words fit its release counter line past its first 64 "
+               "bytes");
 
 static inline uint64_t osoe_internal_team_spare_word(uint32_t fanout, uint32_t max_teams,
                                                      uint32_t small_collective_bytes,

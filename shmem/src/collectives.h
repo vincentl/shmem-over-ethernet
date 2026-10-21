@@ -62,6 +62,47 @@ uint64_t *osoe_team_split_words(const struct osoe_team *t);
 void osoe_team_split_and(const char *routine, struct osoe_team *t, uint32_t count);
 
 /*
+ * A collective call as every PE of a node must make it (P24): under
+ * OSOE_CHECK_COLLECTIVES each member says its call before it arrives -
+ * osoe_call_say, into its own internal region's words for the team's number
+ * (internal-region.h's spare words), with plain stores its arrival's release
+ * publishes - and the node-mate that meets every member's arrival, the lead
+ * of a data collective or the last to arrive at a sync, compares them all
+ * with its own before anything is released: osoe_call_compare ends the job
+ * naming two PEs and their calls where they differ, or a PE that said none.
+ * `operation` is a reduction's or scan's operation, element kind and width
+ * (osoe_call_operation); `bytes` what every member must pass, 0 where they
+ * may differ (a collect's blocks); `detail` a broadcast's root, an alltoall's
+ * strides, a scan's inclusiveness. Off, neither says nor reads anything.
+ */
+enum osoe_call_kind {
+    OSOE_CALL_SYNC = 1,
+    OSOE_CALL_BROADCAST,
+    OSOE_CALL_REDUCTION,
+    OSOE_CALL_FCOLLECT,
+    OSOE_CALL_COLLECT,
+    OSOE_CALL_ALLTOALL,
+    OSOE_CALL_SCAN,
+};
+
+struct osoe_call {
+    enum osoe_call_kind kind;
+    uint32_t operation;
+    uint64_t bytes;
+    uint64_t detail;
+};
+
+static inline uint32_t osoe_call_operation(uint32_t operation, struct osoe_element element)
+{
+    return (operation & 0xff) << 16 | ((uint32_t)element.kind & 0xff) << 8 |
+           (element.width & 0xff);
+}
+
+void osoe_call_say(const struct osoe_team *t, uint32_t epoch, const struct osoe_call *call);
+void osoe_call_compare(const char *routine, const struct osoe_team *t, uint32_t epoch,
+                       const struct osoe_call *mine);
+
+/*
  * A word of a call's kind and up to three of its arguments, any one of which
  * changing changes it but once in 2^64: splitmix64's finalizer, a part at a
  * time. Its AND over the PEs beside its inverse's says whether they all passed

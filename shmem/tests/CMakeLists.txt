@@ -3155,9 +3155,6 @@ if(OSOE_INTERNODE)
   # holding no partial result. Three nodes, so that node 0 also has a child that
   # did call the reduction.
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-    add_executable(shmem_test_collective-divergence test-collective-divergence.c)
-    target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
-    osoe_warnings(shmem_test_collective-divergence)
     add_test(NAME shmem.collective-divergence
       COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
               $<TARGET_FILE:shmem_test_collective-divergence>)
@@ -3789,6 +3786,73 @@ foreach(label 0-0-0-0 0-0-1-1)
   if(label STREQUAL "0-0-1-1")
     osoe_internode_label(shmem.malloc.equivalent.${label})
   endif()
+endforeach()
+
+# Collectives the PEs of one node call differently (P24), under
+# OSOE_CHECK_COLLECTIVES=1: PE 1 broadcasts where the rest reduce (kind),
+# fcollects two longs where they fcollect one (gather), broadcasts from another
+# root, reduces half the elements (count), or enters a barrier where they reduce
+# (sync) or alltoall (alltoall, met only at the alltoall's closing sync, where
+# whichever PE arrives last compares) - each named by the node-mate that meets
+# every member's call, before any result is given out, on one node and on two,
+# where PE 1 is a non-lead of node 0 whose difference no lead's check sees. An
+# alltoall is named after its puts. Without the setting, the
+# default, the first returns as before (off); a node-mate without it is named
+# by the PE that compares (unsaid). And the collectives' own programs, run with
+# the check on, find nothing to name.
+add_executable(shmem_test_collective-divergence test-collective-divergence.c)
+target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
+osoe_warnings(shmem_test_collective-divergence)
+set(osoe_call_check_named "the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]")
+foreach(kind kind gather root count sync alltoall)
+  set(environment OSOE_CHECK_COLLECTIVES=1)
+  if(NOT kind STREQUAL "kind")
+    list(APPEND environment OSOE_TEST_DIVERGE_KIND=${kind})
+  endif()
+  foreach(label 0-0-0-0 0-0-1-1)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+      continue()
+    endif()
+    string(REPLACE "-" "," map "${label}")
+    add_test(NAME shmem.collective-check.${kind}.${label}
+      COMMAND ${CMAKE_COMMAND} -E env ${environment}
+              $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+              $<TARGET_FILE:shmem_test_collective-divergence>)
+    set_tests_properties(shmem.collective-check.${kind}.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_call_check_named}"
+      FAIL_REGULAR_EXPRESSION "returned from its collective")
+    if(label STREQUAL "0-0-1-1")
+      osoe_internode_label(shmem.collective-check.${kind}.${label})
+    endif()
+  endforeach()
+endforeach()
+add_test(NAME shmem.collective-check.off.0-0-0-0
+  COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+          $<TARGET_FILE:shmem_test_collective-divergence>)
+set_tests_properties(shmem.collective-check.off.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "returned from its collective, which it must not"
+  FAIL_REGULAR_EXPRESSION "OSOE_CHECK_COLLECTIVES")
+add_test(NAME shmem.collective-check.unsaid.0-0-0-0
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_COLLECTIVES=1
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_CHECK_COLLECTIVES=0 --
+          $<TARGET_FILE:shmem_test_collective-divergence>)
+set_tests_properties(shmem.collective-check.unsaid.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "PE 1, of this node, said no call for .*'s collective [0-9]+ where this PE checks the node's calls [(]OSOE_CHECK_COLLECTIVES[)]")
+foreach(program reduce broadcast collect alltoall scan team)
+  foreach(label 0-0-0-0 0-0-1-1)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+      continue()
+    endif()
+    string(REPLACE "-" "," map "${label}")
+    add_test(NAME shmem.collective-check.clean.${program}.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_COLLECTIVES=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_${program}>)
+    set_tests_properties(shmem.collective-check.clean.${program}.${label} PROPERTIES
+      LABELS "tier2" TIMEOUT 90 FAIL_REGULAR_EXPRESSION "OSOE_CHECK_COLLECTIVES")
+    if(label STREQUAL "0-0-1-1")
+      osoe_internode_label(shmem.collective-check.clean.${program}.${label})
+    endif()
+  endforeach()
 endforeach()
 
 # A handle's generation past 32 bits (P5): eight splits under one number from

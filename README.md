@@ -1249,16 +1249,23 @@ specification or takes a choice the specification leaves open.
   blocked. A program woken only from outside the library - by a signal
   handler's store, or another program writing memory it shares with a PE -
   should turn detection off: `OSOE_DEADLOCK_SECONDS=0`.
-- **A collective that the PEs of one node call differently is not detected.**
-  The leads of the nodes compare a reduction's, a broadcast's or a collect's
-  epoch, kind and size - a reduction's operation and element, a broadcast's root
-  node - where they meet, and a disagreement between nodes ends the job naming
-  it ("PEs called different collectives, or the same one with different
-  arguments"). The PEs of one node are compared with nobody: one that
-  broadcasts where the others reduce, or passes another count, root or
-  `fcollect` size, gets or gives wrong data, and nothing says so - the job can
-  end with status 0. The specification leaves a collective that its PEs do not
-  call alike undefined. Every node's lead decides from the count it is given
+- **A collective that the PEs of one node call differently is not detected by
+  default.** The leads of the nodes compare a reduction's, a broadcast's or a
+  collect's epoch, kind and size - a reduction's operation and element, a
+  broadcast's root node - where they meet, and a disagreement between nodes
+  ends the job naming it ("PEs called different collectives, or the same one
+  with different arguments"). The PEs of one node are compared with nobody
+  unless `OSOE_CHECK_COLLECTIVES=1`: without it, one that broadcasts where the
+  others reduce, or passes another count, root or `fcollect` size, gets or
+  gives wrong data, and nothing says so - the job can end with status 0. With
+  it, each PE says its call - its kind, operation, element, bytes, root or
+  strides - where the node's PEs meet, and the one that meets them all, a data
+  collective's lead or the last to reach a barrier, ends the job naming two
+  PEs and their calls where they differ, before any result is given out; an
+  `alltoall` is compared at the barrier that ends it, after its puts, and a scan
+  over a team spanning nodes, which has no meeting within a node, not at all.
+  Off by default until it is timed at many PEs a node (P24, H12). The
+  specification leaves a collective that its PEs do not call alike undefined. Every node's lead decides from the count it is given
   whether a reduction or broadcast is small - at most
   `OSOE_SMALL_COLLECTIVE_BYTES` - or large, which rests on every PE passing the
   same count, as the specification has them do (it says so outright only for
@@ -1273,17 +1280,24 @@ specification or takes a choice the specification leaves open.
   scan's members are compared with their tree parent when the scan is large
   and its team spans nodes - its number among the team's scans, inclusive or
   exclusive, its element and its bytes, the PEs of one node too - and not at
-  all when it is small or its team lies on one node, where PEs given other
-  counts get wrong results with nothing said; given counts on either side of
-  the line, they end the job by name or wait until the deadlock detector ends
-  it.
+  all when it is small or its team lies on one node (but under
+  `OSOE_CHECK_COLLECTIVES=1`, which compares a one-node team's), where PEs
+  given other counts get wrong results with nothing said; given counts on
+  either side of the line, they end the job by name or wait until the
+  deadlock detector ends it.
 - **A team split is compared, by contrast**: every parent PE's start, stride
   and size - or `xrange` - go into the split's reduction, and PEs that passed
   others end the job by name, naming what each passed.
-- **Nor is a `shmem_malloc` that the PEs call with different sizes**, which the
-  specification leaves undefined too: the next object then starts at another
-  place on the PE that differed, puts to it land in the wrong place, and
-  nothing says so.
+- **So is a symmetric-heap call**: every `shmem_malloc`, `shmem_calloc`,
+  `shmem_align`, `shmem_malloc_with_hints`, `shmem_realloc` and `shmem_free`
+  that does something first ANDs a word of its arguments, and the word's
+  inverse, over every PE - one small reduction a call - and PEs that passed
+  others end the job by name, naming what each passed (P23), where until then
+  the next object started at another place on the PE that differed and puts to
+  it landed in the wrong place with nothing said. The specification leaves such
+  a call undefined. A PE that does nothing - a size of 0, a null pointer to
+  free - where the others do something returns at once, and the others wait in
+  the check until the deadlock detector ends the job.
 - **Under `srun -K1`, or `osoe-launch` without `-k`, PEs of more than one node
   calling `shmem_global_exit` at once can lose a caller's output**, where the
   specification has every PE's output flushed (§9.1.6): the first node to leave
@@ -1729,6 +1743,7 @@ moves every message of the node, and the helpers that can share the work
 |---|---|
 | `OSOE_HEAP_SHIFT` | A size, a whole number of pages - `4k` is refused on a Raspberry Pi 5's 16 KiB pages: each PE maps its heap that far times its rank past the base, so no two PEs share a symmetric address - how a program is checked for assuming they do. |
 | `OSOE_FORCE_REMOTE` | `1`: `shmem_ptr` and `shmem_team_ptr` answer NULL for node-mates, and `SHMEM_TEAM_SHARED` shrinks to the calling PE alone; the traffic to node-mates still goes through shared memory. Needs two logical nodes or more. |
+| `OSOE_CHECK_COLLECTIVES` | `1`: every collective's call is compared among the PEs of a node - its kind, operation, element, bytes, root or strides, as each PE says it where they meet - and a difference ends the job naming two PEs and their calls ("A collective that the PEs of one node call differently", Limits). Set it on every PE of a node or on none: a PE that compares ends the job naming a node-mate that said no call. Off by default until timed at many PEs a node. |
 | `OSOE_CHECK_QUIET` | `1`: every quiet on a context that threads share (`SHMEM_THREAD_MULTIPLE`) checks that it completed what it promises, and ends the job naming what it did not. |
 | `OSOE_TEST_PERTURB` | `1`: short sleeps and yields at the internal choice points of a context that threads share, to widen races. |
 | `OSOE_TEST_NOTICE_SECONDS` | Seconds before a start-up wait's first notice, `1` to `3600`, in place of 30, so that a test sees one without waiting. A testing hook, refused by name, as the settings above are, when it is not a whole number in that range. |

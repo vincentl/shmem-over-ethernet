@@ -636,6 +636,16 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_TEST_PRINT_LINK='%s' is not 0 or 1", getenv("OSOE_TEST_PRINT_LINK"));
     b->print_link = print_link == 1;
 
+    /* OSOE_CHECK_COLLECTIVES (P24; the author, 2026-10-20: under a setting, off
+     * until timed at many PEs a node, H12): each PE says each collective's call
+     * and the node-mate that meets them compares them (collectives.h). A PE's
+     * own: a node-mate without it says nothing, which the one comparing names. */
+    uint32_t check_collectives = 0;
+    if (osoe_environment_u32("OSOE_CHECK_COLLECTIVES", &check_collectives) ==
+            OSOE_ENVIRONMENT_INVALID || check_collectives > 1)
+        osoe_fatal("OSOE_CHECK_COLLECTIVES='%s' is not 0 or 1", getenv("OSOE_CHECK_COLLECTIVES"));
+    b->check_collectives = check_collectives == 1;
+
     /* And H23's: a lead held back from its mesh, refused by name when it names
      * no node of the job or no time. */
     const char *hold = getenv("OSOE_TEST_MESH_HOLD");
