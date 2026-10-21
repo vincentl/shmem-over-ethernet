@@ -2014,7 +2014,7 @@ if(OSOE_INTERNODE)
   foreach(mode three two crowded)
     add_test(NAME shmem.helpers.auto.${mode}
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/helpers-auto.sh $<TARGET_FILE:osoe-launch>
-              $<TARGET_FILE:shmem_test_rma> ${mode})
+              $<TARGET_FILE:shmem_test_internode> ${mode})
     set_tests_properties(shmem.helpers.auto.${mode} PROPERTIES LABELS "tier2" TIMEOUT 90
       PASS_REGULAR_EXPRESSION "HELPERS AUTO OK")
     osoe_internode_label(shmem.helpers.auto.${mode})
