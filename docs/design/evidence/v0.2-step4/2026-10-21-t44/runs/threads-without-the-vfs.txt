@@ -1,0 +1,23 @@
+== u1-threads-shmem-only, PE 0
+PE 0: thread 21771 mpi-and-shmem R
+PE 0: thread 21778 osoe-agent S
+PE 0: 2 threads
+PE 0: thread 21771 mpi-and-shmem R
+PE 0: thread 21778 osoe-agent S
+PE 0: 2 threads
+== u2-threads-mpi-started, PE 0
+PE 0: thread 21798 mpi-and-shmem R
+PE 0: thread 21805 mpi-and-shmem S
+PE 0: thread 21807 osoe-agent S
+PE 0: 3 threads
+PE 0: thread 21798 mpi-and-shmem R
+PE 0: thread 21805 mpi-and-shmem S
+PE 0: thread 21807 osoe-agent S
+PE 0: 3 threads
+== u3-threads-mpi-finalized, PE 0
+PE 0: thread 21827 mpi-and-shmem R
+PE 0: thread 21836 osoe-agent S
+PE 0: 2 threads
+PE 0: thread 21827 mpi-and-shmem R
+PE 0: thread 21836 osoe-agent S
+PE 0: 2 threads

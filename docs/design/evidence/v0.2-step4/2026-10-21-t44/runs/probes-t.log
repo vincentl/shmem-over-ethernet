@@ -1,0 +1,10 @@
+# 2026-10-24T12:30:43Z, load 1.09 0.50 0.19
+t0-shmem-built-without-mpi             exit   0    3.0 s  0 of 2 PEs ok
+t1-shmem-only                          exit   0    3.0 s  0 of 2 PEs ok
+t2-mpi-only-mpirun                     exit   0    3.1 s  0 of 2 PEs ok
+t3-mpi-then-shmem-mpirun               exit   0    3.1 s  0 of 2 PEs ok
+t4-shmem-then-mpi-mpirun               exit   0    3.1 s  0 of 2 PEs ok
+t5-singletons                          exit   0    3.0 s  0 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.26f00000.0 sm_segment.lima-osoe.501.304f0000.0 
+t6-mpi-finalized-early                 exit   0    3.1 s  0 of 2 PEs ok
+t7-thread-multiple                     exit   0    3.1 s  0 of 2 PEs ok
+t8-two-helpers                         exit   0    3.1 s  0 of 2 PEs ok

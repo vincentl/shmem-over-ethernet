@@ -1,0 +1,34 @@
+[New LWP 20473]
+[New LWP 20472]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/aarch64-linux-gnu/libthread_db.so.1".
+0x0000ffffab60f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 3 (Thread 0xffffa9ffec60 (LWP 20472) "mpi-and-shmem"):
+#0  0x0000ffffab60f22c in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000ffffab6028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000ffffab6028fc [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000ffffab66e424 [PAC] in epoll_pwait () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000ffffaaf593fc [PAC] in ?? () from /lib/aarch64-linux-gnu/libevent_core-2.1.so.7
+#5  0x0000ffffaaf4ef40 [PAC] in event_base_loop () from /lib/aarch64-linux-gnu/libevent_core-2.1.so.7
+#6  0x0000ffffaad0330c [PAC] in ?? () from /lib/aarch64-linux-gnu/libpmix.so.2
+#7  0x0000ffffab6061d8 [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#8  0x0000ffffab66e15c [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 2 (Thread 0xffffa8cd8c60 (LWP 20473) "osoe-agent"):
+#0  0x0000ffffab66bde4 in syscall () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000ffffabb56790 in osoe_futex_wait_bitset (word=0xffffa8f7f384, expected=0, bitset=4294967295, deadline=0xffffa8cd8370, scope=<optimized out>) at <repo>/base/futex-futex2.c:52
+#2  0x0000ffffabb4050c in osoe_transport_agent_wait (wake=wake@entry=0xffffa8f7f384, seen=seen@entry=0) at <repo>/shmem/src/transport-am.c:215
+#3  0x0000ffffabaffee8 in agent_main (arg=0xffffa8f7f380) at <repo>/shmem/src/agent.c:242
+#4  0x0000ffffab6061d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#5  0x0000ffffab66e15c [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 1 (Thread 0xffffabbb6060 (LWP 20469) "mpi-and-shmem"):
+#0  0x0000ffffab60f228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000ffffab6028b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000ffffab63e51c [PAC] in clock_nanosleep () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000ffffab648b40 [PAC] in nanosleep () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000ffffab659290 [PAC] in sleep () from /lib/aarch64-linux-gnu/libc.so.6
+#5  0x0000000000401eb8 [PAC] in mode_hold () at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:369
+#6  main (argc=<optimized out>, argv=<optimized out>) at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:566
+[Inferior 1 (process 20469) detached]

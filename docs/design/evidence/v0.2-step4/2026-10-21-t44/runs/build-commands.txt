@@ -1,0 +1,4 @@
+# oshcc, as it would run mpicc:
+mpicc -I<repo>/shmem/include -fno-pie -no-pie -Xlinker -T -Xlinker <repo>/tools/wrapper/osoe-statics.ld -O2 -g -std=gnu11 -Wall -Wextra -o <out>/mpi-and-shmem <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c -L<repo>/build/release/shmem -losoe -Xlinker -rpath -Xlinker <repo>/build/release/shmem
+# and mpicc, as it would run the C compiler:
+gcc -I<repo>/shmem/include -fno-pie -no-pie -Xlinker -T -Xlinker <repo>/tools/wrapper/osoe-statics.ld -O2 -g -std=gnu11 -Wall -Wextra -o <out>/mpi-and-shmem <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c -L<repo>/build/release/shmem -losoe -Xlinker -rpath -Xlinker <repo>/build/release/shmem -I/usr/lib/aarch64-linux-gnu/openmpi/include -I/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi -L/usr/lib/aarch64-linux-gnu/openmpi/lib -lmpi

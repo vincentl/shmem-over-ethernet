@@ -1,0 +1,18 @@
+PE 1: MPI started: rank 0 of 1
+PE 0: MPI started: rank 0 of 1
+PE 2: MPI started: rank 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.21285.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 0: shmem started: PE 0 of 3
+PE 0: waiting
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.21285.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.21285.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 2: shmem started: PE 2 of 3
+PE 2: waiting
+PE 1: shmem started: PE 1 of 3
+PE 1: exit(0) with neither library finalized
+osoe: PE 1: the process exited without calling shmem_finalize; ending the job (spec §4, §9.1.4)
+osoe: PE 0: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 1; this PE was waiting in shmem_barrier_all
+osoe-launch: rank 0 exited with status 1
+osoe-launch: rank 1 exited with status 1
+osoe-launch: rank 2 exited with status 1

@@ -1,0 +1,13 @@
+PE 2: MPI started: rank 2 of 4
+PE 3: MPI started: rank 3 of 4
+PE 0: MPI started: rank 0 of 4
+PE 1: MPI started: rank 1 of 4
+osoe: PE 0: node 0 found none of its 32 candidate ports free in OSOE_PORT_RANGE=17000-17003; choose a range this host does not use
+osoe: PE 1: shmem_init: the job is aborting on behalf of PE 0; this PE cannot make progress
+--------------------------------------------------------------------------
+prterun detected that one or more processes exited with non-zero status,
+thus causing the job to be terminated. The first process to do so was:
+
+   Process name: [prterun-lima-osoe-18793@1,0]
+   Exit code:    1
+--------------------------------------------------------------------------

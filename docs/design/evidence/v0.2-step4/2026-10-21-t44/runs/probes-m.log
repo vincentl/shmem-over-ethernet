@@ -1,0 +1,5 @@
+# 2026-10-24T12:31:50Z, load 0.65 0.49 0.20
+m1-window-mpi-then-shmem               exit   0    0.1 s  0 of 4 PEs ok
+m2-window-shmem-then-mpi               exit   0    0.1 s  0 of 4 PEs ok
+m3-window-2-nodes                      exit   0    0.1 s  0 of 4 PEs ok
+m4-window-tcp-btl                      exit   0    0.1 s  0 of 4 PEs ok

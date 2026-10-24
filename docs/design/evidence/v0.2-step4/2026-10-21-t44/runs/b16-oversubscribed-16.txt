@@ -1,0 +1,96 @@
+PE 9: MPI started: rank 9 of 16
+PE 6: MPI started: rank 6 of 16
+PE 3: MPI started: rank 3 of 16
+PE 4: MPI started: rank 4 of 16
+PE 13: MPI started: rank 13 of 16
+PE 0: MPI started: rank 0 of 16
+PE 14: MPI started: rank 14 of 16
+PE 8: MPI started: rank 8 of 16
+PE 7: MPI started: rank 7 of 16
+PE 2: MPI started: rank 2 of 16
+PE 10: MPI started: rank 10 of 16
+PE 15: MPI started: rank 15 of 16
+PE 12: MPI started: rank 12 of 16
+PE 5: MPI started: rank 5 of 16
+PE 11: MPI started: rank 11 of 16
+PE 1: MPI started: rank 1 of 16
+osoe: PE 7 of 16 (local 7 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 15 of 16 (local 15 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 4 of 16 (local 4 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 10 of 16 (local 10 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 14 of 16 (local 14 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 1 of 16 (local 1 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 6 of 16 (local 6 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+PE 7: shmem started: PE 7 of 16
+PE 15: shmem started: PE 15 of 16
+PE 4: shmem started: PE 4 of 16
+PE 10: shmem started: PE 10 of 16
+PE 14: shmem started: PE 14 of 16
+PE 1: shmem started: PE 1 of 16
+PE 6: shmem started: PE 6 of 16
+PE 2: shmem started: PE 2 of 16
+PE 3: shmem started: PE 3 of 16
+osoe: PE 2 of 16 (local 2 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 3 of 16 (local 3 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 11 of 16 (local 11 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 8 of 16 (local 8 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 13 of 16 (local 13 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 0 of 16 (local 0 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+osoe: PE 5 of 16 (local 5 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+PE 11: shmem started: PE 11 of 16
+PE 8: shmem started: PE 8 of 16
+PE 0: shmem started: PE 0 of 16
+PE 13: shmem started: PE 13 of 16
+PE 5: shmem started: PE 5 of 16
+osoe: PE 12 of 16 (local 12 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+PE 12: shmem started: PE 12 of 16
+osoe: PE 9 of 16 (local 9 of 16): segment /dev/shm/osoe.17508.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 262144 bytes, node 0 of 1
+PE 9: shmem started: PE 9 of 16
+PE 1: check: 5 rounds, ok
+PE 3: check: 5 rounds, ok
+PE 11: check: 5 rounds, ok
+PE 13: check: 5 rounds, ok
+PE 8: check: 5 rounds, ok
+PE 5: check: 5 rounds, ok
+PE 4: check: 5 rounds, ok
+PE 14: check: 5 rounds, ok
+PE 2: check: 5 rounds, ok
+PE 15: check: 5 rounds, ok
+PE 10: check: 5 rounds, ok
+PE 12: check: 5 rounds, ok
+PE 7: check: 5 rounds, ok
+PE 9: check: 5 rounds, ok
+PE 6: check: 5 rounds, ok
+PE 0: check: 5 rounds, ok
+PE 15: shmem finalized
+PE 8: shmem finalized
+PE 6: shmem finalized
+PE 11: shmem finalized
+PE 14: shmem finalized
+PE 5: shmem finalized
+PE 10: shmem finalized
+PE 12: shmem finalized
+PE 2: shmem finalized
+PE 9: shmem finalized
+PE 3: shmem finalized
+PE 7: shmem finalized
+PE 4: shmem finalized
+PE 0: shmem finalized
+PE 13: shmem finalized
+PE 1: shmem finalized
+PE 12: MPI finalized
+PE 15: MPI finalized
+PE 8: MPI finalized
+PE 0: MPI finalized
+PE 1: MPI finalized
+PE 14: MPI finalized
+PE 4: MPI finalized
+PE 3: MPI finalized
+PE 13: MPI finalized
+PE 11: MPI finalized
+PE 10: MPI finalized
+PE 2: MPI finalized
+PE 6: MPI finalized
+PE 5: MPI finalized
+PE 7: MPI finalized
+PE 9: MPI finalized

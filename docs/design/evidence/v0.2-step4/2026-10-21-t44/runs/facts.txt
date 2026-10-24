@@ -1,0 +1,46 @@
+# 2026-10-24T12:30:33Z
+Linux lima-osoe 6.12.113+deb13-cloud-arm64 #1 SMP Debian 6.12.113-1 (2026-10-15) aarch64 GNU/Linux
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+CPUs: 4; 7939 MiB; /dev/shm: 3.9G
+ptrace_scope: 0
+max locked memory: 8192 KiB; open files: 1024
+gcc (Debian 14.2.0-19) 14.2.0
+# osoe
+osoe-launch (osoe) 0.1.0
+# Open MPI
+mpirun (Open MPI) 5.0.7
+
+Report bugs to https://www.open-mpi.org/community/help/
+Open MPI: 5.0.7
+Open MPI repo revision: v5.0.7
+Open MPI release date: Feb 14, 2025
+C compiler: gcc
+Thread support: posix (MPI_THREAD_MULTIPLE: yes, OPAL support: yes, OMPI progress: no, Event lib: yes)
+libevent-2.1-7t64:arm64 2.1.13-stable-1~deb13u1
+libhwloc15:arm64 2.12.0-4
+libopenmpi-dev:arm64 5.0.7-1
+libopenmpi40:arm64 5.0.7-1
+libpmix2t64:arm64 5.0.7-1
+libucx0:arm64 1.18.1+ds-2+b1
+openmpi-bin 5.0.7-1
+openmpi-common 5.0.7-1
+# /etc/openmpi/openmpi-mca-params.conf, without comments
+btl_base_warn_component_unused=0
+mtl = ^ofi
+btl = ^uct,openib,ofi
+pml = ^ucx
+osc = ^ucx,pt2pt
+# mpicc
+gcc -I/usr/lib/aarch64-linux-gnu/openmpi/include -I/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi -L/usr/lib/aarch64-linux-gnu/openmpi/lib -lmpi
+# what the package puts on the PATH under osoe's names
+oshCC oshc++ oshcc oshcxx oshfort oshmem_info oshrun 
+-a: not found oshcc is /usr/bin/oshcc oshrun is /usr/bin/oshrun 
+gcc -I/usr/lib/aarch64-linux-gnu/openmpi/include -I/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi -L/usr/lib/aarch64-linux-gnu/openmpi/lib -loshmem -lmpi
+openshmem pshmem.h pshmemx.h shmem-compat.h shmem.fh shmem.h shmemx.h 
+# Slurm
+slurm-wlm 24.11.5
+MPI plugin types are... 	none 	pmi2 	pmix 	cray_shasta specific pmix plugin versions available: pmix_v5 
+debug* up 1 idle 4
+# the host's name
+lima-osoe
+fe80::5055:55ff:fe39:599c lima-osoe

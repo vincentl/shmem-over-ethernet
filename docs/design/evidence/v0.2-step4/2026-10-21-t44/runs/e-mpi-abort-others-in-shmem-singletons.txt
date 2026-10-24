@@ -1,0 +1,24 @@
+PE 0: MPI started: rank 0 of 1
+PE 1: MPI started: rank 0 of 1
+PE 2: MPI started: rank 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.21222.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 0: shmem started: PE 0 of 3
+PE 0: waiting
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.21222.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.21222.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 2: shmem started: PE 2 of 3
+PE 1: shmem started: PE 1 of 3
+PE 2: waiting
+PE 1: MPI_Abort(3)
+--------------------------------------------------------------------------
+MPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD
+  Proc: [[20118,0],0]
+  Errorcode: 3
+
+NOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.
+You may or may not see output from other processes, depending on
+exactly when Open MPI kills them.
+--------------------------------------------------------------------------
+osoe-launch: rank 1 exited with status 3
+osoe-launch: rank 2 killed by signal 15
+osoe-launch: rank 0 killed by signal 15

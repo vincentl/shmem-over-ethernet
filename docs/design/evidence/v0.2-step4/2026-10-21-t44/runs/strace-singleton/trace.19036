@@ -1,0 +1,6 @@
+08:31:31.222667 execve("<out>/mpi-and-shmem", ["<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xfffff38f8da0 /* 31 vars */) = 0
+08:31:31.282738 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0xffffa784ed30, parent_tid=0xffffa784ed30, exit_signal=0, stack=0xffffa7040000, stack_size=0x80e540, tls=0xffffa784f380} => {parent_tid=[19037]}, 88) = 19037
+08:31:31.294673 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0xffffa6fced30, parent_tid=0xffffa6fced30, exit_signal=0, stack=0xffffa67c0000, stack_size=0x80e540, tls=0xffffa6fcf380} => {parent_tid=[19038]}, 88) = 19038
+08:31:31.364864 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0xffffa4c86d30, parent_tid=0xffffa4c86d30, exit_signal=0, stack=0xffffa4478000, stack_size=0x80e540, tls=0xffffa4c87380} => {parent_tid=[19039]}, 88) = 19039
+08:31:32.385965 exit_group(0)           = ?
+08:31:32.387071 +++ exited with 0 +++

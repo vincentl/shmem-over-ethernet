@@ -1,0 +1,6 @@
+# 2026-10-24T12:30:41Z, load 1.09 0.50 0.19
+d1-pmix-mpi-then-shmem                 exit   0    0.5 s  4 of 4 PEs ok
+d2-pmix-shmem-then-mpi                 exit   0    0.3 s  4 of 4 PEs ok
+d3-pmix-mpi-only                       exit   0    0.3 s  4 of 4 PEs ok
+d4-no-pmix-mpi-then-shmem              exit   0    0.2 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4a4c0000.0 sm_segment.lima-osoe.501.5f30000.0 sm_segment.lima-osoe.501.b8940000.0 sm_segment.lima-osoe.501.e6730000.0 
+d5-pmix-shmem-restarted-three-times    exit   0    0.3 s  4 of 4 PEs ok

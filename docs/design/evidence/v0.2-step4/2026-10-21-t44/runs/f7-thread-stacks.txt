@@ -1,0 +1,32 @@
+[New LWP 19094]
+[New LWP 19093]
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/aarch64-linux-gnu/libthread_db.so.1".
+0x0000ffffb5edf228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 3 (Thread 0xffffb493ec60 (LWP 19093) "fuse"):
+#0  0x0000ffffb5edf228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000ffffb5ed28b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000ffffb5ed28fc [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000ffffb51b242c [PAC] in ?? () from /lib/aarch64-linux-gnu/ucx/libucs_fuse.so.0
+#4  0x0000ffffb51b29b0 [PAC] in ?? () from /lib/aarch64-linux-gnu/ucx/libucs_fuse.so.0
+#5  0x0000ffffb5ed61d8 [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#6  0x0000ffffb5f3e15c [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 2 (Thread 0xffffb3d7ac60 (LWP 19094) "osoe-agent"):
+#0  0x0000ffffb5f3bde4 in syscall () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000ffffb6426790 in osoe_futex_wait_bitset (word=0xffffb4021384, expected=0, bitset=4294967295, deadline=0xffffb3d7a370, scope=<optimized out>) at <repo>/base/futex-futex2.c:52
+#2  0x0000ffffb641050c in osoe_transport_agent_wait (wake=wake@entry=0xffffb4021384, seen=seen@entry=0) at <repo>/shmem/src/transport-am.c:215
+#3  0x0000ffffb63cfee8 in agent_main (arg=0xffffb4021380) at <repo>/shmem/src/agent.c:242
+#4  0x0000ffffb5ed61d8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#5  0x0000ffffb5f3e15c [PAC] in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+
+Thread 1 (Thread 0xffffb639d060 (LWP 19090) "mpi-and-shmem"):
+#0  0x0000ffffb5edf228 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#1  0x0000ffffb5ed28b8 in ?? () from /lib/aarch64-linux-gnu/libc.so.6
+#2  0x0000ffffb5f0e51c [PAC] in clock_nanosleep () from /lib/aarch64-linux-gnu/libc.so.6
+#3  0x0000ffffb5f18b40 [PAC] in nanosleep () from /lib/aarch64-linux-gnu/libc.so.6
+#4  0x0000ffffb5f29290 [PAC] in sleep () from /lib/aarch64-linux-gnu/libc.so.6
+#5  0x0000000000401eb8 [PAC] in mode_hold () at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:369
+#6  main (argc=<optimized out>, argv=<optimized out>) at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:566
+[Inferior 1 (process 19090) detached]

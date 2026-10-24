@@ -1,0 +1,10 @@
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes
+--------------------------------------------------------------------------
+prterun detected that one or more processes exited with non-zero status,
+thus causing the job to be terminated. The first process to do so was:
+
+   Process name: [prterun-lima-osoe-18042@1,0]
+   Exit code:    2
+--------------------------------------------------------------------------

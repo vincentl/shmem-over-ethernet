@@ -1,0 +1,22 @@
+# 2026-10-24T12:36:13Z, load 0.34 0.43 0.25
+e-crash-others-in-shmem-mpirun         exit 139    2.4 s  0 of 3 PEs ok
+e-crash-others-in-mpi-mpirun           exit 139    2.1 s  0 of 3 PEs ok
+e-mpi-abort-others-in-shmem-mpirun     exit   3    2.0 s  0 of 3 PEs ok
+e-mpi-abort-others-in-mpi-mpirun       exit   3    2.0 s  0 of 3 PEs ok
+e-global-exit-others-in-shmem-mpirun   exit   1    2.3 s  0 of 3 PEs ok
+e-global-exit-others-in-mpi-mpirun     exit   1    2.3 s  0 of 3 PEs ok
+e-plain-exit-others-in-shmem-mpirun    exit   1    2.3 s  0 of 3 PEs ok
+e-plain-exit-others-in-mpi-mpirun      exit   1    2.0 s  0 of 3 PEs ok
+e-crash-others-in-shmem-singletons     exit 139    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.29930000.0 sm_segment.lima-osoe.501.2e2c0000.0 sm_segment.lima-osoe.501.6bf90000.0 
+e-mpi-abort-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4e960000.0 sm_segment.lima-osoe.501.507b0000.0 sm_segment.lima-osoe.501.f4e90000.0 
+e-global-exit-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.5a6b0000.0 sm_segment.lima-osoe.501.682b0000.0 sm_segment.lima-osoe.501.cf9a0000.0 
+e-plain-exit-others-in-shmem-singletons exit   1    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.45600000.0 sm_segment.lima-osoe.501.6a6e0000.0 sm_segment.lima-osoe.501.9ca80000.0 
+e-crash-others-in-shmem-srun           exit 139    2.2 s  0 of 3 PEs ok
+e-mpi-abort-others-in-shmem-srun       exit   3    2.2 s  0 of 3 PEs ok
+e-global-exit-others-in-shmem-srun     exit   3    2.2 s  0 of 3 PEs ok
+e-plain-exit-others-in-shmem-srun      exit   1    2.2 s  0 of 3 PEs ok
+e-sigterm-to-mpirun                    exit   1    6.2 s  0 of 3 PEs ok
+  still running after e-sigterm-to-mpirun:
+      21640       1       6 [mpi-and-shmem] <defunct>
+e-sigint-to-mpirun                     exit   1    6.2 s  0 of 3 PEs ok
+e-sigterm-to-osoe-launch               exit 143    6.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.2ca80000.0 sm_segment.lima-osoe.501.b03a0000.0 sm_segment.lima-osoe.501.b6340000.0 

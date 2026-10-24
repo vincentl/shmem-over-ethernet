@@ -1,0 +1,13 @@
+== k1-tcp-progress-thread, PE 0
+PE 0: thread 20436 mpi-and-shmem R
+PE 0: thread 20443 fuse S
+PE 0: thread 20445 mpi-and-shmem S
+PE 0: thread 20446 mpi-and-shmem S
+PE 0: thread 20449 osoe-agent S
+PE 0: 5 threads
+PE 0: thread 20436 mpi-and-shmem R
+PE 0: thread 20443 fuse S
+PE 0: thread 20445 mpi-and-shmem S
+PE 0: thread 20446 mpi-and-shmem S
+PE 0: thread 20449 osoe-agent S
+PE 0: 5 threads

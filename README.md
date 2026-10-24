@@ -1440,8 +1440,45 @@ specification or takes a choice the specification leaves open.
   deprecated `shmem_wait` and `shmem_wait_until` on a `long`, whose names C11
   gives the type-generic waits, a wrapper writes in parentheses,
   `(shmem_wait_until)`.
-- **MPI in the same program has not been tried**: the test suite's programs that
-  mix the two are not built here.
+- **MPI in the same program works, started by `srun` with Slurm's PMIx or by
+  `mpirun`.** Tried in the development VM (aarch64, Debian 13), with Open
+  MPI 5.0.7 as the distribution packages it and Slurm 24.11.5's PMIx plugin:
+  `MPI_Init` and `shmem_init` in either order and ended in either order,
+  `MPI_Allreduce` and `MPI_Sendrecv` on the symmetric heap and on statics, an
+  MPI window over the heap beside `shmem` puts into it, `shmem_finalize` and
+  `shmem_init` again with MPI running, `MPI_THREAD_MULTIPLE` beside
+  `shmem_init_thread`, up to 16 PEs, on one node and in two or four logical
+  nodes, and sixty starts in a row without a failure. Build with `OSOE_CC=mpicc
+  oshcc`, which keeps osoe's `shmem.h` ahead of the one Open MPI installs beside
+  `mpi.h`. Start with `srun -K1 --cpu-bind=none --mpi=pmix_v5`, where Slurm
+  gives osoe and Open MPI what each reads. `mpirun` gives osoe none of the
+  variables of "Starting PEs without a launcher", and a program it starts is
+  refused at `shmem_init`; a wrapper makes them from Open MPI's
+  (`docs/design/evidence/v0.2-step4/2026-10-21-t44/open-mpi-bootstrap.sh`, for
+  one machine, its logical nodes set by `T44_NODES`; several machines are
+  untried). Under `osoe-launch` every PE can be an MPI singleton, a world of one
+  rank, which gives no MPI between the PEs. Not tried: another build of Open
+  MPI, MPICH, x86-64, a program linked by lld, and speed.
+- **Beside MPI the deadlock detector proves nothing.** Open MPI's threads are
+  threads of the program's own outside the library's waits, and a program with
+  one is never judged deadlocked (the bullet on a program's own deadlock,
+  above): the thread `MPI_Init` starts, until `MPI_Finalize`, and in Debian's
+  build one that UCX's `libucs` starts as the program loads, in every program
+  that links `libmpi`, MPI started or not (UCX's virtual file system). A
+  deadlock in osoe alone then hangs until the launcher's time limit, if it has
+  one, where the same program built without Open MPI was ended in 4 s at
+  `OSOE_DEADLOCK_SECONDS=3`; `UCX_VFS_ENABLE=n` stops UCX's thread and gives
+  the detector back before `MPI_Init` and after `MPI_Finalize`. A deadlock
+  across the libraries, a PE in `MPI_Barrier` and the rest in
+  `shmem_barrier_all`, is found by neither. Under `mpirun`,
+  `shmem_global_exit(status)` ends the job with status 1 and `prterun`'s
+  complaint of ranks that left without `MPI_Finalize`; under `srun` and
+  `osoe-launch` it ends it with `status`, and `MPI_Abort(status)` carries its
+  status under all three. An MPI singleton leaves a 16 MiB sparse
+  `sm_segment.*` file in `/dev/shm`. The package that installs Open MPI also
+  installs an `oshcc`, an `oshrun` and an OpenSHMEM `shmem.h` of its own, to be
+  kept behind osoe's. The record is
+  `docs/design/evidence/v0.2-step4/2026-10-21-t44/`.
 - **`shmemx.h` is empty.** The cache routines (`shmem_set_cache_inv` and five
   more) were deprecated in 1.3 and left the specification after 1.4; osoe keeps
   them as routines that do nothing, for programs that still call them, which is
@@ -1824,6 +1861,9 @@ launcher environment". There is no single-PE default.
   collide, and the second fails at init; a job past its start holds no names
   (below), so a later job may use the pair again.
 - `OSOE_GTIDS[OSOE_LOCALID]` must equal `OSOE_PROCID`.
+- `mpirun` sets none of them, and a program it starts is refused at
+  `shmem_init`: "MPI in the same program", under Limits, says how to start one
+  under it.
 
 For example, two PEs from a shell:
 
