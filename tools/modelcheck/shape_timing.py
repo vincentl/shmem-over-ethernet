@@ -414,18 +414,43 @@ def choose(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE):
     return best[1], capacity
 
 
-def choose_shape(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, circulant=False):
+# The most rows Träff's reduction takes, ceil(log2 nodes) of them: what the
+# reduce-scatter's words hold (internal-region.h,
+# OSOE_INTERNAL_CIRCULANT_ROWS_MOST), a team of more than 2**16 nodes taking the
+# trees. A lane has no more than that for Träff's.
+CIRCULANT_ROWS_MOST = 16
+
+
+def lane_rows(ceiling, job_nodes):
+    """The rows of a lane in a job of `job_nodes` nodes at a fan-out ceiling of
+    `ceiling` - internal-region.h's osoe_internal_lane_rows: a row for each of
+    a tree's child positions and one for what its parent sends down, ceiling +
+    1; and, for Träff's, which gives each round of its reduce-scatter and
+    allgather a row of the receiver's lane, as many as its rounds a half need,
+    ceil(log2 job_nodes) at most CIRCULANT_ROWS_MOST - whichever is more. Both
+    are every node's alike, so that no setting, no word at the rendezvous and no
+    version of the layout is needed: the lane is larger than the ceiling's only
+    past 512 nodes at the default ceiling of 8."""
+    return max(ceiling + 1, min(len(circulant_skips(job_nodes)), CIRCULANT_ROWS_MOST))
+
+
+def choose_shape(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, circulant=False,
+                 lane=None):
     """osoe_shape_choose with its algorithm: (algorithm, k, W). The tree that
     choose() gives; and, where `circulant` allows it - the data path's word that
     it runs Träff's reduce-scatter - for a reduction past the small class whose
-    rounds' rows, ceil(log2 nodes), fit a lane's ceiling + 1 rows, Träff's,
-    where its closed form costs less than that tree's, ties to the tree. Its
-    window is a round's slots: (ceiling + 1) // rows of the lane's rows, the
-    capacity each."""
+    rounds' rows, ceil(log2 nodes), fit a lane's `lane` rows, Träff's, where its
+    closed form costs less than that tree's, ties to the tree. Its window is a
+    round's slots: lane // rows of the lane's rows, the capacity each. `lane` is
+    the lane's rows in the job (lane_rows(ceiling, the job's nodes)); None for a
+    team that is the whole job, as the data path's world team is - osoe_shape_choose
+    takes it always, from its caller."""
+    if lane is None:
+        lane = lane_rows(ceiling, nodes)
     k, W = choose(op, nodes, n, link, ceiling, capacity, small_bytes, s)
     rows = len(circulant_skips(nodes))
-    if circulant and op == 'reduce' and nodes > 1 and n > small_bytes and rows <= ceiling + 1:
-        window = capacity * ((ceiling + 1) // rows)
+    if circulant and op == 'reduce' and nodes > 1 and n > small_bytes and rows <= lane:
+        window = capacity * (lane // rows)
         if circulant_cost(nodes, n, s, window, *link) < cost(op, nodes, k, W, n, s, *link):
             return 'circulant', ceiling, window
     return 'tree', k, W
@@ -638,23 +663,25 @@ def gather_steps(nodes):
     return steps
 
 
-def reduction_cost(nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, circulant=True):
+def reduction_cost(nodes, n, link, ceiling, capacity, small_bytes, s=PIECE, circulant=True,
+                   lane=None):
     """A reduction of `n` bytes among `nodes` leads as the data path runs it:
     the small class one piece through the ceiling's tree, and a larger one the
     chooser's shape, Träff's where `circulant` allows it, and a hop more for the
-    grant a child waits for."""
+    grant a child waits for. `lane`, the lane's rows, as choose_shape's."""
     if nodes <= 1 or n == 0:
         return 0
     if n <= small_bytes:
         return cost('reduce', nodes, ceiling, 1, n, n, *link)
-    shape = choose_shape('reduce', nodes, n, link, ceiling, capacity, small_bytes, s, circulant)
+    shape = choose_shape('reduce', nodes, n, link, ceiling, capacity, small_bytes, s, circulant,
+                         lane)
     return min(SATURATED, shape_cost('reduce', nodes, shape, n, link, s) + link[0])
 
 
 def places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s=PIECE,
-                circulant=True):
+                circulant=True, lane=None):
     """What finding a collect's places costs one way (the section's comment),
-    nanoseconds: osoe_places_cost."""
+    nanoseconds: osoe_places_cost. `lane`, the lane's rows, as choose_shape's."""
     h_ns, o_ns, bytes_per_second = link
     if nodes <= 1:
         return 0
@@ -662,10 +689,10 @@ def places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s=PIE
         return SATURATED
     if way == 'members':
         return reduction_cost(nodes, 8 * members, link, ceiling, capacity, small_bytes, s,
-                              circulant)
+                              circulant, lane)
     if way == 'totals':
         return reduction_cost(nodes, 8 * nodes, link, ceiling, capacity, small_bytes, s,
-                              circulant)
+                              circulant, lane)
     if way == 'scan':
         tree = cost('reduce', nodes, ceiling, 1, PLACES_DOWN_BYTES, PLACES_DOWN_BYTES, *link)
         return min(SATURATED, tree + (gather_steps(nodes) + 1) * o_ns)
@@ -674,21 +701,23 @@ def places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s=PIE
 
 
 def choose_places(nodes, members, runs, ordered, room, link, ceiling, capacity, small_bytes,
-                  s=PIECE, circulant=True):
+                  s=PIECE, circulant=True, lane=None):
     """osoe_places_choose: the way a collect's places take by default. The
     members' vector where some node's members are not one run (`runs` false) or
     on one node; otherwise the least cost of each node's total, the exchange -
     on no more nodes than its `room`, nor than EXCHANGE_DEFAULT_NODES_MOST - and
-    the scan - where the runs are `ordered` - ties to that order."""
+    the scan - where the runs are `ordered` - ties to that order. `lane`, the
+    lane's rows, as choose_shape's."""
     if nodes <= 1 or not runs:
         return 'members'
     best, least = 'totals', places_cost('totals', nodes, members, link, ceiling, capacity,
-                                        small_bytes, s, circulant)
+                                        small_bytes, s, circulant, lane)
     exchange = nodes <= room and nodes <= EXCHANGE_DEFAULT_NODES_MOST
     for way, allowed in (('exchange', exchange), ('scan', ordered)):
         if not allowed:
             continue
-        c = places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s, circulant)
+        c = places_cost(way, nodes, members, link, ceiling, capacity, small_bytes, s, circulant,
+                        lane)
         if c < least:
             best, least = way, c
     return best
@@ -894,9 +923,54 @@ def check_pins(failures):
         failures.append('PINS: a broadcast takes Träff\'s')
     if choose_shape('reduce', 4, 1 << 20, PI_LINK, 8, 4, 1024)[0] != 'tree':
         failures.append('PINS: a reduction takes Träff\'s where the data path does not allow it')
-    if choose_shape('reduce', 16, 1 << 20, PI_LINK, 2, 4, 1024, circulant=True)[0] != 'tree':
-        failures.append('PINS: Träff\'s taken on 16 nodes with a ceiling of 2, whose lanes '
-                        'hold 3 rows')
+
+
+def check_lane(failures, lane_of=lane_rows):
+    """Träff's rows are a lane's, and a lane's rows are not the ceiling's alone
+    (P3): a lane has max(ceiling + 1, ceil(log2 nodes)) rows, at most 16 for
+    Träff's, so that a 1 MiB reduction takes Träff's wherever the cost model
+    finds it cheaper - on the Pi's link at every node count to 65,536, at the
+    default ceiling of 8 as at a ceiling of 2, where a lane has 3 rows to
+    begin with - and a lane of the ceiling's rows leaves it to the trees past
+    the nodes those hold (shmem.shape.choice and shmem.circulant.*.ceiling-2
+    hold the C to these). `lane_of` is the lane's rows by the rule under test."""
+    for ceiling, nodes, want in ((8, 1, 9), (8, 256, 9), (8, 257, 9), (8, 512, 9), (8, 513, 10),
+                                 (8, 1024, 10), (8, 1025, 11), (8, 4096, 12), (8, 65536, 16),
+                                 (8, 65537, 16), (8, 1 << 20, 16), (32, 65536, 33),
+                                 (2, 4, 3), (2, 5, 3), (2, 8, 3), (2, 9, 4), (2, 17, 5),
+                                 (2, 33, 6), (15, 65536, 16), (16, 65536, 17)):
+        if lane_of(ceiling, nodes) != want:
+            failures.append(f'LANE: a lane has {lane_of(ceiling, nodes)} rows in a job of '
+                            f'{nodes} nodes at a ceiling of {ceiling}, not {want}')
+    for ceiling, nodes in ((8, 512), (8, 513), (8, 1024), (8, 4096), (8, 65536), (4, 33),
+                           (2, 5), (2, 9), (2, 17), (2, 33)):
+        lane = lane_of(ceiling, nodes)
+        shape = choose_shape('reduce', nodes, 1 << 20, PI_LINK, ceiling, 4, 1024, circulant=True,
+                             lane=lane)
+        if shape[0] != 'circulant' or shape[2] != 4 * (lane // len(circulant_skips(nodes))):
+            failures.append(f'LANE: a 1 MiB reduction on {nodes} nodes of the Pi at a ceiling of '
+                            f'{ceiling} takes {shape}, not Träff\'s with its lane\'s window')
+    # a lane of the ceiling's rows holds no more than the trees' (the rule before P3)
+    for ceiling, nodes in ((8, 513), (8, 1024), (2, 9), (2, 33)):
+        shape = choose_shape('reduce', nodes, 1 << 20, PI_LINK, ceiling, 4, 1024, circulant=True,
+                             lane=ceiling + 1)
+        if shape[0] != 'tree':
+            failures.append(f'LANE: {nodes} nodes take Träff\'s with a lane of the ceiling\'s '
+                            f'{ceiling + 1} rows, whose {len(circulant_skips(nodes))} do not '
+                            'fit')
+    # and none past 65,536 nodes even where the caller allows it: the 17 rows
+    # outgrow a lane of 16
+    if choose_shape('reduce', 65537, 1 << 20, PI_LINK, 8, 4, 1024, circulant=True,
+                    lane=lane_of(8, 65537))[0] != 'tree':
+        failures.append('LANE: 65,537 nodes take Träff\'s with a lane of 16 rows, whose 17 '
+                        'do not fit')
+    # a team within a larger job has the lane the job gave it: of 12 rows in a job
+    # of 4,096, four blocks of the capacity's slots for the 3 rows of 8 nodes
+    shape = choose_shape('reduce', 8, 1 << 20, PI_LINK, 8, 4, 1024, circulant=True,
+                         lane=lane_of(8, 4096))
+    if shape != ('circulant', 8, 16):
+        failures.append(f'LANE: 8 nodes of a job of 4,096 take {shape}, not Träff\'s with a '
+                        'window of 16 pieces, the capacity for each of 4 blocks')
 
 
 def check_circulant(failures):
@@ -907,7 +981,7 @@ def check_circulant(failures):
     for links, error_bound, regret_bound in (('sender', 0.12, 0.08), ('connection', 0.18, 0.08)):
         errors, regrets = [], []
         for N, n in grid:
-            window = 4 * (9 // len(circulant_skips(N)))     # the chooser's, at (8, 4)
+            window = 4 * (lane_rows(8, N) // len(circulant_skips(N)))   # the chooser's, at (8, 4)
             sim_c = simulate_circulant(N, n, PIECE, window, 86, 7, 116, links=links)
             errors.append(abs(circulant_cost(N, n, PIECE, window, *PI_LINK) / 1000 / sim_c - 1))
             trees = {k: simulate('reduce', N, k, 4, n, PIECE, 86, 7, 116, measure='completion',
@@ -923,6 +997,32 @@ def check_circulant(failures):
                             f'and Träff\'s costs up to {max(regrets):.3f}, beyond {regret_bound}')
 
 
+def check_circulant_wide(failures):
+    """Träff's where the lane's rows now let it run (P3), past the 512 nodes the
+    ceiling's lane held at the default: on 513 nodes, the first, a 1 MiB reduction
+    by the simulation of the Pi's links takes Träff's at least twice less time
+    than every tree to the ceiling. The closed form says 3.2 times: its trees
+    cost about 1.3 times the simulation's at this size, where Träff's costs within
+    15% of it, so the gain is 2.9 times by the simulation (51 ms against 18) and the
+    choice the same. The sender links only: the other model's streams are too slow
+    to run so many leads."""
+    nodes, n = 513, 1 << 20
+    algorithm, k, window = choose_shape('reduce', nodes, n, PI_LINK, 8, 4, 1024, circulant=True)
+    if algorithm != 'circulant':
+        failures.append('CIRCULANT: 513 nodes do not take Träff\'s at 1 MiB on the Pi\'s link')
+        return
+    sim_c = simulate_circulant(nodes, n, PIECE, window, 86, 7, 116, links='sender')
+    sim_t = min(simulate('reduce', nodes, t, 4, n, PIECE, 86, 7, 116, measure='completion',
+                         links='sender') for t in range(2, 9))
+    closed = circulant_cost(nodes, n, PIECE, window, *PI_LINK) / 1000
+    if sim_t < 2 * sim_c:
+        failures.append(f'CIRCULANT: on {nodes} nodes the simulation has the best tree at '
+                        f'{sim_t:.0f} us and Träff\'s at {sim_c:.0f}, under twice as fast')
+    if abs(closed / sim_c - 1) > 0.15:
+        failures.append(f'CIRCULANT: on {nodes} nodes Träff\'s closed form is {closed:.0f} us '
+                        f'and its simulation {sim_c:.0f}, more than 15% apart')
+
+
 def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
     failures = []
     check_table(rows, h, o, B, failures)
@@ -930,7 +1030,9 @@ def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
     if choices:
         check_choices(failures)
         check_pins(failures)
+        check_lane(failures)
         check_circulant(failures)
+        check_circulant_wide(failures)
     return failures
 
 
@@ -948,15 +1050,20 @@ def unexpected(failures, check):
 
 def grid_lines():
     """Every input of a grid, and the shape and cost the model gives it: a
-    reduction both with Träff's allowed and without, as the data path asks."""
+    reduction both with Träff's allowed and without, as the data path asks. The
+    team is the job, so a lane has lane_rows(ceiling, nodes) rows (the C's
+    osoe_internal_lane_rows): the node counts either side of where that passes
+    the ceiling's, 5 and 9 at a ceiling of 2, 17 and 33 at 4, 257 and 513 at 8,
+    and 65,536, the most Träff's takes."""
     lines = ['# op nodes bytes hop_ns message_ns bytes_per_second ceiling capacity small'
              ' circulant -> algorithm fanout window cost_ns (tools/modelcheck/shape_timing.py'
              ' grid)']
     links = [PI_LINK, LOOPBACK_LINK, (1000000, 50000, 12000000), (5000, 500, 25000000000)]
     for op in ('reduce', 'broadcast'):
         for link in links:
-            for nodes in (1, 2, 3, 4, 5, 7, 8, 13, 16, 31, 64, 255, 1000, 4096):
-                for ceiling, capacity in ((4, 2), (8, 4), (32, 8)):
+            for nodes in (1, 2, 3, 4, 5, 7, 8, 9, 13, 16, 17, 31, 33, 64, 255, 257, 512, 513,
+                          1000, 1024, 4096, 65536):
+                for ceiling, capacity in ((2, 4), (4, 2), (8, 4), (32, 8)):
                     for n in (8, 1024, 1025, 4096, 16384, 16385, 65536, 1 << 20, 1 << 30):
                         for allowed in ((0, 1) if op == 'reduce' else (0,)):
                             shape = choose_shape(op, nodes, n, link, ceiling, capacity, 1024,
@@ -978,7 +1085,7 @@ def places_grid_lines():
              (50000, 3000, 2700000000)]
     for link in links:
         for nodes in (1, 2, 3, 4, 7, 8, 9, 16, 17, 31, 46, 47, 60, 61, 64, 65, 100, 128, 129,
-                      200, 254, 512, 1000, 4096):
+                      200, 254, 512, 513, 1000, 1024, 4096):
             for per_node in (1, 4, 16):
                 for runs, ordered in ((False, False), (True, False), (True, True)):
                     for ceiling, capacity, small in ((8, 4, 1024), (4, 2, 128), (32, 8, 16384)):
@@ -1087,6 +1194,14 @@ def main(argv):
     check_terms(broken, interior=0)
     mark = unexpected(broken, 'TERMS')
     print(f'broken interior (an interior lead counted k, not k + 1): '
+          f'{"fails" if broken else "PASSES - the check cannot see it"}{mark}')
+    for f in broken[:2]:
+        print('   ', f)
+    ok = ok and not mark
+    broken = []
+    check_lane(broken, lane_of=lambda ceiling, job_nodes: ceiling + 1)
+    mark = unexpected(broken, 'LANE')
+    print(f'broken lane (its rows the ceiling\'s, as before P3): '
           f'{"fails" if broken else "PASSES - the check cannot see it"}{mark}')
     for f in broken[:2]:
         print('   ', f)

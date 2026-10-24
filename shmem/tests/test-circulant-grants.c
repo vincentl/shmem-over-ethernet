@@ -55,8 +55,10 @@ static struct osoe_collective_shape chosen(uint64_t bytes)
                      osoe_circulant_rows(nodes) <=
                          osoe_internal_circulant_rows(b->node_count);
     return osoe_shape_choose(OSOE_SHAPE_REDUCE, nodes, bytes, &osoe.job.link,
-                             b->collective_fanout, b->collective_pipeline,
-                             b->small_collective_bytes, OSOE_INTERNAL_PIECE_BYTES, circulant);
+                             b->collective_fanout,
+                             osoe_internal_lane_rows(b->collective_fanout, b->node_count),
+                             b->collective_pipeline, b->small_collective_bytes,
+                             OSOE_INTERNAL_PIECE_BYTES, circulant);
 }
 
 /* Where team number `number`'s reduce-scatter line `line` starts in a PE's

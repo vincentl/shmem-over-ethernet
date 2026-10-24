@@ -163,7 +163,9 @@ struct osoe_bootstrap {
  * must lie in: 1 is one piece at a time, each a whole pass up and down, as
  * before phase 1 step 5 slice 5; each step of D costs every lane's slots in
  * the internal region again (internal-region.h). A lane is (fan-out + 1) x D
- * slots of a header and 16 KiB, and a PE has one per thread record,
+ * slots of a header and 16 KiB - or, past 512 nodes at the default fan-out,
+ * ceil(log2 nodes) x D, a row of 64 KiB more at the defaults for each doubling
+ * (osoe_internal_lane_rows; P3) - and a PE has one per thread record,
  * OSOE_MAX_THREADS + 1 of them: 9.6 MiB at the defaults (fan-out 8, D = 4, 16
  * threads) - and at the extremes the ranges allow (1,024 teams, fan-out 32,
  * D = 8, 1,023 threads, small collectives of 16 KiB) a PE's region is about

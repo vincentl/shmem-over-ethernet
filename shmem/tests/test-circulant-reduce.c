@@ -51,7 +51,11 @@
  * checked to differ. With `diverge`, PE 1 reduces a byte more than the others:
  * the job must end naming the difference. Under
  * OSOE_COLLECTIVE_SHAPE=tree every call must take a tree: the setting turns
- * Träff's off by name.
+ * Träff's off by name. And where the rounds outnumber the rows a lane of the
+ * fan-out ceiling's + 1 would hold - nine nodes and more at a ceiling of 2, a
+ * lane of three (P3) - the chooser must still take Träff's at some size: a lane
+ * has as many rows as the rounds need, and a test that took none of it would
+ * pass on the trees alone.
  *
  * Every result is checked as the call returns; at the end every PE's failures
  * are summed, and the job's last line says how many calls took Träff's.
@@ -89,7 +93,8 @@ static uint64_t setting(const char *name, uint64_t fallback)
 
 /* What the data path asks the chooser for a reduction of `bytes` over the
  * world (internode-generic.c, shape_of): Träff's allowed under the shape
- * `link` - not `tree` - where its rows fit the reduce-scatter's words. */
+ * `link` - not `tree` - where its rows fit the reduce-scatter's words, in a
+ * lane of the rows the job's nodes and the ceiling give it. */
 static struct osoe_collective_shape chosen(uint64_t bytes)
 {
     const char *shape = getenv("OSOE_COLLECTIVE_SHAPE");
@@ -97,8 +102,10 @@ static struct osoe_collective_shape chosen(uint64_t bytes)
                    osoe_circulant_rows((uint32_t)nodes) <=
                        osoe_internal_circulant_rows((uint32_t)nodes);
     return osoe_shape_choose(OSOE_SHAPE_REDUCE, (uint32_t)nodes, bytes, &link,
-                             (uint32_t)ceiling, (uint32_t)capacity, (uint32_t)small,
-                             OSOE_INTERNAL_PIECE_BYTES, allowed);
+                             (uint32_t)ceiling,
+                             osoe_internal_lane_rows((uint32_t)ceiling, (uint32_t)nodes),
+                             (uint32_t)capacity, (uint32_t)small, OSOE_INTERNAL_PIECE_BYTES,
+                             allowed);
 }
 
 /* The smallest of a ladder of sizes that takes Träff's here, or 0. */
@@ -621,6 +628,9 @@ int main(int argc, char **argv)
     CHECK_FATAL(link.bytes_per_second != 0);    /* the link is set, so the choice is known */
     uint64_t smallest = smallest_circulant();
     size_t large = smallest ? (size_t)smallest : (size_t)1 << 20;
+    const char *shape = getenv("OSOE_COLLECTIVE_SHAPE");
+    CHECK_FATAL(smallest != 0 || (shape && strcmp(shape, "link") != 0) ||
+                osoe_circulant_rows((uint32_t)nodes) <= ceiling + 1);
 
     if (argc > 1 && strcmp(argv[1], "diverge") == 0) {
         diverge(smallest);

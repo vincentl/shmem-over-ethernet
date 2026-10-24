@@ -4511,7 +4511,12 @@ endif()
 # rows runs off its end; under OSOE_COLLECTIVE_SHAPE=tree, where no call may
 # take Träff's; with every node's lead lending a lane of its own (lanes); at a
 # ceiling of 2, where five nodes' three rounds take every row of a lane, the
-# release row's too; at a capacity of 1; at a window of 128 (a ceiling of 32
+# release row's too, and nine, seventeen and thirty-three nodes' four to six
+# rounds outnumber the three rows of a lane that the ceiling sizes alone - a
+# lane has as many rows as the rounds need (P3; internal-region.h,
+# osoe_internal_lane_rows), the chooser takes Träff's there, and the
+# data path checks that the blocks it addresses end within the lane before its
+# first put; at a capacity of 1; at a window of 128 (a ceiling of 32
 # and a capacity of 8 on three nodes); and on a link so slow that a few hundred
 # bytes take Träff's, with fewer elements than nodes (tiny): empty blocks. And a
 # divergent call, which must end by name (diverge). The sanitizers run the cases of up to 9 PEs - 12 and 16 under
@@ -4528,7 +4533,7 @@ if(OSOE_INTERNODE)
   osoe_warnings(shmem_test_circulant-reduce)
   foreach(case 2 3 4 5 6 7 8 9 12 16 17 33 64 70 8x2 5.perturb 16.perturb 4.threads
                16.threads 5.stress 4.max-teams-4 16.tree 7.lanes 5.lanes 5.ceiling-2
-               5.capacity-1 3.window-128 16.tiny)
+               9.ceiling-2 17.ceiling-2 33.ceiling-2 5.capacity-1 3.window-128 16.tiny)
     string(REGEX MATCH "^[0-9]+" nodes "${case}")
     set(per_node 1)
     if(case MATCHES "x2$")
@@ -5825,7 +5830,7 @@ endif()
 # their own scripts under /home - a shell in uninterruptible sleep in an NFSv4
 # open past the launcher's limit - and failed. if(TEST): the single-node build
 # registers none of them.
-foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33
+foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33 shmem.circulant.33.ceiling-2
              shmem.shape.chosen.pi.64 shmem.shape.chosen.loopback.64
              shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes
              shmem.zero-copy-refusals.64-nodes)

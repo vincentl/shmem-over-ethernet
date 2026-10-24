@@ -94,13 +94,18 @@
  *
  * Then **the scans' area** (below), **the exchange's words** (below, P33), and
  * last **the lanes**: one per thread
- * record of the PE (node.h), each `fanout + 1` rows of D slots, a piece's
- * header and its 16 KiB each (OSOE_INTERNAL_SLOT_BYTES) - a
+ * record of the PE (node.h), each osoe_internal_lane_rows rows of D slots, a
+ * piece's header and its 16 KiB each (OSOE_INTERNAL_SLOT_BYTES) - a
  * row for each child position's pieces and one for what the parent sends
- * down, piece k in the row's slot k mod D - a lane's place its index times its
- * size. Last, so that no other place depends on how many there are: a lane is
- * found by an index that travels (E4), and the index alone, with what every
- * node agrees on, places it.
+ * down, piece k in the row's slot k mod D, which makes `fanout + 1` rows; and,
+ * where Träff's reduction (below) needs more, a row for each of its rounds a
+ * half, ceil(log2 N) of them, as the job's node count N makes them: the lane
+ * has the more of the two, so that Träff's runs on up to 65,536 nodes at
+ * every fan-out, and the lane is larger than the fan-out's alone only past 512
+ * nodes at the default of 8 (P3) - a lane's place its index times its size.
+ * Last, so that no other place depends on how many there are: a lane is found
+ * by an index that travels (E4), and the index alone, with what every node
+ * agrees on, places it.
  *
  * **What a team number owns here is the team's while one of this PE's teams
  * holds the number** (step D): a PE gives a number back when it destroys its
@@ -509,11 +514,32 @@ static inline uint64_t osoe_internal_exchange_offset(uint32_t fanout, uint32_t m
            osoe_internal_scan_bytes(fanout, max_teams, small_collective_bytes);
 }
 
-/* One lane: a row of `pipeline` slots per child position, then the release
- * row. */
-static inline uint64_t osoe_internal_lane_bytes(uint32_t fanout, uint32_t pipeline)
+/*
+ * The rows of one lane in a job of `nodes` nodes: a row of `pipeline` slots per
+ * child position of a tree and then the release row, `fanout` + 1 - and for
+ * Träff's reduction, which gives each of its rounds a row of the receiver's
+ * lane (the reduce-scatter's words, above), as many as its rounds a half, the
+ * rows osoe_internal_circulant_rows says, whichever is more. So a lane is
+ * sized by two numbers every node agrees on - the fan-out and the node count,
+ * no setting of its own and no word at the rendezvous - and is larger than the
+ * fan-out's only where the rounds outnumber it: past 512 nodes at the default
+ * fan-out of 8, by a row of 64 KiB at the defaults for each doubling, on every
+ * lane of every PE. The tree's rows are the first `fanout` + 1 of them, its
+ * release row the last of those, wherever the lane ends. The chooser is given
+ * this number as the lane it may fit rounds to (collective-shape.h).
+ */
+static inline uint32_t osoe_internal_lane_rows(uint32_t fanout, uint32_t nodes)
 {
-    return (uint64_t)(fanout + 1) * pipeline * OSOE_INTERNAL_SLOT_BYTES;
+    uint32_t circulant = osoe_internal_circulant_rows(nodes);
+    return fanout + 1 > circulant ? fanout + 1 : circulant;
+}
+
+/* One lane: osoe_internal_lane_rows rows of `pipeline` slots. */
+static inline uint64_t osoe_internal_lane_bytes(uint32_t fanout, uint32_t pipeline,
+                                                uint32_t nodes)
+{
+    return (uint64_t)osoe_internal_lane_rows(fanout, nodes) * pipeline *
+           OSOE_INTERNAL_SLOT_BYTES;
 }
 
 /* Where the lanes start: past the exchange's words. */
@@ -537,7 +563,7 @@ static inline uint64_t osoe_internal_region_bytes(uint32_t fanout, uint32_t pipe
                                                   uint32_t nodes, uint32_t lanes)
 {
     return osoe_internal_lanes_offset(fanout, max_teams, small_collective_bytes, nodes) +
-           (uint64_t)lanes * osoe_internal_lane_bytes(fanout, pipeline);
+           (uint64_t)lanes * osoe_internal_lane_bytes(fanout, pipeline, nodes);
 }
 
 #endif /* OSOE_INTERNAL_REGION_H */

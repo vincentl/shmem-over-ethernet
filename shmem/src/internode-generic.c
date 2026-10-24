@@ -192,16 +192,21 @@
  * lead program:
  *   - **rows**: round k of either half moves its pieces into the k-th block
  *     of the receiver's lane, a block being the call's window of slots - a
- *     round takes as many of the lane's ceiling + 1 rows as the rounds leave
- *     it, so that the window is 16 pieces on four nodes and the capacity from
- *     17 - piece j into the block's slot j mod the window, each a put of its header
+ *     round takes as many of the lane's rows as the rounds leave it, so that
+ *     at the defaults' lane of nine rows the window is 16 pieces on four nodes
+ *     and the capacity from 17 - piece j into the block's slot j mod the
+ *     window, each a put of its header
  *     and bytes and then a fenced add on the receiver's arrival counter for the
  *     row, cumulative over the team's life and compared as at least. The
  *     receiver checks each piece's header, combines or copies what follows it
  *     into its accumulator at the piece's place on its own application thread
  *     - §5.8's rules 1 and 2: pieces land in scratch, and only the lead's
  *     thread writes `dest` - and clears it. A reduction takes ceil(log2 N)
- *     rows, so the chooser takes it only where they fit a lane's ceiling + 1;
+ *     rows, and a lane has as many as that or the fan-out ceiling's + 1,
+ *     whichever is more (osoe_internal_lane_rows; P3), so the ceiling does not
+ *     limit the nodes it runs on: the chooser is told the lane's rows and takes
+ *     it only where they fit, which they do for every team the reduce-scatter's
+ *     words hold, up to 65,536 nodes;
  *   - **credits**: a round sends to one lead and receives from another, so no
  *     piece says how far its sender's receiver has got. The receiver adds a
  *     credit at the sender for each piece it takes, and the sender puts piece
@@ -243,7 +248,9 @@
  * at the pace of the link or of the credits, N - 1 blocks of n / N each way a
  * half on every lead's link; ceil(log2 N) + 3 lines of words a team number and
  * the grant's - four more up to 32 nodes, five to 1,024 - and a lane's
- * ceil(log2 N) rows a reduction.
+ * ceil(log2 N) rows a reduction, which a lane of the ceiling's + 1 holds up to
+ * 512 nodes at the default and a longer lane, 64 KiB a row at the defaults,
+ * beyond.
  *
  * **A gather is Bruck's allgather among the team's node leads** (§5.8, "An
  * allgather for fcollect"; phase 1 step 5 slice 6), tools/modelcheck/
@@ -416,7 +423,7 @@ static uint64_t lane_slot(uint32_t lane, uint32_t position, uint64_t piece)
     return osoe_internal_lanes_offset(fanout, osoe.bootstrap.max_teams,
                                       osoe.bootstrap.small_collective_bytes,
                                       osoe.bootstrap.node_count) +
-           (uint64_t)lane * osoe_internal_lane_bytes(fanout, pipeline) +
+           (uint64_t)lane * osoe_internal_lane_bytes(fanout, pipeline, osoe.bootstrap.node_count) +
            ((uint64_t)position * pipeline + piece % pipeline) * OSOE_INTERNAL_SLOT_BYTES;
 }
 
@@ -759,9 +766,12 @@ static void find_lead_tree(const struct generic_team *g, uint32_t team, uint32_t
  * what the chooser returns, and the layout is sized for them, so every shape
  * fits: its child positions within the ceiling's rows and counters, its
  * window within the capacity's slots. And Träff's reduction (v0.2 step 3),
- * under `link` and not `tree`, where its rows fit both a lane, which the
- * chooser checks, and the reduce-scatter's words, which hold
- * OSOE_INTERNAL_CIRCULANT_ROWS_MOST: a team of up to 65,536 nodes.
+ * under `link` and not `tree`, where its rows fit the reduce-scatter's words,
+ * which hold OSOE_INTERNAL_CIRCULANT_ROWS_MOST - a team of up to 65,536 nodes -
+ * and a lane, which the chooser checks against the lane's rows it is told,
+ * osoe_internal_lane_rows of the ceiling and the job's node count: the ceiling's
+ * + 1 or the job's rounds, whichever is more, so that every team the words
+ * hold fits (P3).
  */
 static struct osoe_collective_shape shape_of(enum osoe_shape_operation operation,
                                              const struct generic_team *g, uint64_t bytes)
@@ -774,6 +784,7 @@ static struct osoe_collective_shape shape_of(enum osoe_shape_operation operation
     bool circulant = b->collective_shape == OSOE_COLLECTIVE_SHAPE_LINK &&
                      osoe_circulant_rows(g->count) <= circulant_layout_rows();
     return osoe_shape_choose(operation, g->count, bytes, &osoe.job.link, b->collective_fanout,
+                             osoe_internal_lane_rows(b->collective_fanout, b->node_count),
                              b->collective_pipeline, b->small_collective_bytes,
                              OSOE_INTERNAL_PIECE_BYTES, circulant);
 }
@@ -1697,12 +1708,19 @@ static void in_rounds(struct generic_team *team_phase, const struct pieces *piec
     uint64_t grants = team_phase->circulant_grant_base + rows;
     /* Every node computes the same shape for the call, and the chooser's
      * window leaves every round's block within a lane: a shape past it is a
-     * bug, named before any put. */
-    if ((uint64_t)rows * shape.window >
-        (uint64_t)(osoe.bootstrap.collective_fanout + 1) * osoe.bootstrap.collective_pipeline)
-        osoe_fatal("%s: Träff's %u rounds a half at a window of %u pieces outrun a lane of %u "
-                   "rows of %u slots", pieces->routine, rows, shape.window,
-                   osoe.bootstrap.collective_fanout + 1, osoe.bootstrap.collective_pipeline);
+     * bug, named before any put. Told by the functions that place the slots -
+     * the end of the last round's last slot against where the next lane
+     * begins - and not by the sizes they are meant to agree with: a lane's
+     * rows the layout did not make room for would run into the next lane's. */
+    uint64_t lane_start = lane_slot(0, 0, 0), lane_size = lane_slot(1, 0, 0) - lane_start;
+    uint64_t blocks_size = shape.window == 0
+                               ? UINT64_MAX
+                               : round_slot(0, rows - 1, shape.window, shape.window - 1) +
+                                     OSOE_INTERNAL_SLOT_BYTES - lane_start;
+    if (blocks_size > lane_size)
+        osoe_fatal("%s: Träff's %u rounds a half at a window of %u pieces need %llu bytes of "
+                   "slots in a lane, which holds %llu", pieces->routine, rows, shape.window,
+                   (unsigned long long)blocks_size, (unsigned long long)lane_size);
     uint32_t own = own_lane(), number = pieces->number;
     uint32_t granted[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
     uint32_t sender_lanes[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
