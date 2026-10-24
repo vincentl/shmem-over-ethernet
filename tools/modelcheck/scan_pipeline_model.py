@@ -393,8 +393,9 @@ def case(design, members, k, depth, pieces, order):
 
 # (design, members, fan-out, depth, pieces, order, expect): True, or the property it must fail.
 # Each runs under SC and then under x86-TSO, with the same verdict - but `summed`, which
-# names VALUE: under TSO the search meets RESULT first, and each of the two fails
-# under both orders (the search order moves with the buffers' flush steps; T29's report).
+# fails VALUE and RESULT under both orders and is named by the one the search meets
+# first: VALUE under SC, RESULT under TSO, whose flush steps move the search order
+# (T29, 2026-10-24).
 CASES = [
     ('design', 3, 2, 2, 3, 'A', True),           # a root and two leaves
     ('design', 4, 1, 2, 3, 'A', True),           # a chain: members both parent and child
@@ -443,11 +444,10 @@ def main():
         if not want(name):
             continue
         for tso in (False, True):
-            if tso and design == 'summed':
-                continue
             res = explore(name, threads, mem, tso=tso, max_seconds=900,
                           liveness_max_states=3_000_000, done=lambda M, n=n: M[FIN] == n)
-            ok &= report(res, expect=expect, tso=tso)
+            met = 'RESULT' if tso and design == 'summed' else expect
+            ok &= report(res, expect=met, tso=tso)
     return 0 if ok else 1
 
 
