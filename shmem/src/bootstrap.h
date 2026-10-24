@@ -89,6 +89,9 @@ struct osoe_bootstrap {
     /* OSOE_TEST_PRINT_LINK=1, a testing hook (T19): rank 0 prints the link it
      * measured at the end of shmem_init, as the OSOE_LINK_* that pin it. */
     bool print_link;
+    /* OSOE_CHECK_COLLECTIVES=1 (P24): every collective's call compared among
+     * a node's PEs (collectives.h's struct osoe_call). */
+    bool check_collectives;
     /* OSOE_TEST_MESH_HOLD=NODE:MS, a testing hook (H23): node NODE's lead
      * reaches its mesh MS milliseconds late; 0 milliseconds for none. */
     uint32_t mesh_hold_node, mesh_hold_ms;

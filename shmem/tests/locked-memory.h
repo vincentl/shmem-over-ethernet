@@ -22,6 +22,10 @@
  * asks the capability of the initial user namespace for both, as io_uring
  * does; a process's own CapEff, which a rootless container's root has, would
  * not say what io_uring will charge.
+ *
+ * A test at a limit the site has, not at nothing, leaves the limit as it was
+ * set for the job and asks the same question of memory a page past it
+ * (osoe_test_locked_memory_is_limited; T39, test-zero-copy-refusals.c).
  */
 #ifndef OSOE_TEST_LOCKED_MEMORY_H
 #define OSOE_TEST_LOCKED_MEMORY_H
@@ -34,6 +38,19 @@
 
 #include "check.h"
 
+/* Whether `bytes` of fresh memory lock under this process's present limit,
+ * by the system call itself (above); they are unlocked again. */
+static inline bool osoe_test_memory_locks(size_t bytes)
+{
+    void *p = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    CHECK_FATAL(p != MAP_FAILED);
+    bool locked = syscall(SYS_mlock, p, bytes) == 0;
+    if (locked)
+        syscall(SYS_munlock, p, bytes);
+    munmap(p, bytes);
+    return locked;
+}
+
 /* Lower this process's locked-memory limit to nothing; true if its sends by
  * reference will now be refused, false if it may lock memory anyway. */
 static inline bool osoe_test_no_locked_memory(void)
@@ -42,14 +59,19 @@ static inline bool osoe_test_no_locked_memory(void)
     CHECK_FATAL(getrlimit(RLIMIT_MEMLOCK, &limit) == 0);
     limit.rlim_cur = 0;
     CHECK_FATAL(setrlimit(RLIMIT_MEMLOCK, &limit) == 0);
-    long page = sysconf(_SC_PAGESIZE);
-    void *p = mmap(NULL, (size_t)page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    CHECK_FATAL(p != MAP_FAILED);
-    bool locked = syscall(SYS_mlock, p, (size_t)page) == 0;
-    if (locked)
-        syscall(SYS_munlock, p, (size_t)page);
-    munmap(p, (size_t)page);
-    return !locked;
+    return !osoe_test_memory_locks((size_t)sysconf(_SC_PAGESIZE));
+}
+
+/* True if this process's locked-memory limit, as it is, is held to: memory a
+ * page past it does not lock. False for a process that may lock memory whatever
+ * its limit, or whose limit is none, where no send by reference is refused. */
+static inline bool osoe_test_locked_memory_is_limited(void)
+{
+    struct rlimit limit;
+    CHECK_FATAL(getrlimit(RLIMIT_MEMLOCK, &limit) == 0);
+    if (limit.rlim_cur == RLIM_INFINITY)
+        return false;
+    return !osoe_test_memory_locks((size_t)limit.rlim_cur + (size_t)sysconf(_SC_PAGESIZE));
 }
 
 #endif /* OSOE_TEST_LOCKED_MEMORY_H */

@@ -3147,6 +3147,14 @@ untouched. The hints change no behaviour on one node and are not required to
 change any behaviour ever — they are advisory — but retrofitting hint plumbing
 into a finished allocator is the expensive version of this.
 
+*As built since 2026-10-20 (P23):* what invariant 6 rests on - every PE making
+the same calls with the same arguments - is checked, not assumed: each call that does something
+first ANDs a word of its kind and arguments, and the word's inverse, over every
+PE through the finalize team's split lines, and every PE ends naming what it
+passed where they differ (`malloc.c`, `same_arguments`). One small reduction a
+call, the author's choice: in the VM a `shmem_malloc` and `shmem_free` pair went
+from 35 to 102 µs on one node of 4 PEs.
+
 ### 4.5 Teams and allocation
 
 **OpenSHMEM has no team-based allocation through 1.6.** The spec creates a
@@ -5539,6 +5547,19 @@ a fast member's put lands in it: back-to-back gathers need none, alltoall after
 one does. The puts start at the PE's right neighbour, so no PE is everyone's
 first target; a strided block is a put an element, element-strided within each
 block as the spec's Example 33 and SOS read §9.10.6.
+
+*As built since 2026-10-20 (P24):* the node's PEs are compared too, under
+`OSOE_CHECK_COLLECTIVES=1`, off by default until timed at many PEs a node (H12).
+Each member says its call - kind, operation, element and width, bytes where all
+must agree, a broadcast's root, an alltoall's strides, a scan's inclusiveness -
+in three spare words of its own internal region's release-counter line for the
+team's number, with plain stores before its arrival's release read-modify-write;
+the member that meets every arrival - a data collective's lead after its wait, a
+sync's last arriver after its bump - reads them through the arrival counter's
+release sequence and ends the job naming two PEs and their calls where they
+differ, before anything is released (`collectives.h`, `struct osoe_call`). An
+alltoall is compared at its closing sync, after its puts; a scan over a team
+spanning nodes has no meeting within a node and is not.
 
 ### 5.6 Barrier versus sync
 

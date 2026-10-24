@@ -10,9 +10,12 @@ void osoe_barrier_all(const char *routine);
 void osoe_barrier_finalize(void);
 
 /* A barrier over team `t` - the quiet, then the team's sync - for a collective
- * that ends with one (alltoall). Not counted as the application's barrier. */
+ * that ends with one (alltoall), whose call (`call`; collectives.h, P24) the
+ * sync's members say and compare in place of a sync's. Not counted as the
+ * application's barrier. */
 struct osoe_team;
-void osoe_team_barrier(struct osoe_team *t, const char *routine);
+struct osoe_call;
+void osoe_team_barrier(struct osoe_team *t, const char *routine, const struct osoe_call *call);
 
 /* A sync over team `t` and no quiet (§5.6), for the library's own use: the
  * split's sync over its parent and destroy's over the team (team.c). Not

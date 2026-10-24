@@ -1367,20 +1367,11 @@ struct split_arguments {
     char text[64];
 };
 
-/* A word of the kind of split and up to three of its arguments, any one of
- * which changing changes it but once in 2^64: splitmix64's finalizer, a
- * part at a time. */
+/* A word of the kind of split and up to three of its arguments
+ * (collectives.h). */
 static uint64_t arguments_word(uint64_t kind, int a, int b, int c)
 {
-    const uint64_t parts[] = { kind, (uint32_t)a, (uint32_t)b, (uint32_t)c };
-    uint64_t h = 0;
-    for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {
-        h += parts[i] + UINT64_C(0x9e3779b97f4a7c15);
-        h = (h ^ (h >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-        h = (h ^ (h >> 27)) * UINT64_C(0x94d049bb133111eb);
-        h ^= h >> 31;
-    }
-    return h;
+    return osoe_arguments_word(kind, (uint32_t)a, (uint32_t)b, (uint32_t)c);
 }
 
 /*

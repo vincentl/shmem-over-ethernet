@@ -1,0 +1,4 @@
+1792560328.332241009 state= sessions=1
+1792560328.542715449 state=active sessions=2
+1792560330.572774111 state=closing sessions=1
+1792560340.694077721 state= sessions=0

@@ -21,6 +21,14 @@
  * same arguments (the spec requires it), so none is left waiting. A failed
  * allocation is not "nothing": every PE fails identically, so the exit barrier
  * still runs and all of them return a null pointer together.
+ *
+ * And every call that does something first checks that every PE made it with
+ * the same arguments (same_arguments, P23), since the heaps' symmetry rests on
+ * it: a PE that asked for another size went on with its heap apart from the
+ * others', and a put to an object of its landed in another of theirs (the
+ * release review's conformance C5). A PE that does nothing where another does
+ * something - a zero size against another - is not caught here: it returns,
+ * and the others wait in the check until the deadlock detector names it.
  */
 #include <stdatomic.h>
 #include <stddef.h>
@@ -32,17 +40,58 @@
 
 #include "allocator.h"
 #include "barrier.h"
+#include "collectives.h"
 #include "export.h"
 #include "fatal.h"
 #include "metrics.h"
 #include "state.h"
 #include "symmetric.h"
+#include "team.h"
 #include "transport.h"
 
 static void *heap_at(uint64_t offset)
 {
     return (char *)osoe.node.heap_of[osoe.bootstrap.local_id] + offset;
 }
+
+/* The routines same_arguments tells apart, so that one's arguments never pass
+ * for another's: realloc(NULL, n) is malloc(n) and checked as malloc. */
+enum call_kind {
+    CALL_MALLOC = 1,
+    CALL_MALLOC_WITH_HINTS,
+    CALL_CALLOC,
+    CALL_ALIGN,
+    CALL_REALLOC,
+    CALL_FREE,
+};
+
+/*
+ * P23 (the author, 2026-10-20: always): whether every PE made this call with
+ * the same arguments - its kind and arguments as a word, ANDed over every PE
+ * with its inverse (collectives.h's osoe_arguments_word) before anything is
+ * taken or given, one small reduction a call. Through the finalize team's
+ * split lines, which no application collective uses, so that a split of the
+ * world on another thread meanwhile shares nothing with it, and the world's
+ * epochs osoe-stat shows stay the program's own. Every PE reads the same AND,
+ * so where it says no, every PE ends alike, each naming what it passed
+ * (DIFFERENT).
+ */
+static bool same_arguments(const char *routine, enum call_kind kind, uint64_t a, uint64_t b)
+{
+    struct osoe_team *finalize = osoe_team_finalize();
+    uint64_t *words = osoe_team_split_words(finalize);
+    uint64_t word = osoe_arguments_word(kind, a, b, 0);
+    words[0] = word;
+    words[1] = ~word;
+    osoe_team_split_and(routine, finalize, 2);
+    return (words[0] | words[1]) == UINT64_MAX;
+}
+
+/* The end of a call whose arguments differ between PEs: the routine, then what
+ * this PE passed. */
+#define DIFFERENT                                                                          \
+    "%s: the PEs called it with different arguments, which spec §9.3 requires to be the " \
+    "same on every PE; this PE passed "
 
 /*
  * Tell the transport what a hinted block is for (§4.4, §4.10). Spec §9.3.5's
@@ -103,6 +152,9 @@ OSOE_API void *pshmem_malloc(size_t size)
 {
     if (size == 0)
         return NULL;
+    osoe_require_initialized("shmem_malloc");
+    if (!same_arguments("shmem_malloc", CALL_MALLOC, size, 0))
+        osoe_fatal(DIFFERENT "size %zu", "shmem_malloc", size);
     return allocate("shmem_malloc", size, OSOE_ALLOCATOR_ALIGN, 0, false);
 }
 
@@ -119,6 +171,9 @@ OSOE_API void *pshmem_malloc_with_hints(size_t size, long hints)
 {
     if (size == 0)
         return NULL;
+    osoe_require_initialized("shmem_malloc_with_hints");
+    if (!same_arguments("shmem_malloc_with_hints", CALL_MALLOC_WITH_HINTS, size, (uint64_t)hints))
+        osoe_fatal(DIFFERENT "size %zu and hints %ld", "shmem_malloc_with_hints", size, hints);
     return allocate("shmem_malloc_with_hints", size, OSOE_ALLOCATOR_ALIGN, hints, false);
 }
 
@@ -131,6 +186,9 @@ OSOE_API void *pshmem_calloc(size_t count, size_t size)
 {
     if (count == 0 || size == 0)
         return NULL;
+    osoe_require_initialized("shmem_calloc");
+    if (!same_arguments("shmem_calloc", CALL_CALLOC, count, size))
+        osoe_fatal(DIFFERENT "count %zu and size %zu", "shmem_calloc", count, size);
     if (size > SIZE_MAX / count)
         return allocate("shmem_calloc", UINT64_MAX, OSOE_ALLOCATOR_ALIGN, 0, false);
     return allocate("shmem_calloc", (uint64_t)count * size, OSOE_ALLOCATOR_ALIGN, 0, true);
@@ -151,6 +209,9 @@ OSOE_API void *pshmem_align(size_t alignment, size_t size)
         alignment % sizeof(void *) != 0)
         osoe_fatal("shmem_align: alignment %zu is not a power of two that is a multiple "
                    "of sizeof(void *) (%zu)", alignment, sizeof(void *));
+    osoe_require_initialized("shmem_align");
+    if (!same_arguments("shmem_align", CALL_ALIGN, alignment, size))
+        osoe_fatal(DIFFERENT "alignment %zu and size %zu", "shmem_align", alignment, size);
     /*
      * The allocator aligns heap *offsets*, and the caller was promised an
      * aligned *address*. The two agree only while this PE's heap base is itself
@@ -179,7 +240,11 @@ OSOE_API void pshmem_free(void *ptr)
     osoe_count(OSOE_C_SHMEM_FREE_CALLS, 1);
     osoe_barrier_all("shmem_free");
     uint64_t offset;
-    if (!osoe_symmetric_heap_offset(ptr, 0, &offset) || osoe_allocator_give(&osoe.allocator, offset) != 0)
+    bool in_heap = osoe_symmetric_heap_offset(ptr, 0, &offset);
+    if (in_heap && !same_arguments("shmem_free", CALL_FREE, offset, 0))
+        osoe_fatal(DIFFERENT "the block at offset %llu of the symmetric heap", "shmem_free",
+                   (unsigned long long)offset);
+    if (!in_heap || osoe_allocator_give(&osoe.allocator, offset) != 0)
         osoe_fatal("shmem_free: %p is not the address of a block allocated from the "
                    "symmetric heap", ptr);
     osoe_publish_heap_levels();
@@ -219,6 +284,9 @@ OSOE_API void *pshmem_realloc(void *ptr, size_t size)
         osoe_allocator_query(&osoe.allocator, offset, &old_size, &hints) != 0)
         osoe_fatal("shmem_realloc: %p is not the address of a block allocated from the "
                    "symmetric heap", ptr);
+    if (!same_arguments("shmem_realloc", CALL_REALLOC, offset, size))
+        osoe_fatal(DIFFERENT "the block at offset %llu of the symmetric heap and size %zu",
+                   "shmem_realloc", (unsigned long long)offset, size);
 
     void *result = ptr;
     switch (osoe_allocator_resize(&osoe.allocator, offset, size)) {

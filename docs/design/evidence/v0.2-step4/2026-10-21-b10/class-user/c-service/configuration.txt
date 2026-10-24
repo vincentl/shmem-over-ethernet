@@ -1,0 +1,2 @@
+RemoveIPC=no in logind.conf, logind restarted, no lingering
+RemoveIPC=false UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no

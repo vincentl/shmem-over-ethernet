@@ -1,0 +1,22 @@
+Oct 21 01:29:29.901183 lima-osoe systemd[1]: b10-job-smoke.service: Deactivated successfully.
+Oct 21 01:29:29.948720 lima-osoe systemd-logind[2921349]: New session c3 of user osoe-b10.
+Oct 21 01:29:29.949165 lima-osoe systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:29:29.949796 lima-osoe systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:29:29.966561 lima-osoe systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:29:29.967820 lima-osoe systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Oct 21 01:29:29.976372 lima-osoe systemd-logind[2921349]: New session 30 of user osoe-b10.
+Oct 21 01:29:30.038368 lima-osoe systemd[1]: Started user@1000.service - User Manager for UID 1000.
+Oct 21 01:29:30.041890 lima-osoe systemd[1]: Started session-c3.scope - Session c3 of User osoe-b10.
+Oct 21 01:29:32.062760 lima-osoe systemd[1]: session-c3.scope: Deactivated successfully.
+Oct 21 01:29:32.065505 lima-osoe systemd-logind[2921349]: Session c3 logged out. Waiting for processes to exit.
+Oct 21 01:29:32.066640 lima-osoe systemd-logind[2921349]: Removed session c3.
+Oct 21 01:29:32.076970 lima-osoe systemd[1]: Started b10-job-f-running.service - [systemd-run] /tmp/b10-out/job.sh /tmp/b10-out/running/f-running 0 40 30.
+Oct 21 01:29:42.127051 lima-osoe systemd[1]: Stopping user@1000.service - User Manager for UID 1000...
+Oct 21 01:29:42.197937 lima-osoe systemd-logind[2921349]: Removed session 30.
+Oct 21 01:29:42.200061 lima-osoe systemd[1]: user@1000.service: Deactivated successfully.
+Oct 21 01:29:42.200539 lima-osoe systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+Oct 21 01:29:42.202269 lima-osoe systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:29:42.237045 lima-osoe systemd[1]: user-runtime-dir@1000.service: Deactivated successfully.
+Oct 21 01:29:42.237246 lima-osoe systemd[1]: Stopped user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:29:42.239043 lima-osoe systemd[1]: Removed slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:30:02.108745 lima-osoe systemd[1]: b10-job-f-running.service: Deactivated successfully.

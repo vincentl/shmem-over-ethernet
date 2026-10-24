@@ -25,14 +25,34 @@
 #include "ring.h"
 #include "wire.h"
 
+/*
+ * A line in one buffer and one write, as the library writes its own (fatal.c).
+ * The three nodes and the launcher write to one pipe, ctest's, and node 0's
+ * report of its call comes within microseconds of node 2's refusal. Written as
+ * three fprintf calls - the prefix, the message, the newline - each a write of
+ * its own on an unbuffered stderr, node 0's line fell between the prefix and
+ * the message about one run in ten, and the refusal the test looks for did not
+ * arrive whole (T47). A write of less than PIPE_BUF bytes to a pipe is not
+ * split by another writer's.
+ */
+static void write_line(const char *prefix, const char *fmt, va_list ap)
+{
+    char message[1024], line[1100];
+    vsnprintf(message, sizeof message, fmt, ap);
+    int n = snprintf(line, sizeof line, "%s%s\n", prefix, message);
+    if (n > 0) {
+        size_t len = (size_t)n < sizeof line ? (size_t)n : sizeof line - 1;
+        ssize_t ignored = write(STDERR_FILENO, line, len);
+        (void)ignored;
+    }
+}
+
 _Noreturn void osoe_fatal(const char *fmt, ...);
 _Noreturn void osoe_fatal(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "osoe_fatal: ");
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
+    write_line("osoe_fatal: ", fmt, ap);
     va_end(ap);
     exit(1);
 }
@@ -42,9 +62,7 @@ void osoe_notice(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "osoe_notice: ");
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
+    write_line("osoe_notice: ", fmt, ap);
     va_end(ap);
 }
 

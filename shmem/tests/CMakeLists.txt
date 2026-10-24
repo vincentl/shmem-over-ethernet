@@ -1704,6 +1704,39 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     SKIP_REGULAR_EXPRESSION "SKIPPED: a PE may lock memory")
   osoe_internode_label(shmem.internode.zero-copy-refused.0-1-2)
 endif()
+
+# The zero-copy send at the limit a site has, among many peers (T39; the scale
+# review of v0.2 before Part 4, S8; test-zero-copy-refusals.c and
+# zero-copy-refusals.sh): sixty-four logical nodes of one PE each, every
+# process's locked-memory limit 8 MiB, soft and hard, and every PE putting
+# 128 KiB to every other, four times, with OSOE_WIRE_ZERO_COPY=on. A node's
+# sixty-three connections each lend a buffer at a time, far more than the count
+# allows a host, so sends are refused on many of them - on every node in 20 runs
+# of 20 - and the job must still end well with every byte right, the notice said
+# by at least half of the processes (the last argument), and "Cannot allocate
+# memory", which a refusal ended a job with before the wire copied after one,
+# nowhere. Skipped where a process may lock memory whatever its limit
+# (CAP_IPC_LOCK), where the user's hard limit is below 8 MiB, and where the
+# rings of sixty-four nodes alone pass it (a kernel from 6.14 charges them).
+# Not under a sanitizer: sixty-four PEs outgrow the VM's memory under
+# AddressSanitizer (as the shapes' 64 do), and ThreadSanitizer leaves out the
+# tests across nodes (the README, How osoe is tested). Run alone, as the other
+# jobs of 32 to 70 PEs are (below).
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_executable(shmem_test_zero-copy-refusals test-zero-copy-refusals.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_zero-copy-refusals PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_zero-copy-refusals PRIVATE osoe rt)
+  osoe_warnings(shmem_test_zero-copy-refusals)
+  add_test(NAME shmem.zero-copy-refusals.64-nodes
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/zero-copy-refusals.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_zero-copy-refusals> 64 8192 128 4 32)
+  set_tests_properties(shmem.zero-copy-refusals.64-nodes PROPERTIES LABELS "tier2" TIMEOUT 300
+    PASS_REGULAR_EXPRESSION "ZERO COPY REFUSALS OK" SKIP_REGULAR_EXPRESSION "SKIPPED: ")
+  osoe_internode_label(shmem.zero-copy-refusals.64-nodes)
+endif()
+
 # The same through the bootstrap's Slurm path (§6.1): osoe-launch -s names the
 # launcher's variables as srun does, SLURM_ in place of OSOE_. One node, one PE
 # a node, the block map, and the cyclic one, whose ranks are not contiguous per
@@ -2798,6 +2831,19 @@ if(OSOE_INTERNODE)
 endif()
 osoe_tier2_test(fork)
 osoe_tier2_test(barrier)
+# The one-node quiet's fence (T35; test-quiet-litmus.c): a store-buffering
+# litmus through shmem_quiet, two PEs of one node, 20 million rounds. It can show
+# the fence's absence only where the library's acquire loads are ldapr - a build
+# configured by hand with -DCMAKE_C_FLAGS=-march=armv8.3-a on a CPU that has
+# them - or on x86-64, and skips everywhere else, every preset on aarch64 among
+# them (the author, 2026-10-20: no preset).
+add_executable(shmem_test_quiet-litmus test-quiet-litmus.c)
+target_link_libraries(shmem_test_quiet-litmus PRIVATE osoe)
+osoe_warnings(shmem_test_quiet-litmus)
+add_test(NAME shmem.quiet.litmus.L2
+  COMMAND osoe-launch -n 2 -t 150 -- $<TARGET_FILE:shmem_test_quiet-litmus>)
+set_tests_properties(shmem.quiet.litmus.L2 PROPERTIES LABELS "tier2" TIMEOUT 180
+  SKIP_RETURN_CODE 77)
 osoe_tier2_test(malloc)
 osoe_tier2_test(set-range)
 osoe_tier2_test(rma)
@@ -3192,9 +3238,6 @@ if(OSOE_INTERNODE)
   # holding no partial result. Three nodes, so that node 0 also has a child that
   # did call the reduction.
   if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-    add_executable(shmem_test_collective-divergence test-collective-divergence.c)
-    target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
-    osoe_warnings(shmem_test_collective-divergence)
     add_test(NAME shmem.collective-divergence
       COMMAND osoe-launch -n 3 -m 0,1,2 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
               $<TARGET_FILE:shmem_test_collective-divergence>)
@@ -3770,6 +3813,129 @@ foreach(case_expect
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     if(map STREQUAL "0,0,1,1")
       osoe_internode_label(shmem.team-split.${mode}.${label})
+    endif()
+  endforeach()
+endforeach()
+
+# A symmetric-heap call whose PEs pass different arguments (P23): PE 1 another
+# size, hints, count and size of the same product, alignment, realloc size or
+# block to free than the rest - each valid on its own PE - ends the job by name
+# in the call's check, every routine on one node and malloc and free on two;
+# its pass the job's end, named by whichever PE ends it first, as the
+# divergent splits'. And the calls the specification makes the same - realloc
+# of a null pointer and malloc, realloc to size 0 and free - pass it.
+add_executable(shmem_test_malloc-divergent test-malloc-divergent.c)
+target_link_libraries(shmem_test_malloc-divergent PRIVATE osoe)
+osoe_warnings(shmem_test_malloc-divergent)
+foreach(case_expect
+    "malloc|shmem_malloc|size (1000|1008)|0-0-0-0 0-0-1-1"
+    "hints|shmem_malloc_with_hints|size 1000 and hints [0-9]+|0-0-0-0"
+    "calloc|shmem_calloc|count (2 and size 500|4 and size 250)|0-0-0-0"
+    "align|shmem_align|alignment (16|64) and size 1000|0-0-0-0"
+    "realloc|shmem_realloc|the block at offset [0-9]+ of the symmetric heap and size (2000|3000)|0-0-0-0"
+    "free|shmem_free|the block at offset [0-9]+ of the symmetric heap|0-0-0-0 0-0-1-1")
+  string(REGEX MATCH "^([^|]*)[|]([^|]*)[|](.*)[|]([^|]*)$" matched "${case_expect}")
+  set(mode ${CMAKE_MATCH_1})
+  set(routine ${CMAKE_MATCH_2})
+  set(passed ${CMAKE_MATCH_3})
+  string(REPLACE " " ";" labels "${CMAKE_MATCH_4}")
+  foreach(label IN LISTS labels)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+      continue()
+    endif()
+    string(REPLACE "-" "," map "${label}")
+    add_test(NAME shmem.malloc.divergent.${mode}.${label}
+      COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+              $<TARGET_FILE:shmem_test_malloc-divergent> ${mode})
+    set_tests_properties(shmem.malloc.divergent.${mode}.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "osoe: PE [0-3]: ${routine}: the PEs called it with different arguments, which spec .*same on every PE. this PE passed ${passed}"
+      FAIL_REGULAR_EXPRESSION "CHECK[(];every check passed")
+    if(label STREQUAL "0-0-1-1")
+      osoe_internode_label(shmem.malloc.divergent.${mode}.${label})
+    endif()
+  endforeach()
+endforeach()
+foreach(label 0-0-0-0 0-0-1-1)
+  if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+    continue()
+  endif()
+  string(REPLACE "-" "," map "${label}")
+  add_test(NAME shmem.malloc.equivalent.${label}
+    COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 --
+            $<TARGET_FILE:shmem_test_malloc-divergent> equivalent)
+  set_tests_properties(shmem.malloc.equivalent.${label} PROPERTIES LABELS "tier2" TIMEOUT 90
+    PASS_REGULAR_EXPRESSION "every check passed")
+  if(label STREQUAL "0-0-1-1")
+    osoe_internode_label(shmem.malloc.equivalent.${label})
+  endif()
+endforeach()
+
+# Collectives the PEs of one node call differently (P24), under
+# OSOE_CHECK_COLLECTIVES=1: PE 1 broadcasts where the rest reduce (kind),
+# fcollects two longs where they fcollect one (gather), broadcasts from another
+# root, reduces half the elements (count), or enters a barrier where they reduce
+# (sync) or alltoall (alltoall, met only at the alltoall's closing sync, where
+# whichever PE arrives last compares) - each named by the node-mate that meets
+# every member's call, before any result is given out, on one node and on two,
+# where PE 1 is a non-lead of node 0 whose difference no lead's check sees. An
+# alltoall is named after its puts. Without the setting, the
+# default, the first returns as before (off); a node-mate without it is named
+# by the PE that compares (unsaid). And the collectives' own programs, run with
+# the check on, find nothing to name.
+add_executable(shmem_test_collective-divergence test-collective-divergence.c)
+target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
+osoe_warnings(shmem_test_collective-divergence)
+set(osoe_call_check_named "the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]")
+foreach(kind kind gather root count sync alltoall)
+  set(environment OSOE_CHECK_COLLECTIVES=1)
+  if(NOT kind STREQUAL "kind")
+    list(APPEND environment OSOE_TEST_DIVERGE_KIND=${kind})
+  endif()
+  foreach(label 0-0-0-0 0-0-1-1)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"))
+      continue()
+    endif()
+    string(REPLACE "-" "," map "${label}")
+    add_test(NAME shmem.collective-check.${kind}.${label}
+      COMMAND ${CMAKE_COMMAND} -E env ${environment}
+              $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+              $<TARGET_FILE:shmem_test_collective-divergence>)
+    set_tests_properties(shmem.collective-check.${kind}.${label} PROPERTIES LABELS "tier2"
+      TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_call_check_named}"
+      FAIL_REGULAR_EXPRESSION "returned from its collective")
+    if(label STREQUAL "0-0-1-1")
+      osoe_internode_label(shmem.collective-check.${kind}.${label})
+    endif()
+  endforeach()
+endforeach()
+add_test(NAME shmem.collective-check.off.0-0-0-0
+  COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+          $<TARGET_FILE:shmem_test_collective-divergence>)
+set_tests_properties(shmem.collective-check.off.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "returned from its collective, which it must not"
+  FAIL_REGULAR_EXPRESSION "OSOE_CHECK_COLLECTIVES")
+add_test(NAME shmem.collective-check.unsaid.0-0-0-0
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_COLLECTIVES=1
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_CHECK_COLLECTIVES=0 --
+          $<TARGET_FILE:shmem_test_collective-divergence>)
+set_tests_properties(shmem.collective-check.unsaid.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 60
+  PASS_REGULAR_EXPRESSION "PE 1, of this node, said no call for .*'s collective [0-9]+ where this PE checks the node's calls [(]OSOE_CHECK_COLLECTIVES[)]")
+foreach(program reduce broadcast collect alltoall scan team)
+  foreach(label 0-0-0-0 0-0-1-1)
+    # test-team.c holds every PE on one node (SHMEM_TEAM_SHARED is the world)
+    if(label STREQUAL "0-0-1-1" AND (NOT OSOE_INTERNODE OR CMAKE_C_FLAGS MATCHES "sanitize=thread"
+                                     OR program STREQUAL "team"))
+      continue()
+    endif()
+    string(REPLACE "-" "," map "${label}")
+    add_test(NAME shmem.collective-check.clean.${program}.${label}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_COLLECTIVES=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m ${map} -t 60 -- $<TARGET_FILE:shmem_test_${program}>)
+    set_tests_properties(shmem.collective-check.clean.${program}.${label} PROPERTIES
+      LABELS "tier2" TIMEOUT 90 FAIL_REGULAR_EXPRESSION "OSOE_CHECK_COLLECTIVES")
+    if(label STREQUAL "0-0-1-1")
+      osoe_internode_label(shmem.collective-check.clean.${program}.${label})
     endif()
   endforeach()
 endforeach()
@@ -5589,7 +5755,8 @@ endif()
 # registers none of them.
 foreach(test shmem.circulant.70 shmem.circulant.64 shmem.circulant.33
              shmem.shape.chosen.pi.64 shmem.shape.chosen.loopback.64
-             shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes)
+             shmem.reply-pool.overflow shmem.global-exit.32-nodes shmem.deadlock.waits.32-nodes
+             shmem.zero-copy-refusals.64-nodes)
   if(TEST ${test})
     set_tests_properties(${test} PROPERTIES RUN_SERIAL TRUE)
   endif()

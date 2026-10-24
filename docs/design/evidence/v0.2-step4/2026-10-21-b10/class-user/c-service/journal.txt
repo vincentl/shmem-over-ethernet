@@ -1,0 +1,40 @@
+Oct 21 01:24:59.043805 lima-osoe systemd[1]: Stopping user@1000.service - User Manager for UID 1000...
+Oct 21 01:24:59.082159 lima-osoe systemd-logind[2888395]: Removed session 25.
+Oct 21 01:24:59.083007 lima-osoe systemd[1]: user@1000.service: Deactivated successfully.
+Oct 21 01:24:59.083286 lima-osoe systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+Oct 21 01:24:59.086662 lima-osoe systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:24:59.122014 lima-osoe systemd[1]: user-runtime-dir@1000.service: Deactivated successfully.
+Oct 21 01:24:59.122137 lima-osoe systemd[1]: Stopped user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:24:59.122946 lima-osoe systemd[1]: Removed slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:24:59.577911 lima-osoe systemd[1]: Stopping systemd-logind.service - User Login Management...
+Oct 21 01:24:59.611673 lima-osoe systemd[1]: systemd-logind.service: Deactivated successfully.
+Oct 21 01:24:59.612181 lima-osoe systemd[1]: Stopped systemd-logind.service - User Login Management.
+Oct 21 01:24:59.642813 lima-osoe systemd[1]: Starting systemd-logind.service - User Login Management...
+Oct 21 01:24:59.669909 lima-osoe systemd-logind[2919099]: Watching system buttons on /dev/input/event0 (Power Button)
+Oct 21 01:24:59.670060 lima-osoe systemd-logind[2919099]: New seat seat0.
+Oct 21 01:24:59.673284 lima-osoe systemd-logind[2919099]: New session 4 of user vincent.
+Oct 21 01:24:59.673523 lima-osoe systemd[1]: Started systemd-logind.service - User Login Management.
+Oct 21 01:24:59.675234 lima-osoe systemd[1]: Starting user@501.service - User Manager for UID 501...
+Oct 21 01:24:59.698968 lima-osoe systemd-logind[2919099]: New session 26 of user vincent.
+Oct 21 01:24:59.711467 lima-osoe systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:24:59.712524 lima-osoe systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:24:59.713177 lima-osoe systemd-logind[2919099]: New session c1 of user osoe-b10.
+Oct 21 01:24:59.718288 lima-osoe systemd[1]: Finished user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:24:59.719317 lima-osoe systemd[1]: Starting user@1000.service - User Manager for UID 1000...
+Oct 21 01:24:59.723462 lima-osoe systemd-logind[2919099]: New session 27 of user osoe-b10.
+Oct 21 01:24:59.741896 lima-osoe systemd[1]: Started user@501.service - User Manager for UID 501.
+Oct 21 01:24:59.786637 lima-osoe systemd[1]: Started user@1000.service - User Manager for UID 1000.
+Oct 21 01:24:59.787844 lima-osoe systemd[1]: Started session-c1.scope - Session c1 of User osoe-b10.
+Oct 21 01:25:01.804493 lima-osoe systemd[1]: session-c1.scope: Deactivated successfully.
+Oct 21 01:25:01.808782 lima-osoe systemd-logind[2919099]: Session c1 logged out. Waiting for processes to exit.
+Oct 21 01:25:01.810162 lima-osoe systemd-logind[2919099]: Removed session c1.
+Oct 21 01:25:01.820088 lima-osoe systemd[1]: Started b10-job-c-service.service - [systemd-run] /tmp/b10-out/job.sh /tmp/b10-out/user-class/c-service 25 40.
+Oct 21 01:25:11.821290 lima-osoe systemd[1]: Stopping user@1000.service - User Manager for UID 1000...
+Oct 21 01:25:11.886639 lima-osoe systemd-logind[2919099]: Removed session 27.
+Oct 21 01:25:11.887695 lima-osoe systemd[1]: user@1000.service: Deactivated successfully.
+Oct 21 01:25:11.888051 lima-osoe systemd[1]: Stopped user@1000.service - User Manager for UID 1000.
+Oct 21 01:25:11.890162 lima-osoe systemd[1]: Stopping user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
+Oct 21 01:25:11.923934 lima-osoe systemd[1]: user-runtime-dir@1000.service: Deactivated successfully.
+Oct 21 01:25:11.924141 lima-osoe systemd[1]: Stopped user-runtime-dir@1000.service - User Runtime Directory /run/user/1000.
+Oct 21 01:25:11.925446 lima-osoe systemd[1]: Removed slice user-1000.slice - User Slice of UID 1000.
+Oct 21 01:25:26.848898 lima-osoe systemd[1]: b10-job-c-service.service: Deactivated successfully.
