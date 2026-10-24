@@ -1,0 +1,5 @@
+== singleton: processes the program's tree created (clone without CLONE_THREAD, fork, vfork)
+== singleton: threads created (clone with CLONE_THREAD)
+3
+== singleton: execve
+01:35:24.179201 execve("<out>/mpi-and-shmem", ["<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xffffe3ae4840 /* 29 vars */) = 0

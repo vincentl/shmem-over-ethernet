@@ -1,0 +1,36 @@
+PE 2: MPI started: rank 2 of 4
+PE 1: MPI started: rank 1 of 4
+PE 0: MPI started: rank 0 of 4
+PE 3: MPI started: rank 3 of 4
+osoe: node 1 connected its mesh in 225 us: 2 wires answered and 4 called, in 2 slots of 100 us, 8 calls in flight at most
+osoe: node 1 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: node 2 connected its mesh in 231 us: 4 wires answered and 2 called, in 2 slots of 100 us, 8 calls in flight at most
+osoe: node 2 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: node 3 connected its mesh in 385 us: 4 wires answered and 2 called, in 2 slots of 100 us, 8 calls in flight at most
+osoe: node 0 connected its mesh in 400 us: 2 wires answered and 4 called, in 2 slots of 100 us, 8 calls in flight at most
+osoe: node 3 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: node 0 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: PE 0 of 4 (local 0 of 1): segment /dev/shm/osoe.2939172.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 4; link measured: a hop of 16146 ns, a message cost of 3377 ns, 12406464504 bytes a second (7541 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 3 connections to 1588027
+osoe: node 1 limits the unsent bytes of each of its 3 connections to 1588027
+osoe: node 2 limits the unsent bytes of each of its 3 connections to 1588027
+osoe: PE 2 of 4 (local 0 of 1): segment /dev/shm/osoe.2939172.0.2.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 4; link measured: a hop of 16146 ns, a message cost of 3377 ns, 12406464504 bytes a second (7644 us of this start)
+osoe: PE 1 of 4 (local 0 of 1): segment /dev/shm/osoe.2939172.0.1.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 4; link measured: a hop of 16146 ns, a message cost of 3377 ns, 12406464504 bytes a second (7600 us of this start)
+osoe: PE 3 of 4 (local 0 of 1): segment /dev/shm/osoe.2939172.0.3.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 4; link measured: a hop of 16146 ns, a message cost of 3377 ns, 12406464504 bytes a second (7589 us of this start)
+osoe: node 3 limits the unsent bytes of each of its 3 connections to 1588027
+PE 2: shmem started: PE 2 of 4
+PE 1: shmem started: PE 1 of 4
+PE 3: shmem started: PE 3 of 4
+PE 0: shmem started: PE 0 of 4
+PE 0: check: 20 rounds, ok
+PE 2: check: 20 rounds, ok
+PE 1: check: 20 rounds, ok
+PE 3: check: 20 rounds, ok
+PE 3: shmem finalized
+PE 0: shmem finalized
+PE 1: shmem finalized
+PE 2: shmem finalized
+PE 1: MPI finalized
+PE 0: MPI finalized
+PE 2: MPI finalized
+PE 3: MPI finalized

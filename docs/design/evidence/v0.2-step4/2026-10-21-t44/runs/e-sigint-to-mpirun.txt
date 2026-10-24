@@ -1,0 +1,48 @@
+PE 0: MPI started: rank 0 of 3
+PE 2: MPI started: rank 2 of 3
+PE 1: MPI started: rank 1 of 3
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2945785.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 1: shmem started: PE 1 of 3
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2945785.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2945785.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 2: shmem started: PE 2 of 3
+PE 0: shmem started: PE 0 of 3
+PE 2: thread 2945793 mpi-and-shmem R
+PE 2: thread 2945802 fuse S
+PE 2: thread 2945803 mpi-and-shmem S
+PE 1: thread 2945790 mpi-and-shmem R
+PE 1: thread 2945798 fuse S
+PE 1: thread 2945800 mpi-and-shmem S
+PE 1: thread 2945805 osoe-agent S
+PE 2: thread 2945804 osoe-agent S
+PE 2: 4 threads
+PE 2: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: thread 2945789 mpi-and-shmem R
+PE 0: thread 2945799 fuse S
+PE 0: thread 2945801 mpi-and-shmem S
+PE 0: thread 2945806 osoe-agent S
+PE 0: 4 threads
+PE 2: signal SIGQUIT is ignored
+PE 2: signal SIGILL is handled in libucs.so.0 by ?
+PE 2: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 2: signal SIGBUS is handled in libucs.so.0 by ?
+PE 2: signal SIGFPE is handled in libucs.so.0 by ?
+PE 2: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 2: 7 signals not at their default
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGQUIT is ignored
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 7 signals not at their default
+PE 1: 4 threads
+PE 1: signal SIGHUP is handled in libucs.so.0 by ?
+PE 1: signal SIGQUIT is ignored
+PE 1: signal SIGILL is handled in libucs.so.0 by ?
+PE 1: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 1: signal SIGBUS is handled in libucs.so.0 by ?
+PE 1: signal SIGFPE is handled in libucs.so.0 by ?
+PE 1: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 1: 7 signals not at their default

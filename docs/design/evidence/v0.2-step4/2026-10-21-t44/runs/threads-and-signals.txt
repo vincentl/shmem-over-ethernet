@@ -1,0 +1,145 @@
+== t0-shmem-built-without-mpi, PE 0
+PE 0: thread 2939906 shmem-without-m R
+PE 0: thread 2939909 osoe-agent S
+PE 0: 2 threads
+PE 0: 0 signals not at their default
+PE 0: thread 2939906 shmem-without-m R
+PE 0: thread 2939909 osoe-agent S
+PE 0: 2 threads
+== t1-shmem-only, PE 0
+PE 0: thread 2939927 mpi-and-shmem R
+PE 0: thread 2939929 fuse S
+PE 0: thread 2939932 osoe-agent S
+PE 0: 3 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 5 signals not at their default
+PE 0: thread 2939927 mpi-and-shmem R
+PE 0: thread 2939929 fuse S
+PE 0: thread 2939932 osoe-agent S
+PE 0: 3 threads
+== t2-mpi-only-mpirun, PE 0
+PE 0: thread 2939952 mpi-and-shmem R
+PE 0: thread 2939954 fuse S
+PE 0: thread 2939956 mpi-and-shmem S
+PE 0: 3 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2939952 mpi-and-shmem R
+PE 0: thread 2939954 fuse S
+PE 0: thread 2939956 mpi-and-shmem S
+PE 0: 3 threads
+== t3-mpi-then-shmem-mpirun, PE 0
+PE 0: thread 2939977 mpi-and-shmem R
+PE 0: thread 2939983 fuse S
+PE 0: thread 2939986 mpi-and-shmem S
+PE 0: thread 2939988 osoe-agent R
+PE 0: 4 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2939977 mpi-and-shmem R
+PE 0: thread 2939983 fuse S
+PE 0: thread 2939986 mpi-and-shmem S
+PE 0: thread 2939988 osoe-agent S
+PE 0: 4 threads
+== t4-shmem-then-mpi-mpirun, PE 0
+PE 0: thread 2940008 mpi-and-shmem R
+PE 0: thread 2940014 fuse S
+PE 0: thread 2940017 osoe-agent S
+PE 0: thread 2940019 mpi-and-shmem S
+PE 0: 4 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2940008 mpi-and-shmem R
+PE 0: thread 2940014 fuse S
+PE 0: thread 2940017 osoe-agent S
+PE 0: thread 2940019 mpi-and-shmem S
+PE 0: 4 threads
+== t5-singletons, PE 0
+PE 0: thread 2940042 mpi-and-shmem R
+PE 0: thread 2940044 fuse S
+PE 0: thread 2940046 mpi-and-shmem S
+PE 0: thread 2940049 osoe-agent S
+PE 0: 4 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2940042 mpi-and-shmem R
+PE 0: thread 2940044 fuse S
+PE 0: thread 2940046 mpi-and-shmem S
+PE 0: thread 2940049 osoe-agent S
+PE 0: 4 threads
+== t6-mpi-finalized-early, PE 0
+PE 0: thread 2940084 mpi-and-shmem R
+PE 0: thread 2940091 fuse S
+PE 0: thread 2940095 osoe-agent S
+PE 0: 3 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2940084 mpi-and-shmem R
+PE 0: thread 2940091 fuse S
+PE 0: thread 2940095 osoe-agent S
+PE 0: 3 threads
+== t7-thread-multiple, PE 0
+PE 0: thread 2940115 mpi-and-shmem R
+PE 0: thread 2940122 fuse S
+PE 0: thread 2940123 mpi-and-shmem S
+PE 0: thread 2940126 osoe-agent S
+PE 0: 4 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2940115 mpi-and-shmem R
+PE 0: thread 2940122 fuse S
+PE 0: thread 2940123 mpi-and-shmem S
+PE 0: thread 2940126 osoe-agent S
+PE 0: 4 threads
+== t8-two-helpers, PE 0
+PE 0: thread 2940151 mpi-and-shmem R
+PE 0: thread 2940158 fuse S
+PE 0: thread 2940159 mpi-and-shmem S
+PE 0: thread 2940162 osoe-agent S
+PE 0: 4 threads
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 0: thread 2940151 mpi-and-shmem R
+PE 0: thread 2940158 fuse S
+PE 0: thread 2940159 mpi-and-shmem S
+PE 0: thread 2940162 osoe-agent S
+PE 0: 4 threads

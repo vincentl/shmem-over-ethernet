@@ -1,0 +1,66 @@
+osoe: node 0 connected its mesh in 65 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 45 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: node 0 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.2940326.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 16395 ns, a message cost of 0 ns, 9030867221 bytes a second (1520 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.2940326.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 16395 ns, a message cost of 0 ns, 9030867221 bytes a second (13186 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 1155951
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 1155951
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.2940326.0.1.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 16395 ns, a message cost of 0 ns, 9030867221 bytes a second (13241 us of this start)
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.2940326.0.1.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 16395 ns, a message cost of 0 ns, 9030867221 bytes a second (919 us of this start)
+PE 1: shmem started: PE 1 of 4
+PE 0: shmem started: PE 0 of 4
+PE 2: shmem started: PE 2 of 4
+PE 3: shmem started: PE 3 of 4
+[lima-osoe][[20304,1],2][../../../../../../opal/mca/btl/tcp/btl_tcp_component.c:1038:mca_btl_tcp_component_create_listen] bind() failed: no port available in the range [17000..17004]
+--------------------------------------------------------------------------
+At least one pair of MPI processes are unable to reach each other for
+MPI communications.  This means that no Open MPI device has indicated
+that it can be used to communicate between these processes.  This is
+an error; Open MPI requires that all MPI processes be able to reach
+each other.  This error can sometimes be the result of forgetting to
+specify the "self" BTL.
+
+  Process 1 ([[20304,1],2]) is on host: lima-osoe
+  Process 2 ([[20304,1],0]) is on host: lima-osoe
+  BTLs attempted: self
+
+Your MPI job is now going to abort; sorry.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+MPI_INIT has failed because at least one MPI process is unreachable
+from another.  This *usually* means that an underlying communication
+plugin -- such as a BTL or an MTL -- has either not loaded or not
+allowed itself to be used.  Your MPI job will now abort.
+
+You may wish to try to narrow down the problem;
+
+ * Check the output of ompi_info to see which BTL/MTL plugins are
+   available.
+ * Run your application with MPI_THREAD_SINGLE.
+ * Set the MCA parameter btl_base_verbose to 100 (or mtl_base_verbose,
+   if using MTL-based communications) to see exactly which
+   communication plugins were considered and/or discarded.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+It looks like MPI_INIT failed for some reason; your parallel process is
+likely to abort.  There are many reasons that a parallel process can
+fail during MPI_INIT; some of which are due to configuration or environment
+problems.  This failure appears to be an internal failure; here's some
+additional information (which may only be relevant to an Open MPI
+developer):
+
+  ompi_mpi_init: ompi_mpi_instance_init failed
+  --> Returned "Unreachable" (-12) instead of "Success" (0)
+--------------------------------------------------------------------------
+[lima-osoe:00000] *** An error occurred in MPI_Init
+[lima-osoe:00000] *** reported by process [1330642945,2]
+[lima-osoe:00000] *** on a NULL communicator
+[lima-osoe:00000] *** Unknown error
+[lima-osoe:00000] *** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+[lima-osoe:00000] ***    and MPI will try to terminate your MPI job as well)
+--------------------------------------------------------------------------
+prterun has exited due to process rank 2 with PID 0 on node lima-osoe calling
+"abort". This may have caused other processes in the application to be
+terminated by signals sent by prterun (as reported here).
+--------------------------------------------------------------------------

@@ -1,0 +1,7 @@
+# 2026-10-21T05:35:05Z, load 0.51 2.66 5.60
+n1-listening-mpi-shmem: exit 0; sockets in n1-listening-mpi-shmem-sockets.txt
+  sockets of the program: 16
+n1-listening-shmem-mpi: exit 0; sockets in n1-listening-shmem-mpi-sockets.txt
+  sockets of the program: 16
+n2-same-ports-mpi-shmem                exit   1    0.1 s  0 of 4 PEs ok
+n2-same-ports-shmem-mpi                exit  14    0.1 s  0 of 4 PEs ok

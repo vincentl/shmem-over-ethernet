@@ -1,0 +1,4 @@
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes
+open-mpi-bootstrap: 5 ranks do not divide into 2 logical nodes

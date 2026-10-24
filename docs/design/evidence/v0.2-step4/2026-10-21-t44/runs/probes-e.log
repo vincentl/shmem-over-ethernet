@@ -1,0 +1,20 @@
+# 2026-10-21T05:40:07Z, load 0.43 1.35 4.22
+e-crash-others-in-shmem-mpirun         exit 139    2.1 s  0 of 3 PEs ok
+e-crash-others-in-mpi-mpirun           exit 139    2.3 s  0 of 3 PEs ok
+e-mpi-abort-others-in-shmem-mpirun     exit   3    2.0 s  0 of 3 PEs ok
+e-mpi-abort-others-in-mpi-mpirun       exit   3    2.0 s  0 of 3 PEs ok
+e-global-exit-others-in-shmem-mpirun   exit   1    2.3 s  0 of 3 PEs ok
+e-global-exit-others-in-mpi-mpirun     exit   1    2.3 s  0 of 3 PEs ok
+e-plain-exit-others-in-shmem-mpirun    exit   1    2.0 s  0 of 3 PEs ok
+e-plain-exit-others-in-mpi-mpirun      exit   1    2.3 s  0 of 3 PEs ok
+e-crash-others-in-shmem-singletons     exit 139    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.56340000.0 sm_segment.lima-osoe.501.87430000.0 sm_segment.lima-osoe.501.baa80000.0 
+e-mpi-abort-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.11fb0000.0 sm_segment.lima-osoe.501.5e4c0000.0 sm_segment.lima-osoe.501.c9830000.0 
+e-global-exit-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.7b770000.0 sm_segment.lima-osoe.501.950000.0 sm_segment.lima-osoe.501.a4990000.0 
+e-plain-exit-others-in-shmem-singletons exit   1    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.9660000.0 sm_segment.lima-osoe.501.db870000.0 sm_segment.lima-osoe.501.eeec0000.0 
+e-crash-others-in-shmem-srun           exit 139    2.2 s  0 of 3 PEs ok
+e-mpi-abort-others-in-shmem-srun       exit   3    2.2 s  0 of 3 PEs ok
+e-global-exit-others-in-shmem-srun     exit   3    2.2 s  0 of 3 PEs ok
+e-plain-exit-others-in-shmem-srun      exit   1    2.2 s  0 of 3 PEs ok
+e-sigterm-to-mpirun                    exit   1    6.2 s  0 of 3 PEs ok
+e-sigint-to-mpirun                     exit   1    6.2 s  0 of 3 PEs ok
+e-sigterm-to-osoe-launch               exit 143    6.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4e970000.0 sm_segment.lima-osoe.501.ba0d0000.0 sm_segment.lima-osoe.501.f1f70000.0 

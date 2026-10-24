@@ -1,0 +1,34 @@
+osoe: node 0 connected its mesh in 68 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 29 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: node 1 sets no TCP keepalive and makes no silent-peer check: every node has a loopback address (OSOE_KEEPALIVE sets them)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.2938184.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 19000 ns, a message cost of 0 ns, 11538404355 bytes a second (102 us of this start)
+PE 1: shmem started: PE 1 of 4
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.2938184.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 19000 ns, a message cost of 0 ns, 11538404355 bytes a second (9378 us of this start)
+PE 0: shmem started: PE 0 of 4
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 1476915
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.2938184.0.1.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 19000 ns, a message cost of 0 ns, 11538404355 bytes a second (9383 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 1476915
+PE 2: shmem started: PE 2 of 4
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.2938184.0.1.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 19000 ns, a message cost of 0 ns, 11538404355 bytes a second (1097 us of this start)
+PE 3: shmem started: PE 3 of 4
+PE 1: MPI started: rank 0 of 1
+PE 1: MPI is a world of 1 and shmem a job of 4: not one job, ranks not compared
+PE 3: MPI started: rank 0 of 1
+PE 3: MPI is a world of 1 and shmem a job of 4: not one job, ranks not compared
+PE 2: MPI started: rank 0 of 1
+PE 2: MPI is a world of 1 and shmem a job of 4: not one job, ranks not compared
+PE 0: MPI started: rank 0 of 1
+PE 0: MPI is a world of 1 and shmem a job of 4: not one job, ranks not compared
+PE 0: check: 20 rounds, ok
+PE 1: check: 20 rounds, ok
+PE 2: check: 20 rounds, ok
+PE 3: check: 20 rounds, ok
+PE 1: MPI finalized
+PE 0: MPI finalized
+PE 2: MPI finalized
+PE 3: MPI finalized
+PE 3: shmem finalized
+PE 0: shmem finalized
+PE 2: shmem finalized
+PE 1: shmem finalized

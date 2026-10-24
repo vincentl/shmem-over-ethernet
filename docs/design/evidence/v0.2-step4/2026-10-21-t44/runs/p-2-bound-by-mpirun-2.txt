@@ -1,0 +1,10 @@
+PE 1: MPI started: rank 1 of 2
+PE 0: MPI started: rank 0 of 2
+PE 0: shmem started: PE 0 of 2
+PE 1: shmem started: PE 1 of 2
+PE 0: check: 300 rounds, ok
+PE 1: check: 300 rounds, ok
+PE 1: shmem finalized
+PE 0: shmem finalized
+PE 1: MPI finalized
+PE 0: MPI finalized

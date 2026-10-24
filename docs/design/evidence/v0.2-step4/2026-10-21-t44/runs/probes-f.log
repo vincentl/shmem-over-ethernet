@@ -1,0 +1,8 @@
+# 2026-10-21T05:35:22Z, load 0.39 2.53 5.51
+f1-fork-mpi-then-shmem                 exit   0    0.1 s  0 of 2 PEs ok
+f2-fork-shmem-then-mpi                 exit   0    0.1 s  0 of 2 PEs ok
+f3-fork-singletons                     exit   0    0.0 s  0 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.88d90000.0 sm_segment.lima-osoe.501.ab1b0000.0 
+f4-strace-mpirun                       exit   0    1.1 s  0 of 1 PEs ok
+f5-strace-singleton                    exit   0    1.1 s  0 of 1 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.63130000.0 
+f6-threads-made                        exit   1   10.1 s  0 of 1 PEs ok
+f7-thread-stacks: attached to 2940585, in f7-thread-stacks.txt

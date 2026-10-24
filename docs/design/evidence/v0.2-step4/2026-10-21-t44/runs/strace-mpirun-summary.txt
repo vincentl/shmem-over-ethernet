@@ -1,0 +1,10 @@
+== mpirun: processes the program's tree created (clone without CLONE_THREAD, fork, vfork)
+      1 01:35:22.988735 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0xffffa65110f0) = 2940493
+      1 01:35:22.985814 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0xffffa65110f0) = 2940492
+== mpirun: threads created (clone with CLONE_THREAD)
+3
+== mpirun: execve
+01:35:22.984561 execve("<repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/open-mpi-bootstrap.sh", ["<repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44"..., "<out>/mpi-and-shmem", "hold", "mpi,shme
+01:35:22.990334 execve("<out>/mpi-and-shmem", ["<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xaaaac8da7e08 /* 67 vars */) = 0
+01:35:22.986128 execve("/usr/bin/awk", ["awk", "{ print $22 }", "/proc/2940488/stat"], 0xaaaac8da6f78 /* 57 vars */) = 0
+01:35:22.989013 execve("/usr/bin/hostname", ["hostname"], 0xaaaac8da7d78 /* 57 vars */) = 0

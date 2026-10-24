@@ -1,0 +1,66 @@
+# osoe-stat 2941282
+/osoe.2941282.0.0.0  layout 41  3 local PEs of 3  (job 2941282 step 0 node 0 session 0)
+  4345856 bytes, 251 metrics (checksum 0x543577d0), 51 blocks of 512 bytes
+  collective shape link; link not set
+
+ PE  rank      pid phase       epoch   sweeps  blocked in
+  0     0  2941286 mapped          0        0  -
+  1     1  2941287 mapped          0        0  -
+  2     2  2941290 mapped          0        0  -
+
+counter                                           PE0          PE1          PE2         total
+transport.put.calls                                 0            0            0             0
+transport.put.bytes                                 0            0            0             0
+transport.get.calls                                 0            0            0             0
+transport.get.bytes                                 0            0            0             0
+transport.rmw.calls                                 0            0            0             0
+transport.rmw.fetching                              0            0            0             0
+transport.fence.calls                               0            0            0             0
+transport.wait.calls                                0            0            0             0
+transport.wait.nothing_outstanding                  0            0            0             0
+transport.wait.ns                                   0            0            0             0
+transport.wait.dirty_peers                          0            0            0             0
+transport.notify.calls                              0            0            0             0
+transport.notify.wakes                              0            0            0             0
+transport.watch.calls                               0            0            0             0
+transport.watch.blocked                             0            0            0             0
+transport.watch.blocked_ns                          0            0            0             0
+transport.watch.wakes                               0            0            0             0
+transport.watch.spurious                            0            0            0             0
+transport.watch.sweeps                              0            0            0             0
+transport.watch.saturated                           0            0            0             0
+transport.watch.late_wake                           0            0            0             0
+transport.set_range.calls                           0            0            0             0
+shmem.barrier.calls                                 0            0            0             0
+shmem.barrier.ns                                    0            0            0             0
+shmem.malloc.calls                                  0            0            0             0
+shmem.free.calls                                    0            0            0             0
+shmem.realloc.calls                                 0            0            0             0
+shmem.fence.calls                                   0            0            0             0
+shmem.quiet.calls                                   0            0            0             0
+shmem.pe_quiet.calls                                0            0            0             0
+shmem.wait_until.calls                              0            0            0             0
+shmem.test.calls                                    0            0            0             0
+shmem.signal.update.calls                           0            0            0             0
+shmem.signal.fetch.calls                            0            0            0             0
+shmem.signal.wait.calls                             0            0            0             0
+shmem.team_split.calls                              0            0            0             0
+shmem.team_split.busy_rounds                        0            0            0             0
+shmem.team_split.lost_rounds                        0            0            0             0
+agent.loops                                        47           48           47           142
+agent.wakeups                                       0            0            0             0
+agent.last_wake_ns                                  0            0            0             0
+am.reserve_stalls                                   0            0            0             0
+am.wakes_deferred                                   0            0            0             0
+am.wakes_sent                                       0            0            0             0
+am.wakes_skipped                                    0            0            0             0
+am.gets_nonblocking                                 0            0            0             0
+am.gets_completed                                   0            0            0             0
+am.landing_full                                     0            0            0             0
+am.issue_retries                                    0            0            0             0
+am.context_locks                                    0            0            0             0
+invariant.missed_wake                               0            0            0             0
+invariant.watch_reentered                           0            0            0             0
+thread.claimed                                      1            1            1             1
+thread.tid                                    2941303      2941302      2941301       2941303
+# exit 0

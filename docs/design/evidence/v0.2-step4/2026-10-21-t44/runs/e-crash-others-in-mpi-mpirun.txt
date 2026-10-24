@@ -1,0 +1,31 @@
+PE 0: MPI started: rank 0 of 3
+PE 2: MPI started: rank 2 of 3
+PE 1: MPI started: rank 1 of 3
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2945013.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2945013.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2945013.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 1: shmem started: PE 1 of 3
+PE 2: shmem started: PE 2 of 3
+PE 0: shmem started: PE 0 of 3
+PE 0: waiting
+PE 2: waiting
+[lima-osoe:2945017:0:2945017] Caught signal 11 (Segmentation fault: tkill(2) or tgkill(2) at address 0x1f5002ceff9)
+==== backtrace (tid:2945017) ====
+ 0  /lib/aarch64-linux-gnu/libucs.so.0(ucs_handle_error+0x2b4) [0xffffba1a0424]
+ 1  /lib/aarch64-linux-gnu/libucs.so.0(+0x305a8) [0xffffba1a05a8]
+ 2  /lib/aarch64-linux-gnu/libucs.so.0(+0x306d0) [0xffffba1a06d0]
+ 3  linux-vdso.so.1(__kernel_rt_sigreturn+0) [0xffffbabc0808]
+ 4  /lib/aarch64-linux-gnu/libc.so.6(+0x88020) [0xffffba5c8020]
+ 5  /lib/aarch64-linux-gnu/libc.so.6(gsignal+0x20) [0xffffba576880]
+ 6  <out>/mpi-and-shmem() [0x402370]
+ 7  /lib/aarch64-linux-gnu/libc.so.6(+0x2225c) [0xffffba56225c]
+ 8  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0x9c) [0xffffba56233c]
+ 9  <out>/mpi-and-shmem() [0x402670]
+=================================
+PE 1: raising SIGSEGV
+osoe: PE 0: local PE 1 (rank 1, pid 2945017) has ended without finalizing; ending the job (§3.15); this PE was not waiting in the library
+osoe: PE 2: ending: the job is aborting on behalf of PE 1; this PE was not waiting in the library
+--------------------------------------------------------------------------
+prterun noticed that process rank 1 with PID 2945017 on node lima-osoe exited on
+signal 11 (Segmentation fault).
+--------------------------------------------------------------------------

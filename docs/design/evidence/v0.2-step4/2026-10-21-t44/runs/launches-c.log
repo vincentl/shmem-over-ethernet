@@ -1,0 +1,10 @@
+# 2026-10-21T05:34:32Z, load 0.74 2.95 5.81
+c1-mpi-then-shmem-2-nodes              exit   0    0.3 s  4 of 4 PEs ok
+c2-shmem-then-mpi-2-nodes              exit   0    0.3 s  4 of 4 PEs ok
+c3-mpi-then-shmem-4-nodes              exit   0    0.4 s  4 of 4 PEs ok
+c4-8-pes-2-nodes                       exit   0    0.3 s  8 of 8 PEs ok
+c5-tcp-btl-2-nodes                     exit   0    0.5 s  4 of 4 PEs ok
+c6-two-helpers-2-nodes                 exit   0    0.4 s  4 of 4 PEs ok
+c9-shmem-started-three-times-2-nodes   exit   0    0.4 s  4 of 4 PEs ok
+c8-16-pes-4-nodes                      exit   0    0.3 s  16 of 16 PEs ok
+c7-wrapper-refuses-5-on-2-nodes        exit   2    0.0 s  0 of 5 PEs ok
