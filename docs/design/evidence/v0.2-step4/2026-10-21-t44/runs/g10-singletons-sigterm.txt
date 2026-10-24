@@ -1,52 +1,52 @@
 PE 2: MPI started: rank 0 of 1
 PE 1: MPI started: rank 0 of 1
 PE 0: MPI started: rank 0 of 1
-osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2941241.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.19766.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 0: shmem started: PE 0 of 3
-osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2941241.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.19766.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.19766.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 2: shmem started: PE 2 of 3
 PE 1: shmem started: PE 1 of 3
-PE 0: thread 2941243 mpi-and-shmem R
-PE 0: thread 2941246 fuse S
-PE 0: thread 2941251 mpi-and-shmem S
-PE 1: thread 2941244 mpi-and-shmem R
-PE 0: thread 2941254 osoe-agent S
-PE 1: thread 2941248 fuse S
+PE 0: thread 19768 mpi-and-shmem R
+PE 1: thread 19769 mpi-and-shmem R
+PE 0: thread 19771 fuse S
+PE 2: thread 19770 mpi-and-shmem R
+PE 1: thread 19772 fuse S
+PE 0: thread 19774 mpi-and-shmem S
+PE 2: thread 19773 fuse S
+PE 1: thread 19775 mpi-and-shmem S
+PE 0: thread 19779 osoe-agent S
 PE 0: 4 threads
-PE 1: thread 2941249 mpi-and-shmem S
+PE 2: thread 19776 mpi-and-shmem S
+PE 1: thread 19777 osoe-agent S
+PE 1: 4 threads
+PE 2: thread 19778 osoe-agent S
 PE 0: signal SIGHUP is handled in libucs.so.0 by ?
 PE 0: signal SIGQUIT is ignored
-PE 1: thread 2941252 osoe-agent S
-PE 1: 4 threads
+PE 2: 4 threads
 PE 0: signal SIGILL is handled in libucs.so.0 by ?
 PE 1: signal SIGHUP is handled in libucs.so.0 by ?
 PE 1: signal SIGQUIT is ignored
+PE 2: signal SIGHUP is handled in libucs.so.0 by ?
+PE 2: signal SIGQUIT is ignored
 PE 1: signal SIGILL is handled in libucs.so.0 by ?
+PE 2: signal SIGILL is handled in libucs.so.0 by ?
 PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
 PE 0: signal SIGBUS is handled in libucs.so.0 by ?
 PE 0: signal SIGFPE is handled in libucs.so.0 by ?
 PE 1: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
 PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 2: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
 PE 1: signal SIGBUS is handled in libucs.so.0 by ?
 PE 0: 7 signals not at their default
 PE 1: signal SIGFPE is handled in libucs.so.0 by ?
-PE 1: signal SIGSEGV is handled in libucs.so.0 by ?
-PE 1: 7 signals not at their default
-osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2941241.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-PE 2: shmem started: PE 2 of 3
-PE 2: thread 2941245 mpi-and-shmem R
-PE 2: thread 2941247 fuse S
-PE 2: thread 2941250 mpi-and-shmem S
-PE 2: thread 2941253 osoe-agent S
-PE 2: 4 threads
-PE 2: signal SIGHUP is handled in libucs.so.0 by ?
-PE 2: signal SIGQUIT is ignored
-PE 2: signal SIGILL is handled in libucs.so.0 by ?
-PE 2: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
 PE 2: signal SIGBUS is handled in libucs.so.0 by ?
+PE 1: signal SIGSEGV is handled in libucs.so.0 by ?
 PE 2: signal SIGFPE is handled in libucs.so.0 by ?
+PE 1: 7 signals not at their default
 PE 2: signal SIGSEGV is handled in libucs.so.0 by ?
 PE 2: 7 signals not at their default
-osoe-launch: SIGTERM received; forwarded to 3 process(es) of job 2941241
+osoe-launch: SIGTERM received; forwarded to 3 process(es) of job 19766
+osoe-launch: rank 0 killed by signal 15
 osoe-launch: rank 2 killed by signal 15
 osoe-launch: rank 1 killed by signal 15
-osoe-launch: rank 0 killed by signal 15

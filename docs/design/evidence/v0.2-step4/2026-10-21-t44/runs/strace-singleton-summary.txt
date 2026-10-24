@@ -2,4 +2,4 @@
 == singleton: threads created (clone with CLONE_THREAD)
 3
 == singleton: execve
-01:35:24.179201 execve("<out>/mpi-and-shmem", ["<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xffffe3ae4840 /* 29 vars */) = 0
+08:31:31.222667 execve("<out>/mpi-and-shmem", ["<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xfffff38f8da0 /* 31 vars */) = 0

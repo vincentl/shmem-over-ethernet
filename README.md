@@ -1441,7 +1441,7 @@ specification or takes a choice the specification leaves open.
   gives the type-generic waits, a wrapper writes in parentheses,
   `(shmem_wait_until)`.
 - **MPI in the same program works, started by `srun` with Slurm's PMIx or by
-  `mpirun`.** Tried once, in the development VM (aarch64, Debian 13), with Open
+  `mpirun`.** Tried in the development VM (aarch64, Debian 13), with Open
   MPI 5.0.7 as the distribution packages it and Slurm 24.11.5's PMIx plugin:
   `MPI_Init` and `shmem_init` in either order and ended in either order,
   `MPI_Allreduce` and `MPI_Sendrecv` on the symmetric heap and on statics, an
@@ -1465,15 +1465,16 @@ specification or takes a choice the specification leaves open.
   above): the thread `MPI_Init` starts, until `MPI_Finalize`, and in Debian's
   build one that UCX's `libucs` starts as the program loads, in every program
   that links `libmpi`, MPI started or not (UCX's virtual file system). A
-  deadlock in osoe alone then waits for the launcher's limit, where the same
-  program built without Open MPI was ended in 4 s at `OSOE_DEADLOCK_SECONDS=3`;
-  `UCX_VFS_ENABLE=n` stops UCX's thread and gives the detector back before
-  `MPI_Init` and after `MPI_Finalize`. A deadlock across the libraries, a PE in
-  `MPI_Barrier` and the rest in `shmem_barrier_all`, is found by neither. Under
-  `mpirun`, `shmem_global_exit(status)` ends the job with status 1 and
-  `prterun`'s complaint of ranks that left without `MPI_Finalize`; under `srun`
-  and `osoe-launch` it ends it with `status`, and `MPI_Abort(status)` carries
-  its status under all three. An MPI singleton leaves a 16 MiB sparse
+  deadlock in osoe alone then hangs until the launcher's time limit, if it has
+  one, where the same program built without Open MPI was ended in 4 s at
+  `OSOE_DEADLOCK_SECONDS=3`; `UCX_VFS_ENABLE=n` stops UCX's thread and gives
+  the detector back before `MPI_Init` and after `MPI_Finalize`. A deadlock
+  across the libraries, a PE in `MPI_Barrier` and the rest in
+  `shmem_barrier_all`, is found by neither. Under `mpirun`,
+  `shmem_global_exit(status)` ends the job with status 1 and `prterun`'s
+  complaint of ranks that left without `MPI_Finalize`; under `srun` and
+  `osoe-launch` it ends it with `status`, and `MPI_Abort(status)` carries its
+  status under all three. An MPI singleton leaves a 16 MiB sparse
   `sm_segment.*` file in `/dev/shm`. The package that installs Open MPI also
   installs an `oshcc`, an `oshrun` and an OpenSHMEM `shmem.h` of its own, to be
   kept behind osoe's. The record is

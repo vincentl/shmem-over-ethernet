@@ -1,0 +1,3 @@
+08:31:30.044847 execve("/usr/bin/awk", ["awk", "{ print $22 }", "/proc/19007/stat"], 0xaaaaf2ed0fd8 /* 59 vars */) = 0
+08:31:30.048886 exit_group(0)           = ?
+08:31:30.048970 +++ exited with 0 +++

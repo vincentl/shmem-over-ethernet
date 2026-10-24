@@ -1,8 +1,8 @@
-# 2026-10-21T05:34:27Z, load 0.36 2.92 5.81
+# 2026-10-24T12:30:34Z, load 1.28 0.51 0.19
 a1-shmem-only                          exit   0    0.0 s  2 of 2 PEs ok
-a2-mpi-only                            exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.246b0000.0 sm_segment.lima-osoe.501.d0290000.0 
-a3-mpi-then-shmem                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.15360000.0 sm_segment.lima-osoe.501.e7a40000.0 
-a4-shmem-then-mpi                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.6d620000.0 sm_segment.lima-osoe.501.c66c0000.0 
-a5-mpi-then-shmem-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.47d50000.0 sm_segment.lima-osoe.501.bccf0000.0 sm_segment.lima-osoe.501.dd3f0000.0 sm_segment.lima-osoe.501.f2fe0000.0 
-a6-shmem-then-mpi-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.2f100000.0 sm_segment.lima-osoe.501.66f70000.0 sm_segment.lima-osoe.501.c1ac0000.0 sm_segment.lima-osoe.501.c2280000.0 
-a7-shmem-started-three-times           exit   0    0.2 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.af710000.0 sm_segment.lima-osoe.501.b1ad0000.0 
+a2-mpi-only                            exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.263d0000.0 sm_segment.lima-osoe.501.4d830000.0 
+a3-mpi-then-shmem                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.451c0000.0 sm_segment.lima-osoe.501.94e10000.0 
+a4-shmem-then-mpi                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.60a50000.0 sm_segment.lima-osoe.501.70390000.0 
+a5-mpi-then-shmem-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.3d140000.0 sm_segment.lima-osoe.501.83a10000.0 sm_segment.lima-osoe.501.b0fa0000.0 sm_segment.lima-osoe.501.c0380000.0 
+a6-shmem-then-mpi-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.387a0000.0 sm_segment.lima-osoe.501.3ab60000.0 sm_segment.lima-osoe.501.63490000.0 sm_segment.lima-osoe.501.bf4f0000.0 
+a7-shmem-restarted-three-times         exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.8f8d0000.0 sm_segment.lima-osoe.501.a9de0000.0 

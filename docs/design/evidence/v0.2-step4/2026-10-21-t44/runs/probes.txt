@@ -1,101 +1,106 @@
-# 2026-10-21T05:34:37Z, load 0.84 2.94 5.79
+# 2026-10-24T12:30:43Z, load 1.09 0.50 0.19
 t0-shmem-built-without-mpi             exit   0    3.0 s  0 of 2 PEs ok
 t1-shmem-only                          exit   0    3.0 s  0 of 2 PEs ok
 t2-mpi-only-mpirun                     exit   0    3.1 s  0 of 2 PEs ok
 t3-mpi-then-shmem-mpirun               exit   0    3.1 s  0 of 2 PEs ok
 t4-shmem-then-mpi-mpirun               exit   0    3.1 s  0 of 2 PEs ok
-t5-singletons                          exit   0    3.0 s  0 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.402b0000.0 sm_segment.lima-osoe.501.89890000.0 
+t5-singletons                          exit   0    3.0 s  0 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.26f00000.0 sm_segment.lima-osoe.501.304f0000.0 
 t6-mpi-finalized-early                 exit   0    3.1 s  0 of 2 PEs ok
 t7-thread-multiple                     exit   0    3.1 s  0 of 2 PEs ok
 t8-two-helpers                         exit   0    3.1 s  0 of 2 PEs ok
-# 2026-10-21T05:35:05Z, load 0.51 2.66 5.60
+# 2026-10-24T12:31:11Z, load 0.84 0.50 0.20
 n1-listening-mpi-shmem: exit 0; sockets in n1-listening-mpi-shmem-sockets.txt
 n1-listening-shmem-mpi: exit 0; sockets in n1-listening-shmem-mpi-sockets.txt
 n2-same-ports-mpi-shmem                exit   1    0.1 s  0 of 4 PEs ok
+  still running after n2-same-ports-mpi-shmem:
+      18801       1       0 [mpi-and-shmem]
 n2-same-ports-shmem-mpi                exit  14    0.1 s  0 of 4 PEs ok
-# 2026-10-21T05:35:22Z, load 0.39 2.53 5.51
+# 2026-10-24T12:31:29Z, load 0.73 0.49 0.20
 f1-fork-mpi-then-shmem                 exit   0    0.1 s  0 of 2 PEs ok
 f2-fork-shmem-then-mpi                 exit   0    0.1 s  0 of 2 PEs ok
-f3-fork-singletons                     exit   0    0.0 s  0 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.88d90000.0 sm_segment.lima-osoe.501.ab1b0000.0 
+f3-fork-singletons                     exit   0    0.0 s  0 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.a6c60000.0 sm_segment.lima-osoe.501.f4000000.0 
 f4-strace-mpirun                       exit   0    1.1 s  0 of 1 PEs ok
-f5-strace-singleton                    exit   0    1.1 s  0 of 1 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.63130000.0 
-f6-threads-made                        exit   1   10.1 s  0 of 1 PEs ok
-f7-thread-stacks: attached to 2940585, in f7-thread-stacks.txt
-# 2026-10-21T05:35:43Z, load 0.28 2.36 5.39
+f5-strace-singleton                    exit   0    1.1 s  0 of 1 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.1250000.0 
+f6-threads-made                        exit   1   10.2 s  0 of 1 PEs ok
+f7-thread-stacks: attached to 19090, in f7-thread-stacks.txt
+# 2026-10-24T12:31:50Z, load 0.65 0.49 0.20
 m1-window-mpi-then-shmem               exit   0    0.1 s  0 of 4 PEs ok
 m2-window-shmem-then-mpi               exit   0    0.1 s  0 of 4 PEs ok
 m3-window-2-nodes                      exit   0    0.1 s  0 of 4 PEs ok
 m4-window-tcp-btl                      exit   0    0.1 s  0 of 4 PEs ok
-# 2026-10-21T05:35:44Z, load 0.34 2.34 5.37
-g1-singletons-clean                    exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.42600000.0 sm_segment.lima-osoe.501.92bb0000.0 
+# 2026-10-24T12:31:51Z, load 0.76 0.51 0.21
+g1-singletons-clean                    exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4b400000.0 sm_segment.lima-osoe.501.8ba0000.0 
 g2-mpirun-clean                        exit   0    0.1 s  4 of 4 PEs ok
-g3-srun-clean                          exit   0    0.3 s  4 of 4 PEs ok
-g4-mpirun-plain-exit                   exit   1    2.0 s  0 of 3 PEs ok
+g3-srun-clean                          exit   0    0.2 s  4 of 4 PEs ok
+g4-mpirun-plain-exit                   exit   1    2.3 s  0 of 3 PEs ok
 g5-mpirun-crash                        exit 139    2.1 s  0 of 3 PEs ok
-g6-mpirun-mpi-abort                    exit   3    2.1 s  0 of 3 PEs ok
+g6-mpirun-mpi-abort                    exit   3    2.0 s  0 of 3 PEs ok
 g7-mpirun-global-exit                  exit   1    2.3 s  0 of 3 PEs ok
 g8-srun-global-exit                    exit   3    2.2 s  0 of 3 PEs ok
 g9-mpirun-sigterm                      exit   1    6.2 s  0 of 3 PEs ok
-g10-singletons-sigterm                 exit 143    6.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.26150000.0 sm_segment.lima-osoe.501.7c4c0000.0 sm_segment.lima-osoe.501.a47b0000.0 
-# 2026-10-21T05:36:08Z, load 0.70 2.29 5.29
-o1-osoe-stat: on job 2941282, mpirun's pid; exit # exit 0
-# 2026-10-21T05:36:18Z, load 0.59 2.21 5.23
+g10-singletons-sigterm                 exit 143    6.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.49260000.0 sm_segment.lima-osoe.501.63990000.0 sm_segment.lima-osoe.501.b00a0000.0 
+# 2026-10-24T12:32:15Z, load 0.54 0.48 0.21
+o1-osoe-stat: on job 19807, mpirun's pid; exit # exit 0
+# 2026-10-24T12:32:25Z, load 0.46 0.46 0.20
 p-2-bound-by-mpirun-1                  exit   0    0.2 s  2 of 2 PEs ok
 p-2-unbound-1                          exit   0    0.2 s  2 of 2 PEs ok
 p-2-bound-by-mpirun-2                  exit   0    0.2 s  2 of 2 PEs ok
 p-2-unbound-2                          exit   0    0.2 s  2 of 2 PEs ok
 p-2-bound-by-mpirun-3                  exit   0    0.2 s  2 of 2 PEs ok
 p-2-unbound-3                          exit   0    0.2 s  2 of 2 PEs ok
-p-4-bound-by-mpirun-1                  exit   0    0.4 s  4 of 4 PEs ok
-p-4-unbound-1                          exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-to-cores-1                   exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-by-mpirun-2                  exit   0    0.4 s  4 of 4 PEs ok
-p-4-unbound-2                          exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-to-cores-2                   exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-by-mpirun-3                  exit   0    0.4 s  4 of 4 PEs ok
-p-4-unbound-3                          exit   0    0.5 s  4 of 4 PEs ok
-p-4-bound-to-cores-3                   exit   0    0.4 s  4 of 4 PEs ok
-# 2026-10-21T05:36:23Z, load 0.79 2.22 5.22
-# 2026-10-21T05:36:36Z, load 1.34 2.28 5.19
-w0-built-without-mpi-deadlock          exit   1    4.1 s  0 of 3 PEs ok
+p-4-bound-by-mpirun-1                  exit   0    0.5 s  4 of 4 PEs ok
+p-4-unbound-1                          exit   0    0.5 s  4 of 4 PEs ok
+p-4-bound-to-cores-1                   exit   0    0.5 s  4 of 4 PEs ok
+p-4-bound-by-mpirun-2                  exit   0    0.5 s  4 of 4 PEs ok
+p-4-unbound-2                          exit   0    0.6 s  4 of 4 PEs ok
+p-4-bound-to-cores-2                   exit   0    0.6 s  4 of 4 PEs ok
+p-4-bound-by-mpirun-3                  exit   0    0.7 s  4 of 4 PEs ok
+p-4-unbound-3                          exit   0    0.6 s  4 of 4 PEs ok
+p-4-bound-to-cores-3                   exit   0    0.6 s  4 of 4 PEs ok
+# 2026-10-24T12:32:33Z, load 0.93 0.56 0.24
+k1-tcp-progress-thread                 exit   0    3.1 s  0 of 2 PEs ok
+k2-thread-stacks: attached to 20469, in k2-thread-stacks.txt
+# 2026-10-24T12:32:44Z, load 0.79 0.54 0.24
+w0-built-without-mpi-deadlock          exit   1    4.2 s  0 of 3 PEs ok
 w1-shmem-alone-deadlock                exit   1   20.0 s  0 of 3 PEs ok
 w2-mpi-and-shmem-deadlock              exit 124   25.2 s  0 of 3 PEs ok
 w3-shmem-then-mpi-deadlock             exit 124   25.2 s  0 of 3 PEs ok
-  still running after w3-shmem-then-mpi-deadlock:
-    2944519       1      25 [mpi-and-shmem] <defunct>
 w4-mpi-finalized-deadlock              exit 124   25.2 s  0 of 3 PEs ok
-  still running after w4-mpi-finalized-deadlock:
-    2944582       1      25 [mpi-and-shmem] <defunct>
-w5-singletons-deadlock                 exit   1   20.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.2f280000.0 sm_segment.lima-osoe.501.d9da0000.0 sm_segment.lima-osoe.501.e0470000.0 
-w6-mixed-deadlock                      exit 124   25.3 s  0 of 3 PEs ok
-w7-benign                              exit   0   12.2 s  0 of 4 PEs ok
+w5-singletons-deadlock                 exit   1   20.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.153e0000.0 sm_segment.lima-osoe.501.84730000.0 sm_segment.lima-osoe.501.b610000.0 
+w6-mixed-deadlock                      exit 124   25.2 s  0 of 3 PEs ok
+  still running after w6-mixed-deadlock:
+      20700       1      25 [mpi-and-shmem]
+w7-benign                              exit   0   12.1 s  0 of 4 PEs ok
 w8-two-nodes-deadlock                  exit 124   25.2 s  0 of 4 PEs ok
 w9-two-nodes-shmem-alone-deadlock      exit 124   25.2 s  0 of 4 PEs ok
-# 2026-10-21T05:40:07Z, load 0.43 1.35 4.22
-e-crash-others-in-shmem-mpirun         exit 139    2.1 s  0 of 3 PEs ok
-e-crash-others-in-mpi-mpirun           exit 139    2.3 s  0 of 3 PEs ok
+# 2026-10-24T12:36:13Z, load 0.34 0.43 0.25
+e-crash-others-in-shmem-mpirun         exit 139    2.4 s  0 of 3 PEs ok
+e-crash-others-in-mpi-mpirun           exit 139    2.1 s  0 of 3 PEs ok
 e-mpi-abort-others-in-shmem-mpirun     exit   3    2.0 s  0 of 3 PEs ok
 e-mpi-abort-others-in-mpi-mpirun       exit   3    2.0 s  0 of 3 PEs ok
 e-global-exit-others-in-shmem-mpirun   exit   1    2.3 s  0 of 3 PEs ok
 e-global-exit-others-in-mpi-mpirun     exit   1    2.3 s  0 of 3 PEs ok
-e-plain-exit-others-in-shmem-mpirun    exit   1    2.0 s  0 of 3 PEs ok
-e-plain-exit-others-in-mpi-mpirun      exit   1    2.3 s  0 of 3 PEs ok
-e-crash-others-in-shmem-singletons     exit 139    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.56340000.0 sm_segment.lima-osoe.501.87430000.0 sm_segment.lima-osoe.501.baa80000.0 
-e-mpi-abort-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.11fb0000.0 sm_segment.lima-osoe.501.5e4c0000.0 sm_segment.lima-osoe.501.c9830000.0 
-e-global-exit-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.7b770000.0 sm_segment.lima-osoe.501.950000.0 sm_segment.lima-osoe.501.a4990000.0 
-e-plain-exit-others-in-shmem-singletons exit   1    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.9660000.0 sm_segment.lima-osoe.501.db870000.0 sm_segment.lima-osoe.501.eeec0000.0 
+e-plain-exit-others-in-shmem-mpirun    exit   1    2.3 s  0 of 3 PEs ok
+e-plain-exit-others-in-mpi-mpirun      exit   1    2.0 s  0 of 3 PEs ok
+e-crash-others-in-shmem-singletons     exit 139    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.29930000.0 sm_segment.lima-osoe.501.2e2c0000.0 sm_segment.lima-osoe.501.6bf90000.0 
+e-mpi-abort-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4e960000.0 sm_segment.lima-osoe.501.507b0000.0 sm_segment.lima-osoe.501.f4e90000.0 
+e-global-exit-others-in-shmem-singletons exit   3    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.5a6b0000.0 sm_segment.lima-osoe.501.682b0000.0 sm_segment.lima-osoe.501.cf9a0000.0 
+e-plain-exit-others-in-shmem-singletons exit   1    2.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.45600000.0 sm_segment.lima-osoe.501.6a6e0000.0 sm_segment.lima-osoe.501.9ca80000.0 
 e-crash-others-in-shmem-srun           exit 139    2.2 s  0 of 3 PEs ok
 e-mpi-abort-others-in-shmem-srun       exit   3    2.2 s  0 of 3 PEs ok
 e-global-exit-others-in-shmem-srun     exit   3    2.2 s  0 of 3 PEs ok
 e-plain-exit-others-in-shmem-srun      exit   1    2.2 s  0 of 3 PEs ok
 e-sigterm-to-mpirun                    exit   1    6.2 s  0 of 3 PEs ok
+  still running after e-sigterm-to-mpirun:
+      21640       1       6 [mpi-and-shmem] <defunct>
 e-sigint-to-mpirun                     exit   1    6.2 s  0 of 3 PEs ok
-e-sigterm-to-osoe-launch               exit 143    6.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4e970000.0 sm_segment.lima-osoe.501.ba0d0000.0 sm_segment.lima-osoe.501.f1f70000.0 
-# 2026-10-21T05:41:01Z, load 0.42 1.21 4.00
+e-sigterm-to-osoe-launch               exit 143    6.0 s  0 of 3 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.2ca80000.0 sm_segment.lima-osoe.501.b03a0000.0 sm_segment.lima-osoe.501.b6340000.0 
+# 2026-10-24T12:37:08Z, load 0.96 0.61 0.32
 u1-threads-shmem-only                  exit   0    3.0 s  0 of 2 PEs ok
 u2-threads-mpi-started                 exit   0    3.1 s  0 of 2 PEs ok
 u3-threads-mpi-finalized               exit   0    3.1 s  0 of 2 PEs ok
-u4-shmem-only-deadlock                 exit   1    4.2 s  0 of 3 PEs ok
-u5-mpi-started-deadlock                exit 124   25.3 s  0 of 3 PEs ok
+u4-shmem-only-deadlock                 exit   1    4.7 s  0 of 3 PEs ok
+u5-mpi-started-deadlock                exit 124   25.2 s  0 of 3 PEs ok
 u6-mpi-finalized-deadlock              exit   1    4.3 s  0 of 3 PEs ok
-u7-mpi-finalized-deadlock-2-nodes      exit   1    4.8 s  0 of 4 PEs ok
+u7-mpi-finalized-deadlock-2-nodes      exit   1    4.4 s  0 of 4 PEs ok
+# 2026-10-24T12:37:56Z, load 0.56 0.56 0.32

@@ -1,19 +1,8 @@
-PE 0: MPI started: rank 0 of 2
-PE 0: thread 2939952 mpi-and-shmem R
-PE 0: thread 2939954 fuse S
-PE 0: thread 2939956 mpi-and-shmem S
-PE 0: 3 threads
-PE 0: signal SIGHUP is handled in libucs.so.0 by ?
-PE 0: signal SIGILL is handled in libucs.so.0 by ?
-PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
-PE 0: signal SIGBUS is handled in libucs.so.0 by ?
-PE 0: signal SIGFPE is handled in libucs.so.0 by ?
-PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
-PE 0: 6 signals not at their default
 PE 1: MPI started: rank 1 of 2
-PE 1: thread 2939953 mpi-and-shmem R
-PE 1: thread 2939955 fuse S
-PE 1: thread 2939957 mpi-and-shmem S
+PE 0: MPI started: rank 0 of 2
+PE 1: thread 18492 mpi-and-shmem R
+PE 1: thread 18494 fuse S
+PE 1: thread 18495 mpi-and-shmem S
 PE 1: 3 threads
 PE 1: signal SIGHUP is handled in libucs.so.0 by ?
 PE 1: signal SIGILL is handled in libucs.so.0 by ?
@@ -22,13 +11,24 @@ PE 1: signal SIGBUS is handled in libucs.so.0 by ?
 PE 1: signal SIGFPE is handled in libucs.so.0 by ?
 PE 1: signal SIGSEGV is handled in libucs.so.0 by ?
 PE 1: 6 signals not at their default
-PE 1: thread 2939953 mpi-and-shmem R
-PE 1: thread 2939955 fuse S
-PE 1: thread 2939957 mpi-and-shmem S
-PE 1: 3 threads
-PE 0: thread 2939952 mpi-and-shmem R
-PE 0: thread 2939954 fuse S
-PE 0: thread 2939956 mpi-and-shmem S
+PE 0: thread 18491 mpi-and-shmem R
+PE 0: thread 18493 fuse S
+PE 0: thread 18496 mpi-and-shmem S
 PE 0: 3 threads
-PE 0: MPI finalized
+PE 0: signal SIGHUP is handled in libucs.so.0 by ?
+PE 0: signal SIGILL is handled in libucs.so.0 by ?
+PE 0: signal SIGABRT is handled in libopen-pal.so.80 by ? (once)
+PE 0: signal SIGBUS is handled in libucs.so.0 by ?
+PE 0: signal SIGFPE is handled in libucs.so.0 by ?
+PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
+PE 0: 6 signals not at their default
+PE 1: thread 18492 mpi-and-shmem R
+PE 1: thread 18494 fuse S
+PE 1: thread 18495 mpi-and-shmem S
+PE 1: 3 threads
+PE 0: thread 18491 mpi-and-shmem R
+PE 0: thread 18493 fuse S
+PE 0: thread 18496 mpi-and-shmem S
+PE 0: 3 threads
 PE 1: MPI finalized
+PE 0: MPI finalized

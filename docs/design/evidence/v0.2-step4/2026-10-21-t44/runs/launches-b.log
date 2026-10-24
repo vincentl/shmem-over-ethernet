@@ -1,19 +1,19 @@
-# 2026-10-21T05:34:28Z, load 0.36 2.92 5.81
+# 2026-10-24T12:30:34Z, load 1.28 0.51 0.19
 b1-mpi-only                            exit   0    0.1 s  4 of 4 PEs ok
 b2-no-wrapper                          exit   1    0.0 s  0 of 4 PEs ok
 b3-shmem-only                          exit   0    0.0 s  4 of 4 PEs ok
 b4-mpi-then-shmem                      exit   0    0.1 s  4 of 4 PEs ok
-b5-shmem-then-mpi                      exit   0    0.2 s  4 of 4 PEs ok
+b5-shmem-then-mpi                      exit   0    0.1 s  4 of 4 PEs ok
 b6-mpi-then-shmem-mpi-ends-first       exit   0    0.1 s  4 of 4 PEs ok
 b7-shmem-then-mpi-shmem-ends-first     exit   0    0.1 s  4 of 4 PEs ok
 b8-two-pes                             exit   0    0.1 s  2 of 2 PEs ok
 b9-one-pe                              exit   0    0.1 s  1 of 1 PEs ok
 b10-default-binding-2                  exit   0    0.1 s  2 of 2 PEs ok
 b11-default-binding-4                  exit   0    0.1 s  4 of 4 PEs ok
-b12-oversubscribed-8                   exit   0    0.3 s  8 of 8 PEs ok
+b12-oversubscribed-8                   exit   0    0.2 s  8 of 8 PEs ok
 b13-thread-multiple                    exit   0    0.1 s  4 of 4 PEs ok
-b14-two-helpers                        exit   0    0.2 s  4 of 4 PEs ok
-b15-tcp-btl                            exit   0    0.3 s  4 of 4 PEs ok
-b17-shmem-started-three-times          exit   0    0.2 s  4 of 4 PEs ok
+b14-two-helpers                        exit   0    0.1 s  4 of 4 PEs ok
+b15-tcp-btl                            exit   0    0.1 s  4 of 4 PEs ok
+b17-shmem-restarted-three-times        exit   0    0.1 s  4 of 4 PEs ok
 b18-tcp-progress-thread                exit   0    0.3 s  4 of 4 PEs ok
-b16-oversubscribed-16                  exit   0    0.5 s  16 of 16 PEs ok
+b16-oversubscribed-16                  exit   0    0.2 s  16 of 16 PEs ok

@@ -1,0 +1,15 @@
+08:31:30.043963 execve("<repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/open-mpi-bootstrap.sh", ["<repo>/docs/design/evidence/v"..., "<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xffffff882998 /* 59 vars */) = 0
+08:31:30.044512 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0xffffb71eb0f0) = 19011
+08:31:30.048867 wait4(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 19011
+08:31:30.050134 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=19011, si_uid=501, si_status=0, si_utime=0, si_stime=0} ---
+08:31:30.050193 wait4(-1, 0xffffcff2587c, WNOHANG, NULL) = -1 ECHILD (No child processes)
+08:31:30.050327 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0xffffb71eb0f0) = 19012
+08:31:30.051998 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=19012, si_uid=501, si_status=0, si_utime=0, si_stime=0} ---
+08:31:30.052073 wait4(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 19012
+08:31:30.052107 wait4(-1, 0xffffcff2580c, WNOHANG, NULL) = -1 ECHILD (No child processes)
+08:31:30.052148 execve("<out>/mpi-and-shmem", ["<out>/mpi-and-shmem", "hold", "mpi,shmem"], 0xaaaaf2ed1e68 /* 69 vars */) = 0
+08:31:30.107502 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0xffff87d4ed30, parent_tid=0xffff87d4ed30, exit_signal=0, stack=0xffff87540000, stack_size=0x80e540, tls=0xffff87d4f380} => {parent_tid=[19013]}, 88) = 19013
+08:31:30.114546 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0xffff874ced30, parent_tid=0xffff874ced30, exit_signal=0, stack=0xffff86cc0000, stack_size=0x80e540, tls=0xffff874cf380} => {parent_tid=[19014]}, 88) = 19014
+08:31:30.140117 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0xffff861a8d30, parent_tid=0xffff861a8d30, exit_signal=0, stack=0xffff8599a000, stack_size=0x80e540, tls=0xffff861a9380} => {parent_tid=[19015]}, 88) = 19015
+08:31:31.206456 exit_group(0)           = ?
+08:31:31.207597 +++ exited with 0 +++

@@ -1,5 +1,5 @@
-PE 0: MPI started: rank 0 of 1
 PE 1: MPI started: rank 0 of 1
+PE 0: MPI started: rank 0 of 1
 PE 1: check: 20 rounds, ok
 PE 0: check: 20 rounds, ok
 PE 1: MPI finalized

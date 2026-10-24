@@ -1,16 +1,16 @@
-osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2944424.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.20527.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 0: shmem started: PE 0 of 3
 PE 0: waiting in shmem for a flag nobody sets
-osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2944424.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2944424.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-PE 1: shmem started: PE 1 of 3
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.20527.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 2: shmem started: PE 2 of 3
-PE 1: in shmem_barrier_all
 PE 2: in shmem_barrier_all
-osoe-launch: timeout after 20 s; killing 3 process(es) of job 2944424; -t sets the timeout
-osoe-launch: where job 2944424 waits, by osoe-stat --summary 2944424:
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.20527.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 1: shmem started: PE 1 of 3
+PE 1: in shmem_barrier_all
+osoe-launch: timeout after 20 s; killing 3 process(es) of job 20527; -t sets the timeout
+osoe-launch: where job 20527 waits, by osoe-stat --summary 20527:
 node 0   lima-osoe        collective shape link; link not set
-node 0   lima-osoe         3/3  live  world      one node: no tree to walk; the PE lines (osoe-stat JOB) say where each PE waits  rank 0 shmem_int_wait_until (statics offset 0x10040) 19.966 s
-osoe-launch: rank 0 killed by signal 9
+node 0   lima-osoe         3/3  live  world      one node: no tree to walk; the PE lines (osoe-stat JOB) say where each PE waits  rank 0 shmem_int_wait_until (statics offset 0x10040) 19.962 s
 osoe-launch: rank 1 killed by signal 9
 osoe-launch: rank 2 killed by signal 9
+osoe-launch: rank 0 killed by signal 9

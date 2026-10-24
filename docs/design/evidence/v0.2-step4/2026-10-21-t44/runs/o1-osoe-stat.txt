@@ -1,12 +1,12 @@
-# osoe-stat 2941282
-/osoe.2941282.0.0.0  layout 41  3 local PEs of 3  (job 2941282 step 0 node 0 session 0)
+# osoe-stat 19807
+/osoe.19807.0.0.0  layout 41  3 local PEs of 3  (job 19807 step 0 node 0 session 0)
   4345856 bytes, 251 metrics (checksum 0x543577d0), 51 blocks of 512 bytes
   collective shape link; link not set
 
  PE  rank      pid phase       epoch   sweeps  blocked in
-  0     0  2941286 mapped          0        0  -
-  1     1  2941287 mapped          0        0  -
-  2     2  2941290 mapped          0        0  -
+  0     0    19811 mapped          0        0  -
+  1     1    19812 mapped          0        0  -
+  2     2    19813 mapped          0        0  -
 
 counter                                           PE0          PE1          PE2         total
 transport.put.calls                                 0            0            0             0
@@ -47,7 +47,7 @@ shmem.signal.wait.calls                             0            0            0 
 shmem.team_split.calls                              0            0            0             0
 shmem.team_split.busy_rounds                        0            0            0             0
 shmem.team_split.lost_rounds                        0            0            0             0
-agent.loops                                        47           48           47           142
+agent.loops                                        49           49           49           147
 agent.wakeups                                       0            0            0             0
 agent.last_wake_ns                                  0            0            0             0
 am.reserve_stalls                                   0            0            0             0
@@ -62,5 +62,5 @@ am.context_locks                                    0            0            0 
 invariant.missed_wake                               0            0            0             0
 invariant.watch_reentered                           0            0            0             0
 thread.claimed                                      1            1            1             1
-thread.tid                                    2941303      2941302      2941301       2941303
+thread.tid                                      19828        19827        19826         19828
 # exit 0

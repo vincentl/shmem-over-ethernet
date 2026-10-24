@@ -1,43 +1,49 @@
-# 2026-10-21T05:34:27Z, load 0.36 2.92 5.81
+# 2026-10-24T12:30:34Z, load 1.28 0.51 0.19
 a1-shmem-only                          exit   0    0.0 s  2 of 2 PEs ok
-a2-mpi-only                            exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.246b0000.0 sm_segment.lima-osoe.501.d0290000.0 
-a3-mpi-then-shmem                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.15360000.0 sm_segment.lima-osoe.501.e7a40000.0 
-a4-shmem-then-mpi                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.6d620000.0 sm_segment.lima-osoe.501.c66c0000.0 
-a5-mpi-then-shmem-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.47d50000.0 sm_segment.lima-osoe.501.bccf0000.0 sm_segment.lima-osoe.501.dd3f0000.0 sm_segment.lima-osoe.501.f2fe0000.0 
-a6-shmem-then-mpi-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.2f100000.0 sm_segment.lima-osoe.501.66f70000.0 sm_segment.lima-osoe.501.c1ac0000.0 sm_segment.lima-osoe.501.c2280000.0 
-a7-shmem-started-three-times           exit   0    0.2 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.af710000.0 sm_segment.lima-osoe.501.b1ad0000.0 
-# 2026-10-21T05:34:28Z, load 0.36 2.92 5.81
+a2-mpi-only                            exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.263d0000.0 sm_segment.lima-osoe.501.4d830000.0 
+a3-mpi-then-shmem                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.451c0000.0 sm_segment.lima-osoe.501.94e10000.0 
+a4-shmem-then-mpi                      exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.60a50000.0 sm_segment.lima-osoe.501.70390000.0 
+a5-mpi-then-shmem-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.3d140000.0 sm_segment.lima-osoe.501.83a10000.0 sm_segment.lima-osoe.501.b0fa0000.0 sm_segment.lima-osoe.501.c0380000.0 
+a6-shmem-then-mpi-4-on-2-nodes         exit   0    0.1 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.387a0000.0 sm_segment.lima-osoe.501.3ab60000.0 sm_segment.lima-osoe.501.63490000.0 sm_segment.lima-osoe.501.bf4f0000.0 
+a7-shmem-restarted-three-times         exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.8f8d0000.0 sm_segment.lima-osoe.501.a9de0000.0 
+# 2026-10-24T12:30:34Z, load 1.28 0.51 0.19
 b1-mpi-only                            exit   0    0.1 s  4 of 4 PEs ok
 b2-no-wrapper                          exit   1    0.0 s  0 of 4 PEs ok
 b3-shmem-only                          exit   0    0.0 s  4 of 4 PEs ok
 b4-mpi-then-shmem                      exit   0    0.1 s  4 of 4 PEs ok
-b5-shmem-then-mpi                      exit   0    0.2 s  4 of 4 PEs ok
+b5-shmem-then-mpi                      exit   0    0.1 s  4 of 4 PEs ok
 b6-mpi-then-shmem-mpi-ends-first       exit   0    0.1 s  4 of 4 PEs ok
 b7-shmem-then-mpi-shmem-ends-first     exit   0    0.1 s  4 of 4 PEs ok
 b8-two-pes                             exit   0    0.1 s  2 of 2 PEs ok
 b9-one-pe                              exit   0    0.1 s  1 of 1 PEs ok
 b10-default-binding-2                  exit   0    0.1 s  2 of 2 PEs ok
 b11-default-binding-4                  exit   0    0.1 s  4 of 4 PEs ok
-b12-oversubscribed-8                   exit   0    0.3 s  8 of 8 PEs ok
+b12-oversubscribed-8                   exit   0    0.2 s  8 of 8 PEs ok
 b13-thread-multiple                    exit   0    0.1 s  4 of 4 PEs ok
-b14-two-helpers                        exit   0    0.2 s  4 of 4 PEs ok
-b15-tcp-btl                            exit   0    0.3 s  4 of 4 PEs ok
-b17-shmem-started-three-times          exit   0    0.2 s  4 of 4 PEs ok
+b14-two-helpers                        exit   0    0.1 s  4 of 4 PEs ok
+b15-tcp-btl                            exit   0    0.1 s  4 of 4 PEs ok
+b17-shmem-restarted-three-times        exit   0    0.1 s  4 of 4 PEs ok
 b18-tcp-progress-thread                exit   0    0.3 s  4 of 4 PEs ok
-b16-oversubscribed-16                  exit   0    0.5 s  16 of 16 PEs ok
-# 2026-10-21T05:34:32Z, load 0.74 2.95 5.81
-c1-mpi-then-shmem-2-nodes              exit   0    0.3 s  4 of 4 PEs ok
-c2-shmem-then-mpi-2-nodes              exit   0    0.3 s  4 of 4 PEs ok
-c3-mpi-then-shmem-4-nodes              exit   0    0.4 s  4 of 4 PEs ok
+b16-oversubscribed-16                  exit   0    0.2 s  16 of 16 PEs ok
+# 2026-10-24T12:30:38Z, load 1.18 0.50 0.19
+c1-mpi-then-shmem-2-nodes              exit   0    0.6 s  4 of 4 PEs ok
+c2-shmem-then-mpi-2-nodes              exit   0    0.5 s  4 of 4 PEs ok
+c3-mpi-then-shmem-4-nodes              exit   0    0.5 s  4 of 4 PEs ok
 c4-8-pes-2-nodes                       exit   0    0.3 s  8 of 8 PEs ok
-c5-tcp-btl-2-nodes                     exit   0    0.5 s  4 of 4 PEs ok
+c5-tcp-btl-2-nodes                     exit   0    0.4 s  4 of 4 PEs ok
 c6-two-helpers-2-nodes                 exit   0    0.4 s  4 of 4 PEs ok
-c9-shmem-started-three-times-2-nodes   exit   0    0.4 s  4 of 4 PEs ok
+c9-shmem-restarted-three-times-2-nodes exit   0    0.3 s  4 of 4 PEs ok
 c8-16-pes-4-nodes                      exit   0    0.3 s  16 of 16 PEs ok
 c7-wrapper-refuses-5-on-2-nodes        exit   2    0.0 s  0 of 5 PEs ok
-# 2026-10-21T05:34:35Z, load 0.84 2.94 5.79
+# 2026-10-24T12:30:41Z, load 1.09 0.50 0.19
 d1-pmix-mpi-then-shmem                 exit   0    0.5 s  4 of 4 PEs ok
 d2-pmix-shmem-then-mpi                 exit   0    0.3 s  4 of 4 PEs ok
 d3-pmix-mpi-only                       exit   0    0.3 s  4 of 4 PEs ok
-d4-no-pmix-mpi-then-shmem              exit   0    0.2 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.16c50000.0 sm_segment.lima-osoe.501.58a10000.0 sm_segment.lima-osoe.501.5af0000.0 sm_segment.lima-osoe.501.81540000.0 
-d5-pmix-shmem-started-three-times      exit   0    0.3 s  4 of 4 PEs ok
+d4-no-pmix-mpi-then-shmem              exit   0    0.2 s  4 of 4 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.4a4c0000.0 sm_segment.lima-osoe.501.5f30000.0 sm_segment.lima-osoe.501.b8940000.0 sm_segment.lima-osoe.501.e6730000.0 
+d5-pmix-shmem-restarted-three-times    exit   0    0.3 s  4 of 4 PEs ok
+# 2026-10-24T12:57:29Z, load 0.04 0.02 0.08
+s1-shmem-only                          exit   0    0.0 s  2 of 2 PEs ok
+s2-mpi-only                            exit   0    0.1 s  2 of 2 PEs ok
+s3-singletons                          exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.62ab0000.0 sm_segment.lima-osoe.501.84a0000.0 
+s4-variables                           exit   0    0.0 s  0 of 0 PEs ok
+s5-mpirun-and-wrapper                  exit   0    0.1 s  4 of 4 PEs ok

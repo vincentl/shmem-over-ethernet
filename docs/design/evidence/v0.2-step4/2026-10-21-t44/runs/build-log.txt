@@ -4,32 +4,33 @@ mpicc -I<repo>/shmem/include -fno-pie -no-pie -Xlinker -T -Xlinker <repo>/tools/
 gcc -I<repo>/shmem/include -fno-pie -no-pie -Xlinker -T -Xlinker <repo>/tools/wrapper/osoe-statics.ld -O2 -g -std=gnu11 -Wall -Wextra -o <out>/mpi-and-shmem <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c -L<repo>/build/release/shmem -losoe -Xlinker -rpath -Xlinker <repo>/build/release/shmem -I/usr/lib/aarch64-linux-gnu/openmpi/include -I/usr/lib/aarch64-linux-gnu/openmpi/include/openmpi -L/usr/lib/aarch64-linux-gnu/openmpi/lib -lmpi
 build: exit 0, 0 warnings
 baseline build: exit 0, 0 warnings
+Open MPI's include first: 0 errors; the shmem.h found: . /usr/lib/aarch64-linux-gnu/openmpi/include/shmem.h
 # ldd
-	linux-vdso.so.1 (0x0000ffff9f824000)
-	libosoe.so.0 => <repo>/build/release/shmem/libosoe.so.0 (0x0000ffff9f6f0000)
-	libmpi.so.40 => /lib/aarch64-linux-gnu/libmpi.so.40 (0x0000ffff9f360000)
-	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffff9f1a0000)
-	liburing.so.2 => /lib/aarch64-linux-gnu/liburing.so.2 (0x0000ffff9f170000)
-	libfabric.so.1 => /lib/aarch64-linux-gnu/libfabric.so.1 (0x0000ffff9efe0000)
-	libucp.so.0 => /lib/aarch64-linux-gnu/libucp.so.0 (0x0000ffff9ee60000)
-	libucs.so.0 => /lib/aarch64-linux-gnu/libucs.so.0 (0x0000ffff9edd0000)
-	libopen-pal.so.80 => /lib/aarch64-linux-gnu/libopen-pal.so.80 (0x0000ffff9ec60000)
-	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffff9ebb0000)
-	libevent_core-2.1.so.7 => /lib/aarch64-linux-gnu/libevent_core-2.1.so.7 (0x0000ffff9eb50000)
-	libevent_pthreads-2.1.so.7 => /lib/aarch64-linux-gnu/libevent_pthreads-2.1.so.7 (0x0000ffff9eb20000)
-	libhwloc.so.15 => /lib/aarch64-linux-gnu/libhwloc.so.15 (0x0000ffff9eaa0000)
-	libpmix.so.2 => /lib/aarch64-linux-gnu/libpmix.so.2 (0x0000ffff9e870000)
-	/lib/ld-linux-aarch64.so.1 (0x0000ffff9f7e0000)
-	librdmacm.so.1 => /lib/aarch64-linux-gnu/librdmacm.so.1 (0x0000ffff9e830000)
-	libefa.so.1 => /lib/aarch64-linux-gnu/libefa.so.1 (0x0000ffff9e800000)
-	libibverbs.so.1 => /lib/aarch64-linux-gnu/libibverbs.so.1 (0x0000ffff9e7c0000)
-	libuct.so.0 => /lib/aarch64-linux-gnu/libuct.so.0 (0x0000ffff9e750000)
-	libucm.so.0 => /lib/aarch64-linux-gnu/libucm.so.0 (0x0000ffff9e710000)
-	libnl-3.so.200 => /lib/aarch64-linux-gnu/libnl-3.so.200 (0x0000ffff9e6c0000)
-	libudev.so.1 => /lib/aarch64-linux-gnu/libudev.so.1 (0x0000ffff9e660000)
-	libmunge.so.2 => /lib/aarch64-linux-gnu/libmunge.so.2 (0x0000ffff9e630000)
-	libnl-route-3.so.200 => /lib/aarch64-linux-gnu/libnl-route-3.so.200 (0x0000ffff9e580000)
-	libcap.so.2 => /lib/aarch64-linux-gnu/libcap.so.2 (0x0000ffff9e550000)
+	linux-vdso.so.1 (0x0000ffffaf68b000)
+	libosoe.so.0 => <repo>/build/release/shmem/libosoe.so.0 (0x0000ffffaf550000)
+	libmpi.so.40 => /lib/aarch64-linux-gnu/libmpi.so.40 (0x0000ffffaf1c0000)
+	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ffffaf000000)
+	liburing.so.2 => /lib/aarch64-linux-gnu/liburing.so.2 (0x0000ffffaefd0000)
+	libfabric.so.1 => /lib/aarch64-linux-gnu/libfabric.so.1 (0x0000ffffaee40000)
+	libucp.so.0 => /lib/aarch64-linux-gnu/libucp.so.0 (0x0000ffffaecc0000)
+	libucs.so.0 => /lib/aarch64-linux-gnu/libucs.so.0 (0x0000ffffaec30000)
+	libopen-pal.so.80 => /lib/aarch64-linux-gnu/libopen-pal.so.80 (0x0000ffffaeac0000)
+	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ffffaea10000)
+	libevent_core-2.1.so.7 => /lib/aarch64-linux-gnu/libevent_core-2.1.so.7 (0x0000ffffae9b0000)
+	libevent_pthreads-2.1.so.7 => /lib/aarch64-linux-gnu/libevent_pthreads-2.1.so.7 (0x0000ffffae980000)
+	libhwloc.so.15 => /lib/aarch64-linux-gnu/libhwloc.so.15 (0x0000ffffae900000)
+	libpmix.so.2 => /lib/aarch64-linux-gnu/libpmix.so.2 (0x0000ffffae6d0000)
+	/lib/ld-linux-aarch64.so.1 (0x0000ffffaf640000)
+	librdmacm.so.1 => /lib/aarch64-linux-gnu/librdmacm.so.1 (0x0000ffffae690000)
+	libefa.so.1 => /lib/aarch64-linux-gnu/libefa.so.1 (0x0000ffffae660000)
+	libibverbs.so.1 => /lib/aarch64-linux-gnu/libibverbs.so.1 (0x0000ffffae620000)
+	libuct.so.0 => /lib/aarch64-linux-gnu/libuct.so.0 (0x0000ffffae5b0000)
+	libucm.so.0 => /lib/aarch64-linux-gnu/libucm.so.0 (0x0000ffffae570000)
+	libnl-3.so.200 => /lib/aarch64-linux-gnu/libnl-3.so.200 (0x0000ffffae520000)
+	libudev.so.1 => /lib/aarch64-linux-gnu/libudev.so.1 (0x0000ffffae4c0000)
+	libmunge.so.2 => /lib/aarch64-linux-gnu/libmunge.so.2 (0x0000ffffae490000)
+	libnl-route-3.so.200 => /lib/aarch64-linux-gnu/libnl-route-3.so.200 (0x0000ffffae3e0000)
+	libcap.so.2 => /lib/aarch64-linux-gnu/libcap.so.2 (0x0000ffffae3b0000)
 # sections that hold the statics, and the copies of shared libraries' variables
   [23] .osoe_statics_data PROGBITS        0000000000430000 020000 010000 00  WA  0   0 65536
   [24] .osoe_statics_bss NOBITS          0000000000440000 030000 110000 00  WA  0   0 65536
@@ -63,4 +64,4 @@ baseline build: exit 0, 0 warnings
 0000000000440040 b release_flag
 0000000000440050 b static_big
 # file type
-<out>/mpi-and-shmem: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=1580f94000b4b34657ce9e334b1f6a35c4303d01, for GNU/Linux 3.7.0, with debug_info, not stripped
+<out>/mpi-and-shmem: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=6cbe93f0c42d37b14bbc591f4e5e6d06803fe7a2, for GNU/Linux 3.7.0, with debug_info, not stripped

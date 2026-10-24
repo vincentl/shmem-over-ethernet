@@ -1,15 +1,15 @@
-PE 2: MPI started: rank 2 of 4
-PE 3: MPI started: rank 3 of 4
-PE 0: MPI started: rank 0 of 4
 PE 1: MPI started: rank 1 of 4
 osoe: no launcher environment: neither OSOE_PROCID nor SLURM_PROCID is set. Start programs with srun or osoe-launch, or set the OSOE_ bootstrap variables of design §6.2
+PE 2: MPI started: rank 2 of 4
 osoe: no launcher environment: neither OSOE_PROCID nor SLURM_PROCID is set. Start programs with srun or osoe-launch, or set the OSOE_ bootstrap variables of design §6.2
+PE 3: MPI started: rank 3 of 4
 osoe: no launcher environment: neither OSOE_PROCID nor SLURM_PROCID is set. Start programs with srun or osoe-launch, or set the OSOE_ bootstrap variables of design §6.2
+PE 0: MPI started: rank 0 of 4
 osoe: no launcher environment: neither OSOE_PROCID nor SLURM_PROCID is set. Start programs with srun or osoe-launch, or set the OSOE_ bootstrap variables of design §6.2
 --------------------------------------------------------------------------
 prterun detected that one or more processes exited with non-zero status,
 thus causing the job to be terminated. The first process to do so was:
 
-   Process name: [prterun-lima-osoe-2938294@1,0]
+   Process name: [prterun-lima-osoe-16838@1,0]
    Exit code:    1
 --------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# osoe-stat --summary 2941282
+# osoe-stat --summary 19807
 node 0   lima-osoe        collective shape link; link not set
 node 0   lima-osoe         3/3  live  world      one node: no tree to walk; the PE lines (osoe-stat JOB) say where each PE waits  -
 # exit 0

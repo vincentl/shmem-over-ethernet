@@ -1,16 +1,16 @@
-# 2026-10-21T05:36:18Z, load 0.59 2.21 5.23
+# 2026-10-24T12:32:25Z, load 0.46 0.46 0.20
 p-2-bound-by-mpirun-1                  exit   0    0.2 s  2 of 2 PEs ok
 p-2-unbound-1                          exit   0    0.2 s  2 of 2 PEs ok
 p-2-bound-by-mpirun-2                  exit   0    0.2 s  2 of 2 PEs ok
 p-2-unbound-2                          exit   0    0.2 s  2 of 2 PEs ok
 p-2-bound-by-mpirun-3                  exit   0    0.2 s  2 of 2 PEs ok
 p-2-unbound-3                          exit   0    0.2 s  2 of 2 PEs ok
-p-4-bound-by-mpirun-1                  exit   0    0.4 s  4 of 4 PEs ok
-p-4-unbound-1                          exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-to-cores-1                   exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-by-mpirun-2                  exit   0    0.4 s  4 of 4 PEs ok
-p-4-unbound-2                          exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-to-cores-2                   exit   0    0.4 s  4 of 4 PEs ok
-p-4-bound-by-mpirun-3                  exit   0    0.4 s  4 of 4 PEs ok
-p-4-unbound-3                          exit   0    0.5 s  4 of 4 PEs ok
-p-4-bound-to-cores-3                   exit   0    0.4 s  4 of 4 PEs ok
+p-4-bound-by-mpirun-1                  exit   0    0.5 s  4 of 4 PEs ok
+p-4-unbound-1                          exit   0    0.5 s  4 of 4 PEs ok
+p-4-bound-to-cores-1                   exit   0    0.5 s  4 of 4 PEs ok
+p-4-bound-by-mpirun-2                  exit   0    0.5 s  4 of 4 PEs ok
+p-4-unbound-2                          exit   0    0.6 s  4 of 4 PEs ok
+p-4-bound-to-cores-2                   exit   0    0.6 s  4 of 4 PEs ok
+p-4-bound-by-mpirun-3                  exit   0    0.7 s  4 of 4 PEs ok
+p-4-unbound-3                          exit   0    0.6 s  4 of 4 PEs ok
+p-4-bound-to-cores-3                   exit   0    0.6 s  4 of 4 PEs ok

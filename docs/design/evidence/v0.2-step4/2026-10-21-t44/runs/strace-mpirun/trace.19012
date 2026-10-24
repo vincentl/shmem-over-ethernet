@@ -1,0 +1,3 @@
+08:31:30.050677 execve("/usr/bin/hostname", ["hostname"], 0xaaaaf2ed1dd8 /* 59 vars */) = 0
+08:31:30.051931 exit_group(0)           = ?
+08:31:30.051986 +++ exited with 0 +++

@@ -1,0 +1,6 @@
+# 2026-10-24T12:57:29Z, load 0.04 0.02 0.08
+s1-shmem-only                          exit   0    0.0 s  2 of 2 PEs ok
+s2-mpi-only                            exit   0    0.1 s  2 of 2 PEs ok
+s3-singletons                          exit   0    0.0 s  2 of 2 PEs ok; left in /dev/shm: sm_segment.lima-osoe.501.62ab0000.0 sm_segment.lima-osoe.501.84a0000.0 
+s4-variables                           exit   0    0.0 s  0 of 0 PEs ok
+s5-mpirun-and-wrapper                  exit   0    0.1 s  4 of 4 PEs ok

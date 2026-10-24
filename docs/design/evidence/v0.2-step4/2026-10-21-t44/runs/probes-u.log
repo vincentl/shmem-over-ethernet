@@ -1,8 +1,8 @@
-# 2026-10-21T05:41:01Z, load 0.42 1.21 4.00
+# 2026-10-24T12:37:08Z, load 0.96 0.61 0.32
 u1-threads-shmem-only                  exit   0    3.0 s  0 of 2 PEs ok
 u2-threads-mpi-started                 exit   0    3.1 s  0 of 2 PEs ok
 u3-threads-mpi-finalized               exit   0    3.1 s  0 of 2 PEs ok
-u4-shmem-only-deadlock                 exit   1    4.2 s  0 of 3 PEs ok
-u5-mpi-started-deadlock                exit 124   25.3 s  0 of 3 PEs ok
+u4-shmem-only-deadlock                 exit   1    4.7 s  0 of 3 PEs ok
+u5-mpi-started-deadlock                exit 124   25.2 s  0 of 3 PEs ok
 u6-mpi-finalized-deadlock              exit   1    4.3 s  0 of 3 PEs ok
-u7-mpi-finalized-deadlock-2-nodes      exit   1    4.8 s  0 of 4 PEs ok
+u7-mpi-finalized-deadlock-2-nodes      exit   1    4.4 s  0 of 4 PEs ok

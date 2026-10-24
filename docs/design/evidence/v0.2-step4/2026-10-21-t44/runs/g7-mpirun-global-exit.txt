@@ -1,17 +1,17 @@
+PE 2: MPI started: rank 2 of 3
 PE 1: MPI started: rank 1 of 3
 PE 0: MPI started: rank 0 of 3
-PE 2: MPI started: rank 2 of 3
-osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2941078.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2941078.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.19614.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.19614.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 0: shmem started: PE 0 of 3
 PE 0: waiting
 PE 2: shmem started: PE 2 of 3
 PE 2: waiting
-osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2941078.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.19614.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 1: shmem started: PE 1 of 3
 PE 1: shmem_global_exit(3)
 --------------------------------------------------------------------------
-prterun has exited due to process rank 0 with PID 2941081 on node lima-osoe exiting
+prterun has exited due to process rank 0 with PID 19617 on node lima-osoe exiting
 improperly. There are three reasons this could occur:
 
 1. this process did not call "init" before exiting, but others in the

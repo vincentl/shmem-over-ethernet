@@ -1,22 +1,22 @@
-osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2945966.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2945966.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2945966.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-PE 1: shmem started: PE 1 of 3
-PE 1: in shmem_barrier_all
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.21859.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.21859.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.21859.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 0: shmem started: PE 0 of 3
 PE 0: waiting in shmem for a flag nobody sets
 PE 2: shmem started: PE 2 of 3
 PE 2: in shmem_barrier_all
+PE 1: shmem started: PE 1 of 3
+PE 1: in shmem_barrier_all
 osoe: deadlock: every PE of the job waits in the library, and nothing has moved on any of its 1 node for 3 s, nor is anything in flight between them: no PE can ever be woken, so the job ends (OSOE_DEADLOCK_SECONDS=0 turns this off). Where each PE waits:
 osoe: deadlock: lima-osoe: PE 0 in shmem_int_wait_until (statics +0x10040), for 4 s
 osoe: deadlock: lima-osoe: PE 1, 2 in shmem_barrier_all (epoch 1), for 4 s
 osoe: PE 0: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_int_wait_until
-osoe: PE 2: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_barrier_all
 osoe: PE 1: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_barrier_all
+osoe: PE 2: ending: the job is aborting on behalf of PE 0; this PE was waiting in shmem_barrier_all
 --------------------------------------------------------------------------
 prterun detected that one or more processes exited with non-zero status,
 thus causing the job to be terminated. The first process to do so was:
 
-   Process name: [prterun-lima-osoe-2945966@1,0]
+   Process name: [prterun-lima-osoe-21859@1,0]
    Exit code:    1
 --------------------------------------------------------------------------

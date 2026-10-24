@@ -1,28 +1,28 @@
 PE 0: MPI started: rank 0 of 1
 PE 2: MPI started: rank 0 of 1
 PE 1: MPI started: rank 0 of 1
-osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.2945295.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.21192.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 0: shmem started: PE 0 of 3
+osoe: PE 2 of 3 (local 2 of 3): segment /dev/shm/osoe.21192.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+PE 0: waiting
+osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.21192.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 2: shmem started: PE 2 of 3
 PE 2: waiting
-osoe: PE 0 of 3 (local 0 of 3): segment /dev/shm/osoe.2945295.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
-PE 0: shmem started: PE 0 of 3
-PE 0: waiting
-osoe: PE 1 of 3 (local 1 of 3): segment /dev/shm/osoe.2945295.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 1: shmem started: PE 1 of 3
 PE 1: raising SIGSEGV
-[lima-osoe:2945297:0:2945297] Caught signal 11 (Segmentation fault: tkill(2) or tgkill(2) at address 0x1f5002cf111)
-==== backtrace (tid:2945297) ====
- 0  /lib/aarch64-linux-gnu/libucs.so.0(ucs_handle_error+0x2b4) [0xffff8e6f0424]
- 1  /lib/aarch64-linux-gnu/libucs.so.0(+0x305a8) [0xffff8e6f05a8]
- 2  /lib/aarch64-linux-gnu/libucs.so.0(+0x306d0) [0xffff8e6f06d0]
- 3  linux-vdso.so.1(__kernel_rt_sigreturn+0) [0xffff8f110808]
- 4  /lib/aarch64-linux-gnu/libc.so.6(+0x88020) [0xffff8eb18020]
- 5  /lib/aarch64-linux-gnu/libc.so.6(gsignal+0x20) [0xffff8eac6880]
+[lima-osoe:21194:0:21194] Caught signal 11 (Segmentation fault: tkill(2) or tgkill(2) at address 0x1f5000052ca)
+==== backtrace (tid:  21194) ====
+ 0  /lib/aarch64-linux-gnu/libucs.so.0(ucs_handle_error+0x2b4) [0xffff9f760424]
+ 1  /lib/aarch64-linux-gnu/libucs.so.0(+0x305a8) [0xffff9f7605a8]
+ 2  /lib/aarch64-linux-gnu/libucs.so.0(+0x306d0) [0xffff9f7606d0]
+ 3  linux-vdso.so.1(__kernel_rt_sigreturn+0) [0xffffa017d808]
+ 4  /lib/aarch64-linux-gnu/libc.so.6(+0x88020) [0xffff9fb88020]
+ 5  /lib/aarch64-linux-gnu/libc.so.6(gsignal+0x20) [0xffff9fb36880]
  6  <out>/mpi-and-shmem() [0x402370]
- 7  /lib/aarch64-linux-gnu/libc.so.6(+0x2225c) [0xffff8eab225c]
- 8  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0x9c) [0xffff8eab233c]
+ 7  /lib/aarch64-linux-gnu/libc.so.6(+0x2225c) [0xffff9fb2225c]
+ 8  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0x9c) [0xffff9fb2233c]
  9  <out>/mpi-and-shmem() [0x402670]
 =================================
 osoe-launch: rank 1 killed by signal 11
-osoe-launch: rank 2 killed by signal 15
 osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 2 killed by signal 15

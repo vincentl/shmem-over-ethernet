@@ -12,22 +12,22 @@ Breakpoint 1, 0x0000fffff7a0638c in pthread_create () from /lib/aarch64-linux-gn
 #5  0x0000fffff7fc8af4 [PAC] in ?? () from /lib/ld-linux-aarch64.so.1
 #6  0x0000fffff7fbf244 [PAC] in _dl_catch_exception () from /lib/ld-linux-aarch64.so.1
 #7  0x0000fffff7fc8ebc [PAC] in ?? () from /lib/ld-linux-aarch64.so.1
-[New Thread 0xfffff646ec60 (LWP 2940551)]
+[New Thread 0xfffff646ec60 (LWP 19070)]
 
 Thread 1 "mpi-and-shmem" hit Breakpoint 1, 0x0000fffff7a0638c in pthread_create () from /lib/aarch64-linux-gnu/libc.so.6
 #0  0x0000fffff7a0638c in pthread_create () from /lib/aarch64-linux-gnu/libc.so.6
-#1  0x0000fffff7f00100 [PAC] in osoe_agent_start (slot=0xfffff5b51380) at <repo>/shmem/src/agent.c:296
-#2  0x0000fffff7f1052c in session_start () at <repo>/shmem/src/init.c:515
-#3  0x0000fffff7f10a6c in pshmem_init () at <repo>/shmem/src/init.c:681
-#4  0x000000000040293c in start_one (name=0xffffffffef40 "shmem") at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:124
-#5  0x0000000000402cb0 in each (list=list@entry=0xfffffffff633 "shmem", act=act@entry=0x402848 <start_one>) at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:155
+#1  0x0000fffff7f00120 [PAC] in osoe_agent_start (slot=0xfffff5b51380) at <repo>/shmem/src/agent.c:296
+#2  0x0000fffff7f1060c in session_start () at <repo>/shmem/src/init.c:518
+#3  0x0000fffff7f10b4c in pshmem_init () at <repo>/shmem/src/init.c:684
+#4  0x000000000040293c in start_one (name=0xffffffffef00 "shmem") at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:124
+#5  0x0000000000402cb0 in each (list=list@entry=0xfffffffff608 "shmem", act=act@entry=0x402848 <start_one>) at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:155
 #6  0x0000000000401a1c in main (argc=<optimized out>, argv=<optimized out>) at <repo>/docs/design/evidence/v0.2-step4/2026-10-21-t44/mpi-and-shmem.c:559
-[New Thread 0xfffff58aac60 (LWP 2940552)]
-osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.2940538.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
+[New Thread 0xfffff58aac60 (LWP 19071)]
+osoe: PE 0 of 1 (local 0 of 1): segment /dev/shm/osoe.19057.0.0.0, heap 67108864 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 1
 PE 0: shmem started: PE 0 of 1
-PE 0: thread 2940549 mpi-and-shmem R
-PE 0: thread 2940551 fuse S
-PE 0: thread 2940552 osoe-agent S
+PE 0: thread 19068 mpi-and-shmem R
+PE 0: thread 19070 fuse S
+PE 0: thread 19071 osoe-agent S
 PE 0: 3 threads
 PE 0: signal SIGHUP is handled in libucs.so.0 by ?
 PE 0: signal SIGILL is handled in libucs.so.0 by ?
@@ -35,14 +35,14 @@ PE 0: signal SIGBUS is handled in libucs.so.0 by ?
 PE 0: signal SIGFPE is handled in libucs.so.0 by ?
 PE 0: signal SIGSEGV is handled in libucs.so.0 by ?
 PE 0: 5 signals not at their default
-PE 0: thread 2940549 mpi-and-shmem R
-PE 0: thread 2940551 fuse S
-PE 0: thread 2940552 osoe-agent S
+PE 0: thread 19068 mpi-and-shmem R
+PE 0: thread 19070 fuse S
+PE 0: thread 19071 osoe-agent S
 PE 0: 3 threads
-[Thread 0xfffff58aac60 (LWP 2940552) exited]
+[Thread 0xfffff58aac60 (LWP 19071) exited]
 PE 0: shmem finalized
-[Thread 0xfffff646ec60 (LWP 2940551) exited]
-[Inferior 1 (process 2940549) exited normally]
+[Thread 0xfffff646ec60 (LWP 19070) exited]
+[Inferior 1 (process 19068) exited normally]
 No stack.
 The program is not being run.
 No stack.

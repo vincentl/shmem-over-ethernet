@@ -1,12 +1,12 @@
-PE 3: MPI started: rank 3 of 4
-PE 2: MPI started: rank 2 of 4
 PE 1: MPI started: rank 1 of 4
+PE 2: MPI started: rank 2 of 4
+PE 3: MPI started: rank 3 of 4
 PE 0: MPI started: rank 0 of 4
 PE 0: check: 20 rounds, ok
-PE 1: check: 20 rounds, ok
 PE 2: check: 20 rounds, ok
 PE 3: check: 20 rounds, ok
+PE 1: check: 20 rounds, ok
+PE 3: MPI finalized
 PE 0: MPI finalized
 PE 1: MPI finalized
 PE 2: MPI finalized
-PE 3: MPI finalized
