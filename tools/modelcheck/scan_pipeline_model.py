@@ -78,15 +78,34 @@ Breakages
   lanes_node_small    small scans through slots a member's teams share, not each
                       team number's own (SLOT or VALUE).
 
-Runs are SC; a put is fenced before the counter add that covers it
-(invariant 5), and waits are abstract (the region wait's wake is
-wait_word_model.py's).
+Memory orders (T29; round six's portability review, whose note was that the slots
+were written in `nd` steps, which the engine never buffers). Every case runs
+under SC and under x86-TSO. A slot's bytes are a **put** into another member's
+internal region, which its agent (or the helper that owns the wire) applies as
+plain stores: a model store with `serial=False`, which the checker buffers under
+TSO and flushes in the order made. The ghosts that go with a slot (what it held,
+which scan and piece wrote it) are noted atomically with the store, as the `nd`
+steps did, so the SC runs are state for state the ones they were. The add each
+put is fenced before (OSOE_TRANSPORT_FENCED, transport.h, invariant 5) is
+osoe_rmw_apply's (rmw.h): a seq_cst fetch_add, locked, which drains the buffer;
+and the reader loads the counter (osoe_transport_load, seq_cst) before the slot.
+Waits are abstract (the region wait's wake is wait_word_model.py's). The puts,
+all osoe_internode_generic_scan's (internode-generic.c):
+  UP, UPC       a piece's subtree total up, into the parent's lane slot (or the team
+                number's small slot) for the member's position, then
+                scan_counter_of_number's fenced add
+  DOWN, DOWNC   the sum before a child's subtree down, into its slot, then the
+                child's fenced add
+  GRANT         a member entering a large scan: the grant's words put into each
+                child, then scan_grant_counter's fenced add (the words are not
+                modelled: one lane a member)
+Not modelled: a lane word before a child's first piece, and the reader's clears.
 
 Usage: scan_pipeline_model.py [substring ...]   runs the cases whose names match
 """
 import sys
 
-from engine import assemble, explore, report, select
+from engine import DEL, assemble, explore, report, select
 
 UP = lambda p, t, j, s: ('up', p, t, j, s)   # at PE p, team t: child position j's slot s
 UPC = lambda p, t, j: ('upc', p, t, j)       # its counter, cumulative
@@ -209,7 +228,7 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
 
     # Entry: nothing in flight, the ring's locals cleared.
     entry = [('set', 'up', lambda L: 0), ('set', 'down', lambda L: 0),
-             ('set', 'pend', lambda L: 0)]
+             ('set', 'pend', lambda L: 0), ('set', 'put', lambda L: DEL)]
     for q in range(ring):
         entry.append(('set', f'own{q}', lambda L: 0))
         for j in range(len(kids)):
@@ -266,15 +285,24 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
     up.append(('UO', ('ghost', lambda M, L, rank=rank:
                       ({}, {local('own', L['up']): source(x, L['up'], rank, members, pieces)}))))
     if ppe is not None:
-        def put_up(M, L, t=s_t, ppe=ppe, position=position, n=len(kids)):
-            key = UP(ppe, t, position, slot(L['up']))
+        # The put into the parent's up-slot: a store of the bytes - a plain store the
+        # parent's agent makes, buffered under TSO - and, atomic with it, the slot's
+        # ghosts (it was written; whether it still held an unread value). The add
+        # after it, fenced, drains the bytes (osoe_internode_generic_scan, internode-
+        # generic.c: osoe_transport_put, then osoe_transport_rmw OSOE_TRANSPORT_FENCED).
+        def up_key(L, t=s_t, ppe=ppe, position=position):
+            return UP(ppe, t, position, slot(L['up']))
+
+        def note_up(M, L, n=len(kids)):
+            key = up_key(L)
             if M[UNREAD(key)]:
-                return [({OVERWRITE: 1}, {}, 'overwrite')]
+                # An overwrite, flagged: the old bytes stored again, so nothing moves.
+                return {OVERWRITE: 1}, {'put': M[key]}
             total = L[local('own', L['up'])] + sum(L[local(f'c{j}_', L['up'])] for j in range(n))
-            return [({key: total, UNREAD(key): 1, TAG(key): tag(x, L['up'])}, {},
-                     f'PE {pe} puts piece {L["up"]}\'s subtree total into PE {ppe}\'s '
-                     f'up-slot {position}')]
-        up += [('UP', ('nd', put_up)),
+            return {UNREAD(key): 1, TAG(key): tag(x, L['up'])}, {'put': total}
+        up += [('UPN', ('gpre', note_up)),
+               ('UP', ('store', up_key, lambda L: L['put'], False)),
+               ('UPD', ('set', 'put', lambda L: DEL)),
                ('UPO', ('check', lambda M, L: None if not M[OVERWRITE] else
                         f'SLOT: PE {pe} overwrote an unread up-slot')),
                ('UPA', ('add', lambda L, t=t, ppe=ppe, position=position: UPC(ppe, t, position),
@@ -301,16 +329,21 @@ def one_scan(design, pe, members, k, depth, pieces, window, ring, x, team, base,
                                  f'RESULT: PE {pe}\'s exclusive result for piece {L[var]} of '
                                  f'scan {x} is {L["before"]:b}')))
         for j, kpe in enumerate(kpes):
-            def put_down(M, L, j=j, kpe=kpe, t=s_t):
-                key = DOWN(kpe, t, slot(L[var]))
+            # Likewise a put into a child's down-slot: the bytes stored, buffered
+            # under TSO, the ghosts atomic with the store, the fenced add after.
+            def down_key(L, kpe=kpe, t=s_t):
+                return DOWN(kpe, t, slot(L[var]))
+
+            def note_down(M, L, j=j, down_key=down_key):
+                key = down_key(L)
                 if M[UNREAD(key)]:
-                    return [({OVERWRITE: 1}, {}, 'overwrite')]
+                    return {OVERWRITE: 1}, {'put': M[key]}
                 value = L['before'] + L[local('own', L[var])] + \
                     sum(L[local(f'c{i}_', L[var])] for i in range(j))
-                return [({key: value, UNREAD(key): 1, TAG(key): tag(x, L[var])}, {},
-                         f'PE {pe} puts piece {L[var]}\'s sum before child {j} into PE '
-                         f'{kpe}\'s down-slot')]
-            D += [(f'{prefix}Q{j}', ('nd', put_down)),
+                return {UNREAD(key): 1, TAG(key): tag(x, L[var])}, {'put': value}
+            D += [(f'{prefix}QN{j}', ('gpre', note_down)),
+                  (f'{prefix}Q{j}', ('store', down_key, lambda L: L['put'], False)),
+                  (f'{prefix}QD{j}', ('set', 'put', lambda L: DEL)),
                   (f'{prefix}QO{j}', ('check', lambda M, L: None if not M[OVERWRITE] else
                                       f'SLOT: PE {pe} overwrote an unread down-slot')),
                   (f'{prefix}QA{j}', ('add', lambda L, kpe=kpe, t=t: DOWNC(kpe, t),
@@ -358,7 +391,11 @@ def case(design, members, k, depth, pieces, order):
     return name, threads, mem, members
 
 
-# (design, members, fan-out, depth, pieces, order, expect): True, or the property it must fail
+# (design, members, fan-out, depth, pieces, order, expect): True, or the property it must fail.
+# Each runs under SC and then under x86-TSO, with the same verdict - but `summed`, which
+# fails VALUE and RESULT under both orders and is named by the one the search meets
+# first: VALUE under SC, RESULT under TSO, whose flush steps move the search order
+# (T29, 2026-10-24).
 CASES = [
     ('design', 3, 2, 2, 3, 'A', True),           # a root and two leaves
     ('design', 4, 1, 2, 3, 'A', True),           # a chain: members both parent and child
@@ -406,9 +443,11 @@ def main():
         name, threads, mem, n = case(design, members, k, depth, pieces, order)
         if not want(name):
             continue
-        res = explore(name, threads, mem, max_seconds=900, liveness_max_states=3_000_000,
-                      done=lambda M, n=n: M[FIN] == n)
-        ok &= report(res, expect=expect)
+        for tso in (False, True):
+            res = explore(name, threads, mem, tso=tso, max_seconds=900,
+                          liveness_max_states=3_000_000, done=lambda M, n=n: M[FIN] == n)
+            met = 'RESULT' if tso and design == 'summed' else expect
+            ok &= report(res, expect=met, tso=tso)
     return 0 if ok else 1
 
 
