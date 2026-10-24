@@ -1957,8 +1957,9 @@ loud, and how far it reaches depends on where it is:
 Nothing that waits gives up because time has passed (design §3.15). Instead,
 once a start-up wait has lasted 30 seconds its node says what it waits for, in
 one line and then every minute - the lead for the node, since its other PEs wait
-on it, and they end by themselves if its process ends once it has made the
-node's segment - or, in a start without a launch number, finished it: the lead
+on it, and they end by themselves if its process ends after it has made the
+node's segment - or, in a start without a launch number, after it has finished
+it: the lead
 names the local PEs that have not joined, and their ranks; a node's first other
 PE, while its lead has made no segment, names the lead; a lead calling another
 node names that node, its host-list entry, the address and ports it dialled and
