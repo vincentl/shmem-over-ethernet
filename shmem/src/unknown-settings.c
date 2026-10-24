@@ -118,6 +118,7 @@ static const char *const known_settings[] = {
     "OSOE_TEST_HELD_RANK",
     "OSOE_TEST_HELPERS",
     "OSOE_TEST_IBPUT_MISUSE",
+    "OSOE_TEST_KILL_NAME",
     "OSOE_TEST_LEADS",
     "OSOE_TEST_LOCKED_MEMORY",
     "OSOE_TEST_LOCK_MISUSE",

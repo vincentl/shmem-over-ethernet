@@ -1619,7 +1619,7 @@ that one could be added without touching the OpenSHMEM layer.
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 569 of the full build's 1,147 tests in
+  development VM with liburing hidden: 572 of the full build's 1,150 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1957,20 +1957,29 @@ loud, and how far it reaches depends on where it is:
 Nothing that waits gives up because time has passed (design §3.15). Instead,
 once a start-up wait has lasted 30 seconds its node says what it waits for, in
 one line and then every minute - the lead for the node, since its other PEs wait
-on it, and they end by themselves if its process ends: the lead names the local
-PEs that have not joined, and their ranks; a node's first other PE, while its
-lead has made no segment, names the lead; a lead calling another node names that
-node, its host-list entry, the address and ports it dialled and the last error
-("Connection refused", "the connection timed out", "no answer to the hello"); a
-lead waiting to be called names the nodes it waits for, and a lead connecting
-its mesh, calling and called at once, says both in its one line; and a lead
-whose progress thread, created, the system has not yet run says so. The
-launcher ends what remains - `srun -K1` at the first task that fails - and
-`OSOE_NO_PROGRESS_TIMEOUT` ends a wait that stops moving. The start's last
-step, once every node is connected - the link's measurement and the reduction
-that hands every PE its numbers - waits as a collective does: a hang there
-says nothing at 30 s, and shows in `osoe-stat` as a collective's would, its
-routine `shmem_init`.
+on it, and they end by themselves if its process ends after it has made the
+node's segment - or, in a start without a launch number, after it has finished
+it: the lead
+names the local PEs that have not joined, and their ranks; a node's first other
+PE, while its lead has made no segment, names the lead; a lead calling another
+node names that node, its host-list entry, the address and ports it dialled and
+the last error ("Connection refused", "the connection timed out", "no answer to
+the hello"); a lead waiting to be called names the nodes it waits for, and a
+lead connecting its mesh, calling and called at once, says both in its one line;
+and a lead whose progress thread, created, the system has not yet run says so.
+The launcher ends what remains - `srun -K1` at the first task that fails - and
+`OSOE_NO_PROGRESS_TIMEOUT` ends a wait that stops moving. What remains includes
+the node-mates of a lead that dies before it has made the segment and, in a
+start without a launch number, before it has finished it, which is chiefly the
+creating of its heap. The number is how a PE tells the segment of its own start
+from a failed start's leftover by the same names, which its lead is about to
+replace; without one it does not take the process id in the segment for its
+lead's. `osoe-launch` gives every start a number, `OSOE_LAUNCH` gives one by
+hand, and a requeued Slurm job has `SLURM_RESTART_COUNT`; the first run of a
+Slurm job has none. The start's last step, once every node is connected - the
+link's measurement and the reduction that hands every PE its numbers - waits as
+a collective does: a hang there says nothing at 30 s, and shows in `osoe-stat`
+as a collective's would, its routine `shmem_init`.
 
 **Trust.** osoe assumes a private cluster network, as Slurm does. With
 `OSOE_JOB_SECRET`, a host that does not know the secret cannot join the job:

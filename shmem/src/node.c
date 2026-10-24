@@ -419,7 +419,8 @@ static uint32_t first_missing_rank(const struct osoe_node *n, const struct osoe_
  * before, a lead that died with its segment made left the node's other PEs
  * waiting on its count in silence, since the lead is the one that speaks for
  * the node (the adversarial read of 2026-10-03). A segment of another launch
- * is never this far (open_control).
+ * is never this far (open_control); before the lead's `ready` it may be, and
+ * lead_ended_before_ready is the check there.
  */
 static bool lead_ended(const struct osoe_node *n)
 {
@@ -1139,6 +1140,31 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     }
 }
 
+/*
+ * Whether the node's lead has ended after it made the control segment and
+ * before it finished it: killed while it made its heap, with the segment sized
+ * and `ready` unstored, it left its node-mates waiting for the launcher to end
+ * them, their notice saying that it was still at work (the release fixes'
+ * review, correctness F2). Its pid is in the header, a plain field the lead
+ * stores before its release store of `launch` (create_control), so it is read
+ * only after an acquire load that returns this start's launch. That launch also
+ * says that the segment is this start's own and not a failed one's leftover by
+ * the same names, which this start's lead reclaims and a node-mate waits past
+ * (open_control). A launch of 0 - a first Slurm run, a bootstrap made by hand
+ * without OSOE_LAUNCH - is none: two starts with it cannot be told apart, so
+ * the wait stays as it was, ended by the launcher, which under srun -K1 ends
+ * the step when the lead dies (README). And a segment that has lost its name is
+ * a leftover its lead reclaimed, where the loop starts over and does not end;
+ * so the name is looked at last, after the death.
+ */
+static bool lead_ended_before_ready(const struct osoe_node *n, const struct osoe_bootstrap *b)
+{
+    if (b->launch == 0 ||
+        atomic_load_explicit(&n->hdr->launch, memory_order_acquire) != b->launch)
+        return false;
+    return lead_ended(n) && !osoe_shm_orphaned(n->control_fd);
+}
+
 /* A non-lead opens the control segment by name, waiting for the lead to
  * create and publish it. */
 static void open_control(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_t session)
@@ -1199,7 +1225,9 @@ again:;
      * another launch by the same names - a requeued job, a reused pid - may
      * be ready, or failed, already: its `launch` says so, read after the
      * acquire load that published it (the adversarial read of 2026-10-03),
-     * and it is waited past as one not yet reclaimed is. */
+     * and it is waited past as one not yet reclaimed is. A lead that has
+     * ended without storing `ready` ends the start (lead_ended_before_ready),
+     * where its launch says that the pid in the header is this start's. */
     for (;;) {
         bool ready = atomic_load_explicit(&n->hdr->ready, memory_order_acquire) != 0;
         bool failed = atomic_load_explicit(&n->hdr->failed, memory_order_acquire) != 0;
@@ -1233,7 +1261,18 @@ again:;
             }
             goto again;
         }
+        /* The lead's end is seen before `failed` is read: a lead that refused
+         * published that before it ended (publish_failure), and its node-mates
+         * say so, not that it ended. */
+        bool lead_gone = lead_ended_before_ready(n, b);
         check_failed(n);
+        if (lead_gone) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "the local lead, rank %u (pid %d), has ended before "
+                     "finishing the node's control segment %s", b->gtids[0],
+                     (int)n->hdr->creator_pid, n->control_name);
+            fail_rendezvous(n, msg);
+        }
         if (osoe_stall_watch_stalled(&watch, 0))
             osoe_fatal("no progress for %llu s (OSOE_NO_PROGRESS_TIMEOUT): the local lead "
                        "has not initialized %s",
