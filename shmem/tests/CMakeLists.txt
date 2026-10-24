@@ -1233,6 +1233,32 @@ osoe_refusal_test(shmem.start-up.lead-ends-in-join 3 0
   LAUNCH -n 3
   PATTERNS "osoe: PE 1: the local lead, rank 0 [(]pid [0-9]+[)], has ended while this PE waited for local PEs to join the node"
   PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends.sh 3 2 $<TARGET_FILE:shmem_test_init>)
+# And a lead that ends earlier, after it has made and sized the segment and
+# before it stores `ready`, while it creates its heap (kill-on-create.c ends it
+# there): the node's other PEs have mapped the segment and wait on `ready`,
+# where they had no check of the lead's process, and waited for the launcher's
+# limit, their notice saying that the lead was still at work (the release
+# fixes' review, correctness F2). They now end by themselves: the first to see
+# the lead gone names it, and the other says that a local PE failed, or names it
+# too if it saw it as well (node.c, lead_ended_before_ready, which needs the
+# start's launch number, as osoe-launch gives every start). See
+# lead-ends-before-ready.sh. The launcher's limit is 30 s as above. Not under
+# the sanitizers, as slow-message: LD_PRELOAD would change their runtimes' place
+# in the link order.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_library(kill-on-create SHARED kill-on-create.c)
+  target_link_libraries(kill-on-create PRIVATE ${CMAKE_DL_LIBS})
+  osoe_warnings(kill-on-create)
+  osoe_refusal_test(shmem.start-up.lead-ends-before-ready 3 0
+    SECONDS 30
+    LAUNCH -n 3
+    PATTERNS "kill-on-create: ending this process at its creation of /osoe[.][0-9]+[.]0[.]0[.]0[.]heap[.]0"
+             "osoe: PE [12]: the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing the node's control segment /osoe[.][0-9]+[.]0[.]0[.]0"
+             "osoe: PE 1: (the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing|another local PE failed during rendezvous)"
+             "osoe: PE 2: (the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing|another local PE failed during rendezvous)"
+    PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends-before-ready.sh
+            $<TARGET_FILE:kill-on-create> .heap. $<TARGET_FILE:shmem_test_init>)
+endif()
 # A start by the ids of one that failed, its tombstone still standing: it runs,
 # five times of five. See start-same-ids.sh.
 add_test(NAME shmem.start-up.same-ids
