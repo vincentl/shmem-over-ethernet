@@ -1258,6 +1258,21 @@ if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
              "osoe: PE 2: (the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing|another local PE failed during rendezvous)"
     PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends-before-ready.sh
             $<TARGET_FILE:kill-on-create> .heap. $<TARGET_FILE:shmem_test_init>)
+  # And the other side of the same check: a start by the ids of such a lead's
+  # start, whose leftover its node-mates open before their own lead reclaims
+  # it, must not end on the dead lead it finds there - another start's, which
+  # the launch number in the header tells from their own - and, with no launch
+  # number to tell it by, must wait as before. The existing tests of leftovers
+  # passed with either guard of the check taken out. See start-after-lead-ends.sh.
+  add_test(NAME shmem.start-up.lead-ends-before-ready.same-ids
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-after-lead-ends.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:kill-on-create> $<TARGET_FILE:shmem_test_init>)
+  add_test(NAME shmem.start-up.lead-ends-before-ready.same-ids.no-launch
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-after-lead-ends.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:kill-on-create> $<TARGET_FILE:shmem_test_init> no-launch)
+  set_tests_properties(shmem.start-up.lead-ends-before-ready.same-ids
+                       shmem.start-up.lead-ends-before-ready.same-ids.no-launch
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "START AFTER LEAD ENDS OK")
 endif()
 # A start by the ids of one that failed, its tombstone still standing: it runs,
 # five times of five. See start-same-ids.sh.
