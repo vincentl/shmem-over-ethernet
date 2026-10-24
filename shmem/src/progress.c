@@ -38,6 +38,15 @@ uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer)
     return peer < p->node ? peer : peer - 1;
 }
 
+/* The testing holds' clock (OSOE_TEST_HOLD_GOODBYE, goodbye_held; and
+ * OSOE_TEST_HOLD_RELEASE, release_held). */
+static uint64_t monotonic_ns(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
+}
+
 /* ---- Applying what arrived ------------------------------------------- */
 
 /* The peer slot of owner `o`'s wire `i`, and the node at its other end. */
@@ -393,6 +402,22 @@ static void publish_team(struct osoe_progress *p, uint32_t team)
     atomic_store_explicit(&c->fanout, t->tree.fanout, memory_order_release);
 }
 
+/* The control wire's hold (OSOE_TEST_HOLD_RELEASE, progress-host.c; T16): a
+ * RELEASE of a created team queued toward the held node keeps that wire from
+ * sealing anything for half a second, as a peer slow to read would - a control
+ * wire has one buffer, sealed again only once its last segment has gone
+ * (flush_control) - so that a test sees the team's local release held
+ * (release_local) in every run, and not by the chance of a peer stopped for as
+ * long as a socket takes to fill: the review's probe streamed 32 MiB to a
+ * stopped node, and a control wire carries a few bytes a barrier
+ * (shmem.team-release.held; the step D review, G1). */
+#define RELEASE_HOLD_NS (UINT64_C(500) * 1000 * 1000)
+
+static bool release_held(const struct osoe_progress_control *c)
+{
+    return c->release_held_until_ns != 0 && monotonic_ns() < c->release_held_until_ns;
+}
+
 /* Queue one collective message toward a node of the tree, naming the team as
  * that node knows it: its number, and `lead`, the local id of the team's local
  * lead there (am.h; the team redesign's step D) - on the control wire toward
@@ -408,8 +433,11 @@ static void forward(struct osoe_progress *p, uint32_t team, uint32_t node, uint3
     struct osoe_reply r = { .kind = kind, .origin_pe = p->team[team].number,
                             .target_pe = lead, .length = 0, .value = epoch, .token = team };
     enqueue_control(p, slot, &r);
-    if (kind == OSOE_REPLY_RELEASE)
+    if (kind == OSOE_REPLY_RELEASE) {
         p->team[team].releases_queued++;
+        if (p->release_hold && node == p->release_held_node && team >= OSOE_PREDEFINED_TEAMS)
+            p->owner[0].control[slot].release_held_until_ns = monotonic_ns() + RELEASE_HOLD_NS;
+    }
 }
 
 /* A RELEASE has left a control wire's queue for the wire: one fewer of its team's
@@ -1157,13 +1185,6 @@ static void finalize(struct osoe_progress_owner *o, uint32_t i,
  * which timing alone gave its test one run in five. */
 #define ABORT_HOLD_NS (UINT64_C(500) * 1000 * 1000)
 
-static uint64_t monotonic_ns(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
-}
-
 static bool goodbye_held(const struct osoe_progress_owner *o, uint32_t slot)
 {
     return o->engine->abort_hold && slot == o->engine->abort_held_slot &&
@@ -1576,6 +1597,8 @@ static bool flush_control(struct osoe_progress_owner *o, uint32_t slot)
         return moved;
     if (c->queue.depth != 0 || o->closing || c->owe_ack ||
         request_owed(c->acked, c->flagged, c->detector_wanted)) {
+        if (release_held(c))            /* OSOE_TEST_HOLD_RELEASE: the queue keeps its RELEASE */
+            return moved;
         seal_control(o, slot);
         /* The first offer starts the send (wire.h). */
         c->sent += (uint32_t)osoe_wire_send(w, c->buffer, c->bytes);

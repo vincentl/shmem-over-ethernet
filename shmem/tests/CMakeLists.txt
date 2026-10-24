@@ -4016,6 +4016,33 @@ if(OSOE_INTERNODE)
   endif()
 endif()
 
+# The hold of a team's local release (design §3.8; the step D review's
+# correctness G1; T16; test-team-release.c): a team's members leave its block
+# only once its RELEASEs have left the control queues. OSOE_TEST_HOLD_RELEASE=0:1
+# keeps node 0's control wire to node 1 shut for half a second from each
+# RELEASE of a created team queued on it, so that the team over nodes 0 and 1
+# is destroyed with its RELEASE held, and a team over nodes 0 and 2 made inside
+# the window takes its block, as the PEs of node 0 would if they were let go:
+# `releases_held` counts the hold, and with the hold removed the job ends at the
+# first round, "holds another team ... RELEASEs are queued". Not under
+# ThreadSanitizer, like the splits across nodes above.
+if(OSOE_INTERNODE)
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_executable(shmem_test_team-release test-team-release.c
+      ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+    target_include_directories(shmem_test_team-release PRIVATE
+      ${PROJECT_SOURCE_DIR}/tools/stat)
+    target_link_libraries(shmem_test_team-release PRIVATE osoe rt)
+    osoe_warnings(shmem_test_team-release)
+    add_test(NAME shmem.team-release.held.0-1-2
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_HOLD_RELEASE=0:1 SHMEM_SYMMETRIC_SIZE=16m
+              $<TARGET_FILE:osoe-launch> -n 3 -m 0,1,2 -t 60 --
+              $<TARGET_FILE:shmem_test_team-release>)
+    set_tests_properties(shmem.team-release.held.0-1-2 PROPERTIES LABELS "tier2" TIMEOUT 90)
+    osoe_internode_label(shmem.team-release.held.0-1-2)
+  endif()
+endif()
+
 # OSOE_TEAM_BLOCKS (§5.7; the team redesign's step D): a node's pool of team
 # blocks, which its lead lays out, so the PEs of a node must agree - refused as
 # OSOE_MAX_TEAMS is - while two nodes may hold pools of different sizes, since

@@ -322,7 +322,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 584 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 585 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -1586,7 +1586,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 331 of the 584 tests labelled `internode`, `shmem.internode`'s
+  leaves out 332 of the 585 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1618,11 +1618,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  584 tests labelled `internode` - those of a job of more than one node, of
+  585 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 572 of the full build's 1,157 tests in
+  development VM with liburing hidden: 572 of the full build's 1,158 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1632,8 +1632,8 @@ that one could be added without touching the OpenSHMEM layer.
   under `SHMEM_THREAD_MULTIPLE`,
   rendezvous, abort, the proof a deadlock is found by, a progress helper's
   requests and its abort, and the teams' - a team
-  block's life, a split's pending numbers, a pool found empty, the posted
-  arrivals - is checked
+  block's life and the hold of its release, a split's pending numbers, a pool
+  found empty, the posted arrivals - is checked
   exhaustively in small configurations by an explicit-state model checker
   written for them (`tools/modelcheck`). Six of the models, those of the
   `SHMEM_THREAD_MULTIPLE` designs, run only in a build configured with
@@ -1653,9 +1653,19 @@ that one could be added without touching the OpenSHMEM layer.
   it and the test fails. The third is held by the order alone: a helper's view
   reads the open buffers' heads, where the PEs reserve what they post, so an
   answer given before the pass says of that what one given after it would, and
-  the test, with the pass held back, sees only that the answer came first. The
-  one without a model is the deprecated active-set collectives'
-  (`active-set.c`). The checker runs a model under sequential
+  the test, with the pass held back, sees only that the answer came first. A
+  team's local release is held until its RELEASEs have left the control queues,
+  so that its members do not leave, and the block is not claimed again, with one
+  of the old team's queued (design §3.8); it once had neither test nor model,
+  and the suite passed with the hold removed
+  (`docs/reviews/archive/phase1-step7-slice3-correctness.md`, G1). Now
+  `team_block_model.py` queues the RELEASE and `no_hold` fails it, and
+  `shmem.team-release.held.0-1-2`, with node 0's control wire to node 1 shut
+  for half a second after a RELEASE is queued there
+  (`OSOE_TEST_HOLD_RELEASE`), counts the release held and, with the hold
+  removed, ends the job naming the block at its first round. The one without a
+  model is the deprecated active-set collectives' (`active-set.c`). The
+  checker runs a model under sequential
   consistency or x86-TSO (some under both, among them the teams' four models and
   those of the lanes and of a scan's pieces, each store as the library orders it
   and a `release` store buffered as x86 buffers it), and both keep a thread's
@@ -1839,6 +1849,7 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_TEST_SLOW_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: after each of the deadlock detector's questions that helper begins its pass only when the lead has asked again, so that its answer, which follows the pass, is to a question the lead has replaced, and a test sees a true deadlock go unproved - where an answer given before the pass would be taken (`shmem.deadlock.helper-slow.0-0-1-1`). Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_ONLINE_CPUS` | `1` to `65536`: the CPUs online that `OSOE_PROGRESS_HELPERS=auto` counts on each node, in place of the machine's, so that a test of the rule holds on any machine. Read, and checked, by every PE where `auto` is asked for alone. |
 | `OSOE_TEST_HOLD_GOODBYE` | `FROM:TO`, two nodes of the job: node `FROM` holds its abortive goodbye to node `TO` half a second after its abort begins, so that a test sees `TO` hear a third node's goodbye first - the relay a global exit's kept stream is for; every other node ignores it. Refused by name when it is not two different nodes of the job. |
+| `OSOE_TEST_HOLD_RELEASE` | `FROM:TO`, two nodes of the job: after node `FROM` queues a RELEASE of a team a split made toward node `TO`, its control wire to `TO` seals nothing for half a second, as a peer slow to read would keep it, so that a test sees the team's local release held until the RELEASE has left (`shmem.team-release.held.0-1-2`); every other node ignores it. Read, and refused by name when it is not two different nodes of the job, by each node's lead in a job of more than one node alone. |
 | `OSOE_TEST_MESH_HOLD` | `NODE:MS`: node `NODE`'s lead reaches its mesh `MS` milliseconds late, `1` to `60000`, its callers waiting in its listener's backlog meanwhile - the schedule's late lead (`shmem.mesh.hold`). Refused by name when it names no node of the job or no time. |
 | `OSOE_TEST_ABORT_DELAY_MS` | Milliseconds, `0` to `5000`: a node acts on a peer's abortive goodbye that late, and each progress helper begins its own abort that long after it sees the node's, so that a test sees what the lead's wait for its helpers' goodbyes is for. Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_PRINT_LINK` | `1`: rank 0 prints the link it measured at the end of `shmem_init`, as the three `OSOE_LINK_*` settings that pin it, so that a test that failed on the shapes that link chose can be run again on them; nothing where the link is set by hand, the shape is `fixed` or the job has one node. Every test of more than one node in the suite sets it. Refused by name when it is not `0` or `1`. |
