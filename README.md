@@ -322,7 +322,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 577 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 581 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -390,7 +390,10 @@ srun -K1 --cpu-bind=none -N4 --ntasks-per-node=4 /opt/osoe/bin/osoe-pacer --quic
 
 It runs its exercises at small sizes, checks every result, and ends with a line
 beginning `osoe-pacer failures=0` and exit status 0 - in 7 s on the Pi cluster's
-16 PEs. `osoe-pacer --help` lists what else it runs.
+16 PEs. `osoe-pacer --help` lists what else it runs. The smoke test checks data,
+and a `shmem_quiet` that returns before its data has landed shows in data only
+to a reader on a third node: `osoe-pacer --quick relay`, which needs three
+nodes or more, is one.
 
 The version is set once, by `project(osoe VERSION ...)` in `CMakeLists.txt`,
 and everything that names a version says it: `SHMEM_VERSION=1` makes every PE
@@ -1583,7 +1586,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 324 of the 577 tests labelled `internode`, `shmem.internode`'s
+  leaves out 328 of the 581 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1615,11 +1618,11 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  577 tests labelled `internode` - those of a job of more than one node, of
+  581 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 569 of the full build's 1,147 tests in
+  development VM with liburing hidden: 569 of the full build's 1,151 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1688,9 +1691,10 @@ that one could be added without touching the OpenSHMEM layer.
   `env.echo-uring`'s own two pins are checked in every such build.
 - **A stress tester**, `osoe-pacer`: whole-job patterns from real OpenSHMEM
   programs - a streaming sort, all-to-all exchanges, mailboxes, teams, threads,
-  every atomic, transfer and collective, and all of them at once on teams out
-  of step - every result checked against an oracle, and every oracle checked
-  by a planted defect it must catch. A build of it that counts every call
+  every atomic, transfer and collective, a block put to one node and read from
+  it by a third after a quiet, and all of them at once on teams out of step -
+  every result checked against an oracle, and every oracle checked by a planted
+  defect it must catch. A build of it that counts every call
   (`osoe-pacer-counted`, built by the full build where Python 3 is found) shows which of the
   library's 1,794 routines a run reaches.
 - **A Raspberry Pi 5 cluster** over gigabit Ethernet, its four nodes running

@@ -591,6 +591,28 @@ deprecated atomic names, `shmem_wait`, `shmalloc` and `start_pes` in a
 program of their own. Not 1.6's normative surface, but what the corpus
 calls, and they run today.
 
+### 4.11 `relay` - a quiet's promise, kept to a third node
+
+Off by default, and on three nodes or more (T26). A round takes three nodes,
+a, b and c: a PE of a puts a block of 4 MiB to a PE of b, calls `quiet` - or
+`pe_quiet` naming b's PE - and sets a flag at a PE of c with an atomic set; the
+PE of c waits for the flag, gets the block from b, its last words first, and
+checks every word. The rounds rotate through the ordered triples of different
+nodes, the forms of the quiet and of the get turning once a cycle of them, and
+a node's PEs relay at once, a lane to a rank. The block reaches b by the
+connection of a and b and the flag reaches c by the connection of a and c, so
+that nothing but the quiet orders the one before the other: a quiet that
+returns before b's acknowledgement lets c read a block whose end is still the
+round before's, and the failure line says how many of the wrong words are what
+the block held before. The release review planted that defect - a quiet that
+skips the last connection's acknowledgement - and every other exercise passed
+it, since the step it takes after a quiet (a sync, a flag, an atomic, a lock's
+release) travels the stream its data does. Beside it, the home checks its own
+block once the round is over, and the plants are `relay-block` (the reader's
+check), `relay-stale` (both checks, and the account of what is stale) and
+`relay-quiet` (a flag set without a quiet, which is the defect as a program
+meets it, and a race).
+
 ## 5. Phases
 
 Each phase is one brief, `docs/prompts/task-stress-phaseN.md`, and one

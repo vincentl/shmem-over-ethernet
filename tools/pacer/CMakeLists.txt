@@ -9,7 +9,7 @@
 # SHMEM_SYMMETRIC_SIZE; libosoe hides its own copy.
 set(osoe_pacer_sources osoe-pacer.c parallel-print.c sort.c alltoall.c mailbox.c teams.c
   threads.c print.c atomics.c rma.c locks.c memory.c collectives.c waits.c deprecated.c
-  library-counters.c
+  relay.c library-counters.c
   ${PROJECT_SOURCE_DIR}/base/size.c ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
 add_executable(osoe-pacer ${osoe_pacer_sources})
 target_include_directories(osoe-pacer PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/tools/stat)
@@ -226,6 +226,31 @@ if(OSOE_INTERNODE)
       FAIL_REGULAR_EXPRESSION "${pacer_failed}")
     osoe_internode_label(tools.pacer.deprecated.0-1-2-0-1 tools.pacer.waits.0-1-2)
 
+    # relay, on three nodes of a PE each: a block put to the second, a quiet, a
+    # flag on the third, whose PE then reads the block from the second - the one
+    # reader that sees a quiet return early (T26; the release review's eighth
+    # planted defect, which every other exercise passed because its next step
+    # travels on the stream the data does). Six rounds make the six ordered triples
+    # of nodes, 24 the four forms of the quiet and the get, each triple meeting
+    # each, and the 72 of --quick three times that. Named only, and on three nodes
+    # or more: osoe-pacer refuses the run on fewer.
+    #
+    # A copy of the library with that defect - wait_body, in transport-internode.c,
+    # skipping wait_acknowledged for the last connection it has dirty, `if (i + 1 <
+    # c->internode->count)` before the call - fails this test in every run
+    # (2026-10-24, the development VM): 30 of 30 in the release preset, 35 to 46 of
+    # the 72 rounds each, and 30 of 30 in the debug preset, 33 to 43; 32 of 32 with
+    # four runs at once in each; and in the debug preset beside eight busy loops on
+    # its four cores 40 of 40, the fewest 10 rounds of 72. The library as it is
+    # passes it in each preset: 200 of 200 runs, 32 of 32 four at once, and 50 of 50
+    # beside the busy loops.
+    add_test(NAME tools.pacer.relay.0-1-2
+      COMMAND osoe-launch -n 3 -m 0,1,2 -t 240 -- $<TARGET_FILE:osoe-pacer> --quick relay)
+    set_tests_properties(tools.pacer.relay.0-1-2 PROPERTIES LABELS "tier2" TIMEOUT 300
+      PASS_REGULAR_EXPRESSION "osoe-pacer failures=0 "
+      FAIL_REGULAR_EXPRESSION "${pacer_failed}")
+    osoe_internode_label(tools.pacer.relay.0-1-2)
+
     # The sort's other paths - the accumulating mode, the pull exchange, puts
     # where node-mates would take stores - so that every path of it runs too.
     add_test(NAME tools.pacer.sort-paths.0-0-1-1
@@ -377,11 +402,14 @@ endforeach()
 # such PE - osoe-pacer refuses the run, status 2. The round trips are the
 # mailbox's check across nodes alone (a node-mate's message is timed on one
 # clock instead, mailbox.c), so their plant is registered across nodes alone.
+# relay's three need three nodes and are registered on their own map, below.
 set(pacer_plants_across_nodes_only mailbox-round-trip)
-function(pacer_plant_named name defect exercise)
+# The test of a plant on each of `maps`, a list: the maps of this file's plants
+# (above) for all but the few that need more nodes than they have.
+function(pacer_plant_on maps name defect exercise)
   set(patterns "osoe-pacer planted ${defect}: PE 1[ ']"
       "osoe-pacer failures=[1-9][0-9]* seconds=[0-9.]+ plant=${defect}" ${ARGN})
-  foreach(map IN LISTS pacer_plant_maps)
+  foreach(map IN LISTS maps)
     osoe_map_nodes("${map}" nodes)
     string(REPLACE "," "-" label "${map}")
     set(test tools.pacer.plant.${name})
@@ -402,6 +430,9 @@ function(pacer_plant_named name defect exercise)
       osoe_internode_label(${test})
     endif()
   endforeach()
+endfunction()
+function(pacer_plant_named name defect exercise)
+  pacer_plant_on("${pacer_plant_maps}" ${name} ${defect} "${exercise}" ${ARGN})
 endfunction()
 function(pacer_plant defect exercise)
   pacer_plant_named(${defect} ${defect} "${exercise}" ${ARGN})
@@ -644,6 +675,38 @@ pacer_plant_named(mix-waits-value waits-value mix
 # default teams {1,3} and {0,2} hold none), seen in the rma period.
 pacer_plant_named(mix-rma-ptr rma-ptr "--mix-teams;1;mix"
   "mix0.0. rma round=0 ptr: word 32 node-mate PE 1 stored is [0-9a-f]+, not [0-9a-f]+, when its flag said it was there")
+
+# relay's, which need three nodes: the map 0,1,2, a PE a node, in the full build
+# only and not under tsan (above). PE 1 plays each part in turn there - the
+# reader in round 2, of PE 0's block put by PE 2, and the writer in round 1, of
+# PE 2's block read by PE 0 - and the first two plants fire once.
+set(pacer_relay_plant_maps "")
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  set(pacer_relay_plant_maps 0,1,2)
+endif()
+# The reader's check alone: the last of the block's 524,288 words misread, and
+# no other word is, nor one that the block held before.
+pacer_plant_on("${pacer_relay_plant_maps}" relay-block relay-block relay
+  "relay round=2 get: 1 of 524288 words of PE 0's block, put by PE 2, are wrong when PE 1's flag said it had landed. the first, word 524287, is [0-9a-f]+, not [0-9a-f]+. the last wrong word is 524287. 0 of them are what the block held before"
+  "osoe-pacer failures=1 seconds=")
+# Both checks, and the account of what is stale: the last quarter of PE 2's block,
+# 131,072 words, put as the block held them before. PE 0 reads them from PE 2 and
+# PE 2 finds them in its own block after the round, each calling every one of the
+# wrong words what the block held, and no other failure is found.
+pacer_plant_on("${pacer_relay_plant_maps}" relay-stale relay-stale relay
+  "relay round=1 get: 131072 of 524288 words of PE 2's block, put by PE 1, are wrong when PE 0's flag said it had landed. the first, word 393216, is [0-9a-f]+, not [0-9a-f]+. the last wrong word is 524287. 131072 of them are what the block held before"
+  "relay round=1 put: 131072 of 524288 words of the block PE 1 put to PE 2 are wrong when the round is over. the first, word 393216, is [0-9a-f]+, not [0-9a-f]+. the last wrong word is 524287. 131072 of them are what the block held before"
+  "osoe-pacer failures=2 seconds=")
+# The eighth planted defect, a quiet that returns early, as a program meets it:
+# PE 1 sets the flag without a quiet in every round it writes, and the reader
+# finds the end of the block as the round before left it. It is a race, between
+# the reader's get and the writer's data, unlike the other two, and is given the
+# rounds to make it certain: 216, of which PE 1 writes 72. It was seen in 52 to
+# 68 of those writes in 30 runs in each of the release and the debug preset, and
+# beside eight busy loops on the four cores of the development VM in 16 to 48 of
+# them in 40 runs of each (2026-10-24).
+pacer_plant_on("${pacer_relay_plant_maps}" relay-quiet relay-quiet "--rounds;216;relay"
+  "relay round=[0-9]+ get: [0-9]+ of 524288 words of PE [0-9]+'s block, put by PE 1, are wrong when PE [0-9]+'s flag said it had landed. the first, word [0-9]+, is [0-9a-f]+, not [0-9a-f]+. the last wrong word is [0-9]+. [1-9][0-9]* of them are what the block held before")
 
 # The installed program on one node, in both builds - the single-node build's
 # only way to it: installed under a prefix of its own, it finds the library
