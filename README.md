@@ -1645,7 +1645,10 @@ that one could be added without touching the OpenSHMEM layer.
   alone fails without them
   (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-3). The one without a model is the deprecated active-set
   collectives' (`active-set.c`). The checker runs a model under sequential
-  consistency or x86-TSO, and both keep a thread's loads in order, which
+  consistency or x86-TSO (some under both, among them the teams' four models and
+  those of the lanes and of a scan's pieces, each store as the library orders it
+  and a `release` store buffered as x86 buffers it), and both keep a thread's
+  loads in order, which
   aarch64, the machines osoe is built for, does not: the "blocked in" record's
   model passed while its routine name, then plain characters, could be read torn
   on aarch64. That name, a plain field rewritten while another process reads it,

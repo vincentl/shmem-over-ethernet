@@ -89,9 +89,30 @@ Breakages
                     team whose destroy waits for the split (TRAPPED, in
                     split_first).
 
-Every step is a locked instruction or a single-writer store whose order the
-model states; runs are SC. The C11 orders of the library are node.c's, which
-the model's order is the argument for.
+Memory orders (T29; the step D review's portability Q4). Every case runs under
+SC and under x86-TSO, the stores as the library makes them (§3.16): a store the
+library makes `release` is buffered (`serial=False`); a locked instruction, a
+syscall or a `seq_cst` store drains the buffer. The orders are node.c's and
+team.c's:
+  claim     osoe_node_team_claim: the swap is a seq_cst compare-and-swap; the
+            members' zeroing after it a release store (buffered)
+  name      osoe_node_team_name: the generation, the holders and the members,
+            in that order, release stores (buffered; the namer's stores reach
+            memory in the order made, so a reader that loads the members first
+            and the holders after never sees this team's members beside the
+            last team's holders)
+  leave     osoe_node_team_leave: the holders' decrement, the generation's raise
+            and the bit's or are seq_cst read-modify-writes
+  returning osoe_node_team_returning: the members, acquire; the holders and the
+            bit, seq_cst; loads all
+  The flag of `departing` and the last holder's zeroing of `zero_at_leave` are
+  breakages never built: stored as the library would store such words, with
+  release, and buffered.
+  A sync's or a reduction's arrival (team.c, osoe_epoch_bump_eq) is a seq_cst
+  add, which drains the buffer: the sync arrivals below are adds, and under TSO
+  a claimer's reduction and a namer's split sync are a locked or of nothing
+  on a word nothing else reads (`fence`), where the library has them; the SC runs
+  have no such step. The verdicts are the same under both.
 
 Usage: pool_dry_model.py [substring ...]   runs the cases whose names match
 """
@@ -105,10 +126,12 @@ HOLDERS = lambda b: ('holders', b)
 MEMBERS = lambda b: ('members', b)
 DEPARTING = lambda b: ('departing', b)    # departing: set by its team's members before the destroy's sync
 OWNER = lambda b: ('$owner', b)           # whose the block is: one of OWNERS
-ARRIVED = ('$arrived',)                   # parent, remote: arrivals the reduction waits for
-T_SYNC = ('$t_sync',)                     # split_first: arrivals in T's destroy sync
+ARRIVED = ('arrived',)                    # parent, remote: arrivals the reduction waits for
+T_SYNC = ('t_sync',)                      # split_first: arrivals in T's destroy sync
 SPLIT_DONE = ('$split_done',)             # split_first: A's split has returned
 DONE = ('$done',)
+
+FENCE = ('fence',)                        # only the fences touch it, and it never changes
 
 FREE_OWNER, T, A, C, L, T_OUTSIDE = 0, 1, 2, 3, 4, 5
 OWNERS = {FREE_OWNER: 'nobody (free)', T: 'T, destroyed before the split', A: 'A', C: 'C',
@@ -128,21 +151,33 @@ CASES_STATE = {
 ARRIVALS = {'parent': 2, 'remote': 1, 'split_first': 1}
 
 
+def fence(p, then, tso):
+    """Under TSO, a locked or of nothing: the seq_cst read-modify-write the
+    library makes at this point (a reduction's or a sync's arrival), which drains
+    the store buffer on x86. Under SC nothing: a local step that is no step."""
+    if tso:
+        return [(p, ('or', lambda L: FENCE, lambda L: 0, '_', then))]
+    return [(p, ('br', lambda L: True, then, then))]
+
+
 def depart(design, b, p, then):
     """`departing` only: a member about to arrive in its team's destroy sync
     marks the block."""
     if design != 'departing':
         return [(p, ('br', lambda L: True, then, then))]
-    return [(p, ('store', lambda L: DEPARTING(b), lambda L: 1, True, then))]
+    # Never built; a single-writer flag, which the library would store with release.
+    return [(p, ('store', lambda L: DEPARTING(b), lambda L: 1, False, then))]
 
 
 def leave(design, b, p, then):
     """One member leaves block b: holders down by one, and the last holder
-    raises the generation and sets the bit."""
+    raises the generation and sets the bit (osoe_node_team_leave, node.c: each a
+    seq_cst read-modify-write)."""
     B = [(p, ('add', lambda L: HOLDERS(b), lambda L: -1, 'left', '@' + p + 'k')),
          (p + 'k', ('br', lambda L: L['left'] == 0, '@' + p + 'z', then))]
     if design == 'zero_at_leave':
-        B += [(p + 'z', ('store', lambda L: MEMBERS(b), lambda L: 0, True, '@' + p + 'g'))]
+        # Never built: the claim's zeroing (release) moved to the last holder's leave.
+        B += [(p + 'z', ('store', lambda L: MEMBERS(b), lambda L: 0, False, '@' + p + 'g'))]
     else:
         B += [(p + 'z', ('br', lambda L: True, '@' + p + 'g', '@' + p + 'g'))]
     B += [(p + 'g', ('add', lambda L: GEN(b), lambda L: 1, '_', '@' + p + 'f')),
@@ -191,8 +226,8 @@ def returning(design, blocks, p, yes, no):
 
 
 def claim(design, who, p, got, dry):
-    """osoe_node_team_claim: the highest free bit by compare-and-swap, then the
-    block's members zeroed (but in `first` and `zero_at_leave`). The pools here
+    """osoe_node_team_claim: the highest free bit by compare-and-swap (seq_cst), then
+    the block's members zeroed (but in `first` and `zero_at_leave`). The pools here
     are one word, so a lost swap's move to the word a local id names (P9)
     stays in it, as a retry does."""
     B = [(p, ('load', lambda L: FREE, 'w', '@' + p + 'e')),
@@ -206,11 +241,13 @@ def claim(design, who, p, got, dry):
     if design in ('first', 'zero_at_leave'):
         B += [(p + 'z', ('br', lambda L: True, got, got))]
     else:
-        B += [(p + 'z', ('store', lambda L: MEMBERS(L['c']), lambda L: 0, True, got))]
+        # osoe_node_team_claim, node.c: the members' zeroing after the swap is a release
+        # store, buffered under TSO.
+        B += [(p + 'z', ('store', lambda L: MEMBERS(L['c']), lambda L: 0, False, got))]
     return B
 
 
-def split(design, case, who, need, p, then):
+def split(design, case, who, need, p, then, tso):
     """A split's rounds on a lead that needs `need` blocks: claims kept across
     rounds; a pool found empty makes the round busy in the first round and
     while a block is on its way back, and fails the split otherwise. A's
@@ -240,7 +277,10 @@ def split(design, case, who, need, p, then):
         wait = lambda M, L, n=ARRIVALS[case]: M[ARRIVED] == n
     else:
         wait = lambda M, L: True
-    B += [(p + 'B', ('await', wait, '@' + p + 'b')),
+    # The lead's arrival in the round's reduction (osoe_team_split_and) is the
+    # fence; the wait for the others' is the await.
+    B += fence(p + 'B', '@' + p + 'Bw', tso)
+    B += [(p + 'Bw', ('await', wait, '@' + p + 'b')),
           (p + 'b', ('gpost', lambda M, L: ({}, {'round': 1, 'w': DEL, 'c': DEL, 'ok': DEL,
                                                  'b': DEL, 'm': DEL, 'h': DEL, 'f': DEL,
                                                  'g': DEL, 'd': DEL, 'o0': DEL, 'o1': DEL}),
@@ -249,14 +289,19 @@ def split(design, case, who, need, p, then):
           (p + 'X', ('gpost', lambda M, L: ({SPLIT_DONE: 1} if who == A else {}, {}), then))]
     if who == C:
         # C names the block it claimed for a live team: holders, the flag
-        # cleared, then members.
+        # cleared, then members. osoe_node_team_name (node.c) stores the
+        # generation, the holders and the members with release, in that order:
+        # buffered under TSO, and flushed in the order made. The flag is the
+        # breakage `departing`'s, never built, stored as the library would.
+        # The split's sync after it (osoe_team_sync) is the fence.
         B += [(p + 'Y', ('load', lambda L: GEN(L['c']), 'g', '@' + p + 'Yg')),
-              (p + 'Yg', ('store', lambda L: GEN(L['c']), lambda L: L['g'] + 1, True, '@' + p + 'Yh')),
-              (p + 'Yh', ('store', lambda L: HOLDERS(L['c']), lambda L: 1, True, '@' + p + 'Yd')),
-              (p + 'Yd', ('store', lambda L: DEPARTING(L['c']), lambda L: 0, True, '@' + p + 'Ym')),
-              (p + 'Ym', ('store', lambda L: MEMBERS(L['c']), lambda L: 1, True, then))]
+              (p + 'Yg', ('store', lambda L: GEN(L['c']), lambda L: L['g'] + 1, False, '@' + p + 'Yh')),
+              (p + 'Yh', ('store', lambda L: HOLDERS(L['c']), lambda L: 1, False, '@' + p + 'Yd')),
+              (p + 'Yd', ('store', lambda L: DEPARTING(L['c']), lambda L: 0, False, '@' + p + 'Ym')),
+              (p + 'Ym', ('store', lambda L: MEMBERS(L['c']), lambda L: 1, False, '@' + p + 'Yf'))]
+        B += fence(p + 'Yf', then, tso)
     else:
-        B += [(p + 'Y', ('br', lambda L: True, then, then))]
+        B += fence(p + 'Y', then, tso)
     return B
 
 
@@ -271,7 +316,7 @@ def finish(p):
             ('END', ('done',))]
 
 
-def case(design, which):
+def case(design, which, tso=False):
     state = CASES_STATE[which]
     mem = {FREE: 0, DONE: 0, ARRIVED: 0, T_SYNC: 0, SPLIT_DONE: 0}
     for b, (gen, holders, members, departing, free, owner) in enumerate(state):
@@ -282,27 +327,29 @@ def case(design, which):
             mem[FREE] |= 1 << b
     if which == 'member':
         lead = assemble(depart(design, 0, 'd', '@l') + leave(design, 0, 'l', '@s')
-                        + split(design, which, A, 1, 's', '@E') + finish('E'))
+                        + split(design, which, A, 1, 's', '@E', tso) + finish('E'))
         member = assemble(depart(design, 0, 'd', '@l') + leave(design, 0, 'l', '@E')
                           + finish('E'))
-        other = assemble(split(design, which, C, 1, 's', '@E') + finish('E'))
+        other = assemble(split(design, which, C, 1, 's', '@E', tso) + finish('E'))
         threads = [lead, member, other]
     elif which == 'parent':
-        arrive = [('a', ('ghost', lambda M, L: ({ARRIVED: M[ARRIVED] + 1}, {}), '@E'))]
+        # A leaver's arrival in the split's reduction: a locked add (osoe_epoch_bump_eq).
+        arrive = [('a', ('add', lambda L: ARRIVED, lambda L: 1, '_', '@E'))]
         leaver = assemble(depart(design, 0, 'd', '@l') + leave(design, 0, 'l', '@a') + arrive
                           + finish('E'))
-        lead = assemble(split(design, which, A, 1, 's', '@E') + finish('E'))
+        lead = assemble(split(design, which, A, 1, 's', '@E', tso) + finish('E'))
         threads = [lead, leaver, leaver]
     elif which == 'remote':
         # M, T's one member here, not in the parent: it marks the block and
         # arrives in T's sync, whose completion lets X - T's member and a
         # parent PE elsewhere - return from its destroy and arrive in the
-        # split's reduction, which the ghost stands for; then M leaves,
-        # whenever it runs again.
-        sync = [('a', ('ghost', lambda M, L: ({ARRIVED: 1}, {}), '@l'))]
+        # split's reduction, which the add stands for; then M leaves,
+        # whenever it runs again. Arrival in a sync is a locked add
+        # (osoe_epoch_bump_eq), which drains M's buffer under TSO.
+        sync = [('a', ('add', lambda L: ARRIVED, lambda L: 1, '_', '@l'))]
         member = assemble(depart(design, 0, 'd', '@a') + sync + leave(design, 0, 'l', '@E')
                           + finish('E'))
-        lead = assemble(split(design, which, A, 1, 's', '@E') + finish('E'))
+        lead = assemble(split(design, which, A, 1, 's', '@E', tso) + finish('E'))
         threads = [lead, member]
     elif which == 'split_first':
         # T = {X, M}, M here and not in the parent, X a parent PE elsewhere
@@ -310,21 +357,23 @@ def case(design, which):
         # waits for X there; X is in the split's reduction (ARRIVED, at once)
         # and arrives in T's sync once the split has returned; then M leaves.
         member = assemble(depart(design, 0, 'd', '@a') + [
-            ('a', ('ghost', lambda M, L: ({T_SYNC: M[T_SYNC] + 1}, {}), '@w')),
+            ('a', ('add', lambda L: T_SYNC, lambda L: 1, '_', '@w')),
             ('w', ('await', lambda M, L: M[T_SYNC] == 2, '@n')),
             ('n', ('gpost', lambda M, L: ({OWNER(0): T}, {}), '@l'))]
             + leave(design, 0, 'l', '@E') + finish('E'))
         other = assemble([
-            ('x', ('ghost', lambda M, L: ({ARRIVED: 1}, {}), '@y')),
+            ('x', ('add', lambda L: ARRIVED, lambda L: 1, '_', '@y')),
             ('y', ('await', lambda M, L: M[SPLIT_DONE] == 1, '@z')),
-            ('z', ('ghost', lambda M, L: ({T_SYNC: M[T_SYNC] + 1}, {}), '@E'))] + finish('E'))
-        lead = assemble(split(design, which, A, 1, 's', '@E') + finish('E'))
+            ('z', ('add', lambda L: T_SYNC, lambda L: 1, '_', '@E'))] + finish('E'))
+        lead = assemble(split(design, which, A, 1, 's', '@E', tso) + finish('E'))
         threads = [lead, member, other]
     else:
-        threads = [assemble(split(design, which, A, 2, 's', '@E') + finish('E'))]
+        threads = [assemble(split(design, which, A, 2, 's', '@E', tso) + finish('E'))]
     return f'pool_dry/{which}/{design}', threads, mem
 
 
+# (case, design, expect): True, or the property it must fail. Each runs under SC and then
+# under x86-TSO, with the same verdict.
 CASES = [
     ('member', 'design', True),
     ('parent', 'design', True),
@@ -343,13 +392,15 @@ def main():
     want = select(sys.argv)
     ok = True
     for which, design, expect in CASES:
-        name, threads, mem = case(design, which)
-        if not want(name):
+        if not want(case(design, which)[0]):
             continue
-        res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
-                      done=lambda M, n=len(threads): M[DONE] == n,
-                      symmetric=[[1, 2]] if which == 'parent' else ())
-        ok &= report(res, expect=expect)
+        for tso in (False, True):
+            name, threads, mem = case(design, which, tso)
+            res = explore(name, threads, mem, tso=tso, max_seconds=1800,
+                          liveness_max_states=6_000_000,
+                          done=lambda M, n=len(threads): M[DONE] == n,
+                          symmetric=[[1, 2]] if which == 'parent' else ())
+            ok &= report(res, expect=expect, tso=tso)
     return 0 if ok else 1
 
 

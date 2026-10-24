@@ -59,6 +59,32 @@ Breakages
                     step D review, correctness G3), and the comparison with the
                     word last taken passes over a kept bit's.
 
+Memory orders (T29; the step D review's portability Q4). Every case runs under
+SC and under x86-TSO, the stores as the library makes them (§3.16). The
+member's one plain store is the handoff word, a single-writer publication with
+`release`: buffered under TSO (`serial=False`), where the bits, the wake word
+and the wake after it are locked or a syscall and so drain it. The design holds
+under both, and each breakage fails the same way under both: the buffer only
+delays what each side sees of the other's single-writer word, and everything
+the protocol orders is a locked instruction already. The order of each step:
+
+  member (internode-am.c, osoe_internode_arrive)
+    store handoff  atomic_store_explicit(&h->word, generation << 32 | epoch,
+                   release): a plain mov on x86, so buffered
+    or posted      atomic_fetch_or_explicit(..., seq_cst): locked
+    or summary     atomic_fetch_or_explicit(..., seq_cst): locked
+    add wake       atomic_fetch_add_explicit(&lead->agent_wake, 1, seq_cst): locked
+    futex wake     osoe_futex_wake(&lead->agent_wake, ...): a syscall
+  lead (agent.c, agent_main; internode-am.c, osoe_internode_am_take_arrivals,
+  take_arrival)
+    load wake      atomic_load_explicit(&slot->agent_wake, acquire), once a turn
+                   and before the pass
+    load summary   atomic_load_explicit(summary, acquire)
+    exchange       atomic_exchange_explicit(summary, 0, seq_cst) and (&team_posted[w], 0,
+                   seq_cst): locked (`andn`, which returns the old value)
+    load handoff   atomic_load_explicit(&...->arrival.word, acquire)
+    futex wait     osoe_transport_agent_wait(&slot->agent_wake, seen): a syscall
+
 Usage: posted_bitmap_model.py [substring ...]   runs the cases whose names match
 """
 import sys
@@ -82,6 +108,8 @@ def member(design, b):
     for k in range(EPOCHS):
         e, p = k + 1, f'm{k}_'
         nxt = f'@m{k + 1}_S' if k + 1 < EPOCHS else '@E'
+        # serial=False: a release store, osoe_internode_arrive's (internode-am.c); the
+        # ors and the add after it are seq_cst read-modify-writes, and drain it.
         store = (p + 'S', ('store', lambda L: HANDOFF(b), lambda L, e=e: e, False, '@' + p + 'B'))
         bit = (p + 'B', ('or', lambda L: POSTED(g), lambda L: 1 << b, '_', '@' + p + 'G'))
         summary = (p + 'G', ('or', lambda L: SUMMARY, lambda L: 1 << g, '_', '@' + p + 'K'))
@@ -101,6 +129,8 @@ def member(design, b):
                   (p + 'H', ('or', lambda L: SUMMARY, lambda L: 1 << g, '_', '@' + p + 'W')),
                   wait]
         elif design == 'bits_first':
+            # The handoff store last, still the release store it is in the library; the
+            # wake word's add after it drains it.
             B += [(p + 'S', ('or', lambda L: POSTED(g), lambda L: 1 << b, '_', '@' + p + 'B')),
                   (p + 'B', ('or', lambda L: SUMMARY, lambda L: 1 << g, '_', '@' + p + 'G')),
                   (p + 'G', ('store', lambda L: HANDOFF(b), lambda L, e=e: e, False,
@@ -204,6 +234,8 @@ def case(design):
     return f'posted_bitmap/{design} teams={TEAMS} epochs={EPOCHS}', threads, mem
 
 
+# (design, expect): True, or the property it must fail. Each runs under SC and then
+# under x86-TSO, with the same verdict.
 CASES = [
     ('design', True),
     ('summary_first', 'STUCK'),
@@ -221,9 +253,10 @@ def main():
         name, threads, mem = case(design)
         if not want(name):
             continue
-        res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
-                      done=lambda M: M[DONE] == TEAMS + 2)
-        ok &= report(res, expect=expect)
+        for tso in (False, True):
+            res = explore(name, threads, mem, tso=tso, max_seconds=1800,
+                          liveness_max_states=8_000_000, done=lambda M: M[DONE] == TEAMS + 2)
+            ok &= report(res, expect=expect, tso=tso)
     return 0 if ok else 1
 
 

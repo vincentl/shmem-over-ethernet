@@ -95,6 +95,25 @@ Breakages
   lower_fails    a take fails on any other split's pending word, a higher one's
                  too: the lowest split can lose round after round (LOWEST).
 
+Memory orders (T29; the step D review's portability Q4). Every case runs under
+SC and under x86-TSO, and the two agree state for state: every store on the
+design's path is a locked instruction or a `seq_cst` store, an `xchg` on x86,
+so no store is ever left in a buffer and the TSO runs reach the SC runs'
+states. The orders are team.c's:
+  load held (a round's start)
+                   free_mask: atomic_load_explicit(&held[w], acquire), read without a lock
+  cas pending      take_pending: atomic_compare_exchange_strong_explicit(&pending[n], ...,
+                   seq_cst, seq_cst)
+  load held (a take)
+                   take_pending: atomic_load_explicit(&held[w], seq_cst), after the swap
+  store pending 0  give_pending: atomic_store_explicit(&pending[n], 0, seq_cst), after a
+                   take lost (`Tu`, and the words taken so far), a round lost elsewhere
+                   and a number kept (`clear_pending`)
+  or held          split: atomic_fetch_or_explicit(&held[w], bit, seq_cst), before the clear
+  reductions       osoe_team_split_and: each member's arrival a locked add; abstract here
+`token`, the first design, is not in the tree: its stores are kept serializing as
+written, and its verdict is a cycle of waits that no order of stores moves.
+
 Usage: split_numbers_model.py [substring ...]   runs the cases whose names match
 """
 import sys
@@ -204,6 +223,7 @@ def clear_pending(pe, p, then):
     """Clear the pending word of every number in local `release`, one store each."""
     return [(p, ('br', lambda L: L['release'] == 0, then, '@' + p + 'n')),
             (p + 'n', ('set', 'n', lambda L: lowest(L['release']), '@' + p + 's')),
+            # give_pending's seq_cst store (team.c): an xchg, so serial.
             (p + 's', ('store', lambda L: PENDING(pe, L['n']), lambda L: 0, True, '@' + p + 'x')),
             (p + 'x', ('set', 'release', lambda L: L['release'] & ~(1 << L['n']), '@' + p))]
 
@@ -259,6 +279,8 @@ def split_pending(design, case, pe, s, p, then):
         (p + 'Tc', ('br', lambda L: L['c'], '@' + p + 'Th', '@' + p + 'Tw')),
         (p + 'Th', ('load', lambda L: HELD(pe), 'h', '@' + p + 'Tb')),
         (p + 'Tb', ('br', lambda L: (L['h'] >> L['n']) & 1, '@' + p + 'Tu', '@' + p + 'Tg')),
+        # give_pending(numbers, i + 1) of a take that found the number held (team.c):
+        # the same seq_cst store.
         (p + 'Tu', ('store', lambda L: PENDING(pe, L['n']), lambda L: 0, True, '@' + p + 'Tf')),
         (p + 'Tg', ('set', 'taken', lambda L: L['taken'] | 1 << L['n'], '@' + p + 'Ti')),
         (p + 'Ti', ('set', 'want', lambda L: L['want'] & ~(1 << L['n']), '@' + p + 'T0')),
@@ -308,6 +330,7 @@ def split_token(case, pe, s, p, then):
     def may_take(M, L):
         return L['t'] == 0 and all(not M[WANT(pe, o)] for o in lower)
 
+    # The first design's stores (WANT and TOKEN here and below) have no C code: serializing.
     B = [(p + 'W', ('store', lambda L: WANT(pe, s), lambda L: 1, True, '@' + p + 'R')),
          (p + 'R', ('load', lambda L: TOKEN(pe), 't', '@' + p + 'Rt')),
          (p + 'Rt', ('nd', lambda M, L: [({}, {'may': may_take(M, L)}, 'look')], '@' + p + 'Rk')),
@@ -391,6 +414,8 @@ def case(design, which):
     return name, threads, mem, len(threads)
 
 
+# (case, design, expect): True, or the property it must fail. Each runs under SC and then
+# under x86-TSO, with the same verdict.
 CASES = [
     ('shared', 'design', True),
     ('crossed', 'design', True),
@@ -414,9 +439,11 @@ def main():
         name, threads, mem, count = case(design, which)
         if not want(name):
             continue
-        res = explore(name, threads, mem, max_seconds=1800, liveness_max_states=6_000_000,
-                      done=lambda M, count=count: M[DONE] == count)
-        ok &= report(res, expect=expect)
+        for tso in (False, True):
+            res = explore(name, threads, mem, tso=tso, max_seconds=1800,
+                          liveness_max_states=6_000_000,
+                          done=lambda M, count=count: M[DONE] == count)
+            ok &= report(res, expect=expect, tso=tso)
     return 0 if ok else 1
 
 
