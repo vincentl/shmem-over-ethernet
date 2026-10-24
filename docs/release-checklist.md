@@ -197,8 +197,9 @@ rated them (round six's readiness Q5-5).
     `SHMEM_THREAD_MULTIPLE`, so that the stress tester can see a lane shared by
     threads (correctness H1; `shmem.lanes.threads` sees it today)~~ - done
     2026-10-20 (T25: `threads`' fifth phase);
-  - step E's two models under the checker's weaker orders, not sequential
-    consistency only; the PID-namespace message when pids are shifted rather
+  - ~~step E's two models under the checker's weaker orders, not sequential
+    consistency only~~ - done 2026-10-24 (T29: `lane` and `scan_pipeline` under
+    x86-TSO); the PID-namespace message when pids are shifted rather
     than repeated; an x86-64 tsan build's heap placement (portability Q5);
   - a real x86-64 kernel (portability's third step for the x86-64 item).
 - **The 1.6 session routines' semantics, should they ever be more than
@@ -229,7 +230,8 @@ rated them (round six's readiness Q5-5).
   the control segment alone - a job of one node makes no other object, so
   `start-leftovers.sh` and `restart-leftovers.sh` have no form there - and every
   planted defect but `mailbox-round-trip`, whose round trips run across nodes
-  alone, on `0,0,0,0` (`tools.pacer.plant.*.0-0-0-0`, and `start_pes`'s). Left:
+  alone, and the relay's three (2026-10-24, T26), which need three nodes, on
+  `0,0,0,0` (`tools.pacer.plant.*.0-0-0-0`, and `start_pes`'s). Left:
   `shmem.dead-pe.lead-in-init`, whose window, the job's rendezvous held open by
   a node that starts late, a job of one node has not - struck, or built with a
   shim that holds some other step of init open, as `slow-create.c` holds a
@@ -256,8 +258,8 @@ rated them (round six's readiness Q5-5).
   both worth a look when the progress helpers change what a node carries both
   ways at once (looked at on 2026-10-12, H21 in `docs/pi-cluster-results.md`:
   the optimism stands at every helper count, and the 64 KiB was the binding).
-- **A lead that dies between making its segment and finishing it** (correctness
-  F2); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
+- ~~**A lead that dies between making its segment and finishing it** (correctness
+  F2)~~ - done 2026-10-24 (P11, in a start with a launch number); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
   racing its child (F4); F5's small items.
 - **Example 48's plain profiling names in C11** (conformance M1); a fractional
   `SHMEM_SYMMETRIC_SIZE` usable whole (M3); where the cache routines are
@@ -288,8 +290,9 @@ rated them (round six's readiness Q5-5).
     minor 4); 257 leads claiming at once start on one bitmap word; the
     engine's team array is zeroed twice (`progress.c:1141`), more than half of
     a block's 570 bytes on the lead;
-  - nothing asserts that the shared 64-bit atomics are lock-free, and step D's
-    four models run under sequential consistency only (portability Q4);
+  - nothing asserts that the shared 64-bit atomics are lock-free, and ~~step D's
+    four models run under sequential consistency only~~ (portability Q4) - done
+    2026-10-24 (T29: the four under x86-TSO as well);
   - `posted_bitmap_model.py`'s ORDER check is reached by no listed breakage,
     and `take_arrival`'s comparison with the consumed word is redundant
     (correctness G3);
@@ -348,10 +351,10 @@ rated them (round six's readiness Q5-5).
     helper's frame in every report it passes (correctness Q2-2). *Done
     2026-10-11*, with the ninth review's C9-1 (`cmake/thread-sanitizer-gate.py`,
     `docs/decisions/2026-10-11.md`);
-  - a white-box test of the deadlock detector's helper half - an answer naming
+  - ~~a white-box test of the deadlock detector's helper half - an answer naming
     the request posted last, the helpers' applied counts in the activity, the
-    pass after the request - each removal failing it (correctness Q2-3):
-    `deadlock_owners_model.py` alone holds the three today;
+    pass after the request - each removal failing it (correctness Q2-3)~~ - done
+    2026-10-24 (T15: `shmem.deadlock.helper-stale`, `-busy` and `-slow`);
   - the PEs' waits guarded against spinning, as the helpers' and, since
     2026-10-10, the agent's idle waits are by `shmem.helper-wake`'s two runs
     (scale S1; the step 1 review's Q3-1, half closed;
