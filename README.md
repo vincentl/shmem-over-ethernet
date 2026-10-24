@@ -322,7 +322,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 577 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 580 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -1583,7 +1583,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 324 of the 577 tests labelled `internode`, `shmem.internode`'s
+  leaves out 327 of the 580 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1615,7 +1615,7 @@ that one could be added without touching the OpenSHMEM layer.
   release build and 9 of 20 under AddressSanitizer
   (`docs/decisions/2026-10-10-helper-wake.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  577 tests labelled `internode` - those of a job of more than one node, of
+  580 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
@@ -1637,14 +1637,22 @@ that one could be added without touching the OpenSHMEM layer.
   `-DOSOE_MULTIPLE_MODELS=ON`, which no preset sets; get completion's one case
   that a `SHMEM_THREAD_SERIALIZED` program meets runs in every one. Each model
   also carries deliberately broken variants that must fail: a model that cannot
-  fail proves nothing. Some of what the models hold no test of the suite
-  reaches: the deadlock detector's use of the helpers' answers - each answer
-  naming the request posted last, the helpers' work counted in the node's
-  activity, a pass after the request - can each be removed with every detector,
-  helper and stress test passing at two helpers, and `deadlock_owners_model.py`
-  alone fails without them
-  (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-3). The one without a model is the deprecated active-set
-  collectives' (`active-set.c`). The checker runs a model under sequential
+  fail proves nothing. The deadlock detector's use of the helpers' answers -
+  each answer naming the request posted last, the helpers' work counted in the
+  node's activity, a pass after the request - was once held by
+  `deadlock_owners_model.py` alone: each could be removed with every detector,
+  helper and stress test passing at two helpers
+  (`docs/reviews/archive/v0.2-step4-correctness.md`, Q2-3). Now a true
+  deadlock at two helpers, with one helper made to misbehave in the way its
+  clause guards against (`OSOE_TEST_STALE_HELPER`, `OSOE_TEST_BUSY_HELPER`,
+  `OSOE_TEST_SLOW_HELPER`), must go unproved, as `shmem.deadlock.helper-stale`,
+  `-busy` and `-slow` require, and with its clause removed the detector proves
+  it and the test fails. The third is held by the order alone: a helper's view
+  reads the open buffers' heads, where the PEs reserve what they post, so an
+  answer given before the pass says of that what one given after it would, and
+  the test, with the pass held back, sees only that the answer came first. The
+  one without a model is the deprecated active-set collectives'
+  (`active-set.c`). The checker runs a model under sequential
   consistency or x86-TSO (some under both, among them the teams' four models and
   those of the lanes and of a scan's pieces, each store as the library orders it
   and a `release` store buffered as x86 buffers it), and both keep a thread's
@@ -1822,6 +1830,9 @@ moves every message of the node, and the helpers that can share the work
 | `OSOE_TEST_DEADLOCK_DROPS` | A number of probes, `0` to `16`: a node other than the root drops that many of the deadlock detector's first probes, answering none, so that a test sees the root give the collection up after three seconds and begin again rather than wait for the job's life. Refused by name when it is not a whole number in that range. |
 | `OSOE_TEST_ARCHITECTURE` | `other`: the node's lead claims, in the rendezvous, the architecture of the other of x86-64 and aarch64 - `long double`'s format the other's - so that a test sees a job of mixed architectures refused on one machine. Any other value is refused by name. |
 | `OSOE_TEST_DEAF_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper never answers the lead's request to stop, so that a test sees the lead end the job at `shmem_finalize` naming it. Read by each node's lead in a job of more than one node alone, and checked only there. |
+| `OSOE_TEST_STALE_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper answers the deadlock detector's questions until its first yes and never again, so that a test sees a true deadlock go unproved - the detector takes an answer only to the question it asked last (`shmem.deadlock.helper-stale.0-0-1-1`). Read by each node's lead in a job of more than one node alone, and checked only there. |
+| `OSOE_TEST_BUSY_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: that helper counts a message applied at every turn, as real traffic would, so that a test sees a true deadlock go unproved - the node's activity moves, and the detector counts every helper's applied messages in it (`shmem.deadlock.helper-busy.0-0-1-1`). Read by each node's lead in a job of more than one node alone, and checked only there. |
+| `OSOE_TEST_SLOW_HELPER` | A progress helper's number, `1` up to `OSOE_PROGRESS_HELPERS`: after each of the deadlock detector's questions that helper begins its pass only when the lead has asked again, so that its answer, which follows the pass, is to a question the lead has replaced, and a test sees a true deadlock go unproved - where an answer given before the pass would be taken (`shmem.deadlock.helper-slow.0-0-1-1`). Read by each node's lead in a job of more than one node alone, and checked only there. |
 | `OSOE_TEST_ONLINE_CPUS` | `1` to `65536`: the CPUs online that `OSOE_PROGRESS_HELPERS=auto` counts on each node, in place of the machine's, so that a test of the rule holds on any machine. Read, and checked, by every PE where `auto` is asked for alone. |
 | `OSOE_TEST_HOLD_GOODBYE` | `FROM:TO`, two nodes of the job: node `FROM` holds its abortive goodbye to node `TO` half a second after its abort begins, so that a test sees `TO` hear a third node's goodbye first - the relay a global exit's kept stream is for; every other node ignores it. Refused by name when it is not two different nodes of the job. |
 | `OSOE_TEST_MESH_HOLD` | `NODE:MS`: node `NODE`'s lead reaches its mesh `MS` milliseconds late, `1` to `60000`, its callers waiting in its listener's backlog meanwhile - the schedule's late lead (`shmem.mesh.hold`). Refused by name when it names no node of the job or no time. |

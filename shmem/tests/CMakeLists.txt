@@ -4354,6 +4354,37 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
     FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
   osoe_internode_label(shmem.deadlock.waits.probe-dropped.0-0-1-1)
 endif()
+# The detector's helper half (the v0.2 step 4 review, correctness Q2-3). A true
+# deadlock on two nodes at two progress helpers - shmem.deadlock.waits.helpers
+# above, which the detector proves - with one helper made to misbehave in the one
+# way a clause of the half guards against, is not proved: the job waits for the
+# launcher's time limit, and the summary the launcher prints then has the PEs
+# in their wait. With the clause removed the detector proves the deadlock and
+# the test fails (T15):
+#   stale  OSOE_TEST_STALE_HELPER answers once, with yes, and no more: an
+#          answer counts only if it names the question asked last (helpers_say)
+#   busy   OSOE_TEST_BUSY_HELPER counts a message applied at every turn: each
+#          helper's applied count is part of the node's activity (helpers_say)
+#   slow   OSOE_TEST_SLOW_HELPER holds its pass until the lead asks again: an
+#          answer follows a pass begun after the question (helper_main)
+# Not under ThreadSanitizer, which no job is judged deadlocked under.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(case "stale|OSOE_TEST_STALE_HELPER" "busy|OSOE_TEST_BUSY_HELPER"
+               "slow|OSOE_TEST_SLOW_HELPER")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 mode)
+    list(GET parts 1 setting)
+    add_test(NAME shmem.deadlock.helper-${mode}.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1 OSOE_PROGRESS_HELPERS=2 ${setting}=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+              $<TARGET_FILE:shmem_test_deadlock> waits)
+    set_tests_properties(shmem.deadlock.helper-${mode}.0-0-1-1 PROPERTIES LABELS "tier2"
+      TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 30 s.*shmem_int_wait_until"
+      FAIL_REGULAR_EXPRESSION "osoe: deadlock|DEADLOCK TEST REACHED")
+    osoe_internode_label(shmem.deadlock.helper-${mode}.0-0-1-1)
+  endforeach()
+endif()
 # A wake between the detector's two collections (T37): at
 # OSOE_DEADLOCK_SECONDS=3 the last PE's flag is set by a signal of its own 2.5 s
 # into the waits - after the first collection, a second into the quiet, has
