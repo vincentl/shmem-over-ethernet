@@ -73,7 +73,7 @@ static const struct pacer_exercise *const known[] = { &pacer_sort, &pacer_alltoa
                                                       &pacer_locks, &pacer_memory,
                                                       &pacer_waits, &pacer_collectives,
                                                       &pacer_threads, &pacer_print,
-                                                      &pacer_deprecated };
+                                                      &pacer_deprecated, &pacer_relay };
 enum { KNOWN = sizeof known / sizeof *known };
 
 static const char *const plant_names[PACER_PLANTS] = {
@@ -91,7 +91,7 @@ static const char *const plant_names[PACER_PLANTS] = {
     "rma-signal", "waits-value", "waits-index", "waits-excluded", "deprecated-reduce",
     "deprecated-data", "deprecated-outside", "deprecated-barrier", "deprecated-amo",
     "deprecated-wait", "deprecated-word", "waits-count", "teams-renew", "teams-back",
-    "threads-pieces", "threads-collective"
+    "threads-pieces", "threads-collective", "relay-block", "relay-stale", "relay-quiet"
 };
 static const char *const plant_exercise[PACER_PLANTS] = {
     "", "sort", "sort", "sort", "sort", "alltoall", "alltoall", "print", "mailbox", "mailbox",
@@ -102,7 +102,7 @@ static const char *const plant_exercise[PACER_PLANTS] = {
     "rma", "rma", "rma", "memory", "memory", "collectives", "collectives", "collectives",
     "memory", "print", "print", "rma", "waits", "waits", "waits", "deprecated", "deprecated",
     "deprecated", "deprecated", "deprecated", "deprecated", "deprecated", "waits", "teams",
-    "teams", "threads", "threads"
+    "teams", "threads", "threads", "relay", "relay", "relay"
 };
 static const char *const plant_descriptions[PACER_PLANTS] = {
     "",
@@ -178,6 +178,9 @@ static const char *const plant_descriptions[PACER_PLANTS] = {
     "PE 1 misreads the status of the split that follows the exhaust's destroys",
     "PE 1 changes a word at the end of every large get's pieces",
     "PE 1's thread 0 changes a bit of the first result of each kind of collective it checks",
+    "PE 1 misreads the last word of the block it gets",
+    "PE 1 puts the last quarter of its block as the block held it before",
+    "PE 1 sets the flag of the PE that reads its block without a quiet before it",
 };
 
 static void usage(FILE *out)
@@ -187,7 +190,7 @@ static void usage(FILE *out)
 "Puts the library through its paces: whole-job patterns from real OpenSHMEM\n"
 "codes, every result checked against an oracle, a line a checkpoint.\n"
 "\n"
-"Exercises, all but threads and print when none is named:\n"
+"Exercises, all but threads, print, deprecated and relay when none is named:\n"
 "  sort      a streaming bucket sort, ISx's exchange: every key to its owner\n"
 "  alltoall  every-to-every exchange eight ways, on the world and on `even'\n"
 "  mailbox   messages with signals, waited for by every wait and test form\n"
@@ -212,6 +215,10 @@ static void usage(FILE *out)
 "            Annex F's routines - the active-set collectives, the old atomic\n"
 "            names, the old waits, the cache routines - for coverage; only\n"
 "            when named, and on the world alone\n"
+"  relay     a block put to a second node, a quiet, and a flag set on a third,\n"
+"            whose PE then gets the block from the second and checks every\n"
+"            word: the one reader that sees a quiet return early; only when\n"
+"            named, and on three nodes or more\n"
 "  mix       the world split into teams, each running mailbox, atomics, rma,\n"
 "            locks, collectives or waits, out of step, the exercises rotating\n"
 "            through the teams, sort and alltoall on the world between; only\n"
@@ -1384,6 +1391,13 @@ int main(int argc, char **argv)
                     plant_names[options.plant]);
     }
     for (int k = 0; k < chosen_count && !refused; k++) {
+        if (chosen[k]->nodes_needed > layout.nodes) {
+            refused = 1;
+            if (me == 0)
+                fprintf(stderr, "osoe-pacer: %s needs a job of %d logical nodes or more, and this "
+                        "one has %d\n", chosen[k]->name, chosen[k]->nodes_needed, layout.nodes);
+            break;
+        }
         char fields[512] = "";
         /* Under mix every exercise is set up at once, each on a share. */
         struct pacer_options sizing = options;

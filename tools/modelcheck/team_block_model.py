@@ -76,10 +76,35 @@ Breakages
                    generation: another team claims and writes it in between, and
                    the raise lands on that team's block (NAMED, OWN).
 
-Every step is a locked instruction or a single-writer store whose order the
-model states; runs are SC. The map entry's release and the members' acquire are
-the record's argument in node.h, which the sync orders; the model keeps the
-order and leaves the fences to the sanitizers.
+Memory orders (T29; the step D review's portability Q4). Every case runs under
+SC and under x86-TSO, the stores as the library makes them (§3.16): a store
+the library makes `release` is buffered (`serial=False`); a locked
+instruction, a syscall or a `seq_cst` store drains the buffer. The map
+entry's release and the members' acquire are the record's argument in node.h,
+which the sync orders. The orders are node.c's, team.c's and internode-am.c's:
+  claim        osoe_node_team_claim (node.c): a seq_cst compare-and-swap on the
+               bitmap's word
+  write_block  osoe_node_team_name (node.c): the generation, the counters
+               (osoe_epoch_init, base/epoch.c, and collective_state_reset, node.c)
+               and the holders; write_record (team.c): the record's `published`;
+               finish (team.c): the map entry. All release stores, so buffered
+  sync         sync_team (barrier.c): each member's arrival a seq_cst add
+               (osoe_epoch_bump_eq), the model's `add` of the sync's word
+  post         osoe_internode_arrive (internode-am.c): the handoff word, a release
+               store, then the posted bitmap's two ors and the wake word's add
+  engine       loads, all acquire: take_arrival's of the handoff (internode-am.c),
+               team_by_name's of the map entry (osoe_node_team_find, node.h) and of
+               the generation (progress-host.c)
+  leave        osoe_node_team_leave (node.c): the lead's clear of the map entry
+               and the last holder's retraction of the record are release stores,
+               buffered; the holders' decrement, the generation's raise and the
+               bit's or are seq_cst read-modify-writes, which drain them
+  fence        under TSO only, a locked or of nothing where the library has a
+               locked instruction the model leaves abstract: after the map entry,
+               the split's sync arrival that follows finish in split (team.c),
+               before which no message for the team can arrive, and after the
+               handoff, the posted bitmap's ors and the wake word's add
+               (posted_bitmap_model.py). Under SC it is no step.
 
 Usage: team_block_model.py [substring ...]   runs the cases whose names match
 """
@@ -95,7 +120,7 @@ HOLDERS = lambda b: ('holders', b)
 RECORD = lambda b: ('record', b)      # 1 while a team's record is published
 COUNTERS = lambda b: ('counters', b)  # whose counters: the generation that wrote them
 HANDOFF = lambda b: ('handoff', b)    # generation * 16 + posted epoch
-SYNC = lambda k: ('$sync', k)         # an abstract sync over A's two members
+SYNC = lambda k: ('sync', k)          # the arrivals at a sync over A's two members
 HOLDER = lambda b, pe: ('$holder', b, pe)
 LIVE = lambda n: ('$live', n)         # the team live under name n: 0, or A=1, B=2, C=3
 TEAM_GEN = lambda t: ('$team_gen', t)
@@ -104,8 +129,19 @@ MESSAGE = ('$message',)               # a message in flight: name * 8 + team, or
 A_TAKEN = ('$a_taken',)               # A's arrival and A's message, taken by the engine
 DONE = ('$done',)
 
+FENCE = ('fence',)                    # only the fences touch it, and it never changes
+
 A, B, C = 1, 2, 3
 TEAM = {A: 'A', B: 'B', C: 'C'}
+
+
+def fence(p, then, tso):
+    """Under TSO, a locked or of nothing: the seq_cst read-modify-write the
+    library makes at this point, which drains the store buffer on x86. Under SC
+    nothing: a local step that is no step."""
+    if tso:
+        return [(p, ('or', lambda L: FENCE, lambda L: 0, '_', then))]
+    return [(p, ('br', lambda L: True, then, then))]
 
 
 def lowest(w):
@@ -116,8 +152,9 @@ def lowest(w):
 
 
 def claim(p, then):
-    """Take a free block by compare-and-swap over the bitmap; wait while none is
-    free (a dry pool fails the split in the library; here it only waits)."""
+    """Take a free block by compare-and-swap over the bitmap (osoe_node_team_claim:
+    seq_cst); wait while none is free (a dry pool fails the split in the library;
+    here it only waits)."""
     return [(p + 'c', ('await', lambda M, L: M[FREE] != 0, '@' + p + 'l')),
             (p + 'l', ('load', lambda L: FREE, 'w', '@' + p + 'z')),
             (p + 'z', ('br', lambda L: L['w'] == 0, '@' + p + 'c', '@' + p + 'p')),
@@ -127,34 +164,41 @@ def claim(p, then):
             (p + 'k', ('br', lambda L: L['ok'], then, '@' + p + 'l'))]
 
 
-def write_block(p, name, team, members, then):
+def write_block(p, name, team, members, then, tso):
     """The split's local lead writes its block: no holder of another team may
     remain (REWRITE); then the generation, the counters, the holders, the record,
-    and last the map entry - with release, before the sync."""
+    and last the map entry - with release, before the sync. Each is a release
+    store (osoe_node_team_name, write_record, finish), buffered under TSO; the
+    sync arrival after the map entry drains them, and the team is live (LIVE) only
+    from there: no message for it can come before the split's sync completes."""
     def check(M, L):
         held = [pe for pe in range(3) if M[HOLDER(L['b'], pe)]]
         return None if not held else \
             f'REWRITE: block {L["b"]} written for team {TEAM[team]} while PE {held[0]} holds it'
     return [(p + 'h', ('check', check, '@' + p + 'g')),
             (p + 'g', ('load', lambda L: GEN(L['b']), 'g', '@' + p + 'G')),
-            (p + 'G', ('store', lambda L: GEN(L['b']), lambda L: L['g'] + 1, True, '@' + p + 'C')),
-            (p + 'C', ('store', lambda L: COUNTERS(L['b']), lambda L: L['g'] + 1, True,
+            (p + 'G', ('store', lambda L: GEN(L['b']), lambda L: L['g'] + 1, False,
+                       '@' + p + 'C')),
+            (p + 'C', ('store', lambda L: COUNTERS(L['b']), lambda L: L['g'] + 1, False,
                        '@' + p + 'H')),
-            (p + 'H', ('store', lambda L: HOLDERS(L['b']), lambda L, k=len(members): k, True,
+            (p + 'H', ('store', lambda L: HOLDERS(L['b']), lambda L, k=len(members): k, False,
                        '@' + p + 'Hg')),
             (p + 'Hg', ('gpost', lambda M, L, ms=members: ({HOLDER(L['b'], pe): 1 for pe in ms}, {}),
                         '@' + p + 'R')),
-            (p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 1, True, '@' + p + 'M')),
-            (p + 'M', ('store', lambda L: MAP(name), lambda L: L['b'] + 1, True, '@' + p + 'Mg')),
+            (p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 1, False, '@' + p + 'M')),
+            (p + 'M', ('store', lambda L: MAP(name), lambda L: L['b'] + 1, False,
+                       '@' + p + 'F'))] + fence(p + 'F', '@' + p + 'Mg', tso) + [
             (p + 'Mg', ('gpost', lambda M, L, n=name, t=team:
                         ({LIVE(n): t, TEAM_GEN(t): L['g'] + 1, TEAM_BLOCK(t): L['b']},
                          {'g': L['g'] + 1}), then))]
 
 
-def post(p, then):
+def post(p, then, tso):
     """The member that arrives last posts the team's arrival: the generation it
-    holds beside epoch 1, a single-writer store."""
-    return [(p + 'a', ('store', lambda L: HANDOFF(L['b']), lambda L: L['g'] * 16 + 1, True, then))]
+    holds beside epoch 1, a single-writer release store (osoe_internode_arrive),
+    then the posted bitmap's ors and the wake word's add."""
+    return [(p + 'a', ('store', lambda L: HANDOFF(L['b']), lambda L: L['g'] * 16 + 1, False,
+                       '@' + p + 'f'))] + fence(p + 'f', then, tso)
 
 
 def read_counters(p, team, then):
@@ -168,31 +212,36 @@ def leave(design, p, pe, name, then):
     """Forget the team: the lead (local id 0) clears the map entry under its name
     first; then holders down by one, and the last holder retracts the record,
     raises the generation and returns the block."""
-    give_back = [(p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 0, True, '@' + p + 'G')),
+    give_back = [(p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 0, False,
+                            '@' + p + 'G')),
                  (p + 'G', ('add', lambda L: GEN(L['b']), lambda L: 1, '_', '@' + p + 'F')),
                  (p + 'F', ('or', lambda L: FREE, lambda L: 1 << L['b'], '_', then))]
     unheld = lambda M, L: ({HOLDER(L['b'], pe): 0}, {})
+    # osoe_node_team_leave (node.c): the stores - the record's retraction, the map
+    # entry's clear - are release; the decrement, the raise and the bit are seq_cst
+    # read-modify-writes.
     if design == 'last_clears':
         # The first design: the map entry is the last holder's to clear, with the
         # rest of the give-back.
-        give_back = [(p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 0, True,
+        give_back = [(p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 0, False,
                                 '@' + p + 'G')),
                      (p + 'G', ('add', lambda L: GEN(L['b']), lambda L: 1, '_', '@' + p + 'M')),
-                     (p + 'M', ('store', lambda L: MAP(name), lambda L: 0, True, '@' + p + 'F')),
+                     (p + 'M', ('store', lambda L: MAP(name), lambda L: 0, False, '@' + p + 'F')),
                      (p + 'F', ('or', lambda L: FREE, lambda L: 1 << L['b'], '_', then))]
         return [(p + 'q', ('ghost', unheld, '@' + p + 'd')),
                 (p + 'd', ('add', lambda L: HOLDERS(L['b']), lambda L: -1, 'h', '@' + p + 'z')),
                 (p + 'z', ('br', lambda L: L['h'] == 0, '@' + p + 'R', then))] + give_back
     # The lead's first step: its name's entry cleared, before its decrement - so
     # before the last holder's, and before the bit.
-    clear = [(p + 'e', ('store', lambda L: MAP(name), lambda L: 0, True, '@' + p + 'd'))] \
+    clear = [(p + 'e', ('store', lambda L: MAP(name), lambda L: 0, False, '@' + p + 'd'))] \
         if pe == 0 or design == 'map_early' else []
     first = '@' + p + 'e' if clear else '@' + p + 'd'
     if design == 'free_first':
         # The block back in the pool before its generation is raised: a claimer
         # can write it in between, and the raise lands on the new team's.
         give_back = [(p + 'F', ('or', lambda L: FREE, lambda L: 1 << L['b'], '_', '@' + p + 'R')),
-                     (p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 0, True, '@' + p + 'G')),
+                     (p + 'R', ('store', lambda L: RECORD(L['b']), lambda L: 0, False,
+                                '@' + p + 'G')),
                      (p + 'G', ('add', lambda L: GEN(L['b']), lambda L: 1, '_', then))]
         return [(p + 'q', ('ghost', unheld, first))] + clear + [
                 (p + 'd', ('add', lambda L: HOLDERS(L['b']), lambda L: -1, 'h', '@' + p + 'z')),
@@ -201,7 +250,7 @@ def leave(design, p, pe, name, then):
         # No count: the lead gives the block back as it leaves.
         if pe == 0:
             return [(p + 'q', ('ghost', unheld, '@' + p + 'e'))] + \
-                [(p + 'e', ('store', lambda L: MAP(name), lambda L: 0, True, '@' + p + 'R'))] + \
+                [(p + 'e', ('store', lambda L: MAP(name), lambda L: 0, False, '@' + p + 'R'))] + \
                 give_back
         return [(p + 'q', ('ghost', unheld, then))]
     return [(p + 'q', ('ghost', unheld, first))] + clear + [
@@ -210,12 +259,14 @@ def leave(design, p, pe, name, then):
 
 
 def sync(p, k, then, destroy=False):
-    """An abstract sync over A's two members. The destroy's completes only once
-    the engine has taken A's arrival and A's message: its release is the last of
-    what the team's tree carries (proposal §3, "A late message")."""
+    """A sync over A's two members: each arrives with a seq_cst add
+    (osoe_epoch_bump_eq), which drains the store buffer; the wait for the others
+    is abstract. The destroy's completes only once the engine has taken A's
+    arrival and A's message: its release is the last of what the team's tree
+    carries (proposal §3, "A late message")."""
     cond = (lambda M, L: M[SYNC(k)] == 2 and M[A_TAKEN] == 2) if destroy else \
            (lambda M, L: M[SYNC(k)] == 2)
-    return [(p + 's', ('ghost', lambda M, L: ({SYNC(k): M[SYNC(k)] + 1}, {}), '@' + p + 'w')),
+    return [(p + 's', ('add', lambda L: SYNC(k), lambda L: 1, '_', '@' + p + 'w')),
             (p + 'w', ('await', cond, then))]
 
 
@@ -224,12 +275,12 @@ def finish(locals_):
             ('END', ('done',))]
 
 
-def lead(design):
+def lead(design, tso):
     B_ = []
     B_ += claim('a', '@ah')
-    B_ += write_block('a', 0, A, (0, 1), '@as')
+    B_ += write_block('a', 0, A, (0, 1), '@as', tso)
     B_ += sync('a', 1, '@aa')
-    B_ += post('a', '@ar')
+    B_ += post('a', '@ar', tso)
     B_ += read_counters('a', A, '@ds')
     B_ += sync('d', 2, '@dl', destroy=True)
     B_ += [('dl', ('ghost', lambda M, L: ({LIVE(0): 0}, {}), '@lq'))]
@@ -241,8 +292,8 @@ def lead(design):
                    'FREE: the lead left team A and found its name still mapped, its number not '
                    'free for team B', '@bc'))]
     B_ += claim('b', '@bh')
-    B_ += write_block('b', 0, B, (0,), '@ba')
-    B_ += post('b', '@br')
+    B_ += write_block('b', 0, B, (0,), '@ba', tso)
+    B_ += post('b', '@br', tso)
     B_ += read_counters('b', B, '@E')
     B_ += finish(('w', 'ok', 'c', 'h', 'b', 'g'))
     return assemble(B_)
@@ -264,11 +315,11 @@ def member(design):
     return assemble(B_)
 
 
-def other(design):
+def other(design, tso):
     B_ = []
     B_ += claim('c', '@ch')
-    B_ += write_block('c', 1, C, (2,), '@ca')
-    B_ += post('c', '@cr')
+    B_ += write_block('c', 1, C, (2,), '@ca', tso)
+    B_ += post('c', '@cr', tso)
     B_ += read_counters('c', C, '@E')
     B_ += finish(('w', 'ok', 'c', 'b', 'g'))
     return assemble(B_)
@@ -361,8 +412,8 @@ def engine(design):
         ('END', ('done',))])
 
 
-def case(design):
-    threads = [lead(design), member(design), other(design), remote(), engine(design)]
+def case(design, tso=False):
+    threads = [lead(design, tso), member(design), other(design, tso), remote(), engine(design)]
     mem = {FREE: (1 << BLOCKS) - 1, MESSAGE: 0, A_TAKEN: 0, DONE: 0, SYNC(1): 0, SYNC(2): 0}
     for b in range(BLOCKS):
         mem[GEN(b)] = mem[HOLDERS(b)] = mem[RECORD(b)] = mem[COUNTERS(b)] = mem[HANDOFF(b)] = 0
@@ -376,6 +427,8 @@ def case(design):
     return f'team_block/{design} blocks={BLOCKS}', threads, mem
 
 
+# (design, expect): True, or the property it must fail. Each runs under SC and then under
+# x86-TSO, with the same verdict.
 CASES = [
     ('design', True),
     ('no_holders', 'REWRITE'),
@@ -390,12 +443,13 @@ def main():
     want = select(sys.argv)
     ok = True
     for design, expect in CASES:
-        name, threads, mem = case(design)
-        if not want(name):
+        if not want(case(design)[0]):
             continue
-        res = explore(name, threads, mem, max_seconds=1800,
-                      done=lambda M: M[DONE] == 5)
-        ok &= report(res, expect=expect)
+        for tso in (False, True):
+            name, threads, mem = case(design, tso)
+            res = explore(name, threads, mem, tso=tso, max_seconds=1800,
+                          liveness_max_states=1_000_000, done=lambda M: M[DONE] == 5)
+            ok &= report(res, expect=expect, tso=tso)
     return 0 if ok else 1
 
 

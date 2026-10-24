@@ -107,7 +107,32 @@ Breakages
                 team's next collective waits for an arrival that never comes
                 (STUCK).
 
-Runs are SC, as pipeline_model.py's: every add is fenced after its data.
+Memory orders (T29; round six's portability review). Every case runs under SC
+and under x86-TSO. A model store is a **put** into another node's internal
+region, which that node's agent (or the helper that owns the wire) applies as
+plain stores - the AM parser copies the payload into place (am.c) before
+progress.c's `complete` announces it - so under TSO it is buffered
+(`serial=False`) and reaches memory in the order made.
+The add each put is fenced before (OSOE_TRANSPORT_FENCED, transport.h,
+invariant 5) is the agent's osoe_rmw_apply (rmw.h; progress.c, `complete`,
+OSOE_AM_RMW_REQUEST): a seq_cst fetch_add, locked, which drains the buffer. The
+reader loads the counter first (osoe_transport_load, seq_cst), then the bytes.
+A sender's stores stand for its target's agent's, a buffer each where the agent
+has one for all, so the model reorders more than the library can. The puts, all
+internode-generic.c's:
+  GLANE, GRANT   a parent's grant: osoe_internode_generic_reduce_enter, the
+                 grant's words, then grant_counter's fenced add; read by
+                 grant_in and take_grant
+  ALANE, ARR     a child's lane word before its first add (to_parent, number 0)
+  SLOT, SMALL    a piece up, behind its header (to_parent): lane_slot, or
+                 small_slot for a small collective and for the leads' scan
+                 (osoe_internode_generic_scan_node_totals), then
+                 arrival_counter's fenced add; read by children_sent,
+                 combine_children and take_child_lanes
+  RSLOT, SMALL_DOWN, REL
+                 a release down (to_children), then release_counter's fenced
+                 add; read by release_sent and copy_release
+The reader's clears (`cleared`) are not modelled.
 
 Usage: lane_model.py [substring ...]
 """
@@ -241,8 +266,10 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
         for i, k in enumerate(kids if kind == 'r' else []):
             here = p + 'E' if i == 0 else f'{p}E{i}'
             nxt = f'@{p}E{i + 1}' if i + 1 < len(kids) else '@' + p + 'P'
+            # The grant's words put into the child's grant line (reduce_enter), buffered
+            # under TSO; the fenced add after them drains them.
             E += [(here, ('store', lambda L, k=k, team=team: GLANE(team, k), lambda L: lane + 1,
-                          True, f'@{here}G')),
+                          False, f'@{here}G')),
                   (f'{here}G', ('add', lambda L, k=k, team=team: GRANT(team, k), lambda L: 1, '_',
                                 nxt))]
         if not kids or kind != 'r':
@@ -315,8 +342,10 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                 for i, k in enumerate(kids):
                     here = label if i == 0 else f'{label}{i}'
                     nxt = f'@{label}{i + 1}' if i + 1 < len(kids) else then
+                    # A small release put into the child's small release slot
+                    # (to_children), then the fenced add of its release counter.
                     F += [(here, ('store', lambda L, k=k, st=small_down_team: SMALL_DOWN(st, k),
-                                  lambda L: tagbase, True, f'@{here}A')),
+                                  lambda L: tagbase, False, f'@{here}A')),
                           (f'{here}A', ('add', lambda L, k=k: REL(team, k), lambda L: 1, '_', nxt))]
                 return F
             for i, (k, c) in enumerate(zip(kids, kid_pos)):
@@ -340,9 +369,11 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                                     f'{(L[f"k{c}"] or 0) - 1}, bound to '
                                     f'{M[BIND(k, max((L[f"k{c}"] or 0) - 1, 0))]}, not to '
                                     f'collective {me}', f'@{here}S')),
+                      # A release put into the child's lane row (to_children), then
+                      # the fenced add of its release counter.
                       (f'{here}S', ('store', lambda L, k=k, c=c, v=var:
                                     RSLOT(k, L[f'k{c}'] - 1, L[v] % depth),
-                                    lambda L, v=var: tagbase + L[v], True, f'@{here}A')),
+                                    lambda L, v=var: tagbase + L[v], False, f'@{here}A')),
                       (f'{here}A', ('add', lambda L, k=k: REL(team, k), lambda L: 1, '_', nxt))]
             return F
 
@@ -390,9 +421,10 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                   (p + 'GR', ('set', 'go', lambda L: DEL, '@' + p + 'RW'))]
             B += wait_children(p + 'W', 'up', '@' + p + ('SS' if kind == 's' else 'PL'))
             if kind == 's':
-                # A small piece: the team number's own small slot, then the add.
+                # A small piece: the team number's own small slot, then the add
+                # (to_parent: the put, then the arrival counter's fenced add).
                 B += [(p + 'SS', ('store', lambda L, pa=parent, pos=position, st=small_team:
-                                  SMALL(st, pa, pos), lambda L, tb=tagbase: tb, True,
+                                  SMALL(st, pa, pos), lambda L, tb=tagbase: tb, False,
                                   '@' + p + 'SEND1'))]
             # The parent's lane, from the grant line, once (E4): the grant was
             # seen above, so the line is this collective's.
@@ -403,10 +435,11 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                    if design == 'no_grant' else
                    ('load', lambda L, team=team: GLANE(team, n), 'plane', '@' + p + 'FIRST')),
                   # Before the first add of the collective: this thread's lane,
-                  # beside the parent's arrival counter for this position.
+                  # beside the parent's arrival counter for this position (to_parent,
+                  # number 0: the lane word's put).
                   (p + 'FIRST', ('br', lambda L: L['up'] == 0, '@' + p + 'AL', '@' + p + 'SC')),
                   (p + 'AL', ('store', lambda L, pa=parent, pos=position, team=team:
-                              ALANE(team, pa, pos), lambda L: lane + 1, True, '@' + p + 'SC')),
+                              ALANE(team, pa, pos), lambda L: lane + 1, False, '@' + p + 'SC')),
                   # A broadcast's piece up is empty: nothing goes into the lane.
                   (p + 'SC', ('br', lambda L: True, '@' + p + 'SEND1', '@' + p + 'SEND1'))
                   if kind != 'r' else
@@ -415,9 +448,10 @@ def thread(design, n, h, fanout, depth, collectives, pieces):
                               f'LANE: node {n} puts into node {pa} lane {(L["plane"] or 0) - 1}, '
                               f'bound to {M[BIND(pa, max((L["plane"] or 0) - 1, 0))]}, not to '
                               f'collective {me}', '@' + p + 'SEND')),
+                  # The piece into the parent's lane row (to_parent), then the add.
                   (p + 'SEND', ('store', lambda L, pa=parent, pos=position:
                                 SLOT(pa, L['plane'] - 1, pos, L['up'] % depth),
-                                lambda L, tb=tagbase: tb + L['up'], True, '@' + p + 'SEND1')),
+                                lambda L, tb=tagbase: tb + L['up'], False, '@' + p + 'SEND1')),
                   (p + 'SEND1', ('add', lambda L, pa=parent, pos=position, team=team:
                                  ARR(team, pa, pos), lambda L: 1, '_', '@' + p + 'SEND2')),
                   (p + 'SEND2', ('set', 'up', lambda L: L['up'] + 1, '@' + p + 'LOOP')),
@@ -494,6 +528,7 @@ T01 = {'T': [0, 1]}
 ROTATING = {'T': [0, 1, 2, 3]}
 # (design, nodes, threads a node, fanout, depth, teams, order, pieces, expect: True, or the
 # property it must fail); an order entry is (team, root index, {node: leading thread}).
+# Each runs under SC and then under x86-TSO, with the same verdict.
 CASES = [
     # The first model's cases, one thread a node: node 1 the parent in both
     # teams, its two children - nodes 0 and 2 - at position 0 of each tree.
@@ -603,9 +638,11 @@ def main():
                                        pieces)
         if not want(name):
             continue
-        res = explore(name, progs, mem, max_seconds=900, liveness_max_states=3_000_000,
-                      done=lambda M, count=count: M[FIN] == count)
-        ok &= report(res, expect=expect)
+        for tso in (False, True):
+            res = explore(name, progs, mem, tso=tso, max_seconds=900,
+                          liveness_max_states=3_000_000,
+                          done=lambda M, count=count: M[FIN] == count)
+            ok &= report(res, expect=expect, tso=tso)
     return 0 if ok else 1
 
 

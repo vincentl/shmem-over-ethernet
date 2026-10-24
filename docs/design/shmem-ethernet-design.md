@@ -2143,8 +2143,10 @@ be called by - and of the others only local id 1, for the waits the lead is not
 in: while the lead has no segment to speak through, or a leftover of another
 launch by the same names still stands in its place, and while the lead makes
 the node's connection area. The others wait on the lead, and end if its process
-ends: during the node's join by its pid in the header (`lead_ended`), and after
-it by liveness (§3.15). `base/stall-watch.h`'s noticed watches carry the timing,
+ends: while it finishes the node's control segment, by its pid in the header
+once the segment's launch number is this start's (`lead_ended_before_ready`; a
+start without one waits for the launcher there), during the node's join by the
+same pid (`lead_ended`), and after it by liveness (§3.15). `base/stall-watch.h`'s noticed watches carry the timing,
 `osoe_notice` the line; `OSOE_TEST_NOTICE_SECONDS` shortens the 30 s for tests,
 and is no setting.
 
@@ -2507,7 +2509,10 @@ a death during init is found in every build: first built, a lead that died in
 the job's rendezvous left its non-leads waiting there for the launcher (found in
 review; `shmem.dead-pe.lead-in-init`), and the connection area's first wait did
 not sweep until the third review. A lead that dies inside the node's rendezvous
-itself is still the launcher's to find. Where no pidfd can be had — out of descriptors,
+itself is found by its pid in the header - while it finishes the segment only
+in a start with a launch number (`lead_ended_before_ready`, 2026-10-24), during
+the join always (`lead_ended`) - and one that dies before it has made the
+segment is the launcher's to find. Where no pidfd can be had — out of descriptors,
 or a kernel or sandbox refusing the call — the PE is watched by `kill(pid, 0)`
 instead, after one line saying so, rather than the job ending for it; and init
 raises the soft `RLIMIT_NOFILE` to the hard limit, as §6.2 always said it did

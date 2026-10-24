@@ -1233,6 +1233,47 @@ osoe_refusal_test(shmem.start-up.lead-ends-in-join 3 0
   LAUNCH -n 3
   PATTERNS "osoe: PE 1: the local lead, rank 0 [(]pid [0-9]+[)], has ended while this PE waited for local PEs to join the node"
   PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends.sh 3 2 $<TARGET_FILE:shmem_test_init>)
+# And a lead that ends earlier, after it has made and sized the segment and
+# before it stores `ready`, while it creates its heap (kill-on-create.c ends it
+# there): the node's other PEs have mapped the segment and wait on `ready`,
+# where they had no check of the lead's process, and waited for the launcher's
+# limit, their notice saying that the lead was still at work (the release
+# fixes' review, correctness F2). They now end by themselves: the first to see
+# the lead gone names it, and the other says that a local PE failed, or names it
+# too if it saw it as well (node.c, lead_ended_before_ready, which needs the
+# start's launch number, as osoe-launch gives every start). See
+# lead-ends-before-ready.sh. The launcher's limit is 30 s as above. Not under
+# the sanitizers, as slow-message: LD_PRELOAD would change their runtimes' place
+# in the link order.
+if(NOT CMAKE_C_FLAGS MATCHES "sanitize=")
+  add_library(kill-on-create SHARED kill-on-create.c)
+  target_link_libraries(kill-on-create PRIVATE ${CMAKE_DL_LIBS})
+  osoe_warnings(kill-on-create)
+  osoe_refusal_test(shmem.start-up.lead-ends-before-ready 3 0
+    SECONDS 30
+    LAUNCH -n 3
+    PATTERNS "kill-on-create: ending this process at its creation of /osoe[.][0-9]+[.]0[.]0[.]0[.]heap[.]0"
+             "osoe: PE [12]: the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing the node's control segment /osoe[.][0-9]+[.]0[.]0[.]0"
+             "osoe: PE 1: (the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing|another local PE failed during rendezvous)"
+             "osoe: PE 2: (the local lead, rank 0 [(]pid [0-9]+[)], has ended before finishing|another local PE failed during rendezvous)"
+    PROGRAM sh ${CMAKE_CURRENT_SOURCE_DIR}/lead-ends-before-ready.sh
+            $<TARGET_FILE:kill-on-create> .heap. $<TARGET_FILE:shmem_test_init>)
+  # And the other side of the same check: a start by the ids of such a lead's
+  # start, whose leftover its node-mates open before their own lead reclaims
+  # it, must not end on the dead lead it finds there - another start's, which
+  # the launch number in the header tells from their own - and, with no launch
+  # number to tell it by, must wait as before. The existing tests of leftovers
+  # passed with either guard of the check taken out. See start-after-lead-ends.sh.
+  add_test(NAME shmem.start-up.lead-ends-before-ready.same-ids
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-after-lead-ends.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:kill-on-create> $<TARGET_FILE:shmem_test_init>)
+  add_test(NAME shmem.start-up.lead-ends-before-ready.same-ids.no-launch
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/start-after-lead-ends.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:kill-on-create> $<TARGET_FILE:shmem_test_init> no-launch)
+  set_tests_properties(shmem.start-up.lead-ends-before-ready.same-ids
+                       shmem.start-up.lead-ends-before-ready.same-ids.no-launch
+    PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "START AFTER LEAD ENDS OK")
+endif()
 # A start by the ids of one that failed, its tombstone still standing: it runs,
 # five times of five. See start-same-ids.sh.
 add_test(NAME shmem.start-up.same-ids
@@ -4312,6 +4353,37 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
       "every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s"
     FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|osoe-launch: timeout|CHECK[(]")
   osoe_internode_label(shmem.deadlock.waits.probe-dropped.0-0-1-1)
+endif()
+# The detector's helper half (the v0.2 step 4 review, correctness Q2-3). A true
+# deadlock on two nodes at two progress helpers - shmem.deadlock.waits.helpers
+# above, which the detector proves - with one helper made to misbehave in the one
+# way a clause of the half guards against, is not proved: the job waits for the
+# launcher's time limit, and the summary the launcher prints then has the PEs
+# in their wait. With the clause removed the detector proves the deadlock and
+# the test fails (T15):
+#   stale  OSOE_TEST_STALE_HELPER answers once, with yes, and no more: an
+#          answer counts only if it names the question asked last (helpers_say)
+#   busy   OSOE_TEST_BUSY_HELPER counts a message applied at every turn: each
+#          helper's applied count is part of the node's activity (helpers_say)
+#   slow   OSOE_TEST_SLOW_HELPER holds its pass until the lead asks again: an
+#          answer follows a pass begun after the question (helper_main)
+# Not under ThreadSanitizer, which no job is judged deadlocked under.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  foreach(case "stale|OSOE_TEST_STALE_HELPER" "busy|OSOE_TEST_BUSY_HELPER"
+               "slow|OSOE_TEST_SLOW_HELPER")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 mode)
+    list(GET parts 1 setting)
+    add_test(NAME shmem.deadlock.helper-${mode}.0-0-1-1
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_DEADLOCK_SECONDS=1 OSOE_PROGRESS_HELPERS=2 ${setting}=1
+              $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,1,1 -t 30 --
+              $<TARGET_FILE:shmem_test_deadlock> waits)
+    set_tests_properties(shmem.deadlock.helper-${mode}.0-0-1-1 PROPERTIES LABELS "tier2"
+      TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "osoe-launch: timeout after 30 s.*shmem_int_wait_until"
+      FAIL_REGULAR_EXPRESSION "osoe: deadlock|DEADLOCK TEST REACHED")
+    osoe_internode_label(shmem.deadlock.helper-${mode}.0-0-1-1)
+  endforeach()
 endif()
 # A wake between the detector's two collections (T37): at
 # OSOE_DEADLOCK_SECONDS=3 the last PE's flag is set by a signal of its own 2.5 s

@@ -118,6 +118,9 @@ enum pacer_plant {
     PACER_PLANT_TEAMS_BACK,         /* PE 1 misreads the status of the split after the exhaust */
     PACER_PLANT_THREADS_PIECES,     /* PE 1 changes a word at the end of every large get's pieces */
     PACER_PLANT_THREADS_COLLECTIVE, /* PE 1's thread 0 changes a bit of a result of each kind */
+    PACER_PLANT_RELAY_BLOCK,        /* PE 1 misreads the last word of the block it gets */
+    PACER_PLANT_RELAY_STALE,        /* PE 1 puts the end of its block as the block held it before */
+    PACER_PLANT_RELAY_QUIET,        /* PE 1 sets its flag without a quiet before it */
     PACER_PLANTS
 };
 
@@ -162,6 +165,7 @@ struct pacer_exercise {
     const char *const *phases;      /* phase names, NULL-terminated, at most PACER_PHASES */
     long quick_rounds;              /* rounds under --quick */
     int multiple;                   /* needs SHMEM_THREAD_MULTIPLE */
+    int nodes_needed;               /* the job's logical nodes, at least: 0 where any will do */
     uint64_t (*memory)(int npes, const struct pacer_options *options, char *fields,
                        size_t size);
     int (*setup)(shmem_team_t team, const struct pacer_options *options);
@@ -182,7 +186,7 @@ struct pacer_exercise {
 
 extern const struct pacer_exercise pacer_sort, pacer_alltoall, pacer_mailbox, pacer_teams,
     pacer_threads, pacer_print, pacer_atomics, pacer_rma, pacer_locks, pacer_memory,
-    pacer_collectives, pacer_waits, pacer_deprecated;
+    pacer_collectives, pacer_waits, pacer_deprecated, pacer_relay;
 
 /*
  * The job's shape, from SHMEM_TEAM_SHARED at start: every world PE's node,

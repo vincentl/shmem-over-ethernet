@@ -591,6 +591,20 @@ enum { HELPER_ACKNOWLEDGED = 1, HELPER_DONE = 2 };
 
 static uint32_t request_sequence;       /* the agent's: the last request's */
 static uint32_t deaf_helper;            /* OSOE_TEST_DEAF_HELPER, or 0 */
+/*
+ * The deadlock detector's helper half has three clauses that no job reaches
+ * without a helper that misbehaves: an answer counts only if it names the
+ * question asked last, and each helper's applied count is part of the node's
+ * activity (helpers_say); and an answer follows a pass begun after the question
+ * (helper_main). A mutant of each passed every detector, helper and pacer test
+ * at two helpers, and deadlock_owners_model.py alone held them (the v0.2 step 4
+ * review, correctness Q2-3). A hook makes one helper misbehave in the one way its
+ * clause guards against, so that a test sees a true deadlock go unproved:
+ * shmem.deadlock.helper-stale.*, -busy.* and -slow.*.
+ */
+static uint32_t stale_helper;           /* OSOE_TEST_STALE_HELPER, or 0 */
+static uint32_t busy_helper;            /* OSOE_TEST_BUSY_HELPER, or 0 */
+static uint32_t slow_helper;            /* OSOE_TEST_SLOW_HELPER, or 0 */
 
 /* ---- an owner's sleep (§3.10) ------------------------------------------- */
 
@@ -694,6 +708,17 @@ void osoe_progress_host_advertise(void *blob)
     memcpy(blob, &port, sizeof port);
 }
 
+/* The progress helper a test hook's setting names, or 0, which is none: refused
+ * by name when this node runs no such helper. */
+static uint32_t named_helper(const char *setting, uint32_t helpers)
+{
+    uint32_t helper = 0;
+    if (osoe_environment_u32(setting, &helper) == OSOE_ENVIRONMENT_INVALID || helper > helpers)
+        osoe_fatal("%s='%s' names none of this node's %u progress helpers", setting,
+                   getenv(setting), helpers);
+    return helper;
+}
+
 void osoe_progress_host_start(uint32_t session)
 {
     /* A session's own. */
@@ -728,11 +753,13 @@ void osoe_progress_host_start(uint32_t session)
                                                           : "");
     /* The test hook (OSOE_TEST_DEAF_HELPER): a helper that never answers its
      * stop, which the agent must end the job naming (wait_acknowledged). */
-    deaf_helper = 0;
-    if (osoe_environment_u32("OSOE_TEST_DEAF_HELPER", &deaf_helper) == OSOE_ENVIRONMENT_INVALID ||
-        deaf_helper > helpers)
-        osoe_fatal("OSOE_TEST_DEAF_HELPER='%s' names none of this node's %u progress helpers",
-                   getenv("OSOE_TEST_DEAF_HELPER"), helpers);
+    deaf_helper = named_helper("OSOE_TEST_DEAF_HELPER", helpers);
+    /* And the three of the deadlock detector's helper half (helper_main): a
+     * helper whose answers go stale, one whose applied count moves at every turn,
+     * one whose pass waits for the lead's next question. */
+    stale_helper = named_helper("OSOE_TEST_STALE_HELPER", helpers);
+    busy_helper = named_helper("OSOE_TEST_BUSY_HELPER", helpers);
+    slow_helper = named_helper("OSOE_TEST_SLOW_HELPER", helpers);
     uint32_t delay_ms = 0;
     if (osoe_environment_u32("OSOE_TEST_ABORT_DELAY_MS", &delay_ms) == OSOE_ENVIRONMENT_INVALID ||
         delay_ms > 1000 * OSOE_ABORT_GRACE_SECONDS / 2)
@@ -1128,6 +1155,27 @@ static bool answer(uint32_t helper, uint32_t request)
 }
 
 /*
+ * OSOE_TEST_SLOW_HELPER: a pass slower than the lead is patient. The helper has
+ * read `request`, and its pass waits until the lead has asked again - or the
+ * node aborts - so that the answer which follows the pass names a question the
+ * lead has since replaced, and helpers_say takes none such; an answer given at
+ * once, before the pass, which helper_main's order forbids, would be the lead's
+ * last. Waits as every wait does, on the wake word loaded before the request.
+ */
+static void hold_pass(uint32_t helper, uint32_t request)
+{
+    _Atomic uint32_t *word = wake_word(helper);
+    for (;;) {
+        uint32_t seen = atomic_load_explicit(word, memory_order_acquire);
+        if (atomic_load_explicit(&osoe_am.owner[helper].request, memory_order_seq_cst) != request ||
+            osoe_abort_pending())
+            return;
+        struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+        osoe_futex_wait(word, seen, &sweep, OSOE_FUTEX_SHARED);
+    }
+}
+
+/*
  * Owner `o`'s part of the job's end, on its thread: tell every peer of its
  * wires - an abortive goodbye on each that still has someone to tell - and keep
  * receiving until each peer's kernel has acknowledged it, since this process's
@@ -1233,6 +1281,7 @@ static void *helper_main(void *arg)
     osoe_ring_enable(o->ring);          /* its only submitter from here (ring.h) */
     uint32_t taken = 0, due = 0;
     uint64_t turns = 0, abort_seen_ns = 0;
+    bool stale = false;                 /* OSOE_TEST_STALE_HELPER: it has said its last yes */
     for (;;) {
         /* The wake word before the request and the abort word, as every wait
          * loads its word before its pass (§4.9): a request stored, or an abort
@@ -1255,18 +1304,32 @@ static void *helper_main(void *arg)
         take_unsent_request(helper);
         if (request != taken) {
             taken = request;
-            if (request_kind(request) != REQUEST_STOP)
+            if (request_kind(request) != REQUEST_STOP) {
                 due = request;
-            else if (helper != deaf_helper) {
+                if (helper == slow_helper)
+                    hold_pass(helper, request);
+            } else if (helper != deaf_helper) {
                 helper_stop(helper);
                 return wait_released(helper);
             }
         }
+        /* OSOE_TEST_BUSY_HELPER: a message applied at every turn, as real traffic
+         * would, before the turn's answer - so that the count helpers_say reads
+         * after an answer is above the one it read when it asked. */
+        if (helper == busy_helper)
+            osoe_counter_word_add(&o->application_applied, 1);
         bool moved = osoe_progress_poll(o);
         /* After a whole pass begun after the request was read: the pass
-         * between a sample's halves, owner by owner (deadlock_owners_model.py). */
+         * between a sample's halves, owner by owner (deadlock_owners_model.py;
+         * a pass held back fails shmem.deadlock.helper-slow without it). */
         if (due) {
-            moved |= answer(helper, due);
+            /* OSOE_TEST_STALE_HELPER: its first yes is its last word, out of
+             * date at the lead's next question (helpers_say). */
+            if (!stale) {
+                moved |= answer(helper, due);
+                stale = helper == stale_helper &&
+                        (atomic_load_explicit(&h->answer, memory_order_acquire) & ANSWER_YES) != 0;
+            }
             due = 0;
         }
         /* Counted seq_cst, after the turn and before the next turn's load of
@@ -1429,7 +1492,10 @@ static void leave_helpers(void)
  * half asked; and only for a request of its kind, or a quiet one, which says
  * idle too. Each helper's applied count, published by it alone, is read after
  * its answer, so the activity the half reads covers whatever the answer saw;
- * counts only grow, so an unchanged sum is every count unchanged.
+ * counts only grow, so an unchanged sum is every count unchanged. Each of the
+ * two rules fails a test without it - a true deadlock proved at two helpers, one
+ * of them made stale or busy (OSOE_TEST_STALE_HELPER, OSOE_TEST_BUSY_HELPER;
+ * shmem.deadlock.helper-stale and -busy) - as the model's breakages do.
  */
 static bool helpers_say(uint32_t kind, uint64_t *applied)
 {
