@@ -24,10 +24,19 @@ The progress engine keys its state by block index. An arrival handoff carries
 the generation beside the epoch, and a message from another node carries the
 name, which resolves through the map; the engine learns a block's team afresh -
 record and generation - whenever a handoff or a resolved block shows a
-generation other than the one it learnt (D4, D5). A message for a team can be
-in flight only while the team lives: the destroy's sync completes only after
-every message for the team has arrived (proposal §3, "A late message"), which
-the model takes as given.
+generation other than the one it learnt (D4, D5). A message for a team can
+arrive only while the team lives: the destroy's sync completes only after every
+message for the team has arrived (proposal §3, "A late message"), which the
+model takes as given of the ARRIVEs. The RELEASEs the other way are not taken
+as given (T16; the step D review, G1). The engine that closes the destroy's
+epoch queues a RELEASE for the child node on a control queue (`forward`,
+progress.c), from which it leaves only when the control wire has room
+(`seal_control`: a slow or stopped peer keeps it there as long as it likes), and
+lists the node's own release, which lets the members go (`release_down`). The
+local release (`release_local`) is applied only once no RELEASE of the team is
+queued - the hold. Without it the members leave, the block goes back to the
+pool and is claimed by another team while the old team's RELEASE is still
+queued, and the engine, learning the block afresh, ends the job (`known_team`).
 
 Checked
   REWRITE  no block is written for a team while a member of another still holds
@@ -42,6 +51,18 @@ Checked
            its number is in its free mask at its next split.
   FOUND    the member finds A's block mapped under A's name once the split's
            sync has returned.
+  QUEUED   no block is learned again, or reused, while a RELEASE of its earlier
+           use is queued: a block claimed again reaches the engine - its new team
+           posts an arrival and receives a message - at another generation than
+           the one the engine learnt, and the engine must not find the old team's
+           RELEASEs still counted (`known_team`'s fatal: "holds another team ...
+           RELEASEs are queued ... they left before its forwards"). Checked where
+           the fatal is, at the relearn, which is where the engine would overwrite
+           a team it still counts forwards of: a block claimed again while the old
+           RELEASE is queued, and met by the engine only once it has left, costs
+           nothing and is not flagged. The fatal also names an epoch still open
+           and a release unapplied; the destroy's sync, which completes only once
+           the release is applied, rules both out, and the model leaves them to it.
   and, by the engine: no stuck thread, and from every reachable state the run can
   still finish (AG EF done).
 
@@ -57,7 +78,17 @@ Threads (one node; a pool of two blocks)
   remote   another node's lead: one message for A while it lives, then one for C
            and one for B once each lives.
   engine   this node's progress thread: takes posted arrivals and messages in any
-           order.
+           order. The second of team A's two inputs - its members' arrival and
+           the message of the child node, which the remote stands for - closes
+           the epoch: the engine queues A's RELEASE for the child (one child; the
+           RELEASEs of a team with k children are k) and lists the local release
+           (progress.c, book_arrival and release_down, one step). A queued RELEASE
+           leaves at any time (seal_control, which only the wire's room delays),
+           and the local release is applied at any time once none is queued
+           (release_local, which a pass runs at its start and its end; the
+           model's other steps stand for the rest of the pass). B's and C's
+           epochs close too in the library and queue theirs; nobody destroys
+           them here, so nothing waits on their releases and they are left out.
 
 Designs
   design           as above.
@@ -75,6 +106,11 @@ Breakages
   free_first       the last holder returns the block before raising its
                    generation: another team claims and writes it in between, and
                    the raise lands on that team's block (NAMED, OWN).
+  no_hold          the local release is applied whatever the control queue holds -
+                   the first build, `release_local` without its `releases_queued`
+                   test: the members leave, the block is claimed again, and the
+                   engine learns it afresh with the old RELEASE still queued
+                   (QUEUED).
 
 Memory orders (T29; the step D review's portability Q4). Every case runs under
 SC and under x86-TSO, the stores as the library makes them (§3.16): a store
@@ -89,7 +125,20 @@ which the sync orders. The orders are node.c's, team.c's and internode-am.c's:
                and the holders; write_record (team.c): the record's `published`;
                finish (team.c): the map entry. All release stores, so buffered
   sync         sync_team (barrier.c): each member's arrival a seq_cst add
-               (osoe_epoch_bump_eq), the model's `add` of the sync's word
+               (osoe_epoch_bump_eq), the model's `add` of the sync's word; and the
+               wait for the release, osoe_epoch_wait_eq_chained, an acquire load of
+               the block's `released`, which a later load of the member's cannot
+               pass: the model's await, then its loads
+  release      osoe_internode_released (barrier.c), on the engine: the block's
+               `released` raised by osoe_epoch_release_bump_eq (base/epoch.c), a
+               stamp stored with release and then a seq_cst add, a locked
+               instruction that drains the engine's buffer - the stamp and
+               publish_team's stores, for osoe-stat, are read by no thread here -
+               so the raise is made at once, and it is the one word of the
+               engine's a member reads. The queue and its count (`releases_queued`,
+               progress.c: `forward` and `release_left_queue`) and the release
+               listed (`release_pending`) are the engine's own plain variables,
+               which no other thread reads: ghosts
   post         osoe_internode_arrive (internode-am.c): the handoff word, a release
                store, then the posted bitmap's two ors and the wake word's add
   engine       loads, all acquire: take_arrival's of the handoff (internode-am.c),
@@ -127,7 +176,11 @@ TEAM_GEN = lambda t: ('$team_gen', t)
 TEAM_BLOCK = lambda t: ('$team_block', t)
 MESSAGE = ('$message',)               # a message in flight: name * 8 + team, or 0
 A_TAKEN = ('$a_taken',)               # A's arrival and A's message, taken by the engine
+QUEUED = lambda b: ('$queued', b)     # RELEASEs of the block's team in the control queue
+PENDING = lambda b: ('$pending', b)   # 1 while the block's team's local release is unapplied
 DONE = ('$done',)
+
+RELEASED = ('released',)              # A's `released`: the engine raises it, the members wait on it
 
 FENCE = ('fence',)                    # only the fences touch it, and it never changes
 
@@ -261,10 +314,11 @@ def leave(design, p, pe, name, then):
 def sync(p, k, then, destroy=False):
     """A sync over A's two members: each arrives with a seq_cst add
     (osoe_epoch_bump_eq), which drains the store buffer; the wait for the others
-    is abstract. The destroy's completes only once the engine has taken A's
-    arrival and A's message: its release is the last of what the team's tree
-    carries (proposal §3, "A late message")."""
-    cond = (lambda M, L: M[SYNC(k)] == 2 and M[A_TAKEN] == 2) if destroy else \
+    is abstract. The destroy's completes only once the engine has applied A's
+    release: it has taken A's arrival and A's message, which closes the epoch
+    (proposal §3, "A late message"), and - the hold - no RELEASE of A is still
+    queued."""
+    cond = (lambda M, L: M[SYNC(k)] == 2 and M[RELEASED] == 1) if destroy else \
            (lambda M, L: M[SYNC(k)] == 2)
     return [(p + 's', ('add', lambda L: SYNC(k), lambda L: 1, '_', '@' + p + 'w')),
             (p + 'w', ('await', cond, then))]
@@ -343,8 +397,9 @@ def remote():
 
 def engine(design):
     """Takes posted arrivals and messages, in any order, until it has taken the
-    three arrivals and the three messages. Its state for a block is the
-    generation it learnt the block's team at."""
+    three arrivals and the three messages and has nothing queued or listed. Its
+    state for a block is the generation it learnt the block's team at, and, for
+    team A's block, the RELEASE it has queued and the release it has listed."""
     def events(M, L):
         alts = []
         for b in range(BLOCKS):
@@ -353,6 +408,19 @@ def engine(design):
                 alts.append(({}, {'kind': 1, 'b': b, 'eg': h // 16, 'h': h}, f'arrival on block {b}'))
         if M[MESSAGE]:
             alts.append(({}, {'kind': 2, 'm': M[MESSAGE]}, 'a message'))
+        for b in range(BLOCKS):
+            if M[QUEUED(b)]:
+                # seal_control: the RELEASE leaves the queue into the wire's segment,
+                # which only the wire's room delays - so at any time.
+                alts.append(({QUEUED(b): 0}, {'kind': 3},
+                             f'block {b}\'s RELEASE leaves the control queue'))
+            if M[PENDING(b)] and (design == 'no_hold' or not M[QUEUED(b)]):
+                # release_local: the local release. The hold is its test of
+                # `releases_queued`, which no_hold leaves out.
+                alts.append(({PENDING(b): 0, RELEASED: 1}, {'kind': 3},
+                             f'block {b}\'s local release applied'))
+        if (L['n'] or 0) >= 6 and not any(M[QUEUED(b)] or M[PENDING(b)] for b in range(BLOCKS)):
+            alts.append(({}, {'kind': 9}, 'nothing left to take, queued or release'))
         return alts
 
     def learn(M, L):
@@ -363,6 +431,18 @@ def engine(design):
         if known != g and (design != 'no_relearn' or not known):
             return {}, {f'learnt{b}': g}
         return {}, {}
+
+    def relearning(M, L):
+        # known_team (progress.c): a block shown at another generation than the one
+        # learnt is learnt afresh, and its old team caught with a RELEASE queued is
+        # the hold's argument broken - named rather than overwritten.
+        b, g = L['b'], L['eg']
+        known = L[f'learnt{b}']
+        if known and known != g and design != 'no_relearn' and M[QUEUED(b)]:
+            return (f'QUEUED: block {b} holds another team (generation {g}, learnt at {known}) '
+                    f'while {M[QUEUED(b)]} of its RELEASEs are queued: its members left before '
+                    f'its forwards')
+        return None
 
     def apply(M, L):
         b, g = L['b'], L['eg']
@@ -383,14 +463,27 @@ def engine(design):
     def is_a(M, L):
         return L['b'] == M[TEAM_BLOCK(A)] and L['eg'] == M[TEAM_GEN(A)] and M[LIVE(0)] == A
 
+    def taken(M, L, of_a):
+        # A's second input closes its epoch (book_arrival), and release_down, in the
+        # same step, queues the RELEASE for the child and lists the local release.
+        mem = {A_TAKEN: M[A_TAKEN] + of_a}
+        if of_a and M[A_TAKEN] == 1:
+            mem[QUEUED(L['b'])] = 1
+            mem[PENDING(L['b'])] = 1
+        return mem
+
     return assemble([
-        ('L', ('br', lambda L: (L['n'] or 0) >= 6, '@E', '@P')),
         ('P', ('nd', events, '@K')),
-        ('K', ('br', lambda L: L['kind'] == 1, '@HL', '@Q')),
+        ('K', ('br', lambda L: L['kind'] == 1, '@HK', '@K2')),
+        ('K2', ('br', lambda L: L['kind'] == 2, '@Q', '@K3')),
+        # 3: a RELEASE left the queue or the release was applied, in the nd step
+        # itself; 9: nothing is left.
+        ('K3', ('br', lambda L: L['kind'] == 9, '@E', '@X')),
         # An arrival: the handoff's own generation.
+        ('HK', ('check', relearning, '@HL')),
         ('HL', ('ghost', learn, '@HA')),
         ('HA', ('check', apply, '@HT')),
-        ('HT', ('ghost', lambda M, L: ({A_TAKEN: M[A_TAKEN] + is_a(M, L)},
+        ('HT', ('ghost', lambda M, L: (taken(M, L, is_a(M, L)),
                                        {f'taken{L["b"]}': L['h'], 'n': (L['n'] or 0) + 1}), '@X')),
         # A message: its name through the map, then the block's generation.
         ('Q', ('load', lambda L: MAP(L['m'] // 8), 'v', '@Qz')),
@@ -399,24 +492,27 @@ def engine(design):
                 f'block in the map', '@Qb')),
         ('Qb', ('set', 'b', lambda L: L['v'] - 1, '@Qg')),
         ('Qg', ('load', lambda L: GEN(L['b']), 'eg', '@Qo')),
-        ('Qo', ('check', own, '@QL')),
+        ('Qo', ('check', own, '@QK')),
+        ('QK', ('check', relearning, '@QL')),
         ('QL', ('ghost', learn, '@QA')),
         ('QA', ('check', apply, '@QT')),
-        ('QT', ('ghost', lambda M, L: ({MESSAGE: 0, A_TAKEN: M[A_TAKEN] + (L['m'] % 8 == A)},
+        ('QT', ('ghost', lambda M, L: ({MESSAGE: 0, **taken(M, L, L['m'] % 8 == A)},
                                        {'n': (L['n'] or 0) + 1, 'v': DEL, 'm': DEL}), '@X')),
         ('X', ('set', 'kind', lambda L: DEL, '@X2')),
         ('X2', ('set', 'eg', lambda L: DEL, '@X3')),
         ('X3', ('set', 'h', lambda L: DEL, '@X4')),
-        ('X4', ('set', 'b', lambda L: DEL, '@L')),
+        ('X4', ('set', 'b', lambda L: DEL, '@P')),
         ('E', ('ghost', lambda M, L: ({DONE: M[DONE] + 1}, {}), '@END')),
         ('END', ('done',))])
 
 
 def case(design, tso=False):
     threads = [lead(design, tso), member(design), other(design, tso), remote(), engine(design)]
-    mem = {FREE: (1 << BLOCKS) - 1, MESSAGE: 0, A_TAKEN: 0, DONE: 0, SYNC(1): 0, SYNC(2): 0}
+    mem = {FREE: (1 << BLOCKS) - 1, MESSAGE: 0, A_TAKEN: 0, DONE: 0, SYNC(1): 0, SYNC(2): 0,
+           RELEASED: 0}
     for b in range(BLOCKS):
         mem[GEN(b)] = mem[HOLDERS(b)] = mem[RECORD(b)] = mem[COUNTERS(b)] = mem[HANDOFF(b)] = 0
+        mem[QUEUED(b)] = mem[PENDING(b)] = 0
         for pe in range(3):
             mem[HOLDER(b, pe)] = 0
     for n in (0, 1):
@@ -436,6 +532,7 @@ CASES = [
     ('map_early', 'NAMED'),
     ('last_clears', 'FREE'),
     ('free_first', 'NAMED'),
+    ('no_hold', 'QUEUED'),
 ]
 
 
