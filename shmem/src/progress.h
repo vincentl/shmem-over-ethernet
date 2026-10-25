@@ -329,6 +329,10 @@ struct osoe_progress_control {
     bool peer_aborted;
     uint32_t peer_abort_origin;
     uint32_t abort_sent;
+    /* OSOE_TEST_HOLD_RELEASE's window (progress.c, release_held; T16): nothing
+     * is sealed on this wire before this instant (CLOCK_MONOTONIC), or 0 for no
+     * window. */
+    uint64_t release_held_until_ns;
     struct osoe_am_parser parser;
     unsigned char buffer[OSOE_PROGRESS_CONTROL_BYTES];
 };
@@ -403,6 +407,11 @@ struct osoe_progress {
      * engine is made, holds nothing. */
     bool abort_hold;
     uint32_t abort_held_slot;
+    /* OSOE_TEST_HOLD_RELEASE (progress-host.c; T16): whether a RELEASE of a
+     * created team queued toward one node holds that node's control wire for a
+     * while, and the node. Zero, as an engine is made, holds nothing. */
+    bool release_hold;
+    uint32_t release_held_node;
     struct osoe_progress_owner *owner;          /* helpers + 1, by owner */
     struct osoe_progress_host host;
 

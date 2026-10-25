@@ -17,11 +17,12 @@
  * FILE, where the same arithmetic is checked against the rounds written out
  * element by element.
  *
- * And for every node count Träff's reduction takes at the default fan-out
- * ceiling, 2 to 512, and past it at counts up to the 65,536 it takes at any
- * ceiling (one_writer_counts), that each field of a lead's reduce-scatter
- * grant has one writer (T40): the receiver whose round the lead reads it for
- * (internode-generic.c, circulant_grants and take_round_grants).
+ * And for every node count Träff's reduction takes - at any fan-out ceiling,
+ * since P3 sized a lane by the rounds as well as the ceiling, 2 to 65,536, where
+ * the default ceiling's lane held 512 before it (one_writer_counts) - that each
+ * field of a lead's reduce-scatter grant has one writer (T40): the receiver
+ * whose round the lead reads it for (internode-generic.c, circulant_grants and
+ * take_round_grants).
  */
 #include <inttypes.h>
 #include <stdint.h>
@@ -212,12 +213,14 @@ static int one_writer_check(uint32_t nodes, uint64_t count)
 
 /*
  * The node counts one_writer_check takes: those Träff's reduction can run on.
- * It needs ceil(log2 N) rows, no more than a lane's - the fan-out ceiling + 1
- * (collective-shape.c, osoe_shape_choose) - nor than the reduce-scatter's
- * words hold, OSOE_INTERNAL_CIRCULANT_ROWS_MOST (internode-generic.c,
- * shape_of): every count to 512 at the default ceiling of 8, and to 65,536 at
- * a ceiling of 15 or more. Every count to 512, and 513, the first the default
- * ceiling leaves to the trees; past it, each power of two from 1,024 and the
+ * It needs ceil(log2 N) rows, no more than the reduce-scatter's words hold,
+ * OSOE_INTERNAL_CIRCULANT_ROWS_MOST (internode-generic.c, shape_of), nor than
+ * a lane's (collective-shape.c, osoe_shape_choose) - which has as many as the
+ * rounds need or the fan-out ceiling's + 1, whichever is more
+ * (internal-region.h, osoe_internal_lane_rows): so every count to 65,536 at
+ * every ceiling. Before P3 a lane had the ceiling's + 1 alone, and the default
+ * ceiling of 8 left every count past 512 to the trees. Every count to 512,
+ * and 513, the first of those; past it, each power of two from 1,024 and the
  * counts beside it, where a count gains a row - since a count costs its
  * rounds for each of its leads, and every count to 65,536 would be some 10^11
  * rounds. Writes up to `most` counts into `counts`, and returns how many there

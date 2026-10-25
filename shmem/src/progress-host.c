@@ -905,6 +905,22 @@ void osoe_progress_host_start(uint32_t session)
             osoe_am.progress.abort_held_slot = to < from ? to : to - 1;
         }
     }
+    /* OSOE_TEST_HOLD_RELEASE=FROM:TO: node FROM's control wire toward node TO
+     * sealing nothing for half a second from each RELEASE of a created team
+     * queued on it (progress.c, release_held; T16); every other node ignores
+     * it, as above. */
+    hold = getenv("OSOE_TEST_HOLD_RELEASE");
+    osoe_am.progress.release_hold = false;
+    if (hold) {
+        if (sscanf(hold, "%u:%u%n", &from, &to, &used) != 2 || hold[used] != '\0' ||
+            from >= osoe.bootstrap.node_count || to >= osoe.bootstrap.node_count || from == to)
+            osoe_fatal("OSOE_TEST_HOLD_RELEASE='%s' is not FROM:TO, two nodes of this job's %u",
+                       hold, osoe.bootstrap.node_count);
+        if (from == osoe.bootstrap.node) {
+            osoe_am.progress.release_hold = true;
+            osoe_am.progress.release_held_node = to;
+        }
+    }
     uint64_t connections_before = 0, descriptors_before = 0, busy_before = 0;
     for (uint32_t o = 0; o < owners; o++) {
         uint32_t wires = osoe_owner_wires(o, peers, helpers);

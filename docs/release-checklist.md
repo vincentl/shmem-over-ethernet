@@ -274,9 +274,11 @@ rated them (round six's readiness Q5-5).
 - **From the review of step D's merge point**
   (`docs/reviews/archive/phase1-step7-slice3-review.md`), each rated after the
   release or minor:
-  - the release hold of a team's local release (design §3.8) has no test and no
+  - ~~the release hold of a team's local release (design §3.8) has no test and no
     model: the correctness read's probe - a node stopped while 32 MiB streams
-    to it - shows it engaging, and its removal ending the job (G1);
+    to it - shows it engaging, and its removal ending the job (G1)~~ - done
+    2026-10-25 (T16: `team_block_model.py`'s control queue, and
+    `shmem.team-release.held.0-1-2` through `OSOE_TEST_HOLD_RELEASE`);
   - a PE's descriptor generation for a team number is 32 bits: taking one number
     2^32 - 1 times ends the job at the next split - hours on one PE, days on
     several (conformance F2, scale T2); 64 bits, or a generation that wraps;
@@ -359,10 +361,11 @@ rated them (round six's readiness Q5-5).
     2026-10-10, the agent's idle waits are by `shmem.helper-wake`'s two runs
     (scale S1; the step 1 review's Q3-1, half closed;
     `docs/decisions/2026-10-10-helper-wake.md`);
-  - Träff's rounds take a lane's rows, which the fan-out ceiling sizes, so past
+  - ~~Träff's rounds take a lane's rows, which the fan-out ceiling sizes, so past
     512 nodes at the default the cost model's best reduction is out of reach - by
     its own numbers 3.2 to 4.3 times faster at 1 MiB (scale S2): rows sized
-    apart from the ceiling, before hundreds of nodes;
+    apart from the ceiling, before hundreds of nodes~~ - done 2026-10-25 (P3: a
+    lane's rows the more of the ceiling's + 1 and Träff's rounds, to 65,536 nodes);
   - the receive pool's re-arms grow with the peers sending into a node at once
     (scale S3): a fan-in at many peers on the fast link, with
     `transport.am.receive_enobufs` beside the rate - Part 4's;
@@ -389,9 +392,10 @@ rated them (round six's readiness Q5-5).
     twice once in about 25 failing runs, the line having two writers, `abort.c`
     and `fatal.c`, and no guard of once a process (the ninth review's readiness
     Q5-4);
-  - Träff's on teams that are not the world, typed reductions in place at its
+  - ~~Träff's on teams that are not the world, typed reductions in place at its
     sizes, the whole-job `_to_all` at them, members' bits after a rounding sum,
-    nodes at different helper counts, and SOS at three helpers, each right by
-    the review's probes and none in the suite (conformance C3);
+    nodes at different helper counts~~, and SOS at three helpers, each right by
+    the review's probes and none in the suite (conformance C3) - done 2026-10-25
+    (T20) but SOS at three helpers, a run of the tag's (T4);
   - the x86-64 item at the next tag run at two and three helpers too
     (portability P3);
