@@ -273,7 +273,7 @@ checks of the build itself and jobs of a few processes. On four cores of an
 idle virtual machine it took about thirteen minutes, one for the build and
 twelve for the tests (2026-10-17, when they were about 950). Both may run four at a time, as this
 project's own runs do (`cmake --build --preset release -j4`, `ctest --preset
-release -j4`). The 44 tests of the model checker (`tools/modelcheck`, which
+release -j4`). The 45 tests of the model checker (`tools/modelcheck`, which
 needs Python 3) took 62 minutes in a development VM one at a time on
 2026-10-11, when they were 40, the longest of them, `model.reservation`, 14 of
 those, and check the design, which does not vary with the machine. They want
@@ -1555,7 +1555,7 @@ that one could be added without touching the OpenSHMEM layer.
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
   run before every merge, on the exact tree that merges: about 1,150 tests in
-  release, and the model checker's 44 tests beside them, which run in that build
+  release, and the model checker's 45 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.
@@ -1637,12 +1637,13 @@ that one could be added without touching the OpenSHMEM layer.
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
-- **Model checking.** Every lock-free and futex protocol but one - waking the
+- **Model checking.** Every lock-free and futex protocol - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion
   under `SHMEM_THREAD_MULTIPLE`,
   rendezvous, abort, the proof a deadlock is found by, a progress helper's
-  requests and its abort, and the teams' - a team
+  requests and its abort, the deprecated active-set collectives' counted
+  signals, and the teams' - a team
   block's life and the hold of its release, a split's pending numbers, a pool
   found empty, the posted arrivals - is checked
   exhaustively in small configurations by an explicit-state model checker
@@ -1674,11 +1675,15 @@ that one could be added without touching the OpenSHMEM layer.
   `shmem.team-release.held.0-1-2`, with node 0's control wire to node 1 shut
   for half a second after a RELEASE is queued there
   (`OSOE_TEST_HOLD_RELEASE`), counts the release held and, with the hold
-  removed, ends the job naming the block at its first round. The one without a
-  model is the deprecated active-set collectives' (`active-set.c`). The
-  checker runs a model under sequential
-  consistency or x86-TSO (some under both, among them the teams' four models and
-  those of the lanes and of a scan's pieces, each store as the library orders it
+  removed, ends the job naming the block at its first round. The
+  active-set collectives' model (`active-set.c`) runs up to ten members through up
+  to seven calls back to back on one pSync, over a network that lands each put
+  and atomic add in any order a fence, a quiet or put-with-signal allows, with
+  members that share a node and members that do not. The checker runs a model
+  under sequential
+  consistency or x86-TSO (some under both, among them the teams' four models,
+  those of the lanes and of a scan's pieces, and the active-set collectives',
+  each store as the library orders it
   and a `release` store buffered as x86 buffers it), and both keep a thread's
   loads in order, which
   aarch64, the machines osoe is built for, does not: the "blocked in" record's
