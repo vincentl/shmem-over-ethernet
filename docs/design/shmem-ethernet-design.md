@@ -7030,7 +7030,13 @@ connects (§3.12); and a rule for two leads that connect to each other at once �
 the lower node's connection wins, as §6.2's direction already says. *(Since
 H23 the direction is the mesh's schedule's, which a rule of the same kind would
 follow: the connection the schedule makes wins.)* The ring's
-bounds would then follow the active peers rather than *N*.
+bounds would then follow the active peers rather than *N*. *(Decided on 2026-10-25,
+not yet built: the data wires alone on demand, behind a setting, eager by default -
+the control wires stay eager to every node, so the trees, the abort, keepalive and
+the silent-peer check keep theirs; the schedule's caller always dials, the other side
+asking it over their control wire, so no two calls cross; a stalled data wire is
+told as any wait is; the listener stays open for the job's life in on-demand mode
+alone. `docs/decisions/2026-10-24.md`, "The author's answers".)*
 
 **`set_range` is not acted on here** (§4.10, §7.1 step 3). A TCP backend has
 nothing to prepare before the network touches memory: it receives into its own
