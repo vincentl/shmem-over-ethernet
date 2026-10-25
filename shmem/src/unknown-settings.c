@@ -62,6 +62,7 @@ static const char *const known_settings[] = {
     "OSOE_TEST_DEADLOCK_DROPS",
     "OSOE_TEST_DEAF_HELPER",
     "OSOE_TEST_HOLD_GOODBYE",
+    "OSOE_TEST_HOLD_RELEASE",
     "OSOE_TEST_MESH_HOLD",
     "OSOE_TEST_NOTICE_SECONDS",
     "OSOE_TEST_ONLINE_CPUS",
