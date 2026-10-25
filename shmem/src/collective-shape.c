@@ -211,8 +211,9 @@ uint64_t osoe_shape_circulant_cost(uint32_t nodes, uint32_t window, uint64_t byt
 struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operation,
                                                uint32_t nodes, uint64_t bytes,
                                                const struct osoe_link *link, uint32_t ceiling,
-                                               uint32_t capacity, uint32_t small_bytes,
-                                               uint64_t piece_bytes, bool circulant)
+                                               uint32_t lane_rows, uint32_t capacity,
+                                               uint32_t small_bytes, uint64_t piece_bytes,
+                                               bool circulant)
 {
     struct osoe_collective_shape shape = { OSOE_SHAPE_TREE, ceiling, 1 };
     if (nodes <= 1 || bytes <= small_bytes)
@@ -229,11 +230,10 @@ struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operati
     }
     shape.window = capacity;
     uint32_t rows = osoe_circulant_rows(nodes);
-    if (circulant && operation == OSOE_SHAPE_REDUCE && rows <= ceiling + 1) {
-        /* Träff's round takes as many of a lane's ceiling + 1 rows as its
-         * rounds leave it, the capacity's slots each, and keeps them all in
-         * flight. */
-        uint32_t window = capacity * ((ceiling + 1) / rows);
+    if (circulant && operation == OSOE_SHAPE_REDUCE && rows <= lane_rows) {
+        /* Träff's round takes as many of a lane's rows as its rounds leave it,
+         * the capacity's slots each, and keeps them all in flight. */
+        uint32_t window = capacity * (lane_rows / rows);
         if (osoe_shape_circulant_cost(nodes, window, bytes, piece_bytes, link) < least)
             shape = (struct osoe_collective_shape){ OSOE_SHAPE_CIRCULANT, ceiling, window };
     }
@@ -258,16 +258,16 @@ static uint32_t gather_steps(uint32_t nodes)
 /* A reduction of `bytes` among `nodes` leads as the data path runs it
  * (osoe_places_cost's comment): shape_timing.py's reduction_cost(). */
 static uint64_t reduction_cost(uint32_t nodes, uint64_t bytes, const struct osoe_link *link,
-                               uint32_t ceiling, uint32_t capacity, uint32_t small_bytes,
-                               uint64_t piece_bytes, bool circulant)
+                               uint32_t ceiling, uint32_t lane_rows, uint32_t capacity,
+                               uint32_t small_bytes, uint64_t piece_bytes, bool circulant)
 {
     if (nodes <= 1 || bytes == 0)
         return 0;
     if (bytes <= small_bytes)
         return osoe_shape_cost(OSOE_SHAPE_REDUCE, nodes, ceiling, 1, bytes, bytes, link);
     struct osoe_collective_shape s =
-        osoe_shape_choose(OSOE_SHAPE_REDUCE, nodes, bytes, link, ceiling, capacity, small_bytes,
-                          piece_bytes, circulant);
+        osoe_shape_choose(OSOE_SHAPE_REDUCE, nodes, bytes, link, ceiling, lane_rows, capacity,
+                          small_bytes, piece_bytes, circulant);
     uint64_t c = s.algorithm == OSOE_SHAPE_CIRCULANT
                      ? osoe_shape_circulant_cost(nodes, s.window, bytes, piece_bytes, link)
                      : osoe_shape_cost(OSOE_SHAPE_REDUCE, nodes, s.fanout, s.window, bytes,
@@ -276,8 +276,9 @@ static uint64_t reduction_cost(uint32_t nodes, uint64_t bytes, const struct osoe
 }
 
 uint64_t osoe_places_cost(enum osoe_places_way way, uint32_t nodes, uint32_t members,
-                          const struct osoe_link *link, uint32_t ceiling, uint32_t capacity,
-                          uint32_t small_bytes, uint64_t piece_bytes, bool circulant)
+                          const struct osoe_link *link, uint32_t ceiling, uint32_t lane_rows,
+                          uint32_t capacity, uint32_t small_bytes, uint64_t piece_bytes,
+                          bool circulant)
 {
     if (nodes <= 1)
         return 0;
@@ -285,11 +286,11 @@ uint64_t osoe_places_cost(enum osoe_places_way way, uint32_t nodes, uint32_t mem
         return UINT64_MAX;
     switch (way) {
     case OSOE_PLACES_MEMBERS:
-        return reduction_cost(nodes, (uint64_t)8 * members, link, ceiling, capacity, small_bytes,
-                              piece_bytes, circulant);
+        return reduction_cost(nodes, (uint64_t)8 * members, link, ceiling, lane_rows, capacity,
+                              small_bytes, piece_bytes, circulant);
     case OSOE_PLACES_TOTALS:
-        return reduction_cost(nodes, (uint64_t)8 * nodes, link, ceiling, capacity, small_bytes,
-                              piece_bytes, circulant);
+        return reduction_cost(nodes, (uint64_t)8 * nodes, link, ceiling, lane_rows, capacity,
+                              small_bytes, piece_bytes, circulant);
     case OSOE_PLACES_SCAN: {
         uint64_t tree = osoe_shape_cost(OSOE_SHAPE_REDUCE, nodes, ceiling, 1, PLACES_DOWN_BYTES,
                                         PLACES_DOWN_BYTES, link);
@@ -309,14 +310,15 @@ uint64_t osoe_places_cost(enum osoe_places_way way, uint32_t nodes, uint32_t mem
 enum osoe_places_way osoe_places_choose(uint32_t nodes, uint32_t members, bool runs,
                                         bool ordered, uint32_t exchange_nodes,
                                         const struct osoe_link *link, uint32_t ceiling,
-                                        uint32_t capacity, uint32_t small_bytes,
-                                        uint64_t piece_bytes, bool circulant)
+                                        uint32_t lane_rows, uint32_t capacity,
+                                        uint32_t small_bytes, uint64_t piece_bytes,
+                                        bool circulant)
 {
     if (nodes <= 1 || !runs)
         return OSOE_PLACES_MEMBERS;
     enum osoe_places_way best = OSOE_PLACES_TOTALS;
-    uint64_t least = osoe_places_cost(OSOE_PLACES_TOTALS, nodes, members, link, ceiling, capacity,
-                                      small_bytes, piece_bytes, circulant);
+    uint64_t least = osoe_places_cost(OSOE_PLACES_TOTALS, nodes, members, link, ceiling,
+                                      lane_rows, capacity, small_bytes, piece_bytes, circulant);
     const enum osoe_places_way others[2] = { OSOE_PLACES_EXCHANGE, OSOE_PLACES_SCAN };
     const bool allowed[2] = {
         nodes <= exchange_nodes && nodes <= OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST, ordered
@@ -324,8 +326,8 @@ enum osoe_places_way osoe_places_choose(uint32_t nodes, uint32_t members, bool r
     for (unsigned i = 0; i < 2; i++) {
         if (!allowed[i])
             continue;
-        uint64_t c = osoe_places_cost(others[i], nodes, members, link, ceiling, capacity,
-                                      small_bytes, piece_bytes, circulant);
+        uint64_t c = osoe_places_cost(others[i], nodes, members, link, ceiling, lane_rows,
+                                      capacity, small_bytes, piece_bytes, circulant);
         if (c < least) {
             best = others[i];
             least = c;

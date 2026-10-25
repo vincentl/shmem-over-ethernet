@@ -99,7 +99,8 @@ static const uint64_t STREAM_WINDOW = UINT64_C(64) * 1024;
 static struct scratch child_scratch(void)
 {
     const struct osoe_bootstrap *b = &osoe.bootstrap;
-    uint64_t lanes = 2 * osoe_internal_lane_bytes(b->collective_fanout, b->collective_pipeline);
+    uint64_t lanes = 2 * osoe_internal_lane_bytes(b->collective_fanout, b->collective_pipeline,
+                                                  b->node_count);
     uint64_t window = lanes / OSOE_INTERNAL_PIECE_BYTES * OSOE_INTERNAL_PIECE_BYTES;
     return (struct scratch){
         .at = osoe_internal_lanes_offset(b->collective_fanout, b->max_teams,

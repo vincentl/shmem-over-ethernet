@@ -5995,7 +5995,9 @@ team's:
 - **A large collective** goes through *lanes*: each PE's internal region holds
   one per thread record (node.h), (fan-out + 1) × D slots, each a piece's
   16-byte header and its 16 KiB (round six's U1: with the header inside 16
-  KiB, a power-of-two size went in one piece more), which the thread lends to the collective it leads from its entry to its return. One
+  KiB, a power-of-two size went in one piece more) - or past 512 nodes at the
+  default fan-out ⌈log₂ N⌉ × D, a row for each round of Träff's reduction (P3,
+  "Large reductions", below) - which the thread lends to the collective it leads from its entry to its return. One
   per thread record and not a pool (the author's answer to E9): two threads of
   a PE may lead two teams' collectives at once, and a thread waiting for a lane
   could close a cycle across PEs with others waiting the same way.
@@ -6355,7 +6357,23 @@ tree's interior lead sends k + 1 and the fold the step's brief first described
 put up to 3.5 on a fold lead's. Rule 1 holds through the lanes' rows, round k
 of either half into the k-th block of the receiver's lane - a block being as
 many of the lane's rows as the rounds leave a round, all of whose slots it
-keeps in flight, 16 pieces on four nodes; rule 2 on the lead's thread,
+keeps in flight, 16 pieces on four nodes. *(As built at v0.2, P3:)* a lane has
+those rows, ⌈log₂ N⌉ of them for the job's N nodes, or the fan-out ceiling's + 1
+for the tree's child positions and its release, whichever is more
+(`osoe_internal_lane_rows`; the chooser is told the number, and takes Träff's
+where its rounds fit it) - both numbers every node agrees on, so that no
+setting, no word at the rendezvous and no layout version came with it. Träff's
+therefore runs on every team to 65,536 nodes, the rows the reduce-scatter's
+words hold, at every ceiling; with the rows the ceiling sized alone it had run
+only to 512 nodes at the default of 8, a team of 513 nodes or more taking a tree
+at every size, where the cost model finds Träff's faster for 1 MiB by 3.2 times
+at 513 nodes and 4.3 at 4,096 (its event simulation, which runs the trees
+faster than the closed form does at that size, 2.7 to 2.9 times at 513 and
+1,024). A lane is longer than the ceiling's only past 512 nodes at the default:
+a row of 64 KiB at the defaults on each of a PE's lanes for each doubling of
+the nodes, 1.1 MiB a PE at 1,024 nodes, 3.2 at 4,096 and 7.4 at 65,536. Before
+its first put a Träff's reduction checks that the blocks it addresses end within
+the lane, by the functions that place the slots. Rule 2 on the lead's thread,
 which combines or copies every piece; rule 3 since each block is combined once,
 at its owner, in an order the schedule fixes, and copied to every lead. Its
 arithmetic is `collective-circulant.c`, its cost `osoe_shape_circulant_cost`,

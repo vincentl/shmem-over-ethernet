@@ -105,18 +105,23 @@ uint64_t osoe_shape_circulant_cost(uint32_t nodes, uint32_t window, uint64_t byt
  * - and the fan-out the least cost from 2 to `ceiling`, ties to the smaller;
  * and where `circulant` allows it - the caller's word that it runs Träff's
  * reduction - a reduction whose rounds' rows, ceil(log2 nodes), fit a lane's
- * `ceiling` + 1 rows takes Träff's where it costs less than that tree, ties to
- * the tree. Its window is the slots a round can have: each round takes
- * (`ceiling` + 1) / ceil(log2 nodes) of the lane's rows of `capacity` slots -
- * 16 pieces on three or four nodes at the defaults, 12 on five to eight, 8 on
- * nine to sixteen, and the capacity from 17 on.
+ * `lane_rows` takes Träff's where it costs less than that tree, ties to the
+ * tree. `lane_rows` is the rows of a lane in the job, osoe_internal_lane_rows
+ * of its fan-out ceiling and node count (internal-region.h; P3): the ceiling's
+ * + 1, or the job's rounds where they are more, so that the fan-out ceiling no
+ * longer decides how many nodes Träff's runs on. Its window is the slots a
+ * round can have: each round takes `lane_rows` / ceil(log2 nodes) of the lane's
+ * rows of `capacity` slots - at the defaults' lane of nine rows 16 pieces on
+ * three or four nodes, 12 on five to eight, 8 on nine to sixteen, and the
+ * capacity from 17 on, as on the node counts to 512 where a lane has no more.
  * tools/modelcheck/shape_timing.py's choose_shape(), line for line.
  */
 struct osoe_collective_shape osoe_shape_choose(enum osoe_shape_operation operation,
                                                uint32_t nodes, uint64_t bytes,
                                                const struct osoe_link *link, uint32_t ceiling,
-                                               uint32_t capacity, uint32_t small_bytes,
-                                               uint64_t piece_bytes, bool circulant);
+                                               uint32_t lane_rows, uint32_t capacity,
+                                               uint32_t small_bytes, uint64_t piece_bytes,
+                                               bool circulant);
 
 /*
  * collect's places (P31 of docs/prompts/v0.2-open-items.md; collectives.c,
@@ -139,17 +144,19 @@ enum osoe_places_way {
  * `members` members, nanoseconds, under the link: a reduction as the data path
  * runs it - the small class one piece through the ceiling's tree, a larger one
  * osoe_shape_choose's shape and a hop more for its grant, Träff's where
- * `circulant` allows it as for any reduction; the scan the small tree of its
- * 16-byte down - a level-order tree's terms standing in for its pre-order
- * tree's, which is as deep - and a message cost a step of the gather and one
- * more, for its records and the share; the exchange a hop, and for each of its
- * N - 1 messages a message cost and a slot's bytes on the sender's link. 0 on
- * one node, UINT64_MAX where a sum overflows. tools/modelcheck/shape_timing.py's
- * places_cost(), line for line; provisional until H24 and H25 measure the ways.
+ * `circulant` allows it as for any reduction, in a lane of `lane_rows` rows;
+ * the scan the small tree of its 16-byte down - a level-order tree's terms
+ * standing in for its pre-order tree's, which is as deep - and a message cost a
+ * step of the gather and one more, for its records and the share; the exchange
+ * a hop, and for each of its N - 1 messages a message cost and a slot's bytes
+ * on the sender's link. 0 on one node, UINT64_MAX where a sum overflows.
+ * tools/modelcheck/shape_timing.py's places_cost(), line for line; provisional
+ * until H24 and H25 measure the ways.
  */
 uint64_t osoe_places_cost(enum osoe_places_way way, uint32_t nodes, uint32_t members,
-                          const struct osoe_link *link, uint32_t ceiling, uint32_t capacity,
-                          uint32_t small_bytes, uint64_t piece_bytes, bool circulant);
+                          const struct osoe_link *link, uint32_t ceiling, uint32_t lane_rows,
+                          uint32_t capacity, uint32_t small_bytes, uint64_t piece_bytes,
+                          bool circulant);
 
 /*
  * The most nodes the default takes the leads' exchange on (P35 of
@@ -180,7 +187,8 @@ enum { OSOE_PLACES_EXCHANGE_DEFAULT_NODES_MOST = 16 };
 enum osoe_places_way osoe_places_choose(uint32_t nodes, uint32_t members, bool runs,
                                         bool ordered, uint32_t exchange_nodes,
                                         const struct osoe_link *link, uint32_t ceiling,
-                                        uint32_t capacity, uint32_t small_bytes,
-                                        uint64_t piece_bytes, bool circulant);
+                                        uint32_t lane_rows, uint32_t capacity,
+                                        uint32_t small_bytes, uint64_t piece_bytes,
+                                        bool circulant);
 
 #endif /* OSOE_COLLECTIVE_SHAPE_H */

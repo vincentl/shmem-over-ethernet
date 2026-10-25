@@ -677,14 +677,17 @@ static enum osoe_collect_way places_chosen(const struct osoe_team *t, bool order
         osoe.job.link_source == OSOE_LINK_NONE)
         return OSOE_COLLECT_WAY_TOTALS;
     /* Träff's where a reduction of the team's would take it (internode-generic.c,
-     * shape_of): under `link`, and where its rows fit the region's words. */
+     * shape_of): under `link`, and where its rows fit the region's words, in a
+     * lane of the rows the job's has. */
     bool circulant = b->collective_shape == OSOE_COLLECTIVE_SHAPE_LINK &&
                      osoe_circulant_rows(t->nodes) <= osoe_internal_circulant_rows(b->node_count);
     enum osoe_places_way way =
         osoe_places_choose(t->nodes, t->members, true, ordered,
                            osoe_internode_exchange_most_nodes(), &osoe.job.link,
-                           b->collective_fanout, b->collective_pipeline,
-                           b->small_collective_bytes, OSOE_INTERNAL_PIECE_BYTES, circulant);
+                           b->collective_fanout,
+                           osoe_internal_lane_rows(b->collective_fanout, b->node_count),
+                           b->collective_pipeline, b->small_collective_bytes,
+                           OSOE_INTERNAL_PIECE_BYTES, circulant);
     return way == OSOE_PLACES_SCAN       ? OSOE_COLLECT_WAY_SCAN
            : way == OSOE_PLACES_EXCHANGE ? OSOE_COLLECT_WAY_EXCHANGE
                                          : OSOE_COLLECT_WAY_TOTALS;
