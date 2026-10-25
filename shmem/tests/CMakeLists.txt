@@ -4545,11 +4545,26 @@ endif()
 # data path checks that the blocks it addresses end within the lane before its
 # first put; at a capacity of 1; at a window of 128 (a ceiling of 32
 # and a capacity of 8 on three nodes); and on a link so slow that a few hundred
-# bytes take Träff's, with fewer elements than nodes (tiny): empty blocks. And a
-# divergent call, which must end by name (diverge). The sanitizers run the cases of up to 9 PEs - 12 and 16 under
+# bytes take Träff's, with fewer elements than nodes (tiny): empty blocks, at
+# 16 nodes and at 11 and 12, which are not a power of two (below 10 nodes the
+# widest element, 16 bytes, makes fewer elements than nodes a small call).
+# And a divergent call, which must end by name (diverge).
+#
+# Beyond the world: Träff's on teams that are not the world, every typed
+# reduction in place, the whole-job _to_all at the sizes that take Träff's,
+# and rounding sums whose members must hold the same bits (T20; the step 4
+# conformance review's C3, which found each right and none in the suite) run in
+# every case above, and the nodes may run different numbers of progress
+# helpers, which the README allows: each rank is given its node's number with
+# -e, as shmem.start-up.progress-helpers.differs does, 0, 2 and 2 on three
+# nodes, 0, 3, 1 and 2 on four of two PEs, and on five nodes 0, 1, 5, 2 and 3 -
+# one more than the node has peers - so that a helper is idle (helpers-...: the
+# program requires the counts to differ, from the owners each node's lead
+# holds). The sanitizers run the cases of up to 9 PEs - 12 and 16 under
 # asan, beside the suite's other tests, were killed by the VM's OOM killer
 # (asan's own memory, about 55 MB a PE; the Part 2 record) - and tsan one PE a
-# node alone, as shmem.lanes.* does.
+# node alone, as shmem.lanes.* does, and none with helpers, whose puts land in
+# heaps their PEs' threads touch (shmem.helper-wake's reason).
 if(OSOE_INTERNODE)
   add_executable(shmem_test_circulant-reduce test-circulant-reduce.c
     ../src/collective-shape.c ../src/collective-circulant.c ../src/collective-tree.c
@@ -4560,14 +4575,16 @@ if(OSOE_INTERNODE)
   osoe_warnings(shmem_test_circulant-reduce)
   foreach(case 2 3 4 5 6 7 8 9 12 16 17 33 64 70 8x2 5.perturb 16.perturb 4.threads
                16.threads 5.stress 4.max-teams-4 16.tree 7.lanes 5.lanes 5.ceiling-2
-               9.ceiling-2 17.ceiling-2 33.ceiling-2 5.capacity-1 3.window-128 16.tiny)
+               9.ceiling-2 17.ceiling-2 33.ceiling-2 5.capacity-1 3.window-128 16.tiny 11.tiny
+               12.tiny 3.helpers-0-2-2 4x2.helpers-0-3-1-2 5.helpers-0-1-5-2-3)
     string(REGEX MATCH "^[0-9]+" nodes "${case}")
     set(per_node 1)
-    if(case MATCHES "x2$")
+    if(case MATCHES "^[0-9]+x2([.]|$)")
       set(per_node 2)
     endif()
     set(extra "")
     set(arguments "")
+    set(launch_options "")
     set(link OSOE_LINK_HOP_NS=86000 OSOE_LINK_MESSAGE_NS=7000
              OSOE_LINK_BYTES_PER_SECOND=116000000)
     if(case MATCHES "perturb")
@@ -4592,13 +4609,33 @@ if(OSOE_INTERNODE)
     elseif(case MATCHES "tiny")
       set(link OSOE_LINK_HOP_NS=1000 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=1000)
       set(extra OSOE_SMALL_COLLECTIVE_BYTES=128)
+      set(arguments tiny)
+    elseif(case MATCHES "helpers")
+      set(arguments helpers-differ)
     endif()
     math(EXPR pes "${nodes} * ${per_node}")
     if(pes GREATER 9 AND CMAKE_C_FLAGS MATCHES "sanitize=")
       continue()
     endif()
-    if(per_node GREATER 1 AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    if((per_node GREATER 1 OR case MATCHES "helpers") AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
       continue()
+    endif()
+    if(case MATCHES "helpers")
+      # -e RANK:OSOE_PROGRESS_HELPERS=n for every rank of every node: the case
+      # names the nodes' counts, in node order, after "helpers-".
+      string(REGEX REPLACE "^[^.]*[.]helpers-" "" helper_counts "${case}")
+      string(REPLACE "-" ";" helper_counts "${helper_counts}")
+      list(LENGTH helper_counts helper_count)
+      if(NOT helper_count EQUAL nodes)
+        message(FATAL_ERROR
+                "shmem.circulant.${case}: ${helper_count} helper counts for ${nodes} nodes")
+      endif()
+      math(EXPR last_rank "${pes} - 1")
+      foreach(rank RANGE 0 ${last_rank})
+        math(EXPR node_of_rank "${rank} / ${per_node}")
+        list(GET helper_counts ${node_of_rank} helpers)
+        list(APPEND launch_options -e ${rank}:OSOE_PROGRESS_HELPERS=${helpers})
+      endforeach()
     endif()
     set(map "")
     math(EXPR last "${nodes} - 1")
@@ -4618,7 +4655,8 @@ if(OSOE_INTERNODE)
     math(EXPR launch_timeout "${timeout} - 60")
     add_test(NAME shmem.circulant.${case}
       COMMAND ${CMAKE_COMMAND} -E env ${link} SHMEM_SYMMETRIC_SIZE=12m ${extra}
-              $<TARGET_FILE:osoe-launch> -n ${pes} -m ${map} -t ${launch_timeout} --
+              $<TARGET_FILE:osoe-launch> -n ${pes} -m ${map} -t ${launch_timeout}
+              ${launch_options} --
               $<TARGET_FILE:shmem_test_circulant-reduce> ${arguments})
     set_tests_properties(shmem.circulant.${case} PROPERTIES LABELS "tier2"
       TIMEOUT ${timeout} PASS_REGULAR_EXPRESSION "CIRCULANT REDUCE: .* on ${nodes} nodes"
