@@ -99,6 +99,9 @@ Done on 2026-10-27 and 28 (`docs/decisions/2026-10-27-session-3-kit.md`):
    ends, the chain going on past a section that fails and saying so.
 3. **The dry run** (`dry-run.sh`'s `session-3`) of the chain whole: 31.6 minutes,
    every section done, the static checks 17 of 17 after it.
+4. **The dry run again on `main`** at `afc8b2fb`, layout 42 and H23 merged into
+   it (2026-10-28): 31.6 minutes, the same sections, jobs and failures as the
+   first (`docs/decisions/2026-10-28.md`).
 
 Left as they are: two measurements at once on disjoint pairs (no precedent, and
 the kit's `scancel` by name would cancel the other's jobs); the `echo-uring`
