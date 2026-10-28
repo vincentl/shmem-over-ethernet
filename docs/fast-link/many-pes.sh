@@ -15,7 +15,8 @@
 # node the wake's cost alone: the two put streams, the 1 MiB one again with
 # both nodes' CPUs profiled PROFILE_SECONDS long, PROFILE_DELAY seconds in
 # (profile.sh, by PERF: the turnover's wake is the progress thread's
-# futex_wake), and the collectives with the check off and on. Each multistream
+# futex_wake), and the collectives with the check off and on, its files named
+# -wake, apart from a count's. Each multistream
 # node line gives its PEs' sleeps a 64 KiB moved, their voluntary context
 # switches over the window: S1 measured 0.75 at one writer, 8.4 to 9.1 at 16
 # and 16 to 23 at 32 under the rule then, and 1.0 with a wake of one. Every job
@@ -55,11 +56,11 @@ pair_job() {   # PES OUTFILE [NAME=VALUE...] -- PROGRAM [ARGUMENTS...]
     shift 2
     KIT_SALLOC="$KIT_SALLOC $(pair)" launch 2 "$pes" "$file" SHMEM_SYMMETRIC_SIZE="$HEAP" "$@"
 }
-collectives() {   # PES HELPERS ROUND: osoe-bench's lines with the check off and on
+collectives() {   # PES HELPERS ROUND [-wake]: osoe-bench's lines with the check off and on
     local check value
     for check in $(rotate "off on" $(($3 - 1))); do
         [ "$check" = on ] && value=1 || value=0
-        pair_job "$1" "$OUT/collectives-check-$check-pes$1-h$2-r$3.txt" \
+        pair_job "$1" "$OUT/collectives${4:-}-check-$check-pes$1-h$2-r$3.txt" \
             OSOE_PROGRESS_HELPERS="$2" OSOE_CHECK_COLLECTIVES=$value -- \
             "$KIT_BUILD/tools/bench/osoe-bench" quick barrier collectives
     done
@@ -88,19 +89,19 @@ for ((round = 1; round <= ROUNDS; round++)); do
     # connection, one of them profiled beside it, and the check at that count.
     [ -n "$WAKE_PES" ] || continue
     for h in $HELPERS; do
-        KIT_TIMEOUT=$WAKE_TIMEOUT pair_job "$WAKE_PES" "$OUT/put-1m-pes$WAKE_PES-h$h-r$round.txt" \
+        KIT_TIMEOUT=$WAKE_TIMEOUT pair_job "$WAKE_PES" "$OUT/put-1m-wake-pes$WAKE_PES-h$h-r$round.txt" \
             OSOE_PROGRESS_HELPERS="$h" MULTISTREAM_STAT="$STAT" -- \
             "$KIT_BIN/multistream" put 1048576 "$SECONDS_EACH"
-        KIT_TIMEOUT=$WAKE_TIMEOUT pair_job "$WAKE_PES" "$OUT/put-64k-pes$WAKE_PES-h$h-r$round.txt" \
+        KIT_TIMEOUT=$WAKE_TIMEOUT pair_job "$WAKE_PES" "$OUT/put-64k-wake-pes$WAKE_PES-h$h-r$round.txt" \
             OSOE_PROGRESS_HELPERS="$h" MULTISTREAM_STAT="$STAT" -- \
             "$KIT_BIN/multistream" put 65536 "$SECONDS_EACH"
         BESIDE="bash '$KIT/profile.sh' $PROFILE_SECONDS" BESIDE_DELAY=$PROFILE_DELAY \
-            BESIDE_FILE="$OUT/profile-pes$WAKE_PES-h$h-r$round.txt" KIT_TIMEOUT=$WAKE_TIMEOUT \
+            BESIDE_FILE="$OUT/profile-wake-pes$WAKE_PES-h$h-r$round.txt" KIT_TIMEOUT=$WAKE_TIMEOUT \
             KIT_SALLOC="$KIT_SALLOC $(pair)" \
-            beside 2 "$WAKE_PES" "$OUT/put-1m-profiled-pes$WAKE_PES-h$h-r$round.txt" \
+            beside 2 "$WAKE_PES" "$OUT/put-1m-wake-profiled-pes$WAKE_PES-h$h-r$round.txt" \
             SHMEM_SYMMETRIC_SIZE="$HEAP" OSOE_PROGRESS_HELPERS="$h" -- \
             "$KIT_BIN/multistream" put 1048576 "$SECONDS_EACH"
-        KIT_TIMEOUT=$WAKE_TIMEOUT collectives "$WAKE_PES" "$h" "$round"
+        KIT_TIMEOUT=$WAKE_TIMEOUT collectives "$WAKE_PES" "$h" "$round" -wake
     done
 done
 echo "# done $(date -u +%H:%M:%S)" >> "$LOG"

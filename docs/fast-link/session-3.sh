@@ -245,7 +245,8 @@ section_setup() {
     echo "tier 2 on $(node 1), exit $suite_status: $(grep -h 'tests passed' "$CHAIN/setup/suite.txt" || echo 'no summary line')" >> "$verdicts"
     # T35's litmus, which closes T36 run natively on x86-64.
     local litmus
-    litmus=$(grep -h 'shmem\.quiet\.litmus\.L2 ' "$CHAIN/setup/suite.txt" | sed 's/^ *//; s/  */ /g; s/ \.\.* / /')
+    litmus=$(grep -h 'Test *#[0-9]*: shmem\.quiet\.litmus\.L2 ' "$CHAIN/setup/suite.txt" | head -1 |
+        sed 's/^ *//; s/ \.\.*/ /; s/  */ /g')
     echo "the litmus: ${litmus:-not in the output of the suite}" >> "$verdicts"
     cat "$verdicts"
 }

@@ -6,7 +6,7 @@
 # each prefixed by the node's name, so that the progress threads (osoe-agent,
 # osoe-helper-N) are told from the PEs' own; and after it the progress threads'
 # own symbols with their callers, which say what a wake or a copy is made for
-# (§20). PERF is the command (default perf; "sudo -n perf" where
+# (§20), perf's warnings on unwinding left out. PERF is the command (default perf; "sudo -n perf" where
 # kernel.perf_event_paranoid keeps a user from every process); where it is
 # missing or refused, the line says so. The data goes in a directory of the
 # user's own, which the user can empty whoever wrote the file in it.
@@ -28,6 +28,6 @@ $PERF report -i "$data" --stdio --no-children -g none --sort comm,dso,symbol --p
 echo "the progress threads' symbols, with their callers:" | say
 # shellcheck disable=SC2086
 $PERF report -i "$data" --stdio --no-children -g graph,2,callee --sort symbol \
-    --comms osoe-agent,osoe-helper-1,osoe-helper-2,osoe-helper-3,osoe-helper-4 --percent-limit 2 2>&1 |
+    --comms osoe-agent,osoe-helper-1,osoe-helper-2,osoe-helper-3,osoe-helper-4 --percent-limit 2 2> /dev/null |
     grep -v '^#' | grep . | head -60 | say
 rm -rf "$dir"
