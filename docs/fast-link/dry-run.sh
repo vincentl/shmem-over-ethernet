@@ -8,8 +8,9 @@
 # would give. Run from the tree, after `docs/fast-link/build.sh` with
 # KIT_LAUNCHER=osoe-launch has built it here.
 # SECTIONS names the sections to run, in this order (default: every one), and
-# session-3, named alone, the third session's chain whole (session-3.sh), at its
-# own settings - rounds, cases, helper counts and lengths - on these logical
+# session-3, named alone, the third session's chain whole (session-3.sh) - or
+# its sections CHAIN_SECTIONS - at its own settings - rounds, cases, helper
+# counts and lengths - on these logical
 # nodes, each script's own timeout: H12's 256 PEs a node at WAKE_PES (64), the
 # development VM's /dev/shm holding no more; tier 2 the tests of SUITE_TESTS
 # (a few, the litmus among them); SOS's sources SOS_SOURCE, sos.sh's (a
@@ -48,7 +49,7 @@ GIT
         chmod +x "$OUT/bin/git"
         export PATH=$OUT/bin:$PATH TREE_TARS
     fi
-    env -u KIT_TIMEOUT WAKE_PES="${WAKE_PES:-64}" SUITE_JOBS="${SUITE_JOBS:-4}" \
+    env -u KIT_TIMEOUT SECTIONS="${CHAIN_SECTIONS:-}" WAKE_PES="${WAKE_PES:-64}" SUITE_JOBS="${SUITE_JOBS:-4}" \
         SUITE_TESTS="${SUITE_TESTS:-^shmem[.](quiet[.]litmus[.]L2|wire-pair|barrier-am[.]0-1-2)\$}" \
         bash "$KIT/session-3.sh" "$NODES" "$OUT/session-3" > "$OUT/session-3.log" 2>&1
     echo "exit $?"

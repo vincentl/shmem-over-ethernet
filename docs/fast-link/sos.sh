@@ -16,6 +16,8 @@
 # here unless it is: a program finds the library by the build's path, which
 # build.sh gives every node. The build's parallel jobs are JOBS (this
 # machine's CPUs). On one machine (KIT_LAUNCHER=osoe-launch) nothing is copied.
+# DIR/done.txt, written here last, says the build was whole and is on every
+# node; a copy is ended after two minutes.
 # usage: sos.sh NODES DIR
 : "${KIT_TIMEOUT:=1200}"
 source "$(dirname "$0")/common.sh"
@@ -74,14 +76,19 @@ printf '%s\n' unit/*.c unit/*.cpp spec-example/*.c apps/*.c | grep -v '\*' |
     xargs -P "$JOBS" -I{} bash -c 'build_one "$1"' _ {} | sort > build.txt
 say "$(grep -c ': built$' build.txt) built, $(grep -c 'build failed' build.txt) not"
 
-[ "$KIT_LAUNCHER" = osoe-launch ] && exit 0
-# Every node's host key taken on first contact, as slurm-setup.sh takes them,
-# which may still be running beside this.
-SSH="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+built="$(grep -c ': built$' build.txt) programs built at $(date -u +%H:%M:%S)"
+if [ "$KIT_LAUNCHER" = osoe-launch ]; then
+    echo "$built, on this machine alone" > done.txt
+    exit 0
+fi
+# Every node's host key taken on first contact, as slurm-setup.sh takes them.
+SSH="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10"
 status=0
 for n in $(grep -vxF "$(hostname -s)" "$NODES_FILE"); do
-    $SSH -n "$n" mkdir -p "$DIR" && rsync -a --delete -e "$SSH" "$DIR"/ "$n:$DIR"/ ||
+    timeout 120 $SSH -n "$n" mkdir -p "$DIR" &&
+        timeout 120 rsync -a --delete -e "$SSH" "$DIR"/ "$n:$DIR"/ ||
         { say "copying to $n failed"; status=1; }
 done
-[ "$status" -eq 0 ] && say "copied to every node of $NODES_FILE"
-exit "$status"
+[ "$status" -eq 0 ] || exit "$status"
+say "copied to every node of $NODES_FILE"
+echo "$built, copied to every node of $NODES_FILE" > done.txt

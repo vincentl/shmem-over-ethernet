@@ -41,16 +41,21 @@
 #   SUITE_TESTS       ctest -R's regex for tier 2 (empty: all of it)
 #   SUITE_JOBS        tier 2's tests at once (8, the node's cores)
 #   PERF              perf's command (sudo -n perf: perf_event_paranoid is 3
-#                     on the image; perf under osoe-launch)
+#                     on the image, and in the development VM)
 #   SOS_SOURCE        sos.sh's
 #
 # Run it from the tree on the head node - a clone, whose .git trees.sh needs -
-# in the ssh session that forwards the agent, kept open to the end: the setup,
+# from an ssh session that forwards the agent, kept open to the end: the setup,
 # sos.sh, trees.sh and binding.sh reach the nodes by ssh, and the agent is the
-# session's. For example, from the Mac, in the background:
-#   ssh -A slurm-controller 'cd osoe && docs/fast-link/session-3.sh ~/NODES ~/out'
-# and watch ~/out/sections.txt. To stop it, end its process group and then
-# `scancel -u $USER -n osoe-kit`; SECTIONS then runs what is left. Under
+# session's. In a session of its own, so that a dropped connection costs the
+# agent and not the chain, and the connection kept from idling; from the Mac,
+# in the background:
+#   ssh -A -o ServerAliveInterval=30 slurm-controller 'cd osoe; setsid nohup
+#       docs/fast-link/session-3.sh ~/NODES ~/out > ~/session-3.txt 2>&1 < /dev/null &
+#       tail -f --pid=$! ~/session-3.txt'
+# and watch ~/out/sections.txt. To stop it: kill -TERM -$(cat ~/out/chain.pid),
+# its process group; pkill -u $USER -x timeout, since each job's timeout is a
+# group of its own; and scancel -u $USER. SECTIONS then runs what is left. Under
 # KIT_LAUNCHER=osoe-launch, one machine's logical nodes (dry-run.sh), what needs
 # other machines is skipped and says so: the wait, the packages, Slurm, SOS's
 # copies and the binding's switch.
@@ -75,8 +80,7 @@ SUITE_TESTS=${SUITE_TESTS:-}
 SUITE_JOBS=${SUITE_JOBS:-8}
 CLUSTER=1
 [ "$KIT_LAUNCHER" = osoe-launch ] && CLUSTER=0
-if [ "$CLUSTER" = 1 ]; then PERF=${PERF:-sudo -n perf}; else PERF=${PERF:-perf}; fi
-export PERF
+export PERF=${PERF:-sudo -n perf}
 SOS_DIR=$REPOSITORY/build/sos
 SSH="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10"
 HERE=$(hostname -s)
@@ -104,8 +108,11 @@ on_machine() {
 }
 
 # 0. Each machine's start-up script, by its unit's state (fast-link.md §1): done
-# when ActiveState=inactive and Result=success, still running while activating;
-# any other result failed. Never by pgrep -f through ssh, whose pattern is in
+# when ActiveState=inactive and Result=success and its main process has exited -
+# a unit not yet started reads inactive and success too, without an exit time -
+# or active and exited, should the image ever keep it so; still running while
+# activating; any other result failed, which stops the
+# chain for the lead to look at. Never by pgrep -f through ssh, whose pattern is in
 # its own shell's command line. Past STARTUP_EXPECTED minutes the machines still
 # pending are looked at another way - the unit's status and its last lines -
 # and past STARTUP_MINUTES the wait fails.
@@ -114,23 +121,30 @@ section_wait() {
         echo "no start-up scripts to wait for: ${STARTUP_UNIT:+one machine}${STARTUP_UNIT:-STARTUP_UNIT is empty}"
         return 0
     fi
-    local began m out state result loaded pending failed looked=0
+    local began m out state sub result loaded exited pending failed looked=0
     began=$(date +%s)
     while :; do
         pending= failed=
         for m in $(machines); do
-            out=$(on_machine "$m" "systemctl show -p LoadState -p ActiveState -p Result $STARTUP_UNIT" 2>&1)
+            out=$(on_machine "$m" "systemctl show -p LoadState -p ActiveState -p SubState \
+                -p Result -p ExecMainExitTimestamp $STARTUP_UNIT" 2>&1)
             loaded=$(sed -n 's/^LoadState=//p' <<< "$out")
             state=$(sed -n 's/^ActiveState=//p' <<< "$out")
+            sub=$(sed -n 's/^SubState=//p' <<< "$out")
             result=$(sed -n 's/^Result=//p' <<< "$out")
+            exited=$(sed -n 's/^ExecMainExitTimestamp=//p' <<< "$out")
             if [ -z "$state" ] && grep -q 'Permission denied' <<< "$out"; then
                 failed="$failed $m(ssh refused: is the agent forwarded?)"
             elif [ -z "$state" ]; then
                 pending="$pending $m(unreachable)"
             elif [ "$loaded" = not-found ]; then
                 failed="$failed $m(no unit $STARTUP_UNIT)"
-            elif [ "$state" = inactive ] && [ "$result" = success ]; then
+            elif [ "$state" = inactive ] && [ "$result" = success ] && [ -n "$exited" ]; then
                 :
+            elif [ "$state" = active ] && [ "$sub" = exited ] && [ "$result" = success ]; then
+                :
+            elif [ "$state" = inactive ] && [ "$result" = success ]; then
+                pending="$pending $m(not started)"
             elif [ "$state" = activating ] || [ "$state" = active ] || [ "$state" = reloading ]; then
                 pending="$pending $m($state)"
             else
@@ -162,10 +176,11 @@ section_wait() {
 # 1. The setup. The packages on every machine at once (the start-up scripts
 # install all but linux-perf), Slurm and the build: what every section after
 # needs, so that their failure stops the chain. Then SOS's build on this
-# machine in the background, as soon as nothing else builds here - at once on
-# a head node off the list, after the build where this machine builds too -
-# and the facts, the probe, a job of 32 PEs a node and tier 2 on the first node,
-# whose failures are findings, said in OUTDIR/setup/verdicts.txt.
+# machine in the background, at the lowest priority, once Slurm's daemons are
+# up and nothing else builds here - before the build on a head node off the
+# list, after it where this machine builds too - and the facts, the probe, a
+# job of 32 PEs a node and tier 2 on the first node, whose failures are
+# findings, said in OUTDIR/setup/verdicts.txt.
 PACKAGES="build-essential cmake pkg-config liburing-dev git rsync ethtool iperf3 linux-perf"
 packages() {
     local install="sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 -q update &&
@@ -186,7 +201,7 @@ packages() {
     return $status
 }
 start_sos() {
-    ( bash "$KIT/sos.sh" "$NODES" "$SOS_DIR" > "$CHAIN/setup-sos.log" 2>&1 < /dev/null
+    ( nice -n 19 bash "$KIT/sos.sh" "$NODES" "$SOS_DIR" > "$CHAIN/setup-sos.log" 2>&1 < /dev/null
       echo "exit $?" > "$CHAIN/setup-sos.status" ) &
     echo $! > "$CHAIN/setup-sos.pid"
     echo "SOS's build started on this machine (sos.sh, its log $CHAIN/setup-sos.log)"
@@ -201,7 +216,6 @@ section_setup() {
     else
         echo "one machine: no packages installed, and no Slurm"
     fi
-    [ "$sos_first" = 1 ] && start_sos
     if [ "$CLUSTER" = 1 ]; then
         if grep -qxF "$HERE" "$NODES"; then
             bash "$KIT/slurm-setup.sh" "$NODES"
@@ -211,6 +225,7 @@ section_setup() {
             echo "slurm-setup.sh failed:"; tail -20 "$CHAIN/setup/slurm-setup.txt"; return 1; }
         tail -n "$(( $(grep -c . "$NODES") + 1 ))" "$CHAIN/setup/slurm-setup.txt"
     fi
+    [ "$sos_first" = 1 ] && start_sos
     OUT=$CHAIN/setup-build bash "$KIT/build.sh" "$NODES" > "$CHAIN/setup/build.txt" 2>&1 || {
         echo "build.sh failed:"; tail -20 "$CHAIN/setup/build.txt"; return 1; }
     cat "$CHAIN/setup/build.txt"
@@ -224,8 +239,10 @@ section_setup() {
     echo "a job of 32 PEs a node: $(grep -h '^startup ' "$CHAIN/setup/startup-32.txt" || echo 'no startup line')" >> "$verdicts"
     local tests=(--test-dir "$KIT_BUILD" -L tier2 -E '^model\.' -j"$SUITE_JOBS" --timeout 300)
     [ -n "$SUITE_TESTS" ] && tests+=(-R "$SUITE_TESTS")
+    local suite_status
     KIT_TIMEOUT=1800 on "$(node 1)" ctest "${tests[@]}" > "$CHAIN/setup/suite.txt" 2>&1
-    echo "tier 2 on $(node 1), exit $?: $(grep -h 'tests passed' "$CHAIN/setup/suite.txt" || echo 'no summary line')" >> "$verdicts"
+    suite_status=$?
+    echo "tier 2 on $(node 1), exit $suite_status: $(grep -h 'tests passed' "$CHAIN/setup/suite.txt" || echo 'no summary line')" >> "$verdicts"
     # T35's litmus, which closes T36 run natively on x86-64.
     local litmus
     litmus=$(grep -h 'shmem\.quiet\.litmus\.L2 ' "$CHAIN/setup/suite.txt" | sed 's/^ *//; s/  */ /g; s/ \.\.* / /')
@@ -245,30 +262,32 @@ section_behind() { ROUNDS=1 HELPERS="0 2" bash "$KIT/behind.sh" "$NODES" "$CHAIN
 section_trees() { ROUNDS=1 bash "$KIT/trees.sh" "$NODES" "$CHAIN/trees"; }
 
 # 9. The cluster at size, SOS's programs among it: sos.sh's build, started in
-# the setup, waited for by the status it writes as it ends, while its process
-# lives - or, where this run had no setup, the build an earlier one left, or a
-# build now.
+# the setup, waited for while its process lives, ten minutes at most - or,
+# where this run started none, a build an earlier run finished, or one now.
+# sos.sh's done.txt says a build was whole and copied to every node.
 section_scale() {
-    local sos= pid
+    local sos= pid waited=0
     pid=$(cat "$CHAIN/setup-sos.pid" 2>/dev/null)
-    if [ -n "$pid" ] && [ ! -e "$CHAIN/setup-sos.status" ]; then
+    if [ -n "$pid" ] && kill -0 "$pid" 2> /dev/null; then
         echo "$(date -u +%H:%M:%S) waiting for SOS's build (sos.sh)"
-        while [ ! -e "$CHAIN/setup-sos.status" ] && kill -0 "$pid" 2> /dev/null; do
+        while kill -0 "$pid" 2> /dev/null && [ "$waited" -lt 600 ]; do
             sleep 5
+            waited=$((waited + 5))
         done
-        echo "$(date -u +%H:%M:%S) SOS's build ended"
-    elif [ ! -s "$SOS_DIR/build.txt" ]; then
+        echo "$(date -u +%H:%M:%S) SOS's build: $(cat "$CHAIN/setup-sos.status" 2>/dev/null || echo "still running after $waited s")"
+    elif [ -z "$pid" ] && [ ! -e "$SOS_DIR/done.txt" ]; then
         echo "no SOS build yet: sos.sh now"
-        bash "$KIT/sos.sh" "$NODES" "$SOS_DIR" > "$CHAIN/setup-sos.log" 2>&1 < /dev/null
+        nice -n 19 bash "$KIT/sos.sh" "$NODES" "$SOS_DIR" > "$CHAIN/setup-sos.log" 2>&1 < /dev/null
         echo "exit $?" > "$CHAIN/setup-sos.status"
     fi
-    echo "sos.sh: $(cat "$CHAIN/setup-sos.status" 2>/dev/null || echo 'no status'); $(tail -2 "$CHAIN/setup-sos.log" 2>/dev/null | paste -sd' ' -)"
-    if [ "$(cat "$CHAIN/setup-sos.status" 2>/dev/null)" = "exit 0" ] && [ -s "$SOS_DIR/build.txt" ]; then
+    tail -3 "$CHAIN/setup-sos.log" 2>/dev/null
+    if [ -e "$SOS_DIR/done.txt" ]; then
         sos=$SOS_DIR
+        cat "$SOS_DIR/done.txt"
         mkdir -p "$CHAIN/scale"
         cp "$SOS_DIR/build.txt" "$CHAIN/scale/sos-build.txt"
     else
-        echo "no SOS run: its build did not finish"
+        echo "no SOS run: no build whole and copied ($SOS_DIR/done.txt)"
     fi
     MIX_SECONDS=300 SOS_BUILD=$sos bash "$KIT/scale.sh" "$NODES" "$CHAIN/scale"
 }
@@ -280,7 +299,10 @@ section_binding() {
     local status=0 variant srun
     if [ "$CLUSTER" = 1 ]; then
         CONTROLLER=$HERE bash "$KIT/binding.sh" "$NODES" site > "$CHAIN/binding-site.txt" 2>&1 || {
-            echo "binding.sh site failed:"; tail -20 "$CHAIN/binding-site.txt"; return 1; }
+            echo "binding.sh site failed:"; tail -20 "$CHAIN/binding-site.txt"
+            CONTROLLER=$HERE bash "$KIT/binding.sh" "$NODES" none > "$CHAIN/binding-none.txt" 2>&1 ||
+                echo "and binding.sh none failed too: some nodes may be left bound"
+            return 1; }
         tail -n 4 "$CHAIN/binding-site.txt"
     else
         echo "one machine: no Slurm to bind, and the cases run as osoe-launch starts them"
@@ -355,6 +377,7 @@ run_section() {   # NUMBER NAME [stop]
     echo "# $(date -u +%FT%TZ) session-3.sh on $HERE: kit $COMMIT, $(grep -c . "$NODES") nodes,"
     echo "# launcher $KIT_LAUNCHER, sections: $SECTIONS"
 } | tee -a "$STATUS"
+echo $$ > "$CHAIN/chain.pid"
 trap 'echo "stopped by a signal at $(date -u +%H:%M:%S)" | tee -a "$STATUS"; summary; exit 130' INT TERM
 run_section 0 wait stop
 run_section 1 setup stop
