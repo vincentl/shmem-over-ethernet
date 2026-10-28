@@ -1,0 +1,24 @@
+# The first run (2026-10-27, 22:46-23:20 VM time): fourteen mutants; three ran nothing,
+# their expressions holding the runner's field separator, '|'.
+open_early: CAUGHT - 0% tests passed, 1 tests failed out of 1; 	179 - shmem.data-wires.ring.0-1-2-3-4 (Failed)          internode tier2 
+both_dial: CAUGHT - 0% tests passed, 1 tests failed out of 1; 	180 - shmem.data-wires.skip.0-1-2-3-4 (Failed)          internode tier2 
+no_ask: CAUGHT - 0% tests passed, 1 tests failed out of 1; 	180 - shmem.data-wires.skip.0-1-2-3-4 (Failed)          internode tier2 
+call_per_need: THE SED CHANGED NOTHING - not run
+no_visit: CAUGHT - 0% tests passed, 2 tests failed out of 2; 	179 - shmem.data-wires.ring.0-1-2-3-4 (Failed)          internode tier2 	180 - shmem.data-wires.skip.0-1-2-3-4 (Failed)          internode tier2 
+no_receive: CAUGHT - 0% tests passed, 1 tests failed out of 1; 	179 - shmem.data-wires.ring.0-1-2-3-4 (Failed)          internode tier2 
+abort_waits_wire: THE SED CHANGED NOTHING - not run
+quiet_while_making: survived - 100% tests passed, 0 tests failed out of 1
+no_agreement: CAUGHT - 0% tests passed, 1 tests failed out of 1; 	187 - shmem.data-wires.disagree.0-1 (Failed)            internode tier2 
+abandon_answered: survived - 100% tests passed, 0 tests failed out of 1
+no_goodbye_new_wire: THE SED CHANGED NOTHING - not run
+helper_done_early: survived - 100% tests passed, 0 tests failed out of 1
+no_unsent_at_attach: survived - 100% tests passed, 0 tests failed out of 16
+helper_want_unseen: survived - 100% tests passed, 0 tests failed out of 1
+restored and rebuilt
+
+# The second run: the separator '~', the three again, and both quiet checks removed at once.
+call_per_need: CAUGHT - 0% tests passed, 2 tests failed out of 2; 	179 - shmem.data-wires.ring.0-1-2-3-4 (Failed)          internode tier2 	180 - shmem.data-wires.skip.0-1-2-3-4 (Failed)          internode tier2 
+abort_waits_wire: CAUGHT - 0% tests passed, 1 tests failed out of 1; 	186 - shmem.data-wires.exit (Failed)                    internode tier2 
+quiet_while_making_twice: survived - 100% tests passed, 0 tests failed out of 1
+no_goodbye_new_wire: survived - 100% tests passed, 0 tests failed out of 1
+restored and rebuilt
