@@ -2418,8 +2418,9 @@ agent's, which C leaves undefined and which could end the process with main's
 status (found in review; `abort_exit_model.py`, `finalize_returns`). A fatal
 ends at once, on whichever thread finds it, as it did before: its status is a
 failure whoever ends the process, and on the eager mesh every node reads the
-dying lead's end of stream itself. With on-demand connections a fatal will need
-the agent's goodbye too. On the caller's PE, `exit` from the agent runs the
+dying lead's end of stream itself. *(With the data wires on demand, as built
+for H23 on 2026-10-27, the control wires are still eager to every node, so it
+still does: §6.2.)* On the caller's PE, `exit` from the agent runs the
 process's atexit handlers beside whatever other threads the program has; a
 handler that calls into the library then waits out the grace. No PE returns from `shmem_init` before its
 node's lead's agent runs, which the lead publishes in the node's rendezvous
@@ -2453,9 +2454,9 @@ as an end of stream without a goodbye, and a node that reads a dying node's end
 of stream before the tree's message reaches it ends with a failure where
 `shmem_global_exit`'s caller gave a status. The abortive goodbye is read first
 by construction. It costs O(open connections) a node, once: the eager mesh's N,
-which is what a normal goodbye costs too, and O(k + active peers) with on-demand
-connections (§6.2), which still reach every node through the tree's own
-connections. At 4,096 nodes that is 4,095 segments of 56 bytes from each lead. A
+which is what a normal goodbye costs too - and with the data wires on demand
+(§6.2, as built for H23) the N - 1 control wires, still eager, and the data
+wires made. At 4,096 nodes that is 4,095 segments of 56 bytes from each lead. A
 connection with nobody to tell is skipped: one whose normal goodbye has gone,
 whose peer died, or whose peer's own abortive goodbye has arrived — and a peer
 whose abortive goodbye has arrived is sent nothing more of the job's, since its
@@ -6870,7 +6871,8 @@ four pairs' two wires - each begun no earlier than its slot, `OSOE_MESH_SLOT`
 apart from the rendezvous's release, and never skipped. A lead has at most N
 callers' connections, both wires of N/2 callers, which `min(N, 4096)` holds to
 4,097 nodes, where the last lead before had 2(N - 1). The listener closes once
-every caller the schedule gives the lead is in.
+every caller the schedule gives the lead is in - eagerly; with the data wires
+on demand it stays open, served on the lead's ring (below).
 `tools/modelcheck/mesh_model.py` searches every lead's calls and accepts for a
 lead that waits for ever; `mesh_timing.py` times the schedule against the order
 before it.
