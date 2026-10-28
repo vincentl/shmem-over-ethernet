@@ -1288,6 +1288,30 @@ add_test(NAME shmem.start-up.tombstone-gc
           $<TARGET_FILE:osoe-launch> $<TARGET_FILE:shmem_test_init> $<TARGET_FILE:osoe-stat>)
 set_tests_properties(shmem.start-up.tombstone-gc PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "a failed start's tombstone - .*/osoe[.][0-9]+[.]0[.]0[.]0: removed")
+# A node's PEs in more than one PID namespace (D26; pid-namespaces.sh), one PE
+# put in one of its own by unshare inside a user namespace, and skipped where
+# the system refuses that: the node refused as it joins, naming both - by every
+# PE that reaches the check before another's refusal ends it - where the PE
+# alone in its namespace had taken its lead for dead; and a
+# leftover of another namespace, whose creator's pid names a live kernel thread
+# here, refused as such by a start by its ids - not as a running job's - and
+# left alone by --gc, saying why. One node, in both builds.
+add_test(NAME shmem.start-up.pid-namespaces
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/pid-namespaces.sh $<TARGET_FILE:osoe-launch> join
+          $<TARGET_FILE:shmem_test_init>)
+set_tests_properties(shmem.start-up.pid-namespaces PROPERTIES LABELS "tier2" TIMEOUT 60
+  SKIP_RETURN_CODE 77
+  PASS_REGULAR_EXPRESSION "job exited [1-9].*PEs refusing the node by name: [123]"
+  FAIL_REGULAR_EXPRESSION "has ended|died")
+add_test(NAME shmem.start-up.pid-namespace-leftover
+  COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/pid-namespaces.sh $<TARGET_FILE:osoe-launch> leftover
+          $<TARGET_FILE:shmem_test_kill-after-init> $<TARGET_FILE:shmem_test_init>
+          $<TARGET_FILE:osoe-stat>)
+set_tests_properties(shmem.start-up.pid-namespace-leftover PROPERTIES LABELS "tier2" TIMEOUT 60
+  SKIP_RETURN_CODE 77
+  PASS_REGULAR_EXPRESSION
+    "made in another PID namespace, pid:[[][0-9]+[]], where this process is in pid:[[][0-9]+[]]: its creator's pid, [0-9]+, says nothing here.*the start by the same ids exited [1-9].*where this one is pid:[[][0-9]+[]], so its pids say nothing here. left alone.*the segment is left after --gc"
+  FAIL_REGULAR_EXPRESSION "still running|still has live PEs|reclaimed")
 # Unless the job asks for it - OSOE_NO_PROGRESS_TIMEOUT, which is never by default -
 # when the node ends by itself, naming the same. The lead and the PE that has
 # joined wait alike, and the one whose limit comes first says it; the other ends
@@ -2087,6 +2111,26 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   set_tests_properties(shmem.helper-wake.agent.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 90)
   osoe_internode_label(shmem.helper-wake.agent.0-1-2-3)
 endif()
+# And no owner spins before it raises that flag (T38; round nine's scale S4;
+# test-late-flags.c), which the wake counts above cannot see - a flag raised late
+# still finds its waker - nor a bound on the CPU a wake costs, which moved
+# sevenfold with the machine's load (docs/decisions/2026-10-27-t38-wake-cost.md):
+# under a trickle of puts each node's owners raise at most one flag in four more
+# than 10 us after the pass that moved nothing before it (transport.am.late_flags,
+# node layout 42), where round nine's spin raises one each, and pass at most
+# twelve times a wake. At two helpers and at none; not under ThreadSanitizer, as
+# shmem.helper-wake is not.
+if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  osoe_tier2_map_test(late-flags 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
+  set_tests_properties(shmem.late-flags.0-1-2-3 PROPERTIES FAIL_REGULAR_EXPRESSION "CHECK[(]")
+  add_test(NAME shmem.late-flags.agent.0-1-2-3
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_PROGRESS_HELPERS=0 OSOE_DEADLOCK_SECONDS=0
+            $<TARGET_FILE:osoe-launch> -n 4 -m 0,1,2,3 -t 60 --
+            $<TARGET_FILE:shmem_test_late-flags>)
+  set_tests_properties(shmem.late-flags.agent.0-1-2-3 PROPERTIES LABELS "tier2" TIMEOUT 90
+    FAIL_REGULAR_EXPRESSION "CHECK[(]")
+  osoe_internode_label(shmem.late-flags.agent.0-1-2-3)
+endif()
 
 # Keepalive off by default where every node has a loopback address, and on as
 # OSOE_KEEPALIVE sets it there (§3.15; the review of v0.2 step 4's merge point,
@@ -2242,7 +2286,7 @@ if(OSOE_INTERNODE)
   add_executable(shmem_test_hang-walk test-hang-walk.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
   target_include_directories(shmem_test_hang-walk PRIVATE ${PROJECT_SOURCE_DIR}/tools/stat)
-  target_link_libraries(shmem_test_hang-walk PRIVATE osoe rt)
+  target_link_libraries(shmem_test_hang-walk PRIVATE osoe rt Threads::Threads)
   osoe_warnings(shmem_test_hang-walk)
   add_test(NAME shmem.hang-walk
     COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 SHMEM_SYMMETRIC_SIZE=16M
@@ -2252,6 +2296,55 @@ if(OSOE_INTERNODE)
     PASS_REGULAR_EXPRESSION "hang walk found node 6 in [0-9]+ visits"
     FAIL_REGULAR_EXPRESSION "CHECK[(]")
   osoe_internode_label(shmem.hang-walk)
+  # And the same walk of a data collective, which node 6 never calls (D1, layout
+  # 42): each node's lead says what it waits for and on which node, and PE 0, in
+  # the collective, walks from a thread of its own to node 6, whose lead is in
+  # none - through a tree's pieces at one piece and through lanes (the shape
+  # fixed, the ceiling's tree), a broadcast's, Bruck's steps, and the leads'
+  # scan of collect's totals - in as many visits as the waits' own pointers
+  # make, the walk taken once it is the same twice: 0, 2 and 6 in a tree, 0 and
+  # 6 in Bruck's, whose step-1 receiver it is, 0, 5 and 6 in the scan, where
+  # wrong or missing pointers make longer walks or none. Träff's grants and the
+  # exchange of the totals wait on one counter of several leads', which names
+  # no node, only how many are missing: those walks end there, one short, every
+  # other lead in the collective - Träff's a hop from node 0, by the rounds'
+  # arithmetic.
+  set(osoe_data_walks
+    "reduce|found node 6 in 3 visits|none"
+    "reduce-large|found node 6 in 3 visits|OSOE_COLLECTIVE_SHAPE=fixed"
+    "broadcast|found node 6 in 3 visits|none"
+    "fcollect|found node 6 in 2 visits|none"
+    "collect-scan|found node 6 in 3 visits|OSOE_COLLECTIVE_PLACES=scan"
+    "collect-exchange|ended at node 0 in 1 visits, a count still 1 short|OSOE_COLLECTIVE_PLACES=exchange"
+    "circulant|ended at node 4 in 2 visits, a count still 1 short|OSOE_LINK_HOP_NS=86000^OSOE_LINK_MESSAGE_NS=7000^OSOE_LINK_BYTES_PER_SECOND=116000000")
+  foreach(walk ${osoe_data_walks})
+    string(REPLACE "|" ";" parts "${walk}")
+    list(GET parts 0 mode)
+    list(GET parts 1 found)
+    list(GET parts 2 forced)
+    string(REPLACE "^" ";" forced "${forced}")
+    if(forced STREQUAL "none")
+      set(forced "")
+    endif()
+    add_test(NAME shmem.hang-walk.${mode}
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_COLLECTIVE_FANOUT=2 SHMEM_SYMMETRIC_SIZE=16M ${forced}
+              $<TARGET_FILE:osoe-launch> -n 8 -m 0,1,2,3,4,5,6,7 -t 12 -k --
+              $<TARGET_FILE:shmem_test_hang-walk> ${mode})
+    set_tests_properties(shmem.hang-walk.${mode} PROPERTIES LABELS "tier2" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "data walk [(]${mode}[)] ${found}"
+      FAIL_REGULAR_EXPRESSION "CHECK[(]")
+    osoe_internode_label(shmem.hang-walk.${mode})
+  endforeach()
+  # And the summary's line for it, as the launcher's timeout prints it: node 0,
+  # the root, waits for node 1's piece, which never comes, and names node 1.
+  add_test(NAME shmem.hang-walk.summary
+    COMMAND $<TARGET_FILE:osoe-launch> -n 2 -m 0,1 -t 4 -k --
+            $<TARGET_FILE:shmem_test_hang-walk> summary)
+  set_tests_properties(shmem.hang-walk.summary PROPERTIES LABELS "tier2" TIMEOUT 60
+    PASS_REGULAR_EXPRESSION
+      "where job [0-9]+ waits, by osoe-stat --summary.*node 0 .* world +data +[0-9]+/[0-9]+ +waits for node 1's piece 0 +next 1"
+    FAIL_REGULAR_EXPRESSION "CHECK[(]")
+  osoe_internode_label(shmem.hang-walk.summary)
 
   # The reply descriptor pool (§3.8; review round two, D1). The review's scenario
   # at C = 2 must complete; with the target given a smaller credit than the
@@ -3792,11 +3885,12 @@ endforeach()
 # split_2d with one number free fails, then the world again with none free on
 # PE 0, twice, and takes the two teams' number once both are destroyed;
 # too-many, under OSOE_MAX_TEAMS=4, a split_2d, which needs two numbers,
-# failing; dry, under OSOE_TEAM_BLOCKS=8 on one node, two splits finding the
-# pool dry, PE 0 naming the setting and its node each time, a split_2d needing
-# three blocks where one is free failing too - not running its rounds for
-# ever, holding the one it claimed - and a destroyed team's block serving the
-# next; stale-handle, a destroyed team's handle used
+# failing; dry, under OSOE_TEAM_BLOCKS=8 on one node of three PEs, six teams of
+# one splitting with the pool full, since a team of one claims no block (P7),
+# a split finding the pool dry, PE 0 naming the setting and its node, a
+# split_2d whose lead needs two blocks where one is free failing too - not
+# running its rounds for ever, holding the one it claimed - and a destroyed
+# team's block serving the next; stale-handle, a destroyed team's handle used
 # once its number names another team, which ends the job by name; reuse, a
 # team taking a destroyed team's block under another name; and full, the heap
 # filled to its last block under SHMEM_SYMMETRIC_SIZE=1m.
@@ -3816,8 +3910,8 @@ osoe_team_split_mode(exhaust L4 "-n;4" "${osoe_team_split_exhaust_environment}"
   "${osoe_team_split_exhausted}")
 osoe_team_split_mode(too-many L4 "-n;4" "OSOE_MAX_TEAMS=4;SHMEM_SYMMETRIC_SIZE=16m"
   "PE 0: shmem_team_split_2d: no two team numbers are free on every PE of the new teams - between them.*OSOE_MAX_TEAMS is 4.*PE 0: shmem_team_split_strided: no team number is free on every PE of the new team - between them.*OSOE_MAX_TEAMS is 4.*every check of this mode passed")
-osoe_team_split_mode(dry L2 "-n;2" "OSOE_TEAM_BLOCKS=8;SHMEM_SYMMETRIC_SIZE=16m"
-  "PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left for the new team this PE would lead there: OSOE_TEAM_BLOCKS is 8, the teams a node may hold at once.*PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left.*PE 0: shmem_team_split_2d: node 0 [(][^)]*[)] has no team block left.*every check of this mode passed")
+osoe_team_split_mode(dry L3 "-n;3" "OSOE_TEAM_BLOCKS=8;SHMEM_SYMMETRIC_SIZE=16m"
+  "PE 0: shmem_team_split_strided: node 0 [(][^)]*[)] has no team block left for the new team this PE would lead there: OSOE_TEAM_BLOCKS is 8, the teams a node may hold at once.*PE 0: shmem_team_split_2d: node 0 [(][^)]*[)] has no team block left.*every check of this mode passed")
 osoe_team_split_mode(full L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=1m" "${osoe_team_split_full}")
 osoe_team_split_mode(reuse L4 "-n;4" "SHMEM_SYMMETRIC_SIZE=16m" "${osoe_team_split_full}")
 # The stale handle's pass is the job's end, named: its own registration, since

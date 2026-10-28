@@ -183,6 +183,12 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     PE("pe.rank", rank, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.pid", pid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
     PE("pe.tid", tid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
+    /* The PID namespace the PE is in (layout 42; D26): /proc/self/ns/pid's
+     * device and inode, zeros where /proc could not say. A node's PEs share
+     * one, or the node is refused as it joins. */
+    PE("pe.pid_namespace.device", pid_namespace.device, OSOE_MTYPE_U64, OSOE_MKIND_STATE,
+       ""),
+    PE("pe.pid_namespace.inode", pid_namespace.inode, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     PE("pe.phase", phase, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.agent_wake", agent_wake, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     PE("pe.symmetric_size", symmetric_size, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "bytes"),
@@ -286,6 +292,17 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * members' vector, 2 each node's total, 3 the leads' scan (P30; layout 39),
      * 4 the leads' exchange (P33). */
     TEAM("team.tree.collect_way", BLOCK_TREE(collect_way)),
+    /* The data collective this node's lead is in on the team and what it
+     * waits for (layout 42; D1): the epoch open and the last closed, what its
+     * latest wait waits for - an enum osoe_data_wait: 1 its members, 2 a
+     * piece, 3 a release, 4 a grant, 5 credits, 6 a receiver's entry, 7 the
+     * leads' totals - the node whose word ends it, and the piece, round or
+     * step: what osoe-stat's summary walks a hung one by. */
+    TEAM("team.tree.data_epoch_open", BLOCK_TREE(data_epoch_open)),
+    TEAM("team.tree.data_epoch_closed", BLOCK_TREE(data_epoch_closed)),
+    TEAM("team.tree.data_wait", BLOCK_TREE(data_wait)),
+    TEAM("team.tree.data_wait_node", BLOCK_TREE(data_wait_node)),
+    TEAM("team.tree.data_wait_step", BLOCK_TREE(data_wait_step)),
     /* The record (node.h): whether there is one, and what it says. */
     TEAM("team.record.published", BLOCK_RECORD(published)),
     TEAM("team.record.local_members", BLOCK_RECORD(local_members)),
@@ -416,6 +433,13 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * start under way as long as it lives, and a failed start's once it is
      * gone, which osoe-stat --gc removes (§3.14). */
     ND("node.creator_pid", creator_pid, OSOE_MTYPE_I32, OSOE_MKIND_STATE, ""),
+    /* And the namespace that pid is of (layout 42; D26), so that --gc leaves a
+     * segment of another alone and says why, whatever process the pid names
+     * there. */
+    ND("node.creator_pid_namespace.device", creator_pid_namespace.device, OSOE_MTYPE_U64,
+       OSOE_MKIND_STATE, ""),
+    ND("node.creator_pid_namespace.inode", creator_pid_namespace.inode, OSOE_MTYPE_U64,
+       OSOE_MKIND_STATE, ""),
     ND("node.launch", launch, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     /* The rendezvous words (§6.2). A job stuck in bootstrap is stuck in one of
      * these, and which one says how far it got. */
@@ -485,6 +509,8 @@ static const struct osoe_metric_descriptor record_metrics[] = {
     OWNER("transport.am.wakes", wakes, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
     /* Layout 40: when the owner's last pass ended, an instant (node.h). */
     OWNER("transport.am.last_pass_ns", last_pass_ns, OSOE_MTYPE_U64, OSOE_MKIND_STATE, "ns"),
+    /* Layout 42: the owner's idle passes whose flag rose late (node.h; T38). */
+    OWNER("transport.am.late_flags", late_flags, OSOE_MTYPE_U64, OSOE_MKIND_COUNTER, ""),
 };
 
 enum {

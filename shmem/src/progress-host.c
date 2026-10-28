@@ -628,9 +628,22 @@ static void lower_flag(uint32_t owner)
     }
 }
 
-/* Raise the flag, and say whether a writer's bit is set after all. */
+/*
+ * How long after an idle pass's end its owner may raise its flag before the
+ * raise is counted late (node.h, late_flags; T38): far more than the store or
+ * two between them, under every sanitizer, and far less than a spin that
+ * costs a wake anything - the review's polled 200 us.
+ */
+enum { OSOE_FLAG_LATE_NS = 10 * 1000 };
+
+/* Raise the flag, and say whether a writer's bit is set after all. Only after a
+ * pass that moved nothing, which the owner's idle_end_ns timed: a raise later
+ * than OSOE_FLAG_LATE_NS after it is counted. */
 static bool raise_flag_and_look(uint32_t owner)
 {
+    struct osoe_progress_owner *o = &osoe_am.progress.owner[owner];
+    if (osoe_now_ns() - o->idle_end_ns > OSOE_FLAG_LATE_NS)
+        osoe_counter_word_add(&o->metrics->late_flags, 1);
     const struct osoe_connection_area_owner *words = &osoe_am.area.owner[owner];
     atomic_store_explicit(words->sleeping, 1, memory_order_seq_cst);
     osoe_am.owner[owner].flag_raised = true;

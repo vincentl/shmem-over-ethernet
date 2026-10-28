@@ -7,8 +7,9 @@ the rule that no wait gives up merely because time has passed, memory fences,
 the check that the kernel has the io_uring the library needs (`ring-check.c`,
 the full build's alone), a line to stderr written whole (`print-line.h`), the
 parsers for what a job starts from - its settings, Slurm's host lists and the logical node
-map - and SipHash, with which a caller proves it knows a job's secret without
-sending it.
+map - the PID namespace a process is in (`pid-namespace.h`), which a node's PEs
+must share, and SipHash, with which a caller proves it knows a job's secret
+without sending it.
 
 It builds as an object library, `osoe_base`, folded into `libosoe` and installed
 nowhere; `osoe-launch` links it, and `osoe-stat`, `probe` and `osoe-pacer` take

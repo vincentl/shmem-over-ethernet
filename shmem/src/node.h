@@ -26,17 +26,22 @@
 #include "base/cacheline.h"
 #include "base/counters.h"
 #include "base/epoch.h"
+#include "base/pid-namespace.h"
 #include "base/wait-word.h"
 #include "bootstrap.h"
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-/* 41: OSOE_BLOCKED_DETAIL_TEAM_NUMBER, a split waiting on another thread's
- * pending team number (D4). 40: transport.am.last_pass_ns, each owner's last
- * pass (D8). 39:
- * team.tree.collect_way, the way a team's last collect found its places, and
- * the header's OSOE_COLLECTIVE_PLACES (v0.2, P30 and P31). */
-#define OSOE_NODE_LAYOUT 41
+/* 42: each PE's PID namespace in its slot and the lead's in the header (D26);
+ * a team of one's published epoch naming no block, since it claims none (P7);
+ * the data collectives' waits in the tree state (D1); each owner's late flags,
+ * transport.am.late_flags (T38); and OSOE_BLOCKED_DETAIL_CONNECTING, kept for
+ * the data wires made on demand (H23). 41: OSOE_BLOCKED_DETAIL_TEAM_NUMBER, a split waiting on another
+ * thread's pending team number (D4). 40: transport.am.last_pass_ns, each
+ * owner's last pass (D8). 39: team.tree.collect_way, the way a team's last
+ * collect found its places, and the header's OSOE_COLLECTIVE_PLACES (v0.2, P30
+ * and P31). */
+#define OSOE_NODE_LAYOUT 42
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -81,6 +86,11 @@ enum osoe_blocked_detail {
      * number that thread holds pending (team.c, wait_pending; D4), the detail
      * being the number - shown until then as a bare value. */
     OSOE_BLOCKED_DETAIL_TEAM_NUMBER,
+    /* Layout 42: a wait for the data wire to the peer node in the detail while
+     * it is still being made - H23's data wires made on demand, a stalled one
+     * told as any wait is (docs/decisions/2026-10-24.md, the author's answers,
+     * item 4). Kept in this layout for that build: nothing writes it yet. */
+    OSOE_BLOCKED_DETAIL_CONNECTING,
 };
 
 /*
@@ -162,6 +172,14 @@ struct osoe_pe_slot {
     uint32_t rank;
     int32_t pid;                    /* this PE's process id, for liveness (§3.15) */
     int32_t tid;                    /* the initializing thread, for /proc/<pid>/task/<tid> */
+    /* Layout 42 (D26): the PID namespace this PE is in, as /proc/self/ns/pid
+     * names it (base/pid-namespace.h), zeros where /proc cannot say. A node's
+     * PEs watch each other, and the deadlock detector reads their threads, by
+     * process id, which in another namespace names another process: every PE
+     * compares the node's as it joins (node.c, check_agreement), and a node
+     * whose PEs are in more than one is refused, naming two of them. Written
+     * with the fields beside it, before this PE joins. */
+    struct osoe_pid_namespace pid_namespace;
     uint64_t symmetric_size;        /* SHMEM_SYMMETRIC_SIZE as this PE parsed it */
     uint64_t heap_bytes;            /* mapped length of the heap object */
     char heap_name[OSOE_HEAP_NAME_MAX];
@@ -546,6 +564,19 @@ struct osoe_am_owner_metrics {
      * passes ten times a second, so a last pass older than that is an owner
      * stuck in one, or not running: osoe-stat shows its age (D8). */
     _Atomic uint64_t last_pass_ns;
+    /*
+     * Layout 42 (T38; round nine's scale S4): the owner's passes that moved
+     * nothing and whose sleeping flag rose more than OSOE_FLAG_LATE_NS after
+     * the pass ended, on CLOCK_MONOTONIC (progress-host.c,
+     * raise_flag_and_look). As built nothing lies between but a store or two,
+     * and a late flag is the owner preempted in that window; a spin before the
+     * flag - a poll for work before saying it sleeps - makes one at each idle
+     * pass it polls to its end. A flag raised late still finds its waker, so
+     * every wake count stays right under such a spin, and passes a wake stay
+     * at five: this is the count the suite bounds a wake by
+     * (shmem.late-flags.*; docs/decisions/2026-10-27-t38-wake-cost.md).
+     */
+    _Atomic uint64_t late_flags;
 };
 
 /*
@@ -595,9 +626,10 @@ struct osoe_am_connection_metrics {
  * With the tree that is answered by walking *down* from the root in O(log N)
  * visits - each node names the lowest child index that has not arrived, and
  * `hostname` below says where to look next - rather than by visiting every
- * node. Written by the lead's progress thread as the state changes, a handful
- * of single-writer stores per barrier (§3.16) - all but the last three fields,
- * which the generic internode phase writes on the lead's application thread.
+ * node. Its first eight fields, a barrier's or a sync's, written by the lead's
+ * progress thread as the state changes, a handful of single-writer stores per
+ * barrier (§3.16); the rest by the team's local lead on its application thread,
+ * in a data collective (internode-generic.c, collectives.c).
  */
 struct osoe_collective_state {
     _Alignas(OSOE_CACHELINE)
@@ -684,11 +716,92 @@ struct osoe_collective_state {
      * collect_lengths.
      */
     _Atomic uint32_t collect_way;
+    /*
+     * Layout 42 (D1; round six's readiness Q5-1), in the same room: the data
+     * collective this node's lead is in on the team - a reduction, a
+     * broadcast, a gather and the places a collect takes before it - and what
+     * it waits for, published as each of its waits begins, as the progress
+     * engine publishes a barrier's above, so that osoe-stat's summary walks a
+     * hung one from node to node as it walks a barrier. Written by the team's
+     * local lead on its application thread, the node's one thread in the
+     * collective's internode half (collectives.c, internode-generic.c), each a
+     * single-writer publication (§3.16), and zeroed with the rest as the block
+     * is named:
+     * - data_epoch_open, the team's epoch of the collective in progress, from
+     *   the lead's entry until it releases the node's members, 0 between; and
+     *   data_epoch_closed, the last one it ended - epochs counted as above, a
+     *   team's every collective, barriers and syncs among them;
+     * - data_wait, what its latest wait waits for (enum osoe_data_wait); and
+     *   data_wait_node, the node whose word ends it - the child or the parent
+     *   in the tree, a round's sender or receiver in Träff's, a step's in
+     *   Bruck's - or OSOE_COLLECTIVE_TREE_NONE for the node's own members, or
+     *   where a count from several leads cannot say which is missing; and
+     *   data_wait_step, the piece, round or step it waits at, or how many of
+     *   that count are missing. Stored before the wait sleeps - again each
+     *   time a wait on several leads' words finds itself still waiting, so
+     *   that the node named is one missing then - and left as they are when
+     *   it ends: a hung lead's is its last.
+     */
+    _Atomic uint32_t data_epoch_open;
+    _Atomic uint32_t data_epoch_closed;
+    _Atomic uint32_t data_wait;
+    _Atomic uint32_t data_wait_node;
+    _Atomic uint32_t data_wait_step;
 };
 _Static_assert(sizeof(struct osoe_collective_state) == 128,
                "the tree state is 128 bytes since layout 33 - two lines on x86-64 and one on "
-               "aarch64, whose line is 128 - with room for twelve fields more before it "
+               "aarch64, whose line is 128 - with room for seven fields more before it "
                "grows every team block again");
+
+/*
+ * What a node's lead waits for in a data collective (team.tree.data_wait,
+ * layout 42; D1), and whose word ends the wait, team.tree.data_wait_node. The
+ * values are part of the segment's encoding.
+ */
+enum osoe_data_wait {
+    OSOE_DATA_WAIT_NONE,        /* none yet in this collective */
+    OSOE_DATA_WAIT_MEMBERS,     /* the node's own members to arrive */
+    /* A piece from the node: a child's up the tree, or the pieces of a round
+     * of Träff's or a step of Bruck's from its sender; the step the piece,
+     * round or step. */
+    OSOE_DATA_WAIT_PIECE,
+    OSOE_DATA_WAIT_RELEASE,     /* the release of a piece from its parent, down the tree */
+    /* A grant: a large reduction's from its parent in the tree, or the
+     * rounds' of Träff's from several leads, the step how many are missing. */
+    OSOE_DATA_WAIT_GRANT,
+    OSOE_DATA_WAIT_CREDIT,      /* credits for a round's pieces from its receiver, Träff's */
+    OSOE_DATA_WAIT_READY,       /* a step's receiver to enter, Bruck's READY */
+    /* The leads' exchange of their nodes' totals (P33), the step how many are
+     * missing. */
+    OSOE_DATA_WAIT_TOTALS,
+};
+
+/* The lead of a data collective's node says what it waits for now
+ * (struct osoe_collective_state, layout 42; D1): for osoe-stat alone, so
+ * single-writer publications that order nothing (§3.16). */
+static inline void osoe_collective_data_wait(struct osoe_collective_state *c,
+                                             enum osoe_data_wait what, uint32_t node,
+                                             uint32_t step)
+{
+    atomic_store_explicit(&c->data_wait, (uint32_t)what, memory_order_release);
+    atomic_store_explicit(&c->data_wait_node, node, memory_order_release);
+    atomic_store_explicit(&c->data_wait_step, step, memory_order_release);
+}
+
+/* It enters the collective at `epoch`, and waits first for its node's members. */
+static inline void osoe_collective_data_open(struct osoe_collective_state *c, uint32_t epoch)
+{
+    osoe_collective_data_wait(c, OSOE_DATA_WAIT_MEMBERS, OSOE_COLLECTIVE_TREE_NONE, 0);
+    atomic_store_explicit(&c->data_epoch_open, epoch, memory_order_release);
+}
+
+/* It has ended the collective at `epoch`, before it releases its members. */
+static inline void osoe_collective_data_close(struct osoe_collective_state *c, uint32_t epoch)
+{
+    atomic_store_explicit(&c->data_epoch_closed, epoch, memory_order_release);
+    atomic_store_explicit(&c->data_epoch_open, 0, memory_order_release);
+    osoe_collective_data_wait(c, OSOE_DATA_WAIT_NONE, OSOE_COLLECTIVE_TREE_NONE, 0);
+}
 
 /* The ways a collect of differing blocks finds its places (collectives.c,
  * collect_varying), as team.tree.collect_way says them: none yet across nodes,
@@ -729,9 +842,11 @@ enum osoe_collect_way {
  * left it, and nothing of it is still to arrive (the proposal's "Why giving a
  * number back is safe"). SHMEM_TEAM_SHARED under force-remote has none: it is
  * a different team of one on each PE of the node under the one number, and
- * touches nothing of the node's. A created team of one has one, its name being
- * its own. More than one cache line: the children's ranks alone are 128 bytes
- * at the largest fan-out.
+ * touches nothing of the node's. Nor, since layout 42, has a created team of
+ * one, which claims no block (team.c; P7): it touches nothing of the node's
+ * either, and until then its block, a kilobyte of the pool, held nothing it
+ * used. More than one cache line: the children's ranks alone are 128 bytes at
+ * the largest fan-out.
  *
  * **Who sees it, and why** (§3.16). The predefined teams' records are written
  * by this node's lead in osoe_team_start (team.c), in every session, before
@@ -824,7 +939,8 @@ struct osoe_team_record {
  * holds the block's index - the local members holding it, and its generation.
  *
  * **A block's life** (layout 30; tools/modelcheck/team_block_model.py). The
- * local lead of a team a split creates claims a free block from the bitmap
+ * local lead of a team a split creates - of more than one PE since layout 42
+ * (P7): a team of one claims none - claims a free block from the bitmap
  * before the split's reduction (osoe_node_team_claim), and once the number is
  * agreed names it (osoe_node_team_name): its generation raised, to an odd
  * value, its counters and tree state zeroed, the name and the holders - the
@@ -955,6 +1071,19 @@ struct osoe_node_header {
      * local lead there, so open_control holds the node's PEs to it. In room
      * the line had before the rendezvous words: nothing moves. */
     uint32_t collective_places;
+    /*
+     * Layout 42 (D26): the lead's PID namespace (base/pid-namespace.h), what
+     * creator_pid means - a plain field the lead stores with creator_pid,
+     * before its release store of `launch`, so that a node-mate that has seen
+     * this start's launch, or `ready`, reads it, and judges the lead by its
+     * pid only from inside the lead's namespace (node.c, lead_ended). And
+     * what a later start by the same ids reads from a leftover beside the
+     * pid (shm-object.h), and osoe-stat --gc, so that a leftover of another
+     * namespace is named for what it is, whatever process its pid names
+     * here. In the room the line had before the rendezvous words, which keep
+     * their place: on a line of 64 bytes it fills the room.
+     */
+    struct osoe_pid_namespace creator_pid_namespace;
 
     /* Rendezvous words, each a shared futex. */
     _Alignas(OSOE_CACHELINE)
@@ -1227,6 +1356,8 @@ struct osoe_node {
      */
     int control_fd;
     bool keep_name;                 /* OSOE_KEEP_CONTROL_SEGMENT */
+    /* This process's PID namespace, read once as it joins (D26). */
+    struct osoe_pid_namespace pid_namespace;
     struct osoe_node_header *hdr;
     struct osoe_pe_slot *slots;
     struct osoe_counter_block *blocks;   /* this node's whole pool (§3.14) */
@@ -1427,7 +1558,9 @@ bool osoe_node_team_leave(struct osoe_node *n, uint32_t block_index, bool lead);
  * no two PEs share one. Since layout 30 (step D) the word is the team's block
  * index plus one in the high half and k in the low (OSOE_EPOCH_WORD), so that
  * a reader pairs it with a block and not with a number: two PEs of one node
- * may hold different teams under one number (D1). 0 for none.
+ * may hold different teams under one number (D1). 0 for none; and since layout
+ * 42 a high half of 0 beside k for a created team of one, which holds no block
+ * (P7).
  */
 static inline _Atomic uint64_t *osoe_node_published_epoch(const struct osoe_node *n,
                                                           uint32_t local_id, uint32_t team)
@@ -1449,9 +1582,12 @@ static inline _Atomic uint64_t *osoe_node_team_posted_summary(const struct osoe_
     return &n->hdr->team_posted_summary[block_index / 4096];
 }
 
-/* A published epoch word: block `block_index` and epoch count `epoch`. */
+/* A published epoch word: block `block_index` and epoch count `epoch`. A
+ * created team of one holds no block (team.c; P7) and passes UINT32_MAX, whose
+ * word's high half is then 0, as for a number naming no team - the wrap
+ * written out, so that the type of `block_index` cannot widen it away. */
 #define OSOE_EPOCH_WORD(block_index, epoch)                                 \
-    ((uint64_t)((block_index) + 1) << 32 | (uint32_t)(epoch))
+    ((uint64_t)(uint32_t)((block_index) + 1) << 32 | (uint32_t)(epoch))
 
 /* A local PE's landing zone. Its size is set at run time, so zones are indexed
  * by bytes, never by array. */

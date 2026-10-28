@@ -33,6 +33,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "base/pid-namespace.h"
 #include "segment.h"
 
 #ifndef OSOE_VERSION_STRING
@@ -725,6 +726,83 @@ static bool read_tree_state(const struct osoe_segment *s, uint32_t team, const c
     return true;
 }
 
+/*
+ * One team's data collective on one node (layout 42; D1): the epoch this node's
+ * lead has open in it and the last it closed, what its latest wait waits for,
+ * the node whose word ends it, and the piece, round or step - or, where a
+ * count of several leads' says nothing of whose is missing, how many are.
+ * False for a segment before layout 42, which has none.
+ */
+struct data_state {
+    uint64_t open, closed, wait, node, step;
+};
+
+static bool read_data_state(const struct osoe_segment *s, uint32_t team, struct data_state *out)
+{
+    static const char *const fields[] = { "epoch_open", "epoch_closed", "wait", "wait_node",
+                                          "wait_step" };
+    uint64_t *values[] = { &out->open, &out->closed, &out->wait, &out->node, &out->step };
+    *out = (struct data_state){ 0 };
+    for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) {
+        char name[64];
+        snprintf(name, sizeof name, "team.tree.data_%s", fields[i]);
+        if (!osoe_segment_read_name(s, name, team, values[i]))
+            return false;
+    }
+    return true;
+}
+
+/* What a data collective's lead waits for, in words, and the node to look at
+ * next, "-" for none: node.h's enum osoe_data_wait, which this reader knows by
+ * number. */
+static void data_wait_text(const struct data_state *d, char *what, size_t len, char *next,
+                           size_t next_len)
+{
+    bool named = d->node != UINT32_MAX;
+    snprintf(next, next_len, "-");
+    if (named)
+        snprintf(next, next_len, "%" PRIu64, d->node);
+    switch (d->wait) {
+    case OSOE_SEGMENT_DATA_WAIT_MEMBERS:
+        snprintf(what, len, "for its own members");
+        break;
+    case OSOE_SEGMENT_DATA_WAIT_PIECE:
+        snprintf(what, len, "for node %" PRIu64 "'s piece %" PRIu64, d->node, d->step);
+        break;
+    case OSOE_SEGMENT_DATA_WAIT_RELEASE:
+        snprintf(what, len, "for node %" PRIu64 "'s release %" PRIu64, d->node, d->step);
+        break;
+    case OSOE_SEGMENT_DATA_WAIT_GRANT:
+        if (named)
+            snprintf(what, len, "for node %" PRIu64 "'s grant", d->node);
+        else
+            snprintf(what, len, "for %" PRIu64 " more grant%s", d->step, d->step == 1 ? "" : "s");
+        break;
+    case OSOE_SEGMENT_DATA_WAIT_CREDIT:
+        snprintf(what, len, "for node %" PRIu64 "'s credit in round %" PRIu64, d->node, d->step);
+        break;
+    case OSOE_SEGMENT_DATA_WAIT_READY:
+        snprintf(what, len, "for node %" PRIu64 " to enter step %" PRIu64, d->node, d->step);
+        break;
+    case OSOE_SEGMENT_DATA_WAIT_TOTALS:
+        snprintf(what, len, "for %" PRIu64 " more total%s", d->step, d->step == 1 ? "" : "s");
+        break;
+    default:
+        snprintf(what, len, "-");
+        break;
+    }
+}
+
+static void data_line(uint64_t node, const char *host, uint64_t live, uint32_t local_count,
+                      const char *team, const struct data_state *d)
+{
+    char what[96], next[16];
+    data_wait_text(d, what, sizeof what, next, sizeof next);
+    printf("node %-3" PRIu64 " %-16s %2" PRIu64 "/%-2u live  %-10s data  %" PRIu64 "/%-3" PRIu64
+           " waits %-36s next %s\n", node, host, live, local_count, team, d->open, d->closed,
+           d->open ? what : "-", d->open ? next : "-");
+}
+
 static void tree_line(const struct osoe_segment *s, uint64_t node, const char *host,
                       uint64_t live, const char *team, const struct tree_state *t,
                       const char *where)
@@ -749,6 +827,16 @@ static void tree_line(const struct osoe_segment *s, uint64_t node, const char *h
  * **the lowest child that has not**. That last is the next node to look at, and
  * `host` says where. A node with `own` no is one whose own PEs have not all
  * called the collective, and the PE lines of *that* node say which.
+ *
+ * A data collective - a reduction, a broadcast, a gather - has a line of its
+ * own under its team's while this node's lead is in it (layout 42; D1): what
+ * the lead's latest wait waits for, and the node whose word ends it, the next
+ * to look at. A lead that waits for its own members ends the walk, as a
+ * barrier's node whose members have not arrived does; so does a node whose
+ * lead is in no data collective of a team the others wait in, which is where
+ * its lead has not come. Where one
+ * counter of several leads' cannot say whose is missing - Träff's grants, the
+ * exchange of collect's totals - it says how many are, and names no node.
  *
  * The teams are the node's published records (layout 18), each shown under
  * its record's name. The first - the world team - is always shown, so that
@@ -814,10 +902,15 @@ static void summary_line(const struct osoe_segment *s)
         char label[24];
         uint64_t nodes = 0;
         struct tree_state state;
+        struct data_state data;
         if (!team_label(s, t, label, sizeof label) || !read_tree_state(s, t, label, &state))
             continue;
+        bool has_data = read_data_state(s, t, &data);
         osoe_segment_read_name(s, "team.record.nodes", t, &nodes);
-        if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0)))
+        /* A team that has run nothing between nodes says nothing; one that has
+         * run only data collectives has a line since layout 42 (D1). */
+        if (!first && (nodes < 2 || (state.open == 0 && state.closed == 0 &&
+                                     (!has_data || (data.open == 0 && data.closed == 0)))))
             continue;
         if (first && nodes < 2) {
             /* A job of one node - every job of the single-node build - has no
@@ -840,6 +933,10 @@ static void summary_line(const struct osoe_segment *s)
         else
             snprintf(shown, sizeof shown, "%s", label);
         tree_line(s, node, host, live, shown, &state, where);
+        /* And the data collective it is in, if any: what the lead waits for,
+         * and the node to look at next (D1). */
+        if (has_data && data.open != 0)
+            data_line(node, host, live, s->local_count, shown, &data);
     }
     if (!first)
         return;
@@ -1490,6 +1587,28 @@ static int gc_one(const char *name, bool named)
         osoe_segment_close(&s);
         return 0;
     }
+    /*
+     * A segment made in another PID namespace is judged by no pid here (D26):
+     * its slots' and its creator's pids name other processes in this one, or
+     * none - a dead job's would look alive, and a live job's dead. Left alone,
+     * and said so, as a start by its ids says (shm-object.h). A segment before
+     * layout 42 records none, and is judged as before.
+     */
+    uint64_t device = 0, inode = 0;
+    if (osoe_segment_read_name(&s, "node.creator_pid_namespace.device", 0, &device) &&
+        osoe_segment_read_name(&s, "node.creator_pid_namespace.inode", 0, &inode)) {
+        struct osoe_pid_namespace made_in = { device, inode }, here = osoe_pid_namespace_own();
+        if (osoe_pid_namespace_differ(made_in, here)) {
+            char theirs[48], ours[48];
+            osoe_pid_namespace_text(made_in, theirs, sizeof theirs);
+            osoe_pid_namespace_text(here, ours, sizeof ours);
+            printf("%s: made in another PID namespace, %s, where this one is %s, so its pids "
+                   "say nothing here; left alone - if no job of these ids runs, rm -f "
+                   "/dev/shm/osoe.<job id>.*\n", s.name, theirs, ours);
+            osoe_segment_close(&s);
+            return 0;
+        }
+    }
     bool any_joined = false;
     bool gone = all_pes_gone(&s, &any_joined);
     /*
@@ -1788,8 +1907,10 @@ static void usage(FILE *f)
 "                    per node and team: the barrier or sync epoch in\n"
 "                    progress, whether this node's own members arrived, and the\n"
 "                    lowest child that has not - walk a hung barrier or sync\n"
-"                    down from the root by it (§5.3); a reduction, broadcast,\n"
-"                    gather or scan that hangs shows in the PE lines instead,\n"
+"                    down from the root by it (§5.3) - and while its lead is in\n"
+"                    a reduction, broadcast or gather another: what the lead\n"
+"                    waits for and the node to look at next; a hung scan shows\n"
+"                    in the PE lines, each member naming the PE it waits on,\n"
 "                    and so does every hang of a job of one node, which has no\n"
 "                    tree between nodes to walk\n"
 "  -l, --list        list the control segments in /dev/shm\n"

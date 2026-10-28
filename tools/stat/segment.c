@@ -723,6 +723,9 @@ void osoe_segment_blocked_detail(const struct osoe_segment_blocked *b, char *buf
     case OSOE_SEGMENT_DETAIL_TEAM_NUMBER:
         snprintf(buf, len, "pending team number %" PRIu64, d);
         break;
+    case OSOE_SEGMENT_DETAIL_CONNECTING:
+        snprintf(buf, len, "data wire to node %" PRIu64 ", connecting", d);
+        break;
     default:                         snprintf(buf, len, "+%#" PRIx64, d); break;
     }
 }

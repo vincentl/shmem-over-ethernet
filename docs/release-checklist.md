@@ -187,9 +187,11 @@ stopped node as a waiting one - and the rest of that list stand as round three
 rated them (round six's readiness Q5-5).
 
 - **From round six** (`docs/reviews/archive/phase1-step7-slice4-review.md`):
-  - `osoe-stat --summary`'s walk of a data collective: the generic phase
+  - ~~`osoe-stat --summary`'s walk of a data collective: the generic phase
     publishing its state as it waits, as the progress thread does a barrier's
-    (readiness Q5-1; the README says what the view walks today);
+    (readiness Q5-1; the README says what the view walks today)~~ - done
+    2026-10-27 (D1, node layout 42: a lead's waits name the node whose word
+    ends them, but where one count of several leads' says how many);
   - io_uring's own device polling (`IORING_REGISTER_NAPI`, Linux 6.9 and later) as an opt-in
     setting, timed on a cluster: a site's busy polling reached nothing of osoe's receives
     (H27; the author, 2026-10-20, N3);
@@ -199,8 +201,9 @@ rated them (round six's readiness Q5-5).
     2026-10-20 (T25: `threads`' fifth phase);
   - ~~step E's two models under the checker's weaker orders, not sequential
     consistency only~~ - done 2026-10-24 (T29: `lane` and `scan_pipeline` under
-    x86-TSO); the PID-namespace message when pids are shifted rather
-    than repeated; an x86-64 tsan build's heap placement (portability Q5);
+    x86-TSO); ~~the PID-namespace message when pids are shifted rather
+    than repeated~~ - done 2026-10-27 (D26: the creator's namespace beside its
+    pid); an x86-64 tsan build's heap placement (portability Q5);
   - a real x86-64 kernel (portability's third step for the x86-64 item).
 - **The 1.6 session routines' semantics, should they ever be more than
   no-ops** - what design §10's "thorough 1.6 spec read" had left when the author
@@ -300,17 +303,19 @@ rated them (round six's readiness Q5-5).
     (correctness G3);
   - round two's C5, `iput` with a stride, dropped from the README and this list
     (conformance M2);
-  - a start-up check that a node's PEs share one PID namespace (portability Q2,
+  - ~~a start-up check that a node's PEs share one PID namespace (portability Q2,
     the refutation's sketch): each PE's `/proc/self/ns/pid` device and inode in
     its slot, compared by the lead at the join and refused by name - a layout
     change - which would turn a missed death and a false one into a refusal;
     and the deadlock detector reads node-mates' `/proc/<pid>/task`, which across
-    namespaces names another process.
-- **A team of one PE claims no pool block**, maps no name and publishes its
+    namespaces names another process~~ - done 2026-10-27 (D26, node layout 42:
+    compared by every PE at the join, a node-mate judging its lead's pid only
+    from inside the lead's namespace until then).
+- ~~**A team of one PE claims no pool block**, maps no name and publishes its
   epoch word without a block: a `split_2d` with `xrange` 1 makes one per PE, so
   on a node of 256 PEs four of them empty the default pool (step D's second
   part, its first adversarial read, item 5; documented in the README's
-  limits).
+  limits)~~ - done 2026-10-27 (P7, node layout 42).
 - **From the review of v0.2 step 1's merge point**
   (`docs/reviews/archive/v0.2-step1-review.md`), each rated after the release:
   - a test that nothing in the library spins (scale Q3-1), best before v0.2

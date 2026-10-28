@@ -322,7 +322,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 593 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 603 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -336,17 +336,19 @@ the container.
 
 A node's PEs must share one PID namespace and one `/dev/shm`: they meet in
 `/dev/shm`, and osoe watches a node's PEs, and judges what a failed start left
-there, by process id. Run one container a node with all its PEs inside it, or
-containers that keep the host's PID namespace and `/dev/shm` - Apptainer's
-default, not its `--pid` or `--containall`. With a PID namespace for each PE, a
-PE killed by a signal - a crash, the OOM killer - goes unnoticed where the
-namespaces repeat its pid, as identical containers do, and the others wait until
-the launcher ends the step (`srun -K1`), or for ever; where the pids differ, a
-live PE is taken for dead and the job ends at once; with a
-`/dev/shm` for each, the start waits for ever. Where `/dev/shm` outlives a
-container (`--ipc=host`), a start killed with its container leaves names that
-`osoe-stat --gc` cannot judge, and that make a later start by the same ids fail -
-saying another PID namespace left them, where the pids repeat: remove them with
+there, by process id - which in another namespace names another process, or
+none, so that a PE killed by a signal, a crash or the OOM killer, would go
+unnoticed, or a live one be taken for dead. Run one container a node with all
+its PEs inside it, or containers that keep the host's PID namespace and
+`/dev/shm` - Apptainer's default, not its `--pid` or `--containall`. A node
+whose PEs are in more than one PID namespace is refused as it starts, each PE
+that gets as far as the check naming two of them and their namespaces; a PE
+whose `/proc` cannot say which it is in - not mounted, or another namespace's -
+is left out of that comparison. With a `/dev/shm` for each, the start waits for
+ever. Where `/dev/shm` outlives a container (`--ipc=host`), a start killed with
+its container leaves names that make a later start by the same ids fail, saying
+another PID namespace made them, and that `osoe-stat --gc` leaves alone, saying
+the same, since neither can judge another namespace's pids: remove them with
 `rm -f /dev/shm/osoe.<job id>.*`.
 
 ### Developing on macOS
@@ -561,7 +563,8 @@ job's nodes, naming the job by its id - Slurm's job id, or for a job of
 ```sh
 osoe-stat 1234            # job 1234 on this node: counters, and where each PE waits
 osoe-stat --summary 1234  # the node's collective shape and link, then each team's
-                          # barrier or sync between nodes, to walk a hang down
+                          # barrier, sync or data collective between nodes, to
+                          # walk a hang down
 srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
                           # the same on every node of a Slurm job, as its own user
 ```
@@ -581,8 +584,15 @@ beside its longest wait; a job hung in its start shows each PE waiting in
 shows every node and every PE of a job on the machine, however many logical
 nodes the job has there and however many PEs a node has. The summary's walk
 follows a team's barriers and syncs between nodes, whose epochs each node's
-progress thread keeps; a team hung in a reduction, broadcast, gather or scan
-shows there as nothing open, and its PE lines are where to look. A job of one
+progress thread keeps, and its reductions, broadcasts and gathers, whose leads
+say on a line of their own under the team's what they wait for and the node to
+look at next - a piece from a child, a release from a parent, a round's or a
+step's peer - until the walk reaches a node whose lead is not in the
+collective, or waits for its own members, whose PE lines say which. Where a
+lead waits on one count of several leads' - Träff's grants, the exchange of
+collect's totals - its line says how many are missing and names no node, and
+the line with nothing open is the node to look at. A scan's members each name
+the PE they wait on, in the PE lines. A job of one
 node - every job of the single-node build - has no tree between nodes to walk:
 its summary says so, and the PE lines of `osoe-stat JOB` name the PE that is
 not waiting. The summary names a team you made by its number and its first
@@ -723,8 +733,8 @@ build tree.
 - **Launched by Slurm's `srun`, with no PMI library**: nodes find each other
   over TCP from what the step's environment says.
 - **Loud, never hung.** A PE or a node that dies ends the whole job with a
-  message naming it, provided the node's PEs share a PID namespace, which
-  separate containers can break (Building). No wait gives up merely because time has passed; a job
+  message naming it; a node whose PEs do not share a PID namespace, as separate
+  containers can make it, is refused as it starts (Building). No wait gives up merely because time has passed; a job
   proved deadlocked ends, naming where each PE waits, and a job told to
   (`OSOE_NO_PROGRESS_TIMEOUT`) ends a wait on the library's own progress that
   has stopped moving, and says what it waited for. Loud stops where the library
@@ -999,7 +1009,8 @@ specification or takes a choice the specification leaves open.
   to about 29.6 KiB at a thousand nodes, which the `/dev/shm` check counts.
 - **A node holds at most `OSOE_TEAM_BLOCKS` teams at once** (1,024 by default),
   the three predefined among them, a team of members on several nodes counting
-  once on each, and a team of one PE counting too. A split that would make one
+  once on each, and a team of one PE not at all: it claims no block, holding
+  nothing of the node's. A split that would make one
   more on a node returns nonzero on every PE of its parent team, each PE whose
   claim of a block there failed saying why, naming the variable and the node. A
   grid of the whole job takes the most: a `shmem_team_split_2d` whose rows are a
@@ -1245,9 +1256,9 @@ specification or takes a choice the specification leaves open.
 
 **Failures**
 
-- **A PE or a node that dies ends the whole job**, with a message naming it,
-  provided the node's PEs share a PID namespace, which separate containers can
-  break (Building). There is no fault tolerance.
+- **A PE or a node that dies ends the whole job**, with a message naming it; a
+  node whose PEs do not share a PID namespace, as separate containers can make
+  it, is refused as it starts (Building). There is no fault tolerance.
 - **A process that leaves without calling `shmem_finalize` ends the job.** The
   specification has a program end its use of the library with `shmem_finalize`
   or `shmem_global_exit`, and a PE that simply returned from `main` would leave
@@ -1597,7 +1608,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 339 of the 593 tests labelled `internode`, `shmem.internode`'s
+  leaves out 341 of the 603 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1627,13 +1638,23 @@ that one could be added without touching the OpenSHMEM layer.
   runs of 20, at two helpers and at none, in the release build and under
   AddressSanitizer, where counting wakes without the flag failed 8 of 20 in the
   release build and 9 of 20 under AddressSanitizer
-  (`docs/decisions/2026-10-10-helper-wake.md`).
+  (`docs/decisions/2026-10-10-helper-wake.md`). Those counts cannot see an
+  owner that spins before it raises that flag - the flag raised late still
+  finds its waker - and `shmem.late-flags` is for it, at two helpers and at none: each
+  owner counts the flags it raises more than 10 µs after the pass that found
+  nothing to do, and under a trickle of 300 puts 2 ms apart every node's owners
+  must raise at most one late in four of their wakes, and pass at most twelve
+  times a wake. As built they raise none late and pass five times a wake on the
+  putting node, about twice a put on the others; with the spin round nine's
+  review planted, a poll of up to 200 µs before the flag, they raise one late at
+  every wake and every put received
+  (`docs/decisions/2026-10-27-layout-42.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  593 tests labelled `internode` - those of a job of more than one node, of
+  603 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 572 of the full build's 1,166 tests in
+  development VM with liburing hidden: 574 of the full build's 1,178 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -1795,7 +1816,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_MAX_TEAMS` | `256` | Teams one PE may be in at once, the three predefined teams included - the world, the node's shared team, and one the library keeps for `shmem_finalize`: `4` to `1024`. A destroyed team gives its number back. Each number costs every PE about 25 KiB of address space at the other variables' defaults on a few nodes - counters and the slots of its small collectives, which only a team's leads touch, and the same for its scans, which every member of a team that scans does - 28.1 KiB at 64 nodes and 29.6 KiB at a thousand, collect's exchange's slots growing with the nodes to 64. *Checked*. |
-| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 760 bytes each of the memory of the node's first PE, from which a created team's local lead on each node takes one, and to which the last of its members there gives it back. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
+| `OSOE_TEAM_BLOCKS` | `1024` | Teams a node can hold at once, the three predefined teams' included: the node's pool of team blocks in its control segment, a kilobyte each of `/dev/shm`, allocated at start, and about 760 bytes each of the memory of the node's first PE, from which the local lead on each node of a created team of more than one PE takes one, and to which the last of its members there gives it back; a team of one takes none. `8` to `65536`. With none left, a split that needs one on the node returns nonzero on every PE of its parent team, naming the variable and the node. Nodes may differ; a node's PEs may not. *Checked* among a node's PEs. |
 | `OSOE_MAX_CONTEXTS` | `64` | Contexts a PE may have at once, the default context included: `1` to `4096`. A creation that finds none free returns nonzero, as the specification lets it, and the PE says so once, naming this variable. *Checked* among a node's PEs. |
 | `OSOE_MAX_THREADS` | `16` | Live threads of a PE that may have called the library, the main thread included: `1` to `1023`. A thread's place is taken at its first call after `shmem_init`, not counting queries such as `shmem_my_pe`, and freed when it exits, not when the call returns; a call that finds none free ends the job, naming the variable. Each place, and the agent's, has a lane for the large reductions and broadcasts its thread leads and the large scans it makes, 577 KiB of address space at the default fan-out and pipeline depth to 512 nodes, 64 KiB more for each doubling of the nodes past it, which a thread that does neither never touches: 9.6 MiB a PE at the default - but for the link's measurement as a job starts (`OSOE_LINK_HOP_NS`), which writes 64 KiB of the first lane of node 1's first PE and a page of the first lane of each of the next nodes' up to the fan-out. *Checked* among a node's PEs. |
 | `OSOE_GET_LANDING_BYTES` | a node's `4194304` over its PEs | Bytes of each PE's landing zone for the replies of its gets from other nodes, a multiple of `1024` up to `67107840`: past it, a new get waits for earlier ones to land. Unset, the node's 4 MiB split among its PEs in whole KiB, no less than `262144` nor more than `1048576` a PE - 1 MiB to each of 1 to 4 PEs a node, 512 KiB to 8, 256 KiB from 16 - each node from its own count (P32). *Checked* among a node's PEs. |
@@ -1950,7 +1971,9 @@ buffers whose creating process is gone and which no live process maps. It
 leaves alone what a start still under way holds, and an object whose creator
 has not yet recorded itself: a start that died in that moment leaves one that
 `--gc` cannot tell from a start under way, which stays until a job with the
-same ids reclaims it or the epilog below removes it. `osoe-stat --gc` works on the
+same ids reclaims it or the epilog below removes it. Nor does it judge a
+control segment made in another PID namespace than its own, whose pids name
+other processes here: it leaves one alone, saying so (Building). `osoe-stat --gc` works on the
 machine it runs on and removes only what its user may, so a site runs it as
 root on each node - from a timer, not from Slurm's epilog: it reads objects
 any user can write. It reads each into its own memory, so that one changed or
@@ -2081,7 +2104,7 @@ come from the submitting shell.
 ### How a job ends
 
 A PE that dies, or a node that vanishes, ends the whole job with a failure
-(design §3.15), provided a node's PEs share a PID namespace (Building). `shmem_global_exit(status)` ends every PE, and the job with
+(design §3.15); a node whose PEs do not share a PID namespace is refused as it starts (Building). `shmem_global_exit(status)` ends every PE, and the job with
 `status`. The calling PE leaves with `exit(status)`, so its `atexit` handlers
 run and its streams are flushed, as the specification asks. They run on the
 library's own thread, not the one that called, with signals blocked: a handler

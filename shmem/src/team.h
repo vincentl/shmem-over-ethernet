@@ -148,7 +148,9 @@ struct osoe_team {
      * and any team a split makes of one PE. Its sync has nobody to wait for and
      * touches no shared counter - it must not, for SHARED, since every PE of
      * the node would otherwise be counting on the same node-wide words for
-     * teams that are not the same team.
+     * teams that are not the same team. And since layout 42 one a split makes
+     * holds no block of the node's pool at all (team.c, claims_block; P7):
+     * `block` NULL and `block_index` UINT32_MAX.
      */
     bool singleton;
     uint32_t me;                    /* this PE's number within it */
@@ -183,8 +185,9 @@ struct osoe_team {
     /* This node's block for the team (node.h): since step D a block of the
      * node's pool, found through the map by the team's name - its local lead's
      * local id here and its number - after the split's sync; the predefined
-     * teams' at the block index of their number. `block_index` is what the
-     * internode seam and the progress engine know the team by (internode.h). */
+     * teams' at the block index of their number; and none, NULL, for a team of
+     * one a split makes (P7). `block_index` is what the internode seam and the
+     * progress engine know the team by (internode.h). */
     struct osoe_team_block *block;
     uint32_t block_index;
     uint32_t epoch;                 /* this PE's k for the team (§5.4) */

@@ -392,6 +392,9 @@ struct osoe_progress_owner {
      */
     struct osoe_am_owner_metrics *metrics;
     struct osoe_am_owner_metrics own_metrics;
+    /* When its last pass that moved nothing ended, on CLOCK_MONOTONIC: what its
+     * flag's raise is timed from (node.h, late_flags; T38). The owner's own. */
+    uint64_t idle_end_ns;
 };
 
 /*

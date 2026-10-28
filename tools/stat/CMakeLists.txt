@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # osoe-stat is installed (§3.14), as oshcc and osoe-pacer are: it exists to be
 # run on a machine where a job has hung, which is not where the build tree is.
-add_executable(osoe-stat stat.c segment.c)
-target_include_directories(osoe-stat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# base/pid-namespace.c is the library's own reading of a process's PID
+# namespace, compiled in, so that --gc compares a segment's with its own as
+# the library does (D26).
+add_executable(osoe-stat stat.c segment.c ${PROJECT_SOURCE_DIR}/base/pid-namespace.c)
+target_include_directories(osoe-stat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR})
 target_link_libraries(osoe-stat PRIVATE rt)
 osoe_warnings(osoe-stat)
 install(TARGETS osoe-stat)
