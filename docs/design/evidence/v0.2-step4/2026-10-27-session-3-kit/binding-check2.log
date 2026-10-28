@@ -1,0 +1,18 @@
+# lock taken 2026-10-28T05:27:57Z
+ProctrackType           = proctrack/linuxproc
+SelectTypeParameters    = CR_CORE
+TaskPlugin              = task/affinity
+TaskPluginParam         = (null type)
+== srun -K1
+salloc: Granted job allocation 596
+salloc: Nodes lima-osoe are ready for job
+task 0: Cpus_allowed_list:	0-3
+task 1: Cpus_allowed_list:	0-3
+salloc: Relinquishing job allocation 596
+== srun -K1 --cpus-per-task=2
+salloc: Granted job allocation 597
+salloc: Nodes lima-osoe are ready for job
+task 0: Cpus_allowed_list:	0-1
+task 1: Cpus_allowed_list:	2-3
+salloc: Relinquishing job allocation 597
+# done 2026-10-28T05:27:58Z

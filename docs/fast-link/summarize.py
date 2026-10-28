@@ -9,8 +9,10 @@ that failed (run.txt). A case with fewer rounds than the others lost one.
     summarize.py OUTDIR [OUTDIR...]
 
 A section is known by its files: multistream's (its job line, and each node's
-rate, its peers in calls and bytes to each peer), the mailbox's, osoe-bench's
-barrier and collective lines and shapes.c's, which take their form, osoe-bench's
+rate, its PEs' sleeps a 64 KiB, its peers in calls and bytes to each peer), the
+mailbox's, osoe-bench's barrier and collective lines and shapes.c's, which take
+their form - set side by side, where a case was run with OSOE_CHECK_COLLECTIVES
+off and on, as each line's cost with the check - osoe-bench's
 places lines (collect's ways side by side, and the way shape_timing.py's
 choose_places takes on each default job's link), hol's (each operation's,
 alone and behind the stream, at each helper count), get-pieces', fan-in's,
@@ -25,8 +27,8 @@ the unsent limit node 0 set from it, which differ from job to job (round nine's
 review, S2); where a job has no such line, the link its counters' dump
 recorded. Counters PE 0 printed between "counters start begin" and "counters
 end end" (osoe-stat -d -j) are compared field by field, and the fields whose
-names say sends, zero_copy, enobufs or rearm are shown where they moved. A file
-that should parse and does not is named.
+names say sends, zero_copy, enobufs, rearm or reserve_stalls are shown where they
+moved. A file that should parse and does not is named.
 """
 import json
 import math
@@ -52,6 +54,8 @@ BENCH = re.compile(r"(barrier|reduce|broadcast|fcollect|alltoall) pes=\d+ "
 BENCH_ORDER = {"barrier": (0, 0), "reduce": (1, 0), "broadcast": (1, 1), "fcollect": (2, 0),
                "alltoall": (2, 1)}
 MULTISTREAM_PEERS = ("peers_in_calls", "peers_in_calls_with_quiets", "quiet_share", "peers_window_s")
+# A node's PEs' sleeps a 64 KiB moved (multistream.c): the turnover's herd, S1.
+MULTISTREAM_NODE = ("sleeps_per_64kib",) + MULTISTREAM_PEERS
 # osoe-bench's places lines (collect's ways, §12), and ping's summary (§15).
 PLACES = re.compile(r"places way=(\w+) lengths=(\w+) pes=(\d+) bytes=\d+ median_us=([0-9.]+) "
                     r"fastest_us=([0-9.]+)$")
@@ -156,7 +160,7 @@ def moved_counters(text):
     if start is None or end is None:
         return {}
     a, b = flatten(start), flatten(end)
-    wanted = re.compile(r"(^|\.)sends$|zero_copy|enobufs|rearm")
+    wanted = re.compile(r"(^|\.)sends$|zero_copy|enobufs|rearm|reserve_stalls")
     totals = defaultdict(float)
     for key, value in b.items():
         leaf = re.sub(r"\[\d+\]", "", key).split(".")[-1]
@@ -259,7 +263,7 @@ def summarize(directory):
             elif line.startswith("multistream node=") and "mib_per_s=" in line:
                 fields = number_fields(line)
                 multistream[key]["node_mib_per_s"].append(fields["mib_per_s"])
-                for k in MULTISTREAM_PEERS:
+                for k in MULTISTREAM_NODE:
                     if k in fields:
                         multistream[key][k].append(fields[k])
             elif line.startswith("multistream node=") and "peer_mib=" in line:
@@ -375,7 +379,9 @@ def summarize(directory):
             print(f"  {k:3d} each way  iperf3 {i}   echo-uring {e}")
     if multistream:
         print("\nmultistream: the job's MiB/s, a node's (each node's of each round), the"
-              "\nprogress threads' CPU seconds a GiB, and the peer nodes a node's PEs were"
+              "\nprogress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -"
+              "\ntheir voluntary context switches, which every turnover's wake of all its"
+              "\nwriters raises (S1) - and the peer nodes a node's PEs were"
               "\ninside a call toward at once, time-averaged over the window every PE of the"
               "\nnode was in its loop - a lower bound of the model's quantity - then the same"
               "\nwith each quiet counted toward the block before it, which comes nearer it, the"
@@ -389,6 +395,8 @@ def summarize(directory):
             print(f"  {label:36s} job {spread(v['mib_per_s'])}")
             print(f"  {'':36s} node {spread(v['node_mib_per_s'])}")
             print(f"  {'':36s} cpu/GiB {spread(v['progress_cpu_s_per_gib'])}")
+            if v["sleeps_per_64kib"]:
+                print(f"  {'':36s} sleeps a 64 KiB {spread(v['sleeps_per_64kib'])}")
             if v["peers_in_calls"]:
                 print(f"  {'':36s} peers in calls {spread(v['peers_in_calls'])}")
                 print(f"  {'':36s} with quiets {spread(v['peers_in_calls_with_quiets'])},"
@@ -414,6 +422,25 @@ def summarize(directory):
                 label = name + (f" {unit}={size}" if unit else "")
                 print(f"    {label:24s} {spread(bench[key][line])}")
             beside(key, 4)
+        # A case run with OSOE_CHECK_COLLECTIVES on beside the same case off
+        # (many-pes.sh: collectives-check-on and -off): each line's cost (P24).
+        checked = [k for k in bench if k[0].endswith("-check-on")
+                   and (k[0][:-len("on")] + "off",) + k[1:] in bench]
+        if checked:
+            print("\nOSOE_CHECK_COLLECTIVES's cost: each line's median with the check, its median"
+                  "\nwithout, and the first over the second (P24)")
+            for key in sorted(checked, key=lambda k: tuple(-1 if x is None else x for x in k[1:])
+                              + (k[0],)):
+                off = bench[(key[0][:-len("on")] + "off",) + key[1:]]
+                print(f"  {key[0][:-len('-check-on')]} pes={key[1]} h={'-' if key[2] is None else key[2]}")
+                for line in sorted(bench[key]):
+                    if line not in off:
+                        continue
+                    name, unit, size = line[3], line[4], line[1]
+                    label = name + (f" {unit}={size}" if unit else "")
+                    on_us, off_us = statistics.median(bench[key][line]), statistics.median(off[line])
+                    ratio = f"{on_us / off_us:.3f}" if off_us else "-"
+                    print(f"    {label:24s} {figures(on_us):>9} {figures(off_us):>9}  {ratio}")
     if hol:
         print("\nhol: an operation's time, microseconds - a fetch-add's round trip unless the case"
               "\nnames another - alone and behind the stream; the stream's MiB/s")

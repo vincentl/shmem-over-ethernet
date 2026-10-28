@@ -1,0 +1,24 @@
+# lock taken 2026-10-28T04:15:59Z
+ProctrackType           = proctrack/linuxproc
+SelectTypeParameters    = CR_CORE
+TaskPlugin              = task/affinity
+TaskPluginParam         = (null type)
+== srun -K1 --overcommit
+salloc: Granted job allocation 593
+salloc: Nodes lima-osoe are ready for job
+task 0: Cpus_allowed_list:	0-3
+task 1: Cpus_allowed_list:	0-3
+salloc: Relinquishing job allocation 593
+== srun -K1 --overcommit --cpus-per-task=2
+salloc: Granted job allocation 594
+salloc: Nodes lima-osoe are ready for job
+task 0: Cpus_allowed_list:	0-1
+task 1: Cpus_allowed_list:	2-3
+salloc: Relinquishing job allocation 594
+== srun -K1 --cpu-bind=none --overcommit
+salloc: Granted job allocation 595
+salloc: Nodes lima-osoe are ready for job
+task 1: Cpus_allowed_list:	0-3
+task 0: Cpus_allowed_list:	0-3
+salloc: Relinquishing job allocation 595
+# done 2026-10-28T04:15:59Z

@@ -1,0 +1,49 @@
+== ~/kit-s3/dry/session-3/window
+jobs: 20, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  shapes-fixed-k4-d8 pes=8 h=-
+    reduce bytes=65536       262 (226-293, n=5)
+    broadcast bytes=65536    188 (149-211, n=5)
+    reduce bytes=262144      879 (868-910, n=5)
+    broadcast bytes=262144   484 (480-508, n=5)
+    reduce bytes=1048576     3429 (3391-3516, n=5)
+    broadcast bytes=1048576  1877 (1808-1906, n=5)
+    reduce bytes=4194304     14361 (14060-14630, n=5)
+    broadcast bytes=4194304  7735 (7620-8027, n=5)
+    unsent limit 16384 B
+  shapes-link-d4 pes=8 h=-
+    reduce bytes=65536       248 (196-300, n=5)
+    broadcast bytes=65536    167 (139-206, n=5)
+    reduce bytes=262144      1027 (974-1091, n=5)
+    broadcast bytes=262144   635 (623-684, n=5)
+    reduce bytes=1048576     3893 (3542-4010, n=5)
+    broadcast bytes=1048576  2523 (2508-2583, n=5)
+    reduce bytes=4194304     14472 (14270-17118, n=5)
+    broadcast bytes=4194304  10780 (10671-10838, n=5)
+    link 9302 (4109-13410) MiB/s, hop 16.5 (16.2-164) us, message 4.12 (1.28-20.0) us; unsent limit 1248506 (551440-1799901) B
+  shapes-link-d8 pes=8 h=-
+    reduce bytes=65536       245 (235-274, n=5)
+    broadcast bytes=65536    188 (145-199, n=5)
+    reduce bytes=262144      862 (824-904, n=5)
+    broadcast bytes=262144   462 (440-486, n=5)
+    reduce bytes=1048576     3438 (3273-3452, n=5)
+    broadcast bytes=1048576  1859 (1668-2324, n=5)
+    reduce bytes=4194304     14528 (13835-14543, n=5)
+    broadcast bytes=4194304  7886 (7753-8017, n=5)
+    link 10052 (8513-10694) MiB/s, hop 17.0 (15.8-20.4) us, message 3.10 (1.20-3.68) us; unsent limit 1349138 (1142615-1435274) B
+  shapes-tree-d8 pes=8 h=-
+    reduce bytes=65536       258 (243-311, n=5)
+    broadcast bytes=65536    201 (139-210, n=5)
+    reduce bytes=262144      880 (870-921, n=5)
+    broadcast bytes=262144   481 (476-586, n=5)
+    reduce bytes=1048576     3467 (3402-3495, n=5)
+    broadcast bytes=1048576  1844 (1816-1869, n=5)
+    reduce bytes=4194304     14267 (14160-14965, n=5)
+    broadcast bytes=4194304  7816 (7718-8002, n=5)
+    link 10037 (7603-13196) MiB/s, hop 16.5 (16.1-25.7) us, message 2.68 (1.71-9.01) us; unsent limit 1347140 (1020498-1771162) B
