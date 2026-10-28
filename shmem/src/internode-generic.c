@@ -1026,20 +1026,81 @@ static uint64_t own_slot(const struct pieces *pieces, const struct lanes *lanes,
 }
 
 /*
- * Whether every child has sent piece `number` up: each child position's
- * arrival counter shows it, at least - a child may be up to D pieces ahead,
- * and the counter holds the team's whole life, so it is compared with the
- * position's base plus the piece. The loads are seq_cst (transport.h), and so
- * acquire: the bytes a child put before its fenced add are there to read.
+ * What this lead waits for, said in the team's tree state (node.h,
+ * team.tree.data_wait; D1), so that osoe-stat's summary walks a hung data
+ * collective from node to node as it walks a barrier: `rank` the lead whose
+ * word ends the wait, named by its node, or UINT32_MAX where one counter of
+ * several leads' cannot say whose is missing, `step` then how many are. At
+ * every wait of this file but a scan's, whose member names the PE it waits on
+ * in its blocked record instead, a scan's tree being of members, not leads:
+ * before a wait on one lead's word, and from the condition of a wait on
+ * several, each time it finds itself still waiting (say_awaited,
+ * node_totals_in, count_in). Three stores, which order nothing (§3.16).
  */
-static bool children_sent(const struct generic_team *team_phase, const struct pieces *pieces,
-                          const struct lead_tree *tree, uint64_t number)
+static void waits_for(const struct generic_team *team_phase, enum osoe_data_wait what,
+                      uint32_t rank, uint64_t step)
+{
+    osoe_collective_data_wait(team_phase->published, what,
+                              rank == UINT32_MAX ? OSOE_COLLECTIVE_TREE_NONE
+                                                 : osoe_node_of(&osoe.job, rank),
+                              step < UINT32_MAX ? (uint32_t)step : UINT32_MAX);
+}
+
+/*
+ * A wait for one cumulative counter of several leads' adds to reach `want` -
+ * Träff's grants, the exchange of collect's totals - saying each time it finds
+ * it still short how many are missing (D1): one counter cannot say whose. The
+ * load is seq_cst (transport.h), and so acquire, as osoe_region_wait's is: what
+ * the adders put before their fenced adds is there to read after it.
+ */
+struct count_awaited {
+    const struct generic_team *team_phase;
+    enum osoe_data_wait what;
+    uint64_t counter;
+    uint64_t want;
+};
+
+static bool count_in(const void *context)
+{
+    const struct count_awaited *a = context;
+    uint64_t have = osoe_transport_load(OSOE_REGION_INTERNAL, a->counter, 8);
+    if (have >= a->want)
+        return true;
+    waits_for(a->team_phase, a->what, UINT32_MAX, a->want - have);
+    return false;
+}
+
+static void wait_count(const char *routine, const struct generic_team *team_phase,
+                       enum osoe_data_wait what, uint64_t counter, uint64_t want, uint32_t epoch)
+{
+    struct count_awaited awaited = { team_phase, what, counter, want };
+    osoe_region_wait_condition(routine, OSOE_REGION_INTERNAL, counter, 8, count_in, &awaited,
+                               OSOE_BLOCKED_DETAIL_EPOCH, epoch);
+}
+
+/*
+ * The first child position that has not sent piece `number` up, or the
+ * children's count when all have: each child position's arrival counter shows
+ * it, at least - a child may be up to D pieces ahead, and the counter holds
+ * the team's whole life, so it is compared with the position's base plus the
+ * piece. The loads are seq_cst (transport.h), and so acquire: the bytes a
+ * child put before its fenced add are there to read.
+ */
+static uint32_t child_missing(const struct generic_team *team_phase, const struct pieces *pieces,
+                              const struct lead_tree *tree, uint64_t number)
 {
     for (uint32_t c = 0; c < tree->children; c++)
         if (osoe_transport_load(OSOE_REGION_INTERNAL, arrival_counter(pieces->number, c), 8) <
             team_phase->arrival_base[c] + number + 1)
-            return false;
-    return true;
+            return c;
+    return tree->children;
+}
+
+/* Whether every child has sent piece `number` up. */
+static bool children_sent(const struct generic_team *team_phase, const struct pieces *pieces,
+                          const struct lead_tree *tree, uint64_t number)
+{
+    return child_missing(team_phase, pieces, tree, number) == tree->children;
 }
 
 /* Whether the parent has sent piece `number`'s release down: likewise, the
@@ -1260,12 +1321,39 @@ static bool next_down_sent(const struct generic_team *team_phase, const struct p
                                       : release_sent(team_phase, pieces, down);
 }
 
+/*
+ * What a lead waiting so says it waits for, for osoe-stat (D1): the first child
+ * whose copy of piece `up` is missing, or else the parent, whose grant or
+ * release of piece `down` is; at the root, which sends nothing up, the first
+ * child missing piece `down`. Said each time the wait finds it still waiting,
+ * after every wake, so that the node it names is one missing then, and not the
+ * first missing when the wait began - the root of a tree waits for every child
+ * in one wait, and one that has since come would be named for ever.
+ */
+static void say_awaited(const struct awaited *a)
+{
+    const struct lead_tree *tree = a->tree;
+    bool root = tree->parent == UINT32_MAX;
+    uint64_t piece = a->sending ? a->up : a->down;
+    uint32_t missing = a->sending || root ? child_missing(a->team_phase, a->pieces, tree, piece)
+                                          : tree->children;
+    if (missing < tree->children)
+        waits_for(a->team_phase, OSOE_DATA_WAIT_PIECE, tree->child[missing], piece);
+    else if (a->sending && a->granting)
+        waits_for(a->team_phase, OSOE_DATA_WAIT_GRANT, tree->parent, 0);
+    else
+        waits_for(a->team_phase, OSOE_DATA_WAIT_RELEASE, tree->parent, a->down);
+}
+
 static bool awaited_holds(const void *context)
 {
     const struct awaited *a = context;
-    return (a->sending && children_sent(a->team_phase, a->pieces, a->tree, a->up) &&
-            (!a->granting || grant_in(a->team_phase, a->pieces))) ||
-           next_down_sent(a->team_phase, a->pieces, a->tree, a->down);
+    bool holds = (a->sending && children_sent(a->team_phase, a->pieces, a->tree, a->up) &&
+                  (!a->granting || grant_in(a->team_phase, a->pieces))) ||
+                 next_down_sent(a->team_phase, a->pieces, a->tree, a->down);
+    if (!holds)
+        say_awaited(a);
+    return holds;
 }
 
 /*
@@ -1355,6 +1443,8 @@ static void in_pieces(struct generic_team *team_phase, const struct pieces *piec
             down++;
             continue;
         }
+        /* Neither: wait for either, saying whose word it waits on (D1;
+         * say_awaited). */
         struct awaited awaited = { team_phase, pieces, tree, sending,
                                    needs_grant && lanes.parent == NO_LANE, up, down };
         uint64_t first = arrival_counter(pieces->number, 0);
@@ -1726,19 +1816,17 @@ static void in_rounds(struct generic_team *team_phase, const struct pieces *piec
     uint32_t sender_lanes[OSOE_INTERNAL_CIRCULANT_ROWS_MOST];
     for (uint32_t k = 0; k < OSOE_INTERNAL_CIRCULANT_ROWS_MOST; k++)
         sender_lanes[k] = NO_LANE;
-    osoe_region_wait(pieces->routine, OSOE_REGION_INTERNAL,
-                     circulant_reduce_scatter_grant_counter(number), 8, false,
-                     OSOE_COMPARISON_GREATER_OR_EQUAL, grants, OSOE_BLOCKED_DETAIL_EPOCH,
-                     pieces->epoch);
+    /* Every grant on one counter, a round's receiver each: how many are
+     * missing is all its word can say (D1). */
+    wait_count(pieces->routine, team_phase, OSOE_DATA_WAIT_GRANT,
+               circulant_reduce_scatter_grant_counter(number), grants, pieces->epoch);
     take_round_grants(team_phase, pieces, rows, granted);
     uint64_t credit_base = team_phase->circulant_credit_base, most = 0;
     uint32_t made = 0;
     for (uint32_t index = 0; index < 2 * rows; index++) {
         if (index == rows)
-            osoe_region_wait(pieces->routine, OSOE_REGION_INTERNAL,
-                             circulant_allgather_grant_counter(number), 8, false,
-                             OSOE_COMPARISON_GREATER_OR_EQUAL, grants, OSOE_BLOCKED_DETAIL_EPOCH,
-                             pieces->epoch);
+            wait_count(pieces->routine, team_phase, OSOE_DATA_WAIT_GRANT,
+                       circulant_allgather_grant_counter(number), grants, pieces->epoch);
         struct round_flight f = {
             .pieces = pieces,
             .round = osoe_circulant_round(team_phase->index, nodes, index, count),
@@ -1769,6 +1857,12 @@ static void in_rounds(struct generic_team *team_phase, const struct pieces *piec
                 osoe_perturb();
                 continue;
             }
+            /* Neither: the sender's next piece, if it has one to come, or else
+             * the receiver's credit for the next piece out (D1). */
+            if (f.taken < f.receives)
+                waits_for(team_phase, OSOE_DATA_WAIT_PIECE, (uint32_t)f.from, index);
+            else
+                waits_for(team_phase, OSOE_DATA_WAIT_CREDIT, (uint32_t)f.to, index);
             uint64_t first = circulant_arrival_counter(number, 0);
             osoe_region_wait_condition(
                 pieces->routine, OSOE_REGION_INTERNAL, first,
@@ -2306,6 +2400,9 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
 
     for (uint32_t s = 0; s < steps; s++) {
         uint32_t receiver = lead_of(team, (uint32_t)((i + n - (UINT64_C(1) << s)) % n), routine);
+        /* READY[s] is the receiver's, added as it entered; DATA[s] the
+         * writer's, 2^s positions on (D1). */
+        waits_for(team_phase, OSOE_DATA_WAIT_READY, receiver, s);
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, ready_counter(team, s), 8, false,
                          OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
         if (s == 0)
@@ -2313,6 +2410,8 @@ void osoe_internode_generic_collect(uint32_t team, uint32_t epoch, void *buffer,
         put_step(&gather, &team_phase->step_intervals[s], context, (int)receiver);
         osoe_transport_rmw(context, (int)receiver, OSOE_REGION_INTERNAL, data_counter(team, s),
                            OSOE_RMW_ADD, 8, 1, 0, OSOE_TRANSPORT_FENCED);
+        waits_for(team_phase, OSOE_DATA_WAIT_PIECE,
+                  lead_of(team, (uint32_t)((i + (UINT64_C(1) << s)) % n), routine), s);
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, data_counter(team, s), 8, false,
                          OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
     }
@@ -2988,15 +3087,20 @@ struct node_totals_awaited {
     const struct generic_team *team_phase;
     uint32_t number;
     uint32_t children;
+    const uint32_t *child;              /* each child's lead's rank */
 };
 
+/* Saying, while one is missing, the first child whose total has not come (D1),
+ * at every look, as say_awaited does. */
 static bool node_totals_in(const void *context)
 {
     const struct node_totals_awaited *a = context;
     for (uint32_t j = 0; j < a->children; j++)
         if (osoe_transport_load(OSOE_REGION_INTERNAL, arrival_counter(a->number, j), 8) <
-            a->team_phase->arrival_base[j] + 1)
+            a->team_phase->arrival_base[j] + 1) {
+            waits_for(a->team_phase, OSOE_DATA_WAIT_PIECE, a->child[j], 0);
             return false;
+        }
     return true;
 }
 
@@ -3032,7 +3136,7 @@ void osoe_internode_generic_scan_node_totals(uint32_t team, uint32_t epoch, uint
      * subtree's to the parent. */
     uint64_t below[OSOE_COLLECTIVE_FANOUT_MAX], subtree = own;
     if (children > 0) {
-        struct node_totals_awaited awaited = { team_phase, number, children };
+        struct node_totals_awaited awaited = { team_phase, number, children, child };
         uint64_t first = arrival_counter(number, 0);
         osoe_region_wait_condition(routine, OSOE_REGION_INTERNAL, first,
                                    (size_t)(grant_counter(number) + 8 - first), node_totals_in,
@@ -3057,6 +3161,7 @@ void osoe_internode_generic_scan_node_totals(uint32_t team, uint32_t epoch, uint
                            arrival_counter(number, position), OSOE_RMW_ADD, 8, 1, 0,
                            OSOE_TRANSPORT_FENCED);
         /* Down: the totals before this subtree, and the total. */
+        waits_for(team_phase, OSOE_DATA_WAIT_RELEASE, (uint32_t)parent_pe, 0);
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, release_counter(number), 8, false,
                          OSOE_COMPARISON_GREATER_OR_EQUAL, team_phase->release_base + 1,
                          OSOE_BLOCKED_DETAIL_EPOCH, epoch);
@@ -3241,6 +3346,7 @@ void osoe_internode_generic_collect_ranges(uint32_t team, uint32_t epoch, void *
     for (uint32_t s = 0; s < steps; s++) {
         uint64_t power = UINT64_C(1) << s;
         uint32_t receiver = lead_of(team, (uint32_t)((i + n - power) % n), routine);
+        waits_for(team_phase, OSOE_DATA_WAIT_READY, receiver, s);     /* as Bruck's (D1) */
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, ready_counter(team, s), 8, false,
                          OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
         if (s == 0)
@@ -3289,6 +3395,8 @@ void osoe_internode_generic_collect_ranges(uint32_t team, uint32_t epoch, void *
 
         /* This step's own record, from the lead 2^s on: once DATA says the
          * step landed, taken, checked and merged into what this lead holds. */
+        waits_for(team_phase, OSOE_DATA_WAIT_PIECE,
+                  lead_of(team, (uint32_t)((i + power) % n), routine), s);
         osoe_region_wait(routine, OSOE_REGION_INTERNAL, data_counter(team, s), 8, false,
                          OSOE_COMPARISON_GREATER_OR_EQUAL, want, OSOE_BLOCKED_DETAIL_EPOCH, epoch);
         struct gather_record got;
@@ -3438,9 +3546,10 @@ void osoe_internode_generic_exchange_node_totals(uint32_t team, uint32_t epoch, 
         osoe_perturb();
     }
     team_phase->exchange_base[parity] += n - 1;
-    osoe_region_wait(routine, OSOE_REGION_INTERNAL, exchange_counter(number, parity), 8, false,
-                     OSOE_COMPARISON_GREATER_OR_EQUAL, team_phase->exchange_base[parity],
-                     OSOE_BLOCKED_DETAIL_EPOCH, epoch);
+    /* Every lead's total on one counter: how many are missing is all it says
+     * (D1). */
+    wait_count(routine, team_phase, OSOE_DATA_WAIT_TOTALS, exchange_counter(number, parity),
+               team_phase->exchange_base[parity], epoch);
     osoe_perturb();
     for (uint32_t j = 0; j < n; j++) {
         if (j == i) {

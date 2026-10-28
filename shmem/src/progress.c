@@ -1942,6 +1942,14 @@ bool osoe_progress_poll(struct osoe_progress_owner *o)
     osoe_counter_word_add(&o->metrics->passes, 1);
     osoe_counter_word_add(&o->metrics->send_visits, visits);
     atomic_store_explicit(&o->metrics->last_pass_ns, pass_end_ns(), memory_order_release);
+    /* A pass that moved nothing is followed by the owner's flag at once, or by
+     * more work: the fine clock, last of all, for the flag's raise to be timed
+     * from (node.h, late_flags; T38) - a few tens of nanoseconds an idle pass. */
+    if (!moved) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        o->idle_end_ns = (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
+    }
     return moved;
 }
 

@@ -26,14 +26,24 @@
  * memory). Such a leftover is reclaimed whenever it is this user's. */
 #define OSOE_SHM_NO_OWNER (-1L)
 
+/* An object that records its creator's pid but not its PID namespace: every
+ * object but the control segment, whose layouts are their own (D26). */
+#define OSOE_SHM_NO_NAMESPACE (-1L)
+
 /*
  * shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600), reclaiming a leftover as
  * above. `owner_offset` is where in the object the creator stores its pid, as
- * an int32_t, or OSOE_SHM_NO_OWNER. Returns the descriptor, or -1 with a reason
- * in `err`. The caller records its own pid at `owner_offset` once it has
+ * an int32_t, or OSOE_SHM_NO_OWNER; and `namespace_offset` where it stores its
+ * PID namespace, a struct osoe_pid_namespace (base/pid-namespace.h), or
+ * OSOE_SHM_NO_NAMESPACE - the control segment's alone (node.h, layout 42; D26). A
+ * leftover whose creator was in another namespace is judged by no pid, which
+ * names another process here or none: it is refused, by name, as one whose
+ * creator runs is, and never reclaimed. Returns the descriptor, or -1 with a
+ * reason in `err`. The caller records its own pid, and namespace, once it has
  * sized and mapped the object.
  */
-int osoe_shm_create(const char *name, long owner_offset, char *err, size_t errlen);
+int osoe_shm_create(const char *name, long owner_offset, long namespace_offset, char *err,
+                    size_t errlen);
 
 /*
  * The creator a non-lead takes an object from (job.c, connection-area.c): the

@@ -398,14 +398,21 @@ void osoe_segment_close(struct osoe_segment *s);
  *   40  transport.am.last_pass_ns, appended to each owner's record: when its
  *       last pass ended, whose age osoe-stat's owner table shows (D8)
  *   41  a blocked record's detail kind for a split's pending team number (D4)
+ *   42  each PE's PID namespace in its slot, pe.pid_namespace.*, and the
+ *       lead's beside its pid, node.creator_pid_namespace.* (D26); a
+ *       created team of one's published epoch naming no block, since it
+ *       claims none (P7); the data collective a node's lead is in on a team
+ *       and what it waits for, team.tree.data_* (D1); each owner's flags
+ *       raised late, transport.am.late_flags (T38); and a blocked record's
+ *       detail kind for a data wire still being made, kept for H23
  *
- * None of 5 to 41 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 42 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37
  * lengthened the context pool, after which the thread records that hold the
  * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               41
+#define OSOE_SEGMENT_NEWEST_LAYOUT               42
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 
@@ -462,8 +469,9 @@ uint32_t osoe_segment_block_pe(const struct osoe_segment *s, uint32_t block);
  * since layout 30 the block of that team on the node into `*block` - which a
  * block's team is paired with, two PEs of a node holding different teams
  * under one number (the team redesign's step D) - or UINT32_MAX when the PE
- * holds no team under it, or the layout's words do not say. False past the
- * row or the mapping. */
+ * holds no team under it, or holds a team of one, which has no block since
+ * layout 42 (P7), or the layout's words do not say. False past the row or the
+ * mapping. */
 bool osoe_segment_epoch(const struct osoe_segment *s, uint32_t local_id, uint32_t number,
                         uint32_t *block, uint32_t *epoch);
 
@@ -507,6 +515,22 @@ enum osoe_segment_detail {
     OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT,   /* layout 16: bytes of nonblocking gets */
     OSOE_SEGMENT_DETAIL_STATICS_OFFSET,   /* layout 17: an offset into the statics */
     OSOE_SEGMENT_DETAIL_TEAM_NUMBER,      /* layout 41: a pending team number (D4) */
+    OSOE_SEGMENT_DETAIL_CONNECTING,       /* layout 42: a data wire to a node, being made (H23) */
+};
+
+/*
+ * What team.tree.data_wait holds (layout 42; D1): the segment's encoding
+ * (node.h, enum osoe_data_wait), what a data collective's lead waits for.
+ */
+enum osoe_segment_data_wait {
+    OSOE_SEGMENT_DATA_WAIT_NONE,
+    OSOE_SEGMENT_DATA_WAIT_MEMBERS,
+    OSOE_SEGMENT_DATA_WAIT_PIECE,
+    OSOE_SEGMENT_DATA_WAIT_RELEASE,
+    OSOE_SEGMENT_DATA_WAIT_GRANT,
+    OSOE_SEGMENT_DATA_WAIT_CREDIT,
+    OSOE_SEGMENT_DATA_WAIT_READY,
+    OSOE_SEGMENT_DATA_WAIT_TOTALS,
 };
 
 /* `detail` as its kind says - "node 3", "epoch 17", "offset 0x40",

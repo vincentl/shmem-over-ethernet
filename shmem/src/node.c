@@ -18,6 +18,7 @@
 
 #include "base/deadline.h"
 #include "base/futex.h"
+#include "base/pid-namespace.h"
 #include "base/print-line.h"
 #include "base/stall-watch.h"
 #include "abort.h"
@@ -267,8 +268,9 @@ static struct {
  */
 static void tombstone(void)
 {
-    char err[256];
+    char err[512];
     int fd = osoe_shm_create(refusal.name, (long)offsetof(struct osoe_node_header, creator_pid),
+                             (long)offsetof(struct osoe_node_header, creator_pid_namespace),
                              err, sizeof err);
     if (fd < 0)
         return;
@@ -287,6 +289,7 @@ static void tombstone(void)
         return;
     }
     h->creator_pid = (int32_t)getpid();
+    h->creator_pid_namespace = osoe_pid_namespace_own();
     h->dir.magic = OSOE_NODE_MAGIC;
     h->dir.layout = OSOE_NODE_LAYOUT;
     h->dir.directory_bytes = sizeof h->dir;
@@ -421,9 +424,18 @@ static uint32_t first_missing_rank(const struct osoe_node *n, const struct osoe_
  * the node (the adversarial read of 2026-10-03). A segment of another launch
  * is never this far (open_control); before the lead's `ready` it may be, and
  * lead_ended_before_ready is the check there.
+ *
+ * Only from inside the lead's PID namespace (D26): from another, its pid names
+ * another process or none, and a lead at work would be taken for one that had
+ * ended - a refusal naming a cause that is not the cause. There the lead is
+ * not judged at all, and the node is refused once its PEs have joined
+ * (check_agreement), every PE naming the same two. Its namespace is beside its
+ * pid in the header, read after the same acquire.
  */
 static bool lead_ended(const struct osoe_node *n)
 {
+    if (osoe_pid_namespace_differ(n->hdr->creator_pid_namespace, n->pid_namespace))
+        return false;
     int32_t pid = n->hdr->creator_pid;
     return pid > 0 && kill((pid_t)pid, 0) != 0 && errno == ESRCH;
 }
@@ -528,7 +540,8 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
      * predates the control segment this node's lead has just created, and so
      * is a dead job's, reclaimed if it is this user's. */
     char err[256];
-    int fd = osoe_shm_create(slot->heap_name, OSOE_SHM_NO_OWNER, err, sizeof err);
+    int fd = osoe_shm_create(slot->heap_name, OSOE_SHM_NO_OWNER, OSOE_SHM_NO_NAMESPACE, err,
+                             sizeof err);
     if (fd < 0) {
         char msg[320];
         snprintf(msg, sizeof msg, "this PE's heap: %s", err);
@@ -653,7 +666,8 @@ static void create_own_statics(struct osoe_node *n, const struct osoe_bootstrap 
     if (len < 0 || (size_t)len >= sizeof slot->statics_name)
         fail_rendezvous(n, "statics object name too long");
     char err[256];
-    int fd = osoe_shm_create(slot->statics_name, OSOE_SHM_NO_OWNER, err, sizeof err);
+    int fd = osoe_shm_create(slot->statics_name, OSOE_SHM_NO_OWNER, OSOE_SHM_NO_NAMESPACE, err,
+                             sizeof err);
     if (fd < 0) {
         char msg[320];
         snprintf(msg, sizeof msg, "this PE's statics: %s", err);
@@ -758,10 +772,42 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
     }
 }
 
-/* Every local PE must have parsed the same SHMEM_SYMMETRIC_SIZE (§4.1, §4.4).
- * Every PE runs this check on the same slots, so all of them fail together. */
+/*
+ * Every local PE must be in one PID namespace (D26), and have parsed the same
+ * SHMEM_SYMMETRIC_SIZE (§4.1, §4.4). Every PE runs this check on the same
+ * slots, so all of them fail together, naming the same PEs.
+ *
+ * The namespaces first, since the node's PEs watch each other by process id:
+ * from another namespace a pid names another process, or none - a death
+ * unseen, or a live PE taken for dead, by the liveness pidfds (liveness.h) and
+ * by the deadlock detector's /proc/<pid>/task (deadlock.c). Each known one is
+ * compared with the first PE's that is known, a PE whose /proc could not say
+ * left out (base/pid-namespace.h); until this check every pid-based judgement
+ * of the start is made only from inside the lead's namespace (lead_ended).
+ */
 static void check_agreement(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
+    uint32_t first = UINT32_MAX;
+    for (uint32_t i = 0; i < b->local_count; i++) {
+        struct osoe_pid_namespace ns = n->slots[i].pid_namespace;
+        if (!osoe_pid_namespace_known(ns))
+            continue;
+        if (first == UINT32_MAX) {
+            first = i;
+            continue;
+        }
+        if (osoe_pid_namespace_differ(n->slots[first].pid_namespace, ns)) {
+            char one[48], other[48], msg[512];
+            osoe_pid_namespace_text(n->slots[first].pid_namespace, one, sizeof one);
+            osoe_pid_namespace_text(ns, other, sizeof other);
+            snprintf(msg, sizeof msg, "the node's PEs are in more than one PID namespace: "
+                     "local PE %u (rank %u) is in %s and local PE %u (rank %u) in %s; a node's "
+                     "PEs watch each other by process id and must share one - one container a "
+                     "node, or containers that keep the host's PID namespace (README, "
+                     "Building)", first, b->gtids[first], one, i, b->gtids[i], other);
+            fail_rendezvous(n, msg);
+        }
+    }
     for (uint32_t i = 0; i < b->local_count; i++) {
         if (n->slots[i].symmetric_size != b->symmetric_size) {
             char msg[256];
@@ -920,9 +966,11 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     uint64_t owners_bytes = owner_count * sizeof(struct osoe_am_owner_metrics);
     n->control_bytes = page_round(owners_offset + owners_bytes);
 
-    char err[256];
+    /* Room for a leftover's whole story, another namespace's included. */
+    char err[512];
     int fd = osoe_shm_create(n->control_name,
                              (long)offsetof(struct osoe_node_header, creator_pid),
+                             (long)offsetof(struct osoe_node_header, creator_pid_namespace),
                              err, sizeof err);
     if (fd < 0)
         osoe_fatal("the control segment: %s", err);
@@ -959,9 +1007,11 @@ static void create_control(struct osoe_node *n, const struct osoe_bootstrap *b, 
     }
     n->control_fd = fd;             /* kept: see struct osoe_node */
 
-    /* ftruncate zeroed it: every atomic word starts at 0. */
+    /* ftruncate zeroed it: every atomic word starts at 0. The creator's pid and
+     * namespace before `launch`'s release store below (node.h). */
     n->hdr = p;
     n->hdr->creator_pid = (int32_t)getpid();
+    n->hdr->creator_pid_namespace = n->pid_namespace;
     n->slots = (struct osoe_pe_slot *)((char *)p + slots_offset);
     struct osoe_node_header *h = n->hdr;
     h->dir.magic = OSOE_NODE_MAGIC;
@@ -1597,6 +1647,9 @@ static void collective_state_reset(struct osoe_collective_state *c)
     atomic_store_explicit(&c->circulant_rounds, 0, memory_order_release);
     atomic_store_explicit(&c->collect_lengths, 0, memory_order_release);
     atomic_store_explicit(&c->collect_way, 0, memory_order_release);
+    atomic_store_explicit(&c->data_epoch_open, 0, memory_order_release);
+    atomic_store_explicit(&c->data_epoch_closed, 0, memory_order_release);
+    osoe_collective_data_wait(c, OSOE_DATA_WAIT_NONE, OSOE_COLLECTIVE_TREE_NONE, 0);
 }
 
 /*
@@ -1753,6 +1806,9 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     bool lead = b->local_id == 0;
     n->control_fd = -1;
     n->keep_name = b->keep_control_segment;
+    /* Before the segment: the lead records it beside its pid, and a node-mate
+     * judges the lead's pid only where they agree (D26). */
+    n->pid_namespace = osoe_pid_namespace_own();
 
     control_name(n->control_name, sizeof n->control_name, b, session);
     /* SHMEM_SYMMETRIC_SIZE rounded up to the allocator's 16 bytes: §8 asks for
@@ -1848,6 +1904,7 @@ void osoe_node_join(struct osoe_node *n, const struct osoe_bootstrap *b, uint32_
     me->rank = b->rank;
     me->pid = (int32_t)getpid();
     me->tid = (int32_t)gettid();
+    me->pid_namespace = n->pid_namespace;
     /* Before any thread of the library's exists, so this is the task's own
      * binding: what the node's agents may run on (agent.c). None known - a
      * kernel that will not say - leaves the agents where they are. */

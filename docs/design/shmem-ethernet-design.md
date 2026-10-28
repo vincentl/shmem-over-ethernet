@@ -1470,7 +1470,12 @@ at every helper count, a control wire and a data wire (§3.1,
   every reader sums; and since layout 40 the instant its last pass ended, on
   the coarse monotonic clock, whose age `osoe-stat` shows beside its passes:
   an idle owner passes ten times a second, so an old one is an owner stuck in
-  a pass or not running (D8).
+  a pass or not running (D8). Since layout 42 it counts too the flags it
+  raised more than 10 µs after the pass that moved nothing before it, timed on
+  the fine clock (`late_flags`; T38): as built only a store or two lies between,
+  and a spin before the flag - which every wake count passes, the flag raised
+  late still finding its waker - makes one at each idle pass, which
+  `shmem.late-flags` bounds a wake.
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address
@@ -1877,10 +1882,19 @@ headers would pass whenever the library agreed with itself.
   walk down from the root, O(log N) visits, and `node.hostname` — also layout 12 —
   says which machine to ask next. `osoe-stat --summary` prints one line per node
   and team for exactly this walk - of a barrier or a sync, whose epochs the
-  progress thread keeps: the data collectives' generic phase runs on the
-  calling thread and publishes none, so a team hung in one reads "nothing
-  open" there, and the PE lines say where its PEs wait (round six's Q5-1; its
-  own walk is after the release). *Measured* (`shmem.hang-walk`, and the
+  progress thread keeps - and since node layout 42 one more while the node's
+  lead is in a data collective (D1; round six's Q5-1): the generic phase runs on
+  the calling thread, and its lead publishes the epoch it is in and, as each of
+  its waits begins, what it waits for and the node whose word ends the wait -
+  the child or parent in the tree, a round's sender or receiver in Träff's, a
+  step's peer in Bruck's - or its own members, so that the same walk goes from
+  node to node to one whose lead is not in it, or waits for its members. A
+  count several leads add to - Träff's grants, the exchange of collect's totals
+  - cannot say whose is missing, and the line says how many are and names no
+  node; a scan's members, a tree of PEs rather than of leads, name the PE they
+  wait on in their blocked records. Before layout 42 a team hung in a data
+  collective read "nothing open", and the PE lines alone said where its PEs
+  waited. *Measured* (`shmem.hang-walk`, and the
   transcript in the commit): one PE of eight logical nodes never calls the second
   barrier, and three visits find it — node 0 names child 2, node 2 names child 6,
   node 6 has no epoch open and its own members not arrived, so its PE lines say
@@ -2517,7 +2531,11 @@ or a kernel or sandbox refusing the call — the PE is watched by `kill(pid, 0)`
 instead, after one line saying so, rather than the job ending for it; and init
 raises the soft `RLIMIT_NOFILE` to the hard limit, as §6.2 always said it did
 and the code had not. Like the reclaim of a dead job's objects (§6.2), this
-assumes a node's PEs share a pid namespace. The design put the lead's pidfds on
+assumes a node's PEs share a pid namespace, which since node layout 42 the
+join checks (D26): each PE publishes its namespace in its slot, every PE
+compares them once the node has joined and refuses a node whose PEs differ,
+naming two, and until then a node-mate judges its lead by pid only from inside
+the lead's namespace, recorded beside its pid in the header. The design put the lead's pidfds on
 its ring, which a single-node job does not have, and had non-leads check the
 lead with `kill(pid, 0)` at a library wait's sweep, which a computing PE never
 reaches; the agent's own sweep serves both, the same way on every job. It is up
@@ -5719,7 +5737,9 @@ on every parent PE, where PEs that passed others had waited or split apart.
 Every parent PE reads the same result: `split_strided` takes the lowest bit,
 `split_2d` the lowest for every row and the next for every column, since rows
 share no PE, nor columns. Before contributing, the would-be local lead of each
-new team on each node claims the team's block from the pool, so that a dry pool
+new team of more than one PE on each node claims the team's block from the
+pool - a team of one claims none since node layout 42, touching nothing of the
+node's (P7) - so that a dry pool
 fails the split alike - said by the PE that found it dry, naming
 `OSOE_TEAM_BLOCKS` and its node - and so does a mask with no bit left, said once
 by the parent's rank 0, naming `OSOE_MAX_TEAMS`; a block claimed for a split that
@@ -6715,7 +6735,12 @@ small for the node's heaps, among them. Three rules close it:
   false deadlock). A new lead with the dead lead's pid would defeat the check,
   which on one node and within a requeue is a coincidence of `pid_max` - though
   a launch in its own pid namespace makes equal pids likely, if `/dev/shm`
-  outlives the launch.
+  outlives the launch. Since node layout 42 the control segment records its
+  creator's pid namespace beside its pid (D26), and a leftover of another
+  namespace is refused as such, by name, and never reclaimed, whatever process
+  its pid names here - where a pid that another process held here had been
+  named as that process's, a running job's (round six's portability Q5) - and
+  `osoe-stat --gc` leaves it alone, saying why.
 - *The lead makes the segment before anything that can refuse*: the `/dev/shm`
   check comes after it exists and refuses through `failed`; the pages the lead
   writes first are allocated, not only sized, so a `/dev/shm` too full even for

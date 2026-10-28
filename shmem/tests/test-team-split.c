@@ -52,14 +52,14 @@
  * - OSOE_TEST_SPLIT=too-many, four PEs under OSOE_MAX_TEAMS=4, one number: a
  *   split_2d, which needs two, fails, and the one number serves the split
  *   after it, and again once that team is destroyed;
- * - OSOE_TEST_SPLIT=dry, two PEs of one node under OSOE_TEAM_BLOCKS=8, five
- *   blocks for created teams: five teams take them, a sixth and a team of one
- *   fail alike, the lead that found the pool dry saying so; one destroyed, a
- *   split_2d whose three teams need three blocks fails alike too, its lead
- *   holding the one block it claimed - which the first design took for a
- *   block on its way back for ever; the destroyed team's block serves the
- *   next; and with the pool full, a team PE 1 destroys late serves a split PE
- *   0 leads and calls at once;
+ * - OSOE_TEST_SPLIT=dry, three PEs of one node under OSOE_TEAM_BLOCKS=8, five
+ *   blocks for created teams: five teams take them, and six teams of one
+ *   split even so, claiming none (P7); a sixth fails alike, the lead that
+ *   found the pool dry saying so; one destroyed, a split_2d whose lead needs
+ *   two blocks fails alike too, holding the one block it claimed - which the
+ *   first design took for a block on its way back for ever; the destroyed
+ *   team's block serves the next; and with the pool full, a team two PEs
+ *   destroy late serves a split PE 0 leads and calls at once;
  * - OSOE_TEST_SPLIT=stale-handle: a destroyed team's handle used after its
  *   number names another team ends the job by name, rather than reaching the
  *   new team;
@@ -634,60 +634,82 @@ static void too_many(void)
 }
 
 /*
- * OSOE_TEST_SPLIT=dry, two PEs of one node under OSOE_TEAM_BLOCKS=8: five
- * blocks for created teams. Four teams of both and one of PE 1 alone take
- * them; a sixth, and a team of PE 0 alone, find the pool dry and fail alike,
- * PE 0 - the lead that would have claimed - saying so each time; one of the
- * four destroyed gives its block back. A split_2d of the two, a row of both
- * and a column of each, needs three: PE 0 leads two of them and finds at most
- * one, and its split fails alike, PE 0 saying so - the adversarial read of
- * 2026-10-03 found the first design ran its rounds for ever, the block PE 0
- * had claimed taken for one on its way back. The sixth then takes the block
- * given back. Last, with the pool full again, PE 1 destroys its team of one
- * late, and a split of the world that PE 0 leads, called by PE 0 at once,
- * succeeds: PE 0's first claim comes before PE 1 has given the block back,
- * and PE 1 gives it back before it arrives in the split's reduction, so the
- * split's next round finds it - a pool found empty in the first round makes
- * the round busy, not dry (tools/modelcheck/pool_dry_model.py).
+ * OSOE_TEST_SPLIT=dry, three PEs of one node under OSOE_TEAM_BLOCKS=8: five
+ * blocks for created teams. Four teams of all three and one of PEs 1 and 2
+ * take them. With the pool full, teams of one still split - six, two a PE,
+ * more than the pool has blocks - since a team of one claims none (P7): each
+ * works, its epoch word naming no block. A sixth team of all three finds the
+ * pool dry and fails alike, PE 0 - the lead that would have claimed - saying
+ * so; one of the four destroyed gives its block back. A split_2d of the three
+ * by rows of two - rows {0, 1} and {2}, columns {0, 2} and {1} - needs two
+ * blocks, both PE 0's to claim, the row and the column of one needing none:
+ * PE 0 finds one, and its split fails alike, PE 0 saying so - the adversarial
+ * read of 2026-10-03 found the first design ran its rounds for ever, the
+ * block PE 0 had claimed taken for one on its way back. The sixth then takes
+ * the block given back. Last, with the pool full again, PEs 1 and 2 destroy
+ * their team late, and a split of the world that PE 0 leads, called by PE 0
+ * at once, succeeds: PE 0's first claim comes before the pair has given the
+ * block back, and the pair gives it back before it arrives in the split's
+ * reduction, so the split's next round finds it - a pool found empty in the
+ * first round makes the round busy, not dry (tools/modelcheck/pool_dry_model.py).
+ * Until P7 a team of one took a block like any other, and the six failed.
  */
 static void dry(void)
 {
-    CHECK_FATAL(npes == 2);
-    enum { BLOCKS = 5 };
-    shmem_team_t made[BLOCKS + 2];
+    CHECK_FATAL(npes == 3);
+    enum { BLOCKS = 5, ALONE = 6 };
+    shmem_team_t made[BLOCKS + 1], pair = SHMEM_TEAM_INVALID;
     for (int i = 0; i < BLOCKS - 1; i++) {
         made[i] = SHMEM_TEAM_INVALID;
         check_made(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made[i]),
                    made[i]);
     }
-    shmem_team_t alone = SHMEM_TEAM_INVALID;
-    CHECK(shmem_team_split_strided(SHMEM_TEAM_WORLD, 1, 1, 1, NULL, 0, &alone) == 0);
-    CHECK((alone != SHMEM_TEAM_INVALID) == (me == 1));
-    made[BLOCKS - 1] = SHMEM_TEAM_INVALID;
-    made[BLOCKS] = SHMEM_TEAM_WORLD;
-    check_failed(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made[BLOCKS]),
-                 made[BLOCKS], SHMEM_TEAM_INVALID);
-    shmem_team_t one = SHMEM_TEAM_WORLD;
-    check_failed(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, 1, NULL, 0, &one), one,
-                 SHMEM_TEAM_INVALID);
+    int status = shmem_team_split_strided(SHMEM_TEAM_WORLD, 1, 1, 2, NULL, 0, &pair);
+    CHECK(status == 0 && statuses_agree(status) && (pair != SHMEM_TEAM_INVALID) == (me != 0));
+
+    /* Six teams of one with the pool full, world PE i % 3 alone in the i-th. */
+    shmem_team_t alone[ALONE];
+    int held = 0;
+    for (int i = 0; i < ALONE; i++) {
+        shmem_team_t team = SHMEM_TEAM_INVALID;
+        status = shmem_team_split_strided(SHMEM_TEAM_WORLD, i % npes, 1, 1, NULL, 0, &team);
+        CHECK(status == 0 && statuses_agree(status) &&
+              (team != SHMEM_TEAM_INVALID) == (me == i % npes));
+        if (team != SHMEM_TEAM_INVALID)
+            alone[held++] = team;
+    }
+    CHECK(held == ALONE / npes);
+    struct expected own = strided(&world_expected, me, 1, 1);
+    for (int i = 0; i < held; i++) {
+        check_team(alone[i], &own, SHMEM_TEAM_WORLD, &world_expected, 0);
+        exercise(alone[i], &own);
+    }
+    CHECK(osoe_test_teams_without_block() == held);
+
+    made[BLOCKS - 1] = SHMEM_TEAM_WORLD;
+    check_failed(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0,
+                                          &made[BLOCKS - 1]), made[BLOCKS - 1], SHMEM_TEAM_INVALID);
     shmem_team_destroy(made[2]);
     made[2] = SHMEM_TEAM_INVALID;
     shmem_team_t x = SHMEM_TEAM_WORLD, y = SHMEM_TEAM_WORLD;
     check_failed(shmem_team_split_2d(SHMEM_TEAM_WORLD, 2, NULL, 0, &x, NULL, 0, &y), x, y);
+    check_made(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0,
+                                        &made[BLOCKS - 1]), made[BLOCKS - 1]);
+    if (me != 0) {
+        sleep_milliseconds(100);
+        shmem_team_destroy(pair);
+    }
+    made[BLOCKS] = SHMEM_TEAM_INVALID;
     check_made(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0, &made[BLOCKS]),
                made[BLOCKS]);
-    if (me == 1) {
-        sleep_milliseconds(100);
-        shmem_team_destroy(alone);
-    }
-    made[BLOCKS + 1] = SHMEM_TEAM_INVALID;
-    check_made(shmem_team_split_strided(SHMEM_TEAM_WORLD, 0, 1, npes, NULL, 0,
-                                        &made[BLOCKS + 1]), made[BLOCKS + 1]);
-    for (int i = 0; i <= BLOCKS + 1; i++)
+    for (int i = 0; i <= BLOCKS; i++)
         if (made[i] != SHMEM_TEAM_INVALID) {
             exercise(made[i], &world_expected);
             shmem_team_destroy(made[i]);
         }
+    for (int i = 0; i < held; i++)
+        shmem_team_destroy(alone[i]);
+    CHECK(osoe_test_teams_without_block() == 0);
     mode_passed();
 }
 

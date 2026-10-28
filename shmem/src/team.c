@@ -42,7 +42,8 @@
  *      walk meets the nodes in order and O(S log S) otherwise, O(S) memory
  *      either way: the one step that is not logarithmic, taken at creation
  *      only. The local lead claims its node's block for the team from the
- *      pool (node.h) - none of which needs the number;
+ *      pool (node.h) - none of which needs the number - unless the team is
+ *      of one PE, which touches nothing of the node's and claims none (P7);
  *   3. one AND reduction over the parent, in place, in the parent number's
  *      split words of the internal region (internal-region.h): every member
  *      contributes its *free mask* - bit t set when t is not predefined, this
@@ -66,9 +67,9 @@
  *      all did (below);
  *   5. each member takes the number - its descriptor's slot, its counters in
  *      the internal region zeroed (internode.h) - and each node's local lead
- *      of the new team names its block, writes the team's record into it and
- *      maps the block under the team's name (node.h, where the argument that
- *      every reader sees them is written);
+ *      of a new team of more than one PE names its block, writes the team's
+ *      record into it and maps the block under the team's name (node.h,
+ *      where the argument that every reader sees them is written);
  *   6. a sync over the parent, so that no collective on the new team starts
  *      anywhere before every member node's record is published and every
  *      member's counters are zero;
@@ -545,23 +546,30 @@ static void write_record(const struct osoe_team *t, const char *name,
  * mapped under the team's name before the split's sync, which this follows -
  * the map entry's release and this acquire carry the block's name and record
  * with them (node.h). A member finding none is a broken invariant, not a
- * program's mistake.
+ * program's mistake. A created team of one has none to find (P7): no block,
+ * UINT32_MAX, and an epoch word naming none (OSOE_EPOCH_WORD), which osoe-stat
+ * reads as a PE in no team's block.
  */
 static void take_number(struct osoe_team *t)
 {
-    if (t->number < OSOE_PREDEFINED_TEAMS) {
-        t->block_index = t->number;
+    if (t->number >= OSOE_PREDEFINED_TEAMS && t->singleton) {
+        t->block_index = UINT32_MAX;
+        t->block = NULL;
     } else {
-        t->block_index = osoe_node_team_find(&osoe.node, t->lead_local_id, t->number);
-        if (t->block_index == UINT32_MAX)
-            osoe_fatal("%s: no block is mapped on node %u under its name (local lead %u, "
-                       "number %u) after the split's sync", t->name, osoe.job.node,
-                       t->lead_local_id, t->number);
+        if (t->number < OSOE_PREDEFINED_TEAMS) {
+            t->block_index = t->number;
+        } else {
+            t->block_index = osoe_node_team_find(&osoe.node, t->lead_local_id, t->number);
+            if (t->block_index == UINT32_MAX)
+                osoe_fatal("%s: no block is mapped on node %u under its name (local lead %u, "
+                           "number %u) after the split's sync", t->name, osoe.job.node,
+                           t->lead_local_id, t->number);
+        }
+        t->block = osoe_node_team(&osoe.node, t->block_index);
+        if (!t->block)
+            osoe_fatal("%s: its block on node %u is %u, past the pool's %u", t->name,
+                       osoe.job.node, t->block_index, osoe.node.team_count);
     }
-    t->block = osoe_node_team(&osoe.node, t->block_index);
-    if (!t->block)
-        osoe_fatal("%s: its block on node %u is %u, past the pool's %u", t->name, osoe.job.node,
-                   t->block_index, osoe.node.team_count);
     t->published = osoe_node_published_epoch(&osoe.node, osoe.bootstrap.local_id, t->number);
     osoe_team_publish_epoch(t, 0);
     atomic_store_explicit(&numbered[t->number], t, memory_order_release);
@@ -1114,7 +1122,8 @@ static void shape(const struct osoe_team *parent, struct membership *m)
      */
     t->internode = t->local_members < t->members;
     t->nodes = t->internode ? 0 : 1;
-    if (osoe.bootstrap.local_id != t->lead_local_id)
+    /* A team of one has no record to write, so no node set (P7). */
+    if (osoe.bootstrap.local_id != t->lead_local_id || t->singleton)
         return;
     if (!t->internode) {
         node_set_allocate(&m->set, 1, t->name);
@@ -1126,10 +1135,17 @@ static void shape(const struct osoe_team *parent, struct membership *m)
     t->nodes = m->set.count;
 }
 
-/* Whether this PE leads `m`'s team on its node, and so claims its block. */
-static bool leads(const struct membership *m)
+/*
+ * Whether this PE claims a block of its node's pool for `m`'s team: it leads
+ * the team on its node, and the team has more than one PE. A team of one
+ * touches nothing of the node's (team.h) - its collectives return at once,
+ * with no counter, handoff or record - and since P7 (layout 42) it claims no
+ * block either: a split_2d with an xrange of 1 makes one a PE, and four such
+ * grids emptied the default pool at 256 PEs a node.
+ */
+static bool claims_block(const struct membership *m)
 {
-    return m->member && osoe.bootstrap.local_id == m->shape.lead_local_id;
+    return m->member && !m->shape.singleton && osoe.bootstrap.local_id == m->shape.lead_local_id;
 }
 
 /* What a split that failed built of `m`: its arrays, its node set, and the
@@ -1315,7 +1331,8 @@ static bool take_pending(const char *routine, uint32_t parent, const uint32_t *n
 enum split_mark {
     MARK_NOT_BUSY = 1,      /* this PE's pool was not found empty while a block of
                              * it may be about to come back (split) */
-    MARK_NOT_DRY = 2,       /* this PE claimed every block it leads, or leads none */
+    MARK_NOT_DRY = 2,       /* this PE claimed a block for every team it leads of
+                             * more than one PE, or leads none */
     MARK_NOT_CONCURRENT = 4,    /* no other thread of this PE can be in a split:
                                  * its level is below SHMEM_THREAD_MULTIPLE */
 };
@@ -1414,7 +1431,7 @@ static int split(const char *routine, struct osoe_team *parent, uint32_t numbers
          * still leaving it (node.h, osoe_node_team_returning). */
         dry = false;
         for (uint32_t i = 0; i < mine_count; i++)
-            if (leads(&mine[i]) && mine[i].block == UINT32_MAX) {
+            if (claims_block(&mine[i]) && mine[i].block == UINT32_MAX) {
                 mine[i].block = osoe_node_team_claim(&osoe.node, osoe.bootstrap.local_id);
                 dry |= mine[i].block == UINT32_MAX;
             }
@@ -1634,8 +1651,10 @@ OSOE_API void pshmem_team_destroy(shmem_team_t team)
      * holds another team (node.h). */
     uint32_t number = t->number;
     atomic_store_explicit(t->published, 0, memory_order_release);
-    osoe_node_team_leave(&osoe.node, t->block_index,
-                         osoe.bootstrap.local_id == t->lead_local_id);
+    /* A team of one holds no block to leave (P7). */
+    if (t->block)
+        osoe_node_team_leave(&osoe.node, t->block_index,
+                             osoe.bootstrap.local_id == t->lead_local_id);
     forget(t);
     atomic_fetch_and_explicit(&held[number / 64], ~(UINT64_C(1) << (number % 64)),
                               memory_order_seq_cst);

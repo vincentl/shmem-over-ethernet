@@ -278,7 +278,7 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
         char err[256];
         fd = osoe_shm_create(a->name,
                              (long)offsetof(struct osoe_connection_area_header, creator_pid),
-                             err, sizeof err);
+                             OSOE_SHM_NO_NAMESPACE, err, sizeof err);
         if (fd < 0)
             osoe_fatal("the connection area: %s", err);
         if (ftruncate(fd, (off_t)a->bytes) != 0) {
