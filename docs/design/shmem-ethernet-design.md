@@ -7112,7 +7112,8 @@ eager by default until a large cluster measures it:
   writer's own wait, whose fatal says that its connection's data wire is not yet
   made. A node making a wire is neither idle nor quiet, so the deadlock detector
   never takes a stalled wire for a deadlock. `osoe-stat`'s blocked kind for the
-  wait comes with the layout-42 slice.
+  wait, `OSOE_BLOCKED_DETAIL_CONNECTING`, is the layout-42 slice's: named, but
+  set by no writer yet - H23's one open part.
 - **The budget counts the data wires a node makes** (the author, 2026-10-27;
   `docs/decisions/2026-10-27-data-wires-on-demand.md`): on demand the buffers
   are chosen as eagerly, halving to the floor, so that on demand refuses nothing
