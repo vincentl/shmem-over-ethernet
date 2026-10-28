@@ -7,7 +7,16 @@
 # scripts and probes run and their outputs parse - not any number a cluster
 # would give. Run from the tree, after `docs/fast-link/build.sh` with
 # KIT_LAUNCHER=osoe-launch has built it here.
-# SECTIONS names the sections to run, in this order (default: every one).
+# SECTIONS names the sections to run, in this order (default: every one), and
+# session-3, named alone, the third session's chain whole (session-3.sh), at its
+# own settings - rounds, cases, helper counts and lengths - on these logical
+# nodes, each script's own timeout: H12's 256 PEs a node at WAKE_PES (64), the
+# development VM's /dev/shm holding no more; tier 2 the tests of SUITE_TESTS
+# (a few, the litmus among them); SOS's sources SOS_SOURCE, sos.sh's (a
+# reading corpus's tests-sos: the VM has no git to fetch one); and, on a
+# machine without git, as the VM is,
+# the four trees of §16 from TREE_TARS, a directory of git archive's tars made
+# where git is, COMMIT.tar each, which a stand-in git serves to trees.sh.
 # usage: dry-run.sh OUTDIR
 set -u
 export KIT_LAUNCHER=osoe-launch KIT_TIMEOUT=300
@@ -23,6 +32,30 @@ NODES=$OUT/nodes
 printf 'one\ntwo\nthree\nfour\nfive\n' > "$NODES"
 SECTIONS=${SECTIONS:-facts floor helpers ladder zero-copy gets fan-in scale collect behind window tuning trees claims link-cost}
 wanted() { case " $SECTIONS " in *" $1 "*) return 0 ;; esac; return 1; }
+if wanted session-3; then
+    echo "== session-3 $(date -u +%H:%M:%S)"
+    if ! command -v git > /dev/null && [ -n "${TREE_TARS:-}" ]; then
+        mkdir -p "$OUT/bin"
+        cat > "$OUT/bin/git" <<'GIT'
+#!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# The dry run's stand-in for git: git -C REPOSITORY archive COMMIT, from TREE_TARS.
+[ "$1" = -C ] && shift 2
+[ "$1" = archive ] && [ -r "$TREE_TARS/$2.tar" ] && exec cat "$TREE_TARS/$2.tar"
+echo "the dry run's git serves archive COMMIT from $TREE_TARS alone, not: $*" >&2
+exit 1
+GIT
+        chmod +x "$OUT/bin/git"
+        export PATH=$OUT/bin:$PATH TREE_TARS
+    fi
+    env -u KIT_TIMEOUT WAKE_PES="${WAKE_PES:-64}" SUITE_JOBS="${SUITE_JOBS:-4}" \
+        SUITE_TESTS="${SUITE_TESTS:-^shmem[.](quiet[.]litmus[.]L2|wire-pair|barrier-am[.]0-1-2)\$}" \
+        bash "$KIT/session-3.sh" "$NODES" "$OUT/session-3" > "$OUT/session-3.log" 2>&1
+    echo "exit $?"
+    cat "$OUT/session-3/sections.txt"
+    echo "DONE $(date -u +%H:%M:%S)"
+    exit 0
+fi
 run() {   # SECTION [NAME=VALUE...]: the section's script at small sizes
     local section=$1
     shift

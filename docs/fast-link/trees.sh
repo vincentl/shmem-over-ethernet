@@ -15,9 +15,12 @@
 # stream at 64 KiB and at 1 MiB blocks (the rungs' own measures,
 # docs/decisions/2026-10-07-one-thread-profile.md), hol's fetch-add alone and
 # behind the stream, and the mailbox. Each case's files carry its tree's
-# commit, "main" for KIT_BUILD's.
+# commit, "main" for KIT_BUILD's. A tree's build is of TARGETS alone - the
+# library and the three tools a case or its ending runs, in every one of the
+# four trees under those names - not of its tests, which no case runs.
 #   COMMITS ("3ee3357 de3dc42 49c62d3 2dcf8d6"), TREES (build/trees under the
-#   repository), BUILD (1), ROUNDS (3), STREAM_SECONDS (10), MAILBOX_SECONDS (20)
+#   repository), BUILD (1), TARGETS ("osoe osoe-pacer osoe-launch osoe-stat";
+#   "all", the whole build), ROUNDS (3), STREAM_SECONDS (10), MAILBOX_SECONDS (20)
 # usage: trees.sh NODES OUTDIR
 : "${KIT_TIMEOUT:=1800}"
 source "$(dirname "$0")/common.sh"
@@ -27,6 +30,7 @@ TREES=${TREES:-$REPOSITORY/build/trees}
 ROUNDS=${ROUNDS:-3}
 SECONDS_EACH=${STREAM_SECONDS:-10}
 MAILBOX_SECONDS=${MAILBOX_SECONDS:-20}
+TARGETS=${TARGETS:-osoe osoe-pacer osoe-launch osoe-stat}
 PROBES="multistream hol"
 # One node's builds of every tree, each in its own directory, its probes from
 # this tree's kit (docs/fast-link) by that tree's oshcc; a tree whose build
@@ -35,7 +39,8 @@ build_trees() {
     local c status=0
     for c in $COMMITS; do
         ( cd "$TREES/$c" || exit 1
-          { cmake --preset release && cmake --build build/release -j"$(nproc)"; } \
+          # shellcheck disable=SC2086
+          { cmake --preset release && cmake --build build/release -j"$(nproc)" --target $TARGETS; } \
               > build-release.txt 2>&1 || { echo "build failed"; exit 1; }
           mkdir -p build/release/kit
           for p in $PROBES; do
@@ -67,7 +72,7 @@ if [ "${BUILD:-1}" = 1 ]; then
                 { echo "copying the trees to $n failed" | tee -a "$LOG"; exit 1; }
         done
         export -f build_trees
-        export COMMITS TREES PROBES REPOSITORY
+        export COMMITS TREES TARGETS PROBES REPOSITORY
         timeout -k 30 "$KIT_TIMEOUT" srun -J osoe-kit-build -N"$NODE_COUNT" --ntasks-per-node=1 \
             --cpus-per-task="$(nproc)" bash -c build_trees 2>&1 < /dev/null | tee -a "$LOG"
         [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "a tree's build failed on a node" | tee -a "$LOG"; exit 1; }
