@@ -1,0 +1,12 @@
+loads 0 run 1: burst of 20000 iterations: 30.96 us of CPU a gap apart, 27.73 us back to back; 1.12 times
+loads 0 run 2: burst of 20000 iterations: 36.56 us of CPU a gap apart, 24.32 us back to back; 1.50 times
+loads 0 run 3: burst of 20000 iterations: 48.05 us of CPU a gap apart, 26.28 us back to back; 1.83 times
+loads 1 run 1: burst of 20000 iterations: 17.18 us of CPU a gap apart, 16.63 us back to back; 1.03 times
+loads 1 run 2: burst of 20000 iterations: 19.29 us of CPU a gap apart, 19.52 us back to back; 0.99 times
+loads 1 run 3: burst of 20000 iterations: 18.65 us of CPU a gap apart, 16.26 us back to back; 1.15 times
+loads 4 run 1: burst of 20000 iterations: 20.52 us of CPU a gap apart, 22.69 us back to back; 0.90 times
+loads 4 run 2: burst of 20000 iterations: 19.30 us of CPU a gap apart, 19.37 us back to back; 1.00 times
+loads 4 run 3: burst of 20000 iterations: 18.51 us of CPU a gap apart, 18.07 us back to back; 1.02 times
+loads 8 run 1: burst of 20000 iterations: 33.13 us of CPU a gap apart, 20.06 us back to back; 1.65 times
+loads 8 run 2: burst of 20000 iterations: 21.22 us of CPU a gap apart, 21.14 us back to back; 1.00 times
+loads 8 run 3: burst of 20000 iterations: 19.86 us of CPU a gap apart, 18.41 us back to back; 1.08 times
