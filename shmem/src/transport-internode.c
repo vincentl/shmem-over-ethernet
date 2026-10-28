@@ -279,9 +279,16 @@ const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *w
                                          size_t len)
 {
     /* The rings' size first: a job past their ceiling cannot run whatever
-     * this kernel has (ring.h; P17). */
-    if (b->node_count > 1 && osoe_ring_refuses(b->node_count, b->progress_helpers, why, len))
-        return why;
+     * this kernel has (ring.h; P17) - with its data wires on demand, counted
+     * as the connection area will count them (H23). */
+    if (b->node_count > 1) {
+        struct osoe_am_configuration config;
+        osoe_am_configuration_read(&config, b->local_count);
+        uint32_t most = osoe_am_data_wires_most(config.chunk, config.buffer, config.budget,
+                                                b->node_count, b->data_wires_on_demand);
+        if (osoe_ring_refuses(b->node_count, b->progress_helpers, most ? most : 1, why, len))
+            return why;
+    }
     const char *facility;
     int ring_error = b->node_count > 1 ? osoe_ring_check(&facility) : 0;
     if (!ring_error)

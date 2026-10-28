@@ -32,6 +32,18 @@
 #   data-wires.sh LAUNCHER PROGRAM stall-timeout
 #       Node 1 held 30 s with OSOE_NO_PROGRESS_TIMEOUT=2: the job ends with a
 #       failure, naming the data wire that is not made, well before the hold.
+#   data-wires.sh LAUNCHER PROGRAM budget-fits
+#   data-wires.sh LAUNCHER PROGRAM budget-refused
+#   data-wires.sh LAUNCHER PROGRAM budget-eager
+#       Four nodes at the fan-out 2, OSOE_AM_CHUNK=1024 and
+#       OSOE_AM_BUFFER_BUDGET=8192, which holds two pairs of the floor's
+#       buffers where the job's three peers a node need three (the author,
+#       2026-10-27): on demand every lead says it takes the floor and at most
+#       2 data wires a node, and test-data-wires' none - the collective tree's
+#       wires alone, two a node at the most - runs right, no lead making more
+#       than 2; its ring needs a third, and the job ends naming the node and the
+#       count, before the launcher's limit; and eagerly the same settings are
+#       refused at start, naming the budget, as they always were.
 #   data-wires.sh LAUNCHER PROGRAM exit
 #       Three nodes, node 0 holding back every data wire, and its PE calling
 #       shmem_global_exit(3) while the others' first shmem_malloc waits for its
@@ -60,12 +72,18 @@ case $MODE in
     stall-callee) export OSOE_TEST_HOLD_DATA_WIRES=1:4000 OSOE_TEST_NOTICE_SECONDS=1 ;;
     stall-long) export OSOE_TEST_HOLD_DATA_WIRES=0:6000 OSOE_DEADLOCK_SECONDS=1 ;;
     stall-timeout) export OSOE_TEST_HOLD_DATA_WIRES=1:30000 OSOE_NO_PROGRESS_TIMEOUT=2 ;;
+    budget-*) MAP=0,1,2,3
+              export OSOE_COLLECTIVE_FANOUT=2 OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER_BUDGET=8192
+              [ "$MODE" = budget-eager ] && export OSOE_MESH_DATA_WIRES=eager ;;
     exit) MAP=0,1,2; export OSOE_TEST_HOLD_DATA_WIRES=0:20000 ;;
     *) echo "data-wires.sh: no mode '$MODE'"; exit 2 ;;
 esac
 ranks=$(printf '%s\n' "$MAP" | tr , '\n' | grep -c .)
 program_mode=$MODE
-case $MODE in stall-*) program_mode=ring ;; esac
+case $MODE in
+    stall-*|budget-refused) program_mode=ring ;;
+    budget-fits|budget-eager) program_mode=none ;;
+esac
 began=$(date +%s)
 out=$(SHMEM_DEBUG=1 OSOE_PROGRESS_HELPERS=$HELPERS "$LAUNCHER" -n "$ranks" -m "$MAP" -t 40 -k -- \
       "$PROGRAM" "$program_mode" 2>&1)
@@ -143,6 +161,27 @@ case $MODE in
         printf '%s\n' "$out" | grep -q 'killed by signal\|NOT TERMINATED\|timeout after' && exit 1
         printf '%s\n' "$out" | grep -Eq "OSOE_NO_PROGRESS_TIMEOUT\\): (node 0's data wire toward node 1 is not made|the turnover of a connection whose data wire is not yet made has stayed at 0)" ||
             { echo "no fatal naming the data wire"; exit 1; } ;;
+    budget-fits)
+        [ "$status" -eq 0 ] || exit 1
+        printf '%s\n' "$out" | grep -q '^DATA WIRES TEST OK$' || exit 1
+        said=$(printf '%s\n' "$out" | grep -c '^osoe: connection buffers reduced from 4096 to 2048 bytes, and at most 2 data wires a node, to fit OSOE_AM_BUFFER_BUDGET=8192 over 4 nodes (OSOE_MESH_DATA_WIRES=on-demand)$')
+        echo "$said of 4 leads said their count"
+        [ "$said" -eq 4 ] || exit 1
+        for node in 0 1 2 3; do
+            ends=$(printf '%s\n' "$made" | grep -c "^osoe: node $node made")
+            echo "node $node made $ends data wires"
+            [ "$ends" -le 2 ] || exit 1
+        done ;;
+    budget-refused)
+        [ "$status" -ne 0 ] || exit 1
+        printf '%s\n' "$out" | grep -q 'killed by signal\|NOT TERMINATED\|timeout after' && exit 1
+        printf '%s\n' "$out" | grep -Eq 'node [0-3] needs a data wire toward node [0-3] beyond the 2 its connection area holds \(OSOE_MESH_DATA_WIRES=on-demand\): OSOE_AM_BUFFER_BUDGET=8192 holds that many pairs of 2048-byte buffers, the floor of 2 x OSOE_AM_CHUNK, over 4 nodes - raise the budget, or lower OSOE_AM_CHUNK' ||
+            { echo "no refusal naming the count"; exit 1; } ;;
+    budget-eager)
+        [ "$status" -ne 0 ] || exit 1
+        printf '%s\n' "$out" | grep -q 'killed by signal\|NOT TERMINATED\|timeout after' && exit 1
+        printf '%s\n' "$out" | grep -q '4 nodes need 12288 bytes of connection buffers at the smallest size §3.4 allows (2 x OSOE_AM_CHUNK = 2048), which exceeds OSOE_AM_BUFFER_BUDGET=8192' ||
+            { echo "no refusal naming the budget"; exit 1; } ;;
     exit)
         printf '%s\n' "$out" | grep -q 'killed by signal\|NOT TERMINATED\|timeout after\|without its goodbye' && exit 1
         [ "$status" -eq 3 ] || exit 1

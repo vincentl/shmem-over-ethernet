@@ -45,9 +45,11 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n)
 
 /* osoe_wire_ring_open, saying the settings that are said (OSOE_WIRE_SPLIT's
  * line) only where `announce` asks: once a node, by owner 0's ring (the
- * adversarial read of Part 1, N7). */
+ * adversarial read of Part 1, N7). `active` of the `count` wires can have a
+ * socket at once, `lending` of them data wires (ring.h). */
 static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
-                      uint32_t lending, const struct osoe_bootstrap *b, bool announce)
+                      uint32_t active, uint32_t lending, const struct osoe_bootstrap *b,
+                      bool announce)
 {
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, announce);
@@ -56,14 +58,14 @@ static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t cou
      * where that passes io_uring's own most, rather than failing to create a
      * ring for a reason the setting does not name. A control wire never lends,
      * so it owes none (the adversarial read of Part 2, S2). */
-    uint64_t completions = (uint64_t)s.buffer_count + 2 * (uint64_t)count +
-                           (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST * lending + 1;
+    uint64_t completions = (uint64_t)s.buffer_count + 2 * (uint64_t)active +
+                           (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST * lending + 2;
     if (s.zero_copy && completions > OSOE_RING_COMPLETIONS_MOST)
         osoe_fatal("OSOE_WIRE_ZERO_COPY=on: %u peer nodes' data wires and %u receive buffers "
                    "need a completion queue of %llu, more than io_uring's %u; turn the "
                    "zero-copy send off, or lower OSOE_WIRE_BUFFERS", lending, s.buffer_count,
                    (unsigned long long)completions, OSOE_RING_COMPLETIONS_MOST);
-    osoe_ring_open(r, wires, count, lending, s.buffer_count, s.buffer_bytes,
+    osoe_ring_open(r, wires, count, active, lending, s.buffer_count, s.buffer_bytes,
                    s.zero_copy ? OSOE_WIRE_ZERO_COPY_OWED_MOST : 0);
     if (!s.zero_copy)
         return;
@@ -81,7 +83,7 @@ static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t cou
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          uint32_t lending, const struct osoe_bootstrap *b)
 {
-    ring_open(r, wires, count, lending, b, true);
+    ring_open(r, wires, count, count, lending, b, true);
 }
 
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
@@ -510,10 +512,17 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
                         m.made, slots, (unsigned long long)(slot_ns / 1000),
                         OSOE_MESH_CALLS_IN_FLIGHT,
                         on_demand ? "; its data wires on demand" : "");
-    for (uint32_t o = 0; o <= helpers; o++)
+    /* Each ring's bounds over the wires that can have a socket at once: on
+     * demand past the buffer budget's reach, the control wires and the count of
+     * data wires a node may make (connection-area.h; the author, 2026-10-27). */
+    uint32_t most = mesh && mesh->data_wires_most ? mesh->data_wires_most : peers;
+    for (uint32_t o = 0; o <= helpers; o++) {
+        uint32_t data = osoe_owner_wires(o, peers, helpers);
+        uint32_t data_active = data < most ? data : most;
         ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
-                  osoe_ring_wires(o, peers, helpers), osoe_owner_wires(o, peers, helpers), b,
-                  o == 0);
+                  osoe_ring_wires(o, peers, helpers), data_active + (o == 0 ? peers : 0),
+                  data_active, b, o == 0);
+    }
 }
 
 /* osoe_wire_send and osoe_wire_send_lent: `lent` is the region the bytes are

@@ -894,7 +894,7 @@ times these:
 | `OSOE_COLLECTIVE_FANOUT` | a team number 2.5 KiB and, to 512 nodes at the default - past it a lane has the rounds' rows already - a lane 64 KiB, a PE; the tree is at most ⌈log_k n⌉ levels deep - 3 at 500 nodes at the default 8, 5 at 4, 2 at 32 |
 | `OSOE_COLLECTIVE_PIPELINE` | a lane 144 KiB, 2.4 MiB a PE across its 17 |
 | `OSOE_GET_LANDING_BYTES` | the control segment about that much a PE, and 16 bytes a KiB of it; by default 4 MiB a node, from 1 MiB a PE to 256 KiB |
-| `OSOE_AM_CHUNK`, `OSOE_AM_BUFFER_BUDGET` | the connection area eight chunks a peer node at the default buffer, four at its floor; the budget then holds the default to budget / (8 × chunk) + 1 nodes, 2,049 at the defaults, and caps the job at budget / (4 × chunk) + 1, 4,097 |
+| `OSOE_AM_CHUNK`, `OSOE_AM_BUFFER_BUDGET` | the connection area eight chunks a peer node at the default buffer, four at its floor; the budget then holds the default to budget / (8 × chunk) + 1 nodes, 2,049 at the defaults, and caps the job at budget / (4 × chunk) + 1, 4,097 - or, its data wires on demand, a node at budget / (4 × chunk) data wires, 4,096, whatever the job's nodes |
 | `SHMEM_SYMMETRIC_SIZE` | the address space every PE maps P times |
 
 ### What does not scale, and the limits
@@ -963,7 +963,9 @@ times these:
   `shmem_team_split_2d` grids are as many as the default pool holds at 256 PEs
   a node, and a fourth fails (Limits, "Teams").
 - **The ceilings**: 4,097 nodes at the default connection budget (2,049 before
-  the buffers halve); 65,535 PEs a node; `OSOE_MAX_TEAMS` 1,024,
+  the buffers halve) - with the data wires on demand, 4,096 data wires a node
+  instead, and 12,288 nodes at no progress helpers or 16,384 with them, the
+  ceiling of a lead's io_uring; 65,535 PEs a node; `OSOE_MAX_TEAMS` 1,024,
   `OSOE_TEAM_BLOCKS` 65,536, `OSOE_MAX_THREADS` 1,023, a fan-out of 32 and 8
   pieces in flight, at most.
 
@@ -1844,7 +1846,7 @@ moves every message of the node, and the helpers that can share the work
 |---|---|---|
 | `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split, and a put's part is cut shorter, down to a sixteenth of the chunk (4,094 bytes at the default), where it fills the room a buffer has left. *Checked* among a node's PEs in a job of more than one node, the refusal naming `OSOE_AM_*`. |
 | `OSOE_AM_BUFFER` | four chunks, `262144` | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the least allowed: a smaller value is refused, not raised - up to 1 GiB. The default is four chunks, twice the least. *Checked* among a node's PEs in a job of more than one node, as the buffer the budget leaves it, the refusal naming `OSOE_AM_*`. |
-| `OSOE_AM_BUFFER_BUDGET` | `1073741824` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. At the defaults the 256 KiB buffers hold to 2,049 nodes, are halved to the floor from 2,050, and 4,097 nodes fit and 4,098 are refused: raise the budget or lower the chunk. *Checked* among a node's PEs in a job of more than one node, as the buffer it leaves, the refusal naming `OSOE_AM_*`. |
+| `OSOE_AM_BUFFER_BUDGET` | `1073741824` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. At the defaults the 256 KiB buffers hold to 2,049 nodes, are halved to the floor from 2,050, and 4,097 nodes fit and 4,098 are refused: raise the budget or lower the chunk. With `OSOE_MESH_DATA_WIRES=on-demand` the buffers are chosen the same way, so on demand refuses nothing an eager job runs; past where even the floor holds every peer - 4,097 nodes at the defaults - it takes the floor and the budget counts the data wires a node makes instead of its peers, a buffer pair each, 4,096 a node at the defaults, each lead saying so once, and a data wire past the count ends the job naming the node, the count and both settings. The area keeps a place for every peer, which costs nothing until written, since a node writes only its wires' buffers. *Checked* among a node's PEs in a job of more than one node, as the buffer it leaves, the refusal naming `OSOE_AM_*`. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
 | `OSOE_AM_HUGEPAGES` | `0` | `1`: has no effect yet. It asks for huge pages with `MAP_HUGETLB`, which Linux refuses for the `/dev/shm` object the buffers live in, whatever huge pages are reserved, so each PE of a job of several nodes - which alone has the buffers - warns and maps them as before. (A `/dev/shm` mounted with `huge=always` gives them transparent huge pages either way.) |
 | `OSOE_WIRE_BYTES`, `OSOE_WIRE_BUFFERS` | `16384`, `64` | The size and number of the buffers io_uring receives into, shared by the connections of each owner of the node's wires - the lead's agent, and each progress helper: the node holds their product an owner, 1 MiB at the defaults, however many peers it has. A size from `64` to `1048576` bytes; a count that is a power of two from `2` to `32768`. |

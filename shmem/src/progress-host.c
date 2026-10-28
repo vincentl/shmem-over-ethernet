@@ -946,7 +946,7 @@ void osoe_progress_host_start(uint32_t session)
             osoe_fatal("node %u makes its data wires %s and node 0 %s "
                        "(OSOE_MESH_DATA_WIRES): every node of a job must make them alike",
                        n, first ? "eagerly" : "on demand", first ? "on demand" : "eagerly");
-    struct osoe_mesh mesh = { &mesh_listener, peers_address };
+    struct osoe_mesh mesh = { &mesh_listener, peers_address, osoe_am.area.data_wires_most };
     osoe_wires_open(osoe_am.wire, rings, helpers, &osoe.bootstrap, session, &mesh);
     /* On demand the data wires are the agent's to make from here, through the
      * listener left open (data-wires.h). */

@@ -72,6 +72,24 @@ enum osoe_am_size_status osoe_am_choose_buffer(uint64_t chunk, uint64_t requeste
  * `helpers` progress helpers (owner-map.h). */
 uint64_t osoe_am_area_bytes(uint32_t nodes, uint32_t helpers, uint64_t buffer);
 
+/*
+ * The most data wires a node of a job of `nodes` nodes may make (H23; the
+ * author, 2026-10-27): every peer - eagerly, and on demand wherever the
+ * budget holds every peer's buffers at the size osoe_am_choose_buffer
+ * chooses, so that on demand never refuses what eager runs. Past that, which
+ * at the defaults is past 4,097 nodes, on demand takes the floor and counts:
+ * `budget` / (2 x the floor), 4,096 a node at the defaults, and the data wire
+ * past the count ends the job by name (data-wires.c). 0 where not even one
+ * pair of buffers fits. Eagerly such a job is refused at the area's open.
+ */
+uint32_t osoe_am_data_wires_most(uint64_t chunk, uint64_t requested, uint64_t budget,
+                                 uint32_t nodes, bool on_demand);
+
+/* The bytes of the area a node can ever write: its words, and the buffers of
+ * `wires` data wires - what /dev/shm must have room for (shm-object.h). */
+uint64_t osoe_am_area_written_bytes(uint32_t nodes, uint32_t helpers, uint64_t buffer,
+                                    uint32_t wires);
+
 
 /*
  * The send side's work discovery (§3.10, §3.12; phase 1 step 2 slice 3), one
@@ -101,6 +119,8 @@ struct osoe_connection_area {
     uint32_t nodes;         /* the job's logical node count */
     uint64_t buffer_bytes;
     uint64_t chunk_bytes;
+    uint64_t budget;        /* OSOE_AM_BUFFER_BUDGET, for the count's refusal */
+    uint32_t data_wires_most;   /* osoe_am_data_wires_most's, for this job (H23) */
     uint32_t credits;       /* §3.8's C, so the pool can be sized by it */
     struct osoe_connection *connection; /* nodes - 1 handles, by peer slot (osoe_peer_slot) */
     bool creator;           /* this PE is the node lead, so it made the object */

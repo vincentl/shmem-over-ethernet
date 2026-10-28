@@ -107,6 +107,9 @@ struct osoe_wire {
 struct osoe_mesh {
     struct osoe_listener *listener;
     const struct sockaddr_in *peers;
+    /* The most data wires the node may make (connection-area.h's
+     * osoe_am_data_wires_most; H23), which bounds its rings; 0 for every peer. */
+    uint32_t data_wires_most;
 };
 
 /*

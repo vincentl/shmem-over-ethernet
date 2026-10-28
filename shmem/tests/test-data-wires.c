@@ -13,6 +13,10 @@
  *   test-data-wires skip      PE i to PE i + 3 instead: on five nodes the
  *                             schedule has node i + 3 call node i, so node i
  *                             asks it to dial over their control wire
+ *   test-data-wires none      no traffic of its own: the collective tree's
+ *                             wires alone, which shmem_malloc's check and the
+ *                             start's link make - what a node's count of data
+ *                             wires must hold at the least
  *   test-data-wires exit      PE 0 calls shmem_global_exit(3) 300 ms after
  *                             shmem_init, while every other PE is in its first
  *                             shmem_malloc - whose check of its arguments is a
@@ -57,6 +61,13 @@ int main(int argc, char **argv)
     int *slot = shmem_malloc(sizeof *slot);
     *slot = -1;
     shmem_barrier_all();
+    if (strcmp(mode, "none") == 0) {
+        shmem_free(slot);
+        shmem_finalize();
+        if (me == 0)
+            printf("DATA WIRES TEST OK\n");
+        return 0;
+    }
     int step = strcmp(mode, "skip") == 0 ? 3 : 1;
     int to = (me + step) % n, from = (me - step % n + n) % n;
     shmem_int_p(slot, me, to);

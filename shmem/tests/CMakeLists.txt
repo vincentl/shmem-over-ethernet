@@ -1106,22 +1106,27 @@ if(OSOE_INTERNODE)
   # Data wires made on demand (H23; OSOE_MESH_DATA_WIRES=on-demand, the author's
   # decisions of 2026-10-25; data-wires.sh): a ring over five nodes of a PE
   # each, whose wires their callers dial for their own need, and none else
-  # made; a step of three over the same five, every wire asked for over the
-  # control wire by the node the schedule does not have call; the ring over four
-  # nodes of two PEs at two progress helpers, each wire handed by the lead to
-  # the helper that owns it; a data wire held back at its caller and at its
-  # callee, each told by the other node's notice and then made; one held past
-  # the deadlock detector's quiet, which must not take it for a deadlock; one
-  # held past OSOE_NO_PROGRESS_TIMEOUT, which ends the job naming it; and a
-  # global exit
-  # while every other PE's put waits for a wire held back, which ends the job
-  # with the caller's status (data_wire_model.py's STATUS).
+  # made; a step of three over the same five, every wire outside the collective
+  # tree asked for over the control wire by the node the schedule does not have
+  # call; the ring over four nodes of two PEs at two progress helpers, each wire
+  # handed by the lead to the helper that owns it; a data wire held back at its
+  # caller and at its callee, each told by the other node's notice and then
+  # made; one held past the deadlock detector's quiet, which must not take it
+  # for a deadlock; one held past OSOE_NO_PROGRESS_TIMEOUT, which ends the job
+  # naming it; a global exit while every other PE's first allocation waits for
+  # a wire held back, which ends the job with the caller's status
+  # (data_wire_model.py's STATUS); and the count of data wires a node may make
+  # past the buffer budget's reach (the author, 2026-10-27) - four nodes whose
+  # budget holds two pairs of buffers a node where every peer's would take
+  # three: the collective tree's wires fit, a third is refused by name, and
+  # eagerly the same job is refused at start.
   add_executable(shmem_test_data_wires test-data-wires.c)
   target_link_libraries(shmem_test_data_wires PRIVATE osoe)
   osoe_warnings(shmem_test_data_wires)
   foreach(case "ring|0,1,2,3,4|0" "skip|0,1,2,3,4|0" "ring|0,0,1,1,2,2,3,3|2"
                "stall-caller|0,1|0" "stall-callee|0,1|0" "stall-long|0,1|0"
-               "stall-timeout|0,1|0" "exit|0,1,2|0")
+               "stall-timeout|0,1|0" "exit|0,1,2|0" "budget-fits|0,1,2,3|0"
+               "budget-refused|0,1,2,3|0" "budget-eager|0,1,2,3|0")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 mode)
     list(GET parts 1 map)

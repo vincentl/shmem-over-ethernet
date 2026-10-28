@@ -59,6 +59,10 @@ static struct {
     uint64_t *needed_ns;                    /* when the slot was first needed, for SHMEM_DEBUG */
     struct osoe_stall_watch *asked_watch;   /* a slot's request, while SLOT_ASKED */
     uint32_t asked;                         /* slots in SLOT_ASKED */
+    /* The data wires the node may make, and those it has made or begun: past
+     * the buffer budget's reach on demand, the area's count (connection-area.h;
+     * the author, 2026-10-27), and otherwise every peer. */
+    uint32_t most, reserved;
     uint32_t *queue;                        /* slots to call, in order: a ring of `peers` */
     uint32_t queue_first, queue_count;
     struct osoe_listener_call *call[OSOE_MESH_CALLS_IN_FLIGHT];
@@ -131,6 +135,8 @@ void osoe_data_wires_start(const struct osoe_bootstrap *b, uint32_t session,
         atomic_store_explicit(&wires.handed[slot], -1, memory_order_release);
     atomic_store_explicit(&wires.handover_closed, 0, memory_order_release);
     wires.asked = wires.queue_first = wires.queue_count = wires.told_count = 0;
+    wires.most = osoe_am.area.data_wires_most;
+    wires.reserved = 0;
     wires.watched_count = 0;
     wires.aborting = false;
     wires.epoll = epoll_create1(EPOLL_CLOEXEC);
@@ -171,6 +177,30 @@ bool osoe_data_wires_wanted(void)
     return false;
 }
 
+/*
+ * A data wire past the node's count ends the job by name (the author,
+ * 2026-10-27), as the reply pool's exhaustion does: on demand past the buffer
+ * budget's reach, the area pages in only the buffers its wires write, and the
+ * budget counts the wires instead of every peer.
+ */
+static _Noreturn void refuse(uint32_t peer)
+{
+    osoe_fatal("node %u needs a data wire toward node %u beyond the %u its connection area "
+               "holds (OSOE_MESH_DATA_WIRES=on-demand): OSOE_AM_BUFFER_BUDGET=%llu holds that "
+               "many pairs of %llu-byte buffers, the floor of 2 x OSOE_AM_CHUNK, over %u nodes "
+               "- raise the budget, or lower OSOE_AM_CHUNK", wires.node, peer, wires.most,
+               (unsigned long long)osoe_am.area.budget,
+               (unsigned long long)osoe_am.area.buffer_bytes, wires.nodes);
+}
+
+/* A wire this node begins to make, or a peer begins: one more of its count. */
+static void reserve(uint32_t peer)
+{
+    if (wires.reserved == wires.most)
+        refuse(peer);
+    wires.reserved++;
+}
+
 /* A need of peer slot `slot`'s data wire - a writer's, or the peer's request:
  * acted on once, a call where the schedule has this node call the peer and a
  * request to the peer where it does not (data_wire_model.py). */
@@ -179,6 +209,7 @@ static void need(uint32_t slot)
     if (wires.state[slot] != SLOT_NONE || wires.aborting)
         return;
     uint32_t peer = peer_of(slot);
+    reserve(peer);
     wires.needed_ns[slot] = now_ns();
     if (osoe_mesh_schedule_calls(wires.node, peer, wires.nodes)) {
         wires.state[slot] = SLOT_QUEUED;
@@ -275,7 +306,10 @@ static void caller_made(uint32_t peer, int fd)
     if (osoe_mesh_schedule_calls(wires.node, peer, wires.nodes))
         osoe_fatal("node %u was called by node %u for their data wire, which the mesh's "
                    "schedule has node %u call (§6.2)", wires.node, peer, wires.node);
-    made(osoe_peer_slot(wires.node, peer), fd, true);
+    uint32_t slot = osoe_peer_slot(wires.node, peer);
+    if (wires.state[slot] == SLOT_NONE)
+        reserve(peer);                  /* the peer's own need, this node's count too */
+    made(slot, fd, true);
 }
 
 /* What the set's last wait said of each entry of `watched`. */

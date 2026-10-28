@@ -57,22 +57,40 @@ static uint32_t next_power_of_two(uint32_t n)
     return p;
 }
 
-const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, char *why, size_t len)
+/* The wires of owner `owner`'s ring that can have a socket at once: its
+ * control wires, owner 0's, and of its data wires as many as a node may make. */
+static uint32_t active_wires(uint32_t owner, uint32_t peers, uint32_t helpers,
+                             uint32_t data_wires_most)
+{
+    uint32_t data = osoe_owner_wires(owner, peers, helpers);
+    return (data < data_wires_most ? data : data_wires_most) + (owner == 0 ? peers : 0);
+}
+
+const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, uint32_t data_wires_most,
+                              char *why, size_t len)
 {
     uint32_t peers = node_count > 1 ? node_count - 1 : 0;
     uint32_t most_wires = (OSOE_RING_SUBMISSIONS_MOST - 2) / 2;
     for (uint32_t owner = 0; owner <= helpers; owner++) {
-        uint64_t wires = osoe_ring_wires(owner, peers, helpers);
+        uint64_t wires = active_wires(owner, peers, helpers, data_wires_most);
         if (wires <= most_wires)
             continue;
+        /* The most nodes at no helpers: the lead's ring holds n - 1 control
+         * wires and n - 1 data wires, or on demand at most the count of them
+         * (H23) - here the job's count, which past the budget's reach is the
+         * same for every larger job. */
+        uint32_t most_nodes = helpers != 0 ? most_wires + 1
+                              : data_wires_most < peers && data_wires_most < most_wires / 2
+                                  ? most_wires - data_wires_most + 1
+                                  : most_wires / 2 + 1;
         snprintf(why, len,
                  "a job of %u nodes needs a ring of %llu connections on each node's %s, which "
                  "asks io_uring for %llu submissions where the kernel allows %u "
-                 "(IORING_MAX_ENTRIES): at most %u nodes at OSOE_PROGRESS_HELPERS=%u%s",
+                 "(IORING_MAX_ENTRIES): at most %u nodes at OSOE_PROGRESS_HELPERS=%u%s%s",
                  node_count, (unsigned long long)wires,
                  owner == 0 ? "lead" : "progress helper", 2 * (unsigned long long)wires + 2,
-                 OSOE_RING_SUBMISSIONS_MOST, (helpers == 0 ? most_wires / 2 : most_wires) + 1,
-                 helpers,
+                 OSOE_RING_SUBMISSIONS_MOST, most_nodes, helpers,
+                 data_wires_most < peers ? ", its data wires on demand" : "",
                  helpers == 0 ? ", and 16384 with progress helpers, which take the data wires "
                                 "off the lead's ring"
                               : "");
@@ -101,34 +119,34 @@ static const char *locked_memory_note(int e)
 }
 
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
-                    uint32_t lending_count, uint32_t buffer_count, uint32_t buffer_bytes,
-                    uint32_t notifications_per_wire)
+                    uint32_t active, uint32_t lending_active, uint32_t buffer_count,
+                    uint32_t buffer_bytes, uint32_t notifications_per_wire)
 {
     *r = (struct osoe_ring){ .wires = wires, .wire_count = wire_count,
                              .buffer_count = buffer_count, .buffer_bytes = buffer_bytes };
     /*
-     * §3.3's two bounds, each "can never fill". Submission: a receive re-arm and
-     * a send per wire between two submits, the one futex wait (§3.10) and the
-     * one watch. Completion: every provided buffer filled once, a terminal
-     * completion per armed receive, a send per wire, the futex wait, the watch
-     * - and the notifications each wire that may lend may owe, with the
-     * zero-copy send on.
+     * §3.3's two bounds, each "can never fill", over the wires that can have a
+     * socket at once - a wire with none arms nothing and sends nothing (H23).
+     * Submission: a receive re-arm and a send per such wire between two
+     * submits, the one futex wait (§3.10) and the one watch. Completion: every
+     * provided buffer filled once, a terminal completion per armed receive, a
+     * send per such wire, the futex wait, the watch - and the notifications
+     * each one that may lend may owe, with the zero-copy send on.
      */
-    r->submission_bound = 2 * wire_count + 2;
-    r->completion_bound = buffer_count + 2 * wire_count +
-                          notifications_per_wire * lending_count + 2;
+    r->submission_bound = 2 * active + 2;
+    r->completion_bound = buffer_count + 2 * active + notifications_per_wire * lending_active + 2;
     struct io_uring_params p = {
         .flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE,
         .cq_entries = r->completion_bound,
     };
     int e = io_uring_queue_init_params(next_power_of_two(r->submission_bound), &r->uring, &p);
     if (e < 0)
-        osoe_fatal("cannot create an io_uring for %u connections: %s%s", wire_count,
+        osoe_fatal("cannot create an io_uring for %u connections: %s%s", active,
                    strerror(-e), locked_memory_note(e));
     if (p.sq_entries < r->submission_bound || p.cq_entries < r->completion_bound)
         osoe_fatal("the kernel gave an io_uring of %u submissions and %u completions; %u "
                    "connections and %u receive buffers need %u and %u (§3.3)", p.sq_entries,
-                   p.cq_entries, wire_count, buffer_count, r->submission_bound,
+                   p.cq_entries, active, buffer_count, r->submission_bound,
                    r->completion_bound);
 
     r->buffer_ring = io_uring_setup_buf_ring(&r->uring, buffer_count, 0, 0, &e);
