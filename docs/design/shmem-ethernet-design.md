@@ -7088,20 +7088,21 @@ eager by default until a large cluster measures it:
   made. A node making a wire is neither idle nor quiet, so the deadlock detector
   never takes a stalled wire for a deadlock. `osoe-stat`'s blocked kind for the
   wait comes with the layout-42 slice.
-- **The budget counts the data wires a node makes** (the author, 2026-10-27,
-  `docs/decisions/2026-10-27.md`): on demand the buffers are chosen as eagerly,
-  halving to the floor, so that on demand refuses nothing an eager job runs;
-  past where even the floor holds every peer - 4,097 nodes at the defaults - it
-  takes the floor and a node may make budget / (2 × floor) data wires, 4,096 at
-  the defaults, each lead saying so once and the one past the count ending the
-  job by name (`osoe_am_data_wires_most`, `data-wires.c`). The area keeps every
-  peer's place at the floor, for nothing: tmpfs allocates a page as it is first
-  written, and a file four times `/dev/shm`'s own size, in the development VM,
-  took the three pages written into it alone; so the `/dev/shm` check compares
-  the area's words and the count's buffers. The rings' bounds count the wires
-  that can hold a socket - the control wires, and as many data wires as the
-  count - so the lead's io_uring holds a job of 12,288 nodes at no helpers, where
-  eagerly it holds 8,192, and 16,384 with helpers either way.
+- **The budget counts the data wires a node makes** (the author, 2026-10-27;
+  `docs/decisions/2026-10-27-data-wires-on-demand.md`): on demand the buffers
+  are chosen as eagerly, halving to the floor, so that on demand refuses nothing
+  an eager job runs; past where even the floor holds every peer - 4,097 nodes at
+  the defaults - it takes the floor and a node may make budget / (2 × floor)
+  data wires, 4,096 at the defaults, each lead saying so once and the one past
+  the count ending the job by name (`osoe_am_data_wires_most`, `data-wires.c`).
+  The area keeps every peer's place at the floor, for nothing: tmpfs allocates a
+  page as it is first written, and a file four times `/dev/shm`'s own size, in
+  the development VM, took the three pages written into it alone; so the
+  `/dev/shm` check compares the area's words and the count's buffers. The rings'
+  bounds count the wires that can hold a socket - the control wires, and as many
+  data wires as the count - so the lead's io_uring holds a job of 12,288
+  nodes at no helpers, where eagerly it holds 8,192, and 16,384 with helpers
+  either way.
 - **What it saves** is the data wires' sockets and their part of start-up, for a
   program whose nodes each talk to few others, and past 4,097 nodes at the
   defaults the budget's refusal of the job - which still makes the collective

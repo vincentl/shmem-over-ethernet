@@ -1,0 +1,7 @@
+barrier-eager-1 nodes=64 mode=eager status=0 job_ms=1362 mesh_us_most=98567 mesh_us_median=80421 leads=64 data_wire_ends_made=0 dialled=0 ok=0
+barrier-on-demand-1 nodes=64 mode=on-demand status=0 job_ms=1261 mesh_us_most=68289 mesh_us_median=49158 leads=64 data_wire_ends_made=126 dialled=63 ok=0
+ring-on-demand-1 nodes=64 mode=on-demand status=0 job_ms=768 mesh_us_most=54606 mesh_us_median=47650 leads=64 data_wire_ends_made=252 dialled=126 ok=1
+barrier-eager-2 nodes=64 mode=eager status=0 job_ms=1264 mesh_us_most=82592 mesh_us_median=75549 leads=64 data_wire_ends_made=0 dialled=0 ok=0
+barrier-on-demand-2 nodes=64 mode=on-demand status=0 job_ms=1193 mesh_us_most=51186 mesh_us_median=43198 leads=64 data_wire_ends_made=126 dialled=63 ok=0
+ring-on-demand-2 nodes=64 mode=on-demand status=0 job_ms=724 mesh_us_most=54725 mesh_us_median=48140 leads=64 data_wire_ends_made=252 dialled=126 ok=1
+neighbour table overflows during the runs: 0

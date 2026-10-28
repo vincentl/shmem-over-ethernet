@@ -133,15 +133,15 @@ no goodbye - a death, where a global exit had given a status.
   any wire, naming node 1; and the two settings' malformed values refused by name
   (`shmem.start-up.mesh-data-wires.invalid`, `shmem.start-up.test-hold-data-wires.invalid`).
 - **The internode suite run on demand** (`OSOE_MESH_DATA_WIRES=on-demand ctest -L internode`):
-  593 tests before this change, 602 with it. On the first run 589 of 593 passed, the four that
-  failed tests of the eager mesh's own arithmetic: `shmem.unsent.{set,floor,fixed}`, whose lead's
-  line counts the data wires start-up made, and `shmem.start-up.descriptors.16-nodes`, which needs
-  two sockets a node at start-up to pass its descriptor limit. Each now sets
-  `OSOE_MESH_DATA_WIRES=eager`, saying so; `shmem.unsent.measured` had passed on demand only
-  because the link's measurement made the wires its line counted. Then, on the debug build: eager
-  602 of 602; on demand 601 of 602 at no helpers and 601 of 602 at two, the one failure the
-  disagreement's own test, which the suite's environment had made agree, now pinning node 0 to
-  eager.
+  593 tests before this change, 605 with it, 602 until the budget's three below. On the first
+  run 589 of 593 passed, the four that failed tests of the eager mesh's own arithmetic:
+  `shmem.unsent.{set,floor,fixed}`, whose lead's line counts the data wires start-up made, and
+  `shmem.start-up.descriptors.16-nodes`, which needs two sockets a node at start-up to pass its
+  descriptor limit. Each now sets `OSOE_MESH_DATA_WIRES=eager`, saying so; `shmem.unsent.measured`
+  had passed on demand only because the link's measurement made the wires its line counted. Then,
+  on the debug build: eager 602 of 602; on demand 601 of 602 at no helpers and 601 of 602 at two,
+  the one failure the disagreement's own test, which the suite's environment had made agree, now
+  pinning node 0 to eager.
 
 ## The mutants
 
@@ -174,7 +174,8 @@ performance setting, §3.2).
 
 ## The author's answer
 
-On 2026-10-27, through the session that started this one, to the one choice the decisions of
+On 2026-10-27, through the session that started this one, which recorded it too in the day's other
+record (`2026-10-27.md`, the third cluster session's plan), to the one choice the decisions of
 2026-10-25 left open - what `OSOE_AM_BUFFER_BUDGET` bounds on demand:
 
 1. **(a), "Size as eager does"**, as recommended: each data wire's buffer chosen as eager mode
@@ -211,6 +212,35 @@ ceiling at no helpers is 12,288 nodes where eagerly it is 8,192, and 16,384 with
 every peer's would take three (`shmem.data-wires.budget-*`) - the collective tree's wires fit and
 the job runs, no lead making more than two; a program needing a third ends naming it; and eagerly
 the same settings are refused at start, as they always were.
+
+## Verified
+
+The tree of `8d9806e4`, packed from the worktree and checked file by file against the commit, in
+the development VM under its lock, 23:26 to 00:15 VM time (`verify.sh`; its summary, the static
+checks', the models' and the result of every test this change touches, in each run, are the
+evidence's `verify/`): built in the four presets, the single-node build and tier 3's without a
+warning; the static checks 14 of 14; release 1,180 of 1,180 and the single-node build 579 of 579,
+the models apart; debug 1,180 of 1,180, AddressSanitizer 1,140 of 1,140 and ThreadSanitizer 816
+of 816 through its gate; the internode suite on demand, 605 of 605 in debug at no helpers and 605
+of 605 at two, 582 of 582 under AddressSanitizer and 266 of 266 under ThreadSanitizer; tier 3's
+suite 138 of 138; and `model.data_wire`, `model.mesh`, `model.mesh.digest`, `model.mesh_timing`,
+`model.lead_wake`, `model.visit` and `model.selftest`, 7 of 7. The VM's log has no process
+killed for memory.
+
+**Tier 3 at 64 logical nodes** (`tier3-64.sh`, on that tree's tier-3 build, at 01:14 VM time):
+each node in a network namespace of its own over tier 3's Pi-like link, the kernel's neighbour
+table raised for the run as the record of 2026-10-19 has a larger rehearsal do, and set back
+after; two rounds each of `osoe-bench barrier quick` eagerly and on demand, and of
+`test-data-wires`' ring on demand. Every job ended with status 0, the ring's check passed in both
+rounds, and the neighbour table overflowed nowhere. On demand every lead's mesh was its 63
+control wires, 32 answered and 31 called or 31 and 32, connected in 49 and 43 ms at the median
+of the 64 leads and in 68 and 51 at most, where eagerly, with the data wires beside them, it took
+80 and 76, and 99 and 83 at most. The barrier, which runs on the control wires, made only the
+collective tree's 63 data wires, which `shmem_init`'s last step makes; the ring made 126, its own
+64 and the tree's 63, the pair of nodes 0 and 1 being both. The end that dialled a wire had
+waited 0.9 to 1.2 ms at the median from the need that began it, 0.46 the least and 13 the most,
+in the barrier's first round; an end that asked its peer to dial, 1.6 to 2.8 ms, a trip more,
+and 16 the most (`tier3/`, `wire-waits.sh`).
 
 ## For the author
 
