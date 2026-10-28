@@ -1,0 +1,8 @@
+one machine: no packages installed, and no Slurm
+lima-osoe: built, 0 warnings
+SOS's build started on this machine (sos.sh, its log ~/kit-s3/dry/session-3/setup-sos.log)
+probe: PROBE PASSED on 5 of 5 nodes
+a job of 32 PEs a node: startup pes=160 init_ms_pe0=133.2 init_ms_slowest=135.0 init_ms_fastest=81.2
+tier 2 on one, exit 0: 100% tests passed, 0 tests failed out of 3
+the litmus: 1/3 Test #365: shmem.quiet.litmus.L2 ............***Skipped 0.00 sec
+	365 - shmem.quiet.litmus.L2 (Skipped)

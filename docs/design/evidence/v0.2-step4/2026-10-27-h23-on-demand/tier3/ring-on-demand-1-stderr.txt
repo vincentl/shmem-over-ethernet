@@ -1,0 +1,508 @@
+osoe: node 35 connected its mesh in 44173 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 35 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 37 connected its mesh in 42784 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 37 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 48139 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 54 connected its mesh in 36627 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 54 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 21 connected its mesh in 45398 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 62 connected its mesh in 47074 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 18 connected its mesh in 44182 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 2 connected its mesh in 46501 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 18 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 23 connected its mesh in 41590 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 23 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 42074 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 11 connected its mesh in 48720 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 21 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 11 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 61 connected its mesh in 46076 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 40 connected its mesh in 40999 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 61 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 53 connected its mesh in 31141 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 4 connected its mesh in 47650 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 20 connected its mesh in 44772 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 53 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 44 connected its mesh in 40138 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 62 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 51 connected its mesh in 32647 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 47 connected its mesh in 44272 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 44 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 56 connected its mesh in 31274 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 56 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 47 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 15 connected its mesh in 49137 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 15 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 20 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 63 connected its mesh in 41119 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 12 connected its mesh in 47476 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 63 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 12 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 connected its mesh in 50885 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 8 connected its mesh in 48299 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 8 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 40 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 connected its mesh in 43063 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 49 connected its mesh in 41304 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 37 made its data wire toward node 4 on demand: it dialled, 1304 us after its first need
+osoe: node 19 connected its mesh in 48002 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 9 connected its mesh in 51459 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 19 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 9 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 52184 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 51 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 16 connected its mesh in 49858 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 24 connected its mesh in 46728 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 16 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 26 connected its mesh in 51612 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 24 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 26 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 43 connected its mesh in 50990 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 48 connected its mesh in 50719 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 58 connected its mesh in 46332 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 43 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 48 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 58 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 52 connected its mesh in 39967 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 52 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 27 connected its mesh in 49928 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 34 connected its mesh in 49994 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 27 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 59 connected its mesh in 43199 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 34 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 59 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 13 connected its mesh in 48572 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 53 made its data wire toward node 6 on demand: it dialled, 776 us after its first need
+osoe: node 54 made its data wire toward node 6 on demand: it dialled, 1586 us after its first need
+osoe: node 13 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 30 connected its mesh in 49672 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 47 made its data wire toward node 5 on demand: it dialled, 501 us after its first need
+osoe: node 6 made its data wire toward node 54 on demand: the peer dialled for its own need
+osoe: node 6 made its data wire toward node 53 on demand: the peer dialled for its own need
+osoe: node 30 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 42 connected its mesh in 44480 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 56 made its data wire toward node 6 on demand: it dialled, 520 us after its first need
+osoe: node 42 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 25 connected its mesh in 52782 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 25 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 22 connected its mesh in 50513 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 6 made its data wire toward node 56 on demand: the peer dialled for its own need
+osoe: node 22 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 60 connected its mesh in 52515 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 46 connected its mesh in 43042 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 28 connected its mesh in 50961 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 60 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 46 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 28 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 made its data wire toward node 47 on demand: the peer dialled for its own need
+osoe: node 4 made its data wire toward node 37 on demand: the peer dialled for its own need
+osoe: node 50 connected its mesh in 43145 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 7 connected its mesh in 53288 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 45 connected its mesh in 44134 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 39 connected its mesh in 39165 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 38 connected its mesh in 49315 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 45 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 39 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 38 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 10 connected its mesh in 54276 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 40 made its data wire toward node 4 on demand: it dialled, 1116 us after its first need
+osoe: node 3 made its data wire toward node 26 on demand: it dialled, 1468 us after its first need
+osoe: node 10 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 made its data wire toward node 8 on demand: it dialled, 920 us after its first need
+osoe: node 50 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 26 made its data wire toward node 3 on demand: the peer dialled, as asked, 1819 us after its first need
+osoe: node 8 made its data wire toward node 0 on demand: the peer dialled, as asked, 2022 us after its first need
+osoe: node 49 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 32 connected its mesh in 50468 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 31 connected its mesh in 50874 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 32 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 31 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 42 made its data wire toward node 5 on demand: it dialled, 542 us after its first need
+osoe: node 2 made its data wire toward node 20 on demand: it dialled, 1400 us after its first need
+osoe: node 2 made its data wire toward node 21 on demand: it dialled, 1403 us after its first need
+osoe: node 2 made its data wire toward node 23 on demand: it dialled, 1404 us after its first need
+osoe: node 29 connected its mesh in 52835 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 5 made its data wire toward node 42 on demand: the peer dialled for its own need
+osoe: node 29 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 20 made its data wire toward node 2 on demand: the peer dialled, as asked, 2389 us after its first need
+osoe: node 21 made its data wire toward node 2 on demand: the peer dialled, as asked, 3328 us after its first need
+osoe: node 23 made its data wire toward node 2 on demand: the peer dialled, as asked, 2543 us after its first need
+osoe: node 17 connected its mesh in 54606 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 61 made its data wire toward node 7 on demand: it dialled, 3167 us after its first need
+osoe: node 62 made its data wire toward node 7 on demand: it dialled, 2989 us after its first need
+osoe: node 63 made its data wire toward node 7 on demand: it dialled, 2791 us after its first need
+osoe: node 58 made its data wire toward node 7 on demand: it dialled, 2291 us after its first need
+osoe: node 17 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 33 connected its mesh in 53980 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 7 made its data wire toward node 61 on demand: the peer dialled for its own need
+osoe: node 7 made its data wire toward node 62 on demand: the peer dialled for its own need
+osoe: node 7 made its data wire toward node 63 on demand: the peer dialled for its own need
+osoe: node 7 made its data wire toward node 58 on demand: the peer dialled for its own need
+osoe: node 33 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 57 connected its mesh in 50622 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 57 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 49 made its data wire toward node 6 on demand: it dialled, 664 us after its first need
+osoe: node 52 made its data wire toward node 6 on demand: it dialled, 1103 us after its first need
+osoe: node 0 made its data wire toward node 1 on demand: it dialled, 2170 us after its first need
+osoe: node 6 made its data wire toward node 49 on demand: the peer dialled for its own need
+osoe: node 6 made its data wire toward node 52 on demand: the peer dialled for its own need
+osoe: node 55 connected its mesh in 45768 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 45 made its data wire toward node 5 on demand: it dialled, 544 us after its first need
+osoe: node 46 made its data wire toward node 5 on demand: it dialled, 529 us after its first need
+osoe: node 41 connected its mesh in 47850 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 55 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 made its data wire toward node 45 on demand: the peer dialled for its own need
+osoe: node 60 made its data wire toward node 7 on demand: it dialled, 601 us after its first need
+osoe: node 5 made its data wire toward node 46 on demand: the peer dialled for its own need
+osoe: node 4 made its data wire toward node 40 on demand: the peer dialled for its own need
+osoe: node 4 made its data wire toward node 35 on demand: it dialled, 5224 us after its first need
+osoe: node 50 made its data wire toward node 6 on demand: it dialled, 629 us after its first need
+osoe: node 2 made its data wire toward node 18 on demand: it dialled, 2603 us after its first need
+osoe: node 2 made its data wire toward node 22 on demand: it dialled, 1209 us after its first need
+osoe: node 44 made its data wire toward node 5 on demand: it dialled, 2877 us after its first need
+osoe: node 7 made its data wire toward node 60 on demand: the peer dialled for its own need
+osoe: node 41 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 14 connected its mesh in 54000 us: 31 wires answered and 32 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 35 made its data wire toward node 4 on demand: the peer dialled, as asked, 7521 us after its first need
+osoe: node 4 made its data wire toward node 39 on demand: the peer dialled for its own need
+osoe: node 14 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 36 connected its mesh in 53193 us: 32 wires answered and 31 called, in 32 slots of 100 us, 8 calls in flight at most; its data wires on demand
+osoe: node 29 made its data wire toward node 3 on demand: the peer dialled, as asked, 1040 us after its first need
+osoe: node 39 made its data wire toward node 4 on demand: it dialled, 929 us after its first need
+osoe: node 36 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 made its data wire toward node 44 on demand: the peer dialled for its own need
+osoe: node 18 made its data wire toward node 2 on demand: the peer dialled, as asked, 3879 us after its first need
+osoe: node 22 made its data wire toward node 2 on demand: the peer dialled, as asked, 1860 us after its first need
+osoe: node 6 made its data wire toward node 50 on demand: the peer dialled for its own need
+osoe: node 3 made its data wire toward node 29 on demand: it dialled, 655 us after its first need
+osoe: node 3 made its data wire toward node 30 on demand: it dialled, 945 us after its first need
+osoe: node 3 made its data wire toward node 31 on demand: it dialled, 832 us after its first need
+osoe: node 4 made its data wire toward node 34 on demand: it dialled, 546 us after its first need
+osoe: node 48 made its data wire toward node 5 on demand: it dialled, 738 us after its first need
+osoe: node 30 made its data wire toward node 3 on demand: the peer dialled, as asked, 1184 us after its first need
+osoe: node 19 made its data wire toward node 2 on demand: the peer dialled, as asked, 1718 us after its first need
+osoe: node 31 made its data wire toward node 3 on demand: the peer dialled, as asked, 1083 us after its first need
+osoe: node 2 made its data wire toward node 19 on demand: it dialled, 1050 us after its first need
+osoe: node 2 made its data wire toward node 17 on demand: it dialled, 840 us after its first need
+osoe: node 4 made its data wire toward node 33 on demand: it dialled, 669 us after its first need
+osoe: node 34 made its data wire toward node 4 on demand: the peer dialled, as asked, 1598 us after its first need
+osoe: node 5 made its data wire toward node 48 on demand: the peer dialled for its own need
+osoe: node 43 made its data wire toward node 5 on demand: it dialled, 806 us after its first need
+osoe: node 59 made its data wire toward node 7 on demand: it dialled, 1025 us after its first need
+osoe: node 51 made its data wire toward node 6 on demand: it dialled, 636 us after its first need
+osoe: node 5 made its data wire toward node 43 on demand: the peer dialled for its own need
+osoe: node 33 made its data wire toward node 4 on demand: the peer dialled, as asked, 944 us after its first need
+osoe: node 6 made its data wire toward node 51 on demand: the peer dialled for its own need
+osoe: node 7 made its data wire toward node 59 on demand: the peer dialled for its own need
+osoe: node 17 made its data wire toward node 2 on demand: the peer dialled, as asked, 1469 us after its first need
+osoe: node 38 made its data wire toward node 4 on demand: it dialled, 479 us after its first need
+osoe: node 4 made its data wire toward node 38 on demand: the peer dialled for its own need
+osoe: node 4 made its data wire toward node 36 on demand: it dialled, 543 us after its first need
+osoe: node 36 made its data wire toward node 4 on demand: the peer dialled, as asked, 793 us after its first need
+osoe: node 55 made its data wire toward node 6 on demand: it dialled, 517 us after its first need
+osoe: node 57 made its data wire toward node 7 on demand: it dialled, 577 us after its first need
+osoe: node 1 made its data wire toward node 0 on demand: the peer dialled for its own need
+osoe: node 6 made its data wire toward node 55 on demand: the peer dialled for its own need
+osoe: node 7 made its data wire toward node 57 on demand: the peer dialled for its own need
+osoe: node 1 made its data wire toward node 9 on demand: it dialled, 4597 us after its first need
+osoe: node 1 made its data wire toward node 11 on demand: it dialled, 4600 us after its first need
+osoe: node 1 made its data wire toward node 12 on demand: it dialled, 4602 us after its first need
+osoe: node 1 made its data wire toward node 15 on demand: it dialled, 4614 us after its first need
+osoe: node 3 made its data wire toward node 25 on demand: it dialled, 588 us after its first need
+osoe: node 3 made its data wire toward node 27 on demand: it dialled, 544 us after its first need
+osoe: node 9 made its data wire toward node 1 on demand: the peer dialled, as asked, 5503 us after its first need
+osoe: node 25 made its data wire toward node 3 on demand: the peer dialled, as asked, 1087 us after its first need
+osoe: node 27 made its data wire toward node 3 on demand: the peer dialled, as asked, 1008 us after its first need
+osoe: node 15 made its data wire toward node 1 on demand: the peer dialled, as asked, 5948 us after its first need
+osoe: node 1 made its data wire toward node 13 on demand: it dialled, 2721 us after its first need
+osoe: node 3 made its data wire toward node 28 on demand: it dialled, 866 us after its first need
+osoe: node 1 made its data wire toward node 10 on demand: it dialled, 2827 us after its first need
+osoe: node 1 made its data wire toward node 16 on demand: it dialled, 2834 us after its first need
+osoe: node 28 made its data wire toward node 3 on demand: the peer dialled, as asked, 1220 us after its first need
+osoe: node 13 made its data wire toward node 1 on demand: the peer dialled, as asked, 4118 us after its first need
+osoe: node 1 made its data wire toward node 14 on demand: it dialled, 719 us after its first need
+osoe: node 16 made its data wire toward node 1 on demand: the peer dialled, as asked, 5021 us after its first need
+osoe: node 10 made its data wire toward node 1 on demand: the peer dialled, as asked, 3612 us after its first need
+osoe: node 14 made its data wire toward node 1 on demand: the peer dialled, as asked, 1191 us after its first need
+osoe: node 0 made its data wire toward node 7 on demand: it dialled, 542 us after its first need
+osoe: node 0 made its data wire toward node 6 on demand: it dialled, 593 us after its first need
+osoe: node 2 made its data wire toward node 24 on demand: it dialled, 522 us after its first need
+osoe: node 0 made its data wire toward node 2 on demand: it dialled, 553 us after its first need
+osoe: node 7 made its data wire toward node 0 on demand: the peer dialled, as asked, 920 us after its first need
+osoe: node 24 made its data wire toward node 2 on demand: the peer dialled, as asked, 943 us after its first need
+osoe: node 6 made its data wire toward node 0 on demand: the peer dialled, as asked, 934 us after its first need
+osoe: node 2 made its data wire toward node 0 on demand: the peer dialled for its own need
+osoe: node 12 made its data wire toward node 1 on demand: the peer dialled, as asked, 6876 us after its first need
+osoe: node 0 made its data wire toward node 4 on demand: it dialled, 603 us after its first need
+osoe: node 11 made its data wire toward node 1 on demand: the peer dialled, as asked, 7628 us after its first need
+osoe: node 4 made its data wire toward node 0 on demand: the peer dialled, as asked, 855 us after its first need
+osoe: node 41 made its data wire toward node 5 on demand: it dialled, 572 us after its first need
+osoe: node 3 made its data wire toward node 32 on demand: it dialled, 573 us after its first need
+osoe: node 5 made its data wire toward node 41 on demand: the peer dialled for its own need
+osoe: node 0 made its data wire toward node 3 on demand: it dialled, 555 us after its first need
+osoe: node 32 made its data wire toward node 3 on demand: the peer dialled, as asked, 818 us after its first need
+osoe: node 3 made its data wire toward node 0 on demand: the peer dialled for its own need
+osoe: node 0 made its data wire toward node 5 on demand: it dialled, 1125 us after its first need
+osoe: node 5 made its data wire toward node 0 on demand: the peer dialled, as asked, 1428 us after its first need
+osoe: PE 0 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.0.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62875 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 8 connections to 16384
+osoe: PE 3 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.3.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64253 us of this start)
+osoe: PE 8 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.8.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 8 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63224 us of this start)
+osoe: PE 5 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.5.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (65551 us of this start)
+osoe: PE 2 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.2.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63896 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 9 connections to 16384
+osoe: PE 7 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.7.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (60520 us of this start)
+osoe: PE 6 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.6.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62831 us of this start)
+osoe: node 7 limits the unsent bytes of each of its 8 connections to 16384
+osoe: node 8 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 5 limits the unsent bytes of each of its 9 connections to 16384
+osoe: node 3 limits the unsent bytes of each of its 9 connections to 16384
+osoe: PE 4 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.4.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63762 us of this start)
+osoe: node 6 limits the unsent bytes of each of its 9 connections to 16384
+osoe: node 4 limits the unsent bytes of each of its 9 connections to 16384
+osoe: PE 58 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.58.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 58 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62820 us of this start)
+osoe: PE 39 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.39.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 39 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61058 us of this start)
+osoe: node 39 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 33 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.33.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 33 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59656 us of this start)
+osoe: PE 49 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.49.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 49 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (60835 us of this start)
+osoe: PE 45 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.45.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 45 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (60674 us of this start)
+osoe: PE 40 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.40.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 40 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63031 us of this start)
+osoe: PE 23 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.23.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 23 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63402 us of this start)
+osoe: PE 26 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.26.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 26 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63217 us of this start)
+osoe: PE 20 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.20.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 20 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64889 us of this start)
+osoe: PE 37 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.37.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 37 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (66249 us of this start)
+osoe: PE 38 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.38.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 38 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59162 us of this start)
+osoe: PE 17 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.17.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 17 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (60532 us of this start)
+osoe: PE 56 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.56.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 56 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (65010 us of this start)
+osoe: PE 34 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.34.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 34 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61018 us of this start)
+osoe: PE 35 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.35.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 35 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (67881 us of this start)
+osoe: PE 63 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.63.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 63 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64560 us of this start)
+osoe: node 40 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 52 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.52.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 52 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62686 us of this start)
+osoe: node 38 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 47 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.47.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 47 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64888 us of this start)
+osoe: node 33 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 17 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 60 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.60.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 60 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61382 us of this start)
+osoe: node 35 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 53 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.53.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 53 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (65328 us of this start)
+osoe: node 34 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 62 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.62.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 62 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64109 us of this start)
+osoe: node 37 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 47 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 63 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 61 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.61.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 61 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (66665 us of this start)
+osoe: PE 44 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.44.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 44 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63064 us of this start)
+osoe: node 48 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 61 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 62 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 60 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 36 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.36.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 36 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59526 us of this start)
+osoe: PE 25 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.25.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 25 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61138 us of this start)
+osoe: PE 48 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.48.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 48 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63019 us of this start)
+osoe: node 20 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 36 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 25 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 54 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 54 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.54.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 54 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (66335 us of this start)
+osoe: node 26 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 56 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 52 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 44 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 53 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 49 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 28 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.28.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 28 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59351 us of this start)
+osoe: node 23 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 30 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.30.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 30 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62586 us of this start)
+osoe: PE 21 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.21.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 21 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (66877 us of this start)
+osoe: node 28 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 46 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.46.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 46 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61279 us of this start)
+osoe: node 30 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 32 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 32 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.32.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 32 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (58547 us of this start)
+osoe: node 59 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 59 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.59.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 59 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61359 us of this start)
+osoe: PE 1 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.1.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63149 us of this start)
+osoe: node 21 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 57 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 57 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.57.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 57 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59810 us of this start)
+osoe: PE 9 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.9.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 9 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63768 us of this start)
+osoe: node 45 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 55 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.55.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 55 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59818 us of this start)
+osoe: node 9 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 29 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.29.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 29 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61121 us of this start)
+osoe: node 42 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 42 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.42.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 42 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62136 us of this start)
+osoe: node 50 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 29 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 55 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 50 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.50.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 50 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61827 us of this start)
+osoe: PE 43 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.43.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 43 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64282 us of this start)
+osoe: node 43 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 58 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 19 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.19.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 19 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63304 us of this start)
+osoe: node 19 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 18 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 18 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.18.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 18 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64238 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 9 connections to 16384
+osoe: PE 22 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.22.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 22 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62414 us of this start)
+osoe: node 46 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 22 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 51 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 27 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.27.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 27 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61880 us of this start)
+osoe: PE 51 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.51.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 51 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (63231 us of this start)
+osoe: node 27 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 24 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.24.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 24 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (60990 us of this start)
+osoe: node 41 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 41 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.41.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 41 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (58829 us of this start)
+osoe: node 31 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 31 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.31.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 31 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (61485 us of this start)
+osoe: node 24 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 11 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.11.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 11 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (65919 us of this start)
+osoe: node 11 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 10 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.10.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 10 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62005 us of this start)
+osoe: PE 12 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.12.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 12 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (64893 us of this start)
+osoe: PE 14 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.14.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 14 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (59584 us of this start)
+osoe: PE 13 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.13.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 13 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (62718 us of this start)
+osoe: node 14 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 12 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 13 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 15 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.15.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 15 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (66950 us of this start)
+osoe: node 10 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 15 limits the unsent bytes of each of its 1 connections to 16384
+osoe: PE 16 of 64 (local 0 of 1): segment /dev/shm/osoe.2048704.0.16.0, heap 8388608 bytes at 0x100000000000, landing zone 1048576 bytes, node 16 of 64; link measured: a hop of 195939 ns, a message cost of 5818 ns, 125832864 bytes a second (65284 us of this start)
+osoe: node 16 limits the unsent bytes of each of its 1 connections to 16384
+osoe: node 2 made its data wire toward node 3 on demand: it dialled, 853 us after its first need
+osoe: node 19 made its data wire toward node 20 on demand: it dialled, 615 us after its first need
+osoe: node 44 made its data wire toward node 45 on demand: it dialled, 590 us after its first need
+osoe: node 3 made its data wire toward node 2 on demand: the peer dialled for its own need
+osoe: node 3 made its data wire toward node 4 on demand: it dialled, 1006 us after its first need
+osoe: node 40 made its data wire toward node 41 on demand: it dialled, 679 us after its first need
+osoe: node 20 made its data wire toward node 19 on demand: the peer dialled for its own need
+osoe: node 7 made its data wire toward node 8 on demand: it dialled, 1127 us after its first need
+osoe: node 13 made its data wire toward node 14 on demand: it dialled, 808 us after its first need
+osoe: node 61 made its data wire toward node 62 on demand: it dialled, 758 us after its first need
+osoe: node 4 made its data wire toward node 3 on demand: the peer dialled for its own need
+osoe: node 32 made its data wire toward node 33 on demand: it dialled, 837 us after its first need
+osoe: node 45 made its data wire toward node 44 on demand: the peer dialled for its own need
+osoe: node 20 made its data wire toward node 21 on demand: it dialled, 918 us after its first need
+osoe: node 8 made its data wire toward node 7 on demand: the peer dialled for its own need
+osoe: node 8 made its data wire toward node 9 on demand: it dialled, 1230 us after its first need
+osoe: node 11 made its data wire toward node 12 on demand: it dialled, 888 us after its first need
+osoe: node 24 made its data wire toward node 25 on demand: it dialled, 795 us after its first need
+osoe: node 35 made its data wire toward node 36 on demand: it dialled, 780 us after its first need
+osoe: node 26 made its data wire toward node 27 on demand: it dialled, 806 us after its first need
+osoe: node 9 made its data wire toward node 8 on demand: the peer dialled for its own need
+osoe: node 33 made its data wire toward node 32 on demand: the peer dialled for its own need
+osoe: node 9 made its data wire toward node 10 on demand: it dialled, 983 us after its first need
+osoe: node 42 made its data wire toward node 43 on demand: it dialled, 937 us after its first need
+osoe: node 58 made its data wire toward node 59 on demand: it dialled, 1104 us after its first need
+osoe: node 43 made its data wire toward node 44 on demand: it dialled, 1098 us after its first need
+osoe: node 12 made its data wire toward node 11 on demand: the peer dialled for its own need
+osoe: node 27 made its data wire toward node 26 on demand: the peer dialled for its own need
+osoe: node 21 made its data wire toward node 20 on demand: the peer dialled for its own need
+osoe: node 21 made its data wire toward node 22 on demand: it dialled, 1457 us after its first need
+osoe: node 59 made its data wire toward node 58 on demand: the peer dialled for its own need
+osoe: node 14 made its data wire toward node 13 on demand: the peer dialled for its own need
+osoe: node 5 made its data wire toward node 6 on demand: it dialled, 1396 us after its first need
+osoe: node 22 made its data wire toward node 21 on demand: the peer dialled for its own need
+osoe: node 4 made its data wire toward node 5 on demand: it dialled, 1086 us after its first need
+osoe: node 10 made its data wire toward node 9 on demand: the peer dialled for its own need
+osoe: node 10 made its data wire toward node 11 on demand: it dialled, 577 us after its first need
+osoe: node 49 made its data wire toward node 50 on demand: it dialled, 1031 us after its first need
+osoe: node 60 made its data wire toward node 61 on demand: it dialled, 1207 us after its first need
+osoe: node 1 made its data wire toward node 2 on demand: it dialled, 1422 us after its first need
+osoe: node 29 made its data wire toward node 30 on demand: it dialled, 1108 us after its first need
+osoe: node 41 made its data wire toward node 40 on demand: the peer dialled for its own need
+osoe: node 44 made its data wire toward node 43 on demand: the peer dialled for its own need
+osoe: node 41 made its data wire toward node 42 on demand: it dialled, 1429 us after its first need
+osoe: node 11 made its data wire toward node 10 on demand: the peer dialled for its own need
+osoe: node 61 made its data wire toward node 60 on demand: the peer dialled for its own need
+osoe: node 12 made its data wire toward node 13 on demand: it dialled, 1581 us after its first need
+osoe: node 27 made its data wire toward node 28 on demand: it dialled, 1322 us after its first need
+osoe: node 6 made its data wire toward node 5 on demand: the peer dialled for its own need
+osoe: node 6 made its data wire toward node 7 on demand: it dialled, 1401 us after its first need
+osoe: node 22 made its data wire toward node 23 on demand: it dialled, 1098 us after its first need
+osoe: node 2 made its data wire toward node 1 on demand: the peer dialled for its own need
+osoe: node 47 made its data wire toward node 48 on demand: it dialled, 1614 us after its first need
+osoe: node 13 made its data wire toward node 12 on demand: the peer dialled for its own need
+osoe: node 36 made its data wire toward node 35 on demand: the peer dialled for its own need
+osoe: node 36 made its data wire toward node 37 on demand: it dialled, 1445 us after its first need
+osoe: node 42 made its data wire toward node 41 on demand: the peer dialled for its own need
+osoe: node 23 made its data wire toward node 22 on demand: the peer dialled for its own need
+osoe: node 25 made its data wire toward node 24 on demand: the peer dialled for its own need
+osoe: node 38 made its data wire toward node 39 on demand: it dialled, 981 us after its first need
+osoe: node 25 made its data wire toward node 26 on demand: it dialled, 1577 us after its first need
+osoe: node 18 made its data wire toward node 19 on demand: it dialled, 964 us after its first need
+osoe: node 28 made its data wire toward node 27 on demand: the peer dialled for its own need
+osoe: node 43 made its data wire toward node 42 on demand: the peer dialled for its own need
+osoe: node 63 made its data wire toward node 0 on demand: it dialled, 1124 us after its first need
+osoe: node 52 made its data wire toward node 53 on demand: it dialled, 1005 us after its first need
+osoe: node 26 made its data wire toward node 25 on demand: the peer dialled for its own need
+osoe: node 5 made its data wire toward node 4 on demand: the peer dialled for its own need
+osoe: node 30 made its data wire toward node 29 on demand: the peer dialled for its own need
+osoe: node 46 made its data wire toward node 47 on demand: it dialled, 1851 us after its first need
+osoe: node 46 made its data wire toward node 45 on demand: the peer dialled for its own need
+osoe: node 34 made its data wire toward node 35 on demand: it dialled, 1229 us after its first need
+osoe: node 48 made its data wire toward node 47 on demand: the peer dialled for its own need
+osoe: node 24 made its data wire toward node 23 on demand: the peer dialled for its own need
+osoe: node 48 made its data wire toward node 49 on demand: it dialled, 1949 us after its first need
+osoe: node 15 made its data wire toward node 14 on demand: the peer dialled for its own need
+osoe: node 56 made its data wire toward node 55 on demand: the peer dialled for its own need
+osoe: node 60 made its data wire toward node 59 on demand: the peer dialled for its own need
+osoe: node 16 made its data wire toward node 17 on demand: it dialled, 707 us after its first need
+osoe: node 51 made its data wire toward node 52 on demand: it dialled, 1291 us after its first need
+osoe: node 49 made its data wire toward node 48 on demand: the peer dialled for its own need
+osoe: node 35 made its data wire toward node 34 on demand: the peer dialled for its own need
+osoe: node 28 made its data wire toward node 29 on demand: it dialled, 2087 us after its first need
+osoe: node 7 made its data wire toward node 6 on demand: the peer dialled for its own need
+osoe: node 52 made its data wire toward node 51 on demand: the peer dialled for its own need
+osoe: node 33 made its data wire toward node 34 on demand: it dialled, 1654 us after its first need
+osoe: node 0 made its data wire toward node 63 on demand: the peer dialled for its own need
+osoe: node 47 made its data wire toward node 46 on demand: the peer dialled for its own need
+osoe: node 29 made its data wire toward node 28 on demand: the peer dialled for its own need
+osoe: node 58 made its data wire toward node 57 on demand: the peer dialled for its own need
+osoe: node 19 made its data wire toward node 18 on demand: the peer dialled for its own need
+osoe: node 53 made its data wire toward node 52 on demand: the peer dialled for its own need
+osoe: node 53 made its data wire toward node 54 on demand: it dialled, 1823 us after its first need
+osoe: node 45 made its data wire toward node 46 on demand: it dialled, 1926 us after its first need
+osoe: node 15 made its data wire toward node 16 on demand: it dialled, 1896 us after its first need
+osoe: node 54 made its data wire toward node 53 on demand: the peer dialled for its own need
+osoe: node 16 made its data wire toward node 15 on demand: the peer dialled for its own need
+osoe: node 37 made its data wire toward node 36 on demand: the peer dialled for its own need
+osoe: node 50 made its data wire toward node 49 on demand: the peer dialled for its own need
+osoe: node 57 made its data wire toward node 58 on demand: it dialled, 713 us after its first need
+osoe: node 14 made its data wire toward node 15 on demand: it dialled, 1217 us after its first need
+osoe: node 55 made its data wire toward node 56 on demand: it dialled, 1095 us after its first need
+osoe: node 23 made its data wire toward node 24 on demand: it dialled, 1239 us after its first need
+osoe: node 62 made its data wire toward node 61 on demand: the peer dialled for its own need
+osoe: node 17 made its data wire toward node 16 on demand: the peer dialled for its own need
+osoe: node 17 made its data wire toward node 18 on demand: it dialled, 2187 us after its first need
+osoe: node 59 made its data wire toward node 60 on demand: it dialled, 714 us after its first need
+osoe: node 56 made its data wire toward node 57 on demand: it dialled, 1572 us after its first need
+osoe: node 34 made its data wire toward node 33 on demand: the peer dialled for its own need
+osoe: node 37 made its data wire toward node 38 on demand: it dialled, 2856 us after its first need
+osoe: node 31 made its data wire toward node 32 on demand: it dialled, 2966 us after its first need
+osoe: node 54 made its data wire toward node 55 on demand: it dialled, 1747 us after its first need
+osoe: node 39 made its data wire toward node 38 on demand: the peer dialled for its own need
+osoe: node 39 made its data wire toward node 40 on demand: it dialled, 3697 us after its first need
+osoe: node 30 made its data wire toward node 31 on demand: it dialled, 3407 us after its first need
+osoe: node 57 made its data wire toward node 56 on demand: the peer dialled for its own need
+osoe: node 62 made its data wire toward node 63 on demand: it dialled, 3073 us after its first need
+osoe: node 50 made its data wire toward node 51 on demand: it dialled, 2516 us after its first need
+osoe: node 40 made its data wire toward node 39 on demand: the peer dialled for its own need
+osoe: node 55 made its data wire toward node 54 on demand: the peer dialled for its own need
+osoe: node 18 made its data wire toward node 17 on demand: the peer dialled for its own need
+osoe: node 31 made its data wire toward node 30 on demand: the peer dialled for its own need
+osoe: node 32 made its data wire toward node 31 on demand: the peer dialled for its own need
+osoe: node 63 made its data wire toward node 62 on demand: the peer dialled for its own need
+osoe: node 38 made its data wire toward node 37 on demand: the peer dialled for its own need
+osoe: node 51 made its data wire toward node 50 on demand: the peer dialled for its own need

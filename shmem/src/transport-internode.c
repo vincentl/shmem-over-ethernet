@@ -279,9 +279,16 @@ const char *osoe_internode_backend_check(const struct osoe_bootstrap *b, char *w
                                          size_t len)
 {
     /* The rings' size first: a job past their ceiling cannot run whatever
-     * this kernel has (ring.h; P17). */
-    if (b->node_count > 1 && osoe_ring_refuses(b->node_count, b->progress_helpers, why, len))
-        return why;
+     * this kernel has (ring.h; P17) - with its data wires on demand, counted
+     * as the connection area will count them (H23). */
+    if (b->node_count > 1) {
+        struct osoe_am_configuration config;
+        osoe_am_configuration_read(&config, b->local_count);
+        uint32_t most = osoe_am_data_wires_most(config.chunk, config.buffer, config.budget,
+                                                b->node_count, b->data_wires_on_demand);
+        if (osoe_ring_refuses(b->node_count, b->progress_helpers, most ? most : 1, why, len))
+            return why;
+    }
     const char *facility;
     int ring_error = b->node_count > 1 ? osoe_ring_check(&facility) : 0;
     if (!ring_error)
@@ -639,8 +646,15 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
     struct am_wait w;
-    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER, "the connection's buffer turnover",
-                  peer, pe, turnover(connection));
+    /* A connection never opened, on demand, is one whose data wire is not yet
+     * made (H23): its no-progress fatal says so, its lead's notice what the
+     * wire waits for (data-wires.h). */
+    uint64_t opened = turnover(connection);
+    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER,
+                  osoe.bootstrap.data_wires_on_demand && opened == 0
+                      ? "the turnover of a connection whose data wire is not yet made"
+                      : "the connection's buffer turnover",
+                  peer, pe, opened);
     osoe_wait_word_enter(word);
     uint32_t slept_on = 0;
     bool swept = false;

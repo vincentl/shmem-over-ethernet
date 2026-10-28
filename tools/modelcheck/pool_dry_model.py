@@ -44,10 +44,17 @@ split: a flag its members set before arriving in that sync (`departing`, the
 read's suggestion) makes the split wait for the first, and run its rounds for
 ever for the second (`split_first`), whose destroy waits for the split.
 
+A team of one claims no block (P7, node layout 42): it touches nothing of the
+node's, and a split_2d with an xrange of 1 made one a PE, four of which emptied
+the default pool at 256 PEs a node. So a lead claims a block for each team of
+more than one PE it leads, and none for its teams of one (`one`).
+
 Checked
   LEGIT    a split fails dry only when every block it has not claimed was, when
            the lead looked, a live team's, or one held by a member outside the
            split's parent - none free, none of a team the guarantee covers.
+  SPARE    a split whose teams of more than one PE need no more blocks than the
+           pool has free does not fail dry (P7).
   and, by the engine: no stuck thread, and from every reachable state the run can
   still finish (AG EF done) - no busy rounds for ever.
 
@@ -69,6 +76,10 @@ Cases (one node; the reductions abstract)
             flag still set, block 1 a live team's; A leads two teams of one
             split, as split_2d's row and column can be, claims block 0 and
             finds no second.
+  one       a pool of two: block 0 free, block 1 a live team's; A leads two
+            teams of one split, a team of one and one of more than one - a
+            split_2d's row of one PE and its column - and claims a block for
+            the second alone.
 
 Designs
   design            as above.
@@ -88,6 +99,9 @@ Breakages
                     sync makes its block on its way back: the split waits for a
                     team whose destroy waits for the split (TRAPPED, in
                     split_first).
+  singleton_claims  a team of one claims a block as any team does, as before P7:
+                    A takes the free block for its team of one and finds none
+                    for the other (SPARE, in one).
 
 Memory orders (T29; the step D review's portability Q4). Every case runs under
 SC and under x86-TSO, the stores as the library makes them (§3.16): a store the
@@ -146,6 +160,7 @@ CASES_STATE = {
     'remote': [(1, 1, 1, 0, False, T_OUTSIDE)],
     'split_first': [(1, 1, 1, 0, False, L)],
     'two': [(2, 0, 2, 1, True, FREE_OWNER), (1, 1, 1, 0, False, L)],
+    'one': [(0, 0, 0, 0, True, FREE_OWNER), (1, 1, 1, 0, False, L)],
 }
 # The arrivals the split's reduction waits for after its first round.
 ARRIVALS = {'parent': 2, 'remote': 1, 'split_first': 1}
@@ -257,6 +272,10 @@ def split(design, case, who, need, p, then, tso):
     def legit(M, L):
         if who != A:
             return None
+        if case == 'one':
+            # A's teams of more than one PE need the one free block (P7).
+            return 'SPARE: A failed dry where its one team of more than one PE needed one block, ' \
+                   'and one was free'
         for b in range(blocks):
             seen = L[f'o{b}']
             if seen not in (A, C, L_OWNER, T_OUTSIDE):
@@ -367,6 +386,11 @@ def case(design, which, tso=False):
             ('z', ('add', lambda L: T_SYNC, lambda L: 1, '_', '@E'))] + finish('E'))
         lead = assemble(split(design, which, A, 1, 's', '@E', tso) + finish('E'))
         threads = [lead, member, other]
+    elif which == 'one':
+        # The blocks A claims: one for its team of more than one PE, and none for
+        # its team of one (team.c, claims_block) - or, broken, one for each.
+        need = 2 if design == 'singleton_claims' else 1
+        threads = [assemble(split(design, which, A, need, 's', '@E', tso) + finish('E'))]
     else:
         threads = [assemble(split(design, which, A, 2, 's', '@E', tso) + finish('E'))]
     return f'pool_dry/{which}/{design}', threads, mem
@@ -385,6 +409,8 @@ CASES = [
     ('member', 'zero_at_leave', 'LEGIT'),
     ('parent', 'first_round_final', 'LEGIT'),
     ('split_first', 'departing', 'TRAPPED'),
+    ('one', 'design', True),
+    ('one', 'singleton_claims', 'SPARE'),
 ]
 
 

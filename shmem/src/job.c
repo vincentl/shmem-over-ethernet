@@ -166,7 +166,7 @@ static void lead(struct osoe_job *j, const struct osoe_bootstrap *b, uint32_t se
     j->bytes = object_bytes(r.run_count, b->node_count);
     char err[256];
     int fd = osoe_shm_create(j->name, (long)offsetof(struct osoe_job_header, creator_pid),
-                             err, sizeof err);
+                             OSOE_SHM_NO_NAMESPACE, err, sizeof err);
     if (fd < 0)
         osoe_fatal("this node's job tables: %s", err);
     if (ftruncate(fd, (off_t)j->bytes) != 0) {

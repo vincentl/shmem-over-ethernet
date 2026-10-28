@@ -1,0 +1,21 @@
+# lock taken 2026-10-28T05:30:01Z
+== 2 tasks, srun -K1 --cpu-bind=cores
+task 0: Cpus_allowed_list:	0
+task 1: Cpus_allowed_list:	1
+== 2 tasks, srun -K1 --cpu-bind=threads
+task 0: Cpus_allowed_list:	0
+task 1: Cpus_allowed_list:	1
+== 2 tasks, srun -K1 --cpu-bind=cores --cpus-per-task=2
+task 0: Cpus_allowed_list:	0-1
+task 1: Cpus_allowed_list:	2-3
+== 4 tasks, srun -K1 --cpu-bind=cores
+task 0: Cpus_allowed_list:	0
+task 1: Cpus_allowed_list:	1
+task 2: Cpus_allowed_list:	2
+task 3: Cpus_allowed_list:	3
+== 4 tasks, srun -K1 --cpu-bind=threads
+task 0: Cpus_allowed_list:	0
+task 1: Cpus_allowed_list:	1
+task 2: Cpus_allowed_list:	2
+task 3: Cpus_allowed_list:	3
+# done 2026-10-28T05:30:02Z

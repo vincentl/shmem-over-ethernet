@@ -38,6 +38,12 @@ queued - the hold. Without it the members leave, the block goes back to the
 pool and is claimed by another team while the old team's RELEASE is still
 queued, and the engine, learning the block afresh, ends the job (`known_team`).
 
+A team of one PE never enters a block's life (P7, node layout 42): it claims,
+names, maps and leaves nothing, its member finds nothing after the split's sync
+and its epoch word names no block - nothing of the node's for these threads to
+meet - so the teams here are of more than one PE. pool_dry_model.py's `one` has
+the claim it skips.
+
 Checked
   REWRITE  no block is written for a team while a member of another still holds
            it.

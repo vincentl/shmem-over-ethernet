@@ -1,0 +1,87 @@
+data_wire/design/writers1/helper-/no-fault                   SC  states=         21 depth= 13 (miss<3e-27) -> ok +live
+data_wire/design/writers1/helper-/exit@0                     SC  states=     11,466 depth= 28 (miss<8e-22) -> ok +live
+data_wire/design/writers1/helper-/exit@1                     SC  states=     11,005 depth= 28 (miss<8e-22) -> ok +live
+data_wire/design/writers1/helper-/fatal@0                    SC  states=     11,466 depth= 28 (miss<8e-22) -> ok +live
+data_wire/design/writers1/helper-/crash@1                    SC  states=        471 depth= 20 (miss<1e-24) -> ok +live
+data_wire/design/writers1/helper-/crash@0                    SC  states=        445 depth= 20 (miss<1e-24) -> ok +live
+data_wire/design/writers0/helper-/no-fault                   SC  states=         23 depth= 12 (miss<3e-27) -> ok +live
+data_wire/design/writers0/helper-/exit@0                     SC  states=     11,136 depth= 27 (miss<8e-22) -> ok +live
+data_wire/design/writers0/helper-/exit@1                     SC  states=     11,315 depth= 27 (miss<8e-22) -> ok +live
+data_wire/design/writers0/helper-/fatal@0                    SC  states=     11,136 depth= 27 (miss<8e-22) -> ok +live
+data_wire/design/writers0/helper-/crash@1                    SC  states=        569 depth= 19 (miss<2e-24) -> ok +live
+data_wire/design/writers0/helper-/crash@0                    SC  states=        430 depth= 19 (miss<1e-24) -> ok +live
+data_wire/design/writers01/helper-/no-fault                  SC  states=        384 depth= 19 (miss<9e-25) -> ok +live
+data_wire/design/writers01/helper-/exit@0                    SC  states=    171,352 depth= 34 (miss<2e-19) -> ok +live
+data_wire/design/writers01/helper-/exit@1                    SC  states=    160,098 depth= 34 (miss<2e-19) -> ok +live
+data_wire/design/writers01/helper-/fatal@0                   SC  states=    171,352 depth= 34 (miss<2e-19) -> ok +live
+data_wire/design/writers01/helper-/crash@1                   SC  states=     10,947 depth= 26 (miss<8e-22) -> ok +live
+data_wire/design/writers01/helper-/crash@0                   SC  states=     11,594 depth= 26 (miss<8e-22) -> ok +live
+data_wire/design/writers1/helper0/no-fault                   SC  states=         19 depth= 13 (miss<2e-27) -> ok +live
+data_wire/design/writers1/helper0/exit@0                     SC  states=     20,372 depth= 30 (miss<3e-21) -> ok +live
+data_wire/design/writers1/helper0/exit@1                     SC  states=     16,110 depth= 30 (miss<2e-21) -> ok +live
+data_wire/design/writers1/helper0/fatal@0                    SC  states=     20,372 depth= 30 (miss<3e-21) -> ok +live
+data_wire/design/writers1/helper0/crash@1                    SC  states=        666 depth= 22 (miss<3e-24) -> ok +live
+data_wire/design/writers1/helper0/crash@0                    SC  states=        773 depth= 21 (miss<4e-24) -> ok +live
+data_wire/design/writers0/helper0/no-fault                   SC  states=         24 depth= 13 (miss<4e-27) -> ok +live
+data_wire/design/writers0/helper0/exit@0                     SC  states=     20,115 depth= 30 (miss<3e-21) -> ok +live
+data_wire/design/writers0/helper0/exit@1                     SC  states=     19,232 depth= 30 (miss<2e-21) -> ok +live
+data_wire/design/writers0/helper0/fatal@0                    SC  states=     20,115 depth= 30 (miss<3e-21) -> ok +live
+data_wire/design/writers0/helper0/crash@1                    SC  states=        954 depth= 22 (miss<6e-24) -> ok +live
+data_wire/design/writers0/helper0/crash@0                    SC  states=        862 depth= 21 (miss<5e-24) -> ok +live
+data_wire/design/writers01/helper0/no-fault                  SC  states=        405 depth= 21 (miss<1e-24) -> ok +live
+data_wire/design/writers01/helper0/exit@0                    SC  states=    514,885 depth= 38 (miss<2e-18) -> ok +live
+data_wire/design/writers01/helper0/exit@1                    SC  states=    446,206 depth= 38 (miss<1e-18) -> ok +live
+data_wire/design/writers01/helper0/fatal@0                   SC  states=    514,885 depth= 38 (miss<2e-18) -> ok +live
+data_wire/design/writers01/helper0/crash@1                   SC  states=     24,100 depth= 30 (miss<4e-21) -> ok +live
+data_wire/design/writers01/helper0/crash@0                   SC  states=     24,863 depth= 29 (miss<4e-21) -> ok +live
+data_wire/design/writers1/helper1/no-fault                   SC  states=         22 depth= 14 (miss<3e-27) -> ok +live
+data_wire/design/writers1/helper1/exit@0                     SC  states=     19,506 depth= 31 (miss<2e-21) -> ok +live
+data_wire/design/writers1/helper1/exit@1                     SC  states=     19,879 depth= 31 (miss<2e-21) -> ok +live
+data_wire/design/writers1/helper1/fatal@0                    SC  states=     19,506 depth= 31 (miss<2e-21) -> ok +live
+data_wire/design/writers1/helper1/crash@1                    SC  states=        946 depth= 22 (miss<6e-24) -> ok +live
+data_wire/design/writers1/helper1/crash@0                    SC  states=        754 depth= 23 (miss<4e-24) -> ok +live
+data_wire/design/writers0/helper1/no-fault                   SC  states=         21 depth= 12 (miss<3e-27) -> ok +live
+data_wire/design/writers0/helper1/exit@0                     SC  states=     16,351 depth= 29 (miss<2e-21) -> ok +live
+data_wire/design/writers0/helper1/exit@1                     SC  states=     20,108 depth= 29 (miss<3e-21) -> ok +live
+data_wire/design/writers0/helper1/fatal@0                    SC  states=     16,351 depth= 29 (miss<2e-21) -> ok +live
+data_wire/design/writers0/helper1/crash@1                    SC  states=      1,019 depth= 20 (miss<7e-24) -> ok +live
+data_wire/design/writers0/helper1/crash@0                    SC  states=        611 depth= 21 (miss<2e-24) -> ok +live
+data_wire/design/writers01/helper1/no-fault                  SC  states=        365 depth= 20 (miss<8e-25) -> ok +live
+data_wire/design/writers01/helper1/exit@0                    SC  states=    373,747 depth= 37 (miss<9e-19) -> ok +live
+data_wire/design/writers01/helper1/exit@1                    SC  states=    390,588 depth= 37 (miss<1e-18) -> ok +live
+data_wire/design/writers01/helper1/fatal@0                   SC  states=    373,747 depth= 37 (miss<9e-19) -> ok +live
+data_wire/design/writers01/helper1/crash@1                   SC  states=     20,629 depth= 28 (miss<3e-21) -> ok +live
+data_wire/design/writers01/helper1/crash@0                   SC  states=     21,376 depth= 29 (miss<3e-21) -> ok +live
+data_wire/open_early/writers1/helper-/no-fault               SC  states=          6 depth=  5 (miss<2e-28) -> VIOLATION
+    EARLY: node 1 sent a segment toward node 0 before its data wire was up
+    trace: T2:node 1's writer finds nothing reservable, marks and sleeps ; T1:node 1 visits its connection, a writer's mark ; T2:node 1's writer wakes at the turnover ; T2:node 1's writer commits its put and marks ; T1:node 1 visits its connection, a writer's mark ; T1: CHECK FAILED: EARLY: node 1 sent a segment toward node 0 before its data wire was up
+data_wire/open_early/writers0/helper0/no-fault               SC  states=          6 depth=  5 (miss<2e-28) -> VIOLATION
+    EARLY: node 0 sent a segment toward node 1 before its data wire was up
+    trace: T3:node 0's writer finds nothing reservable, marks and sleeps ; T2:node 0's helper visits its connection, a writer's mark ; T3:node 0's writer wakes at the turnover ; T3:node 0's writer commits its put and marks ; T2:node 0's helper visits its connection, a writer's mark ; T2: CHECK FAILED: EARLY: node 0 sent a segment toward node 1 before its data wire was up
+data_wire/both_dial/writers1/helper-/no-fault                SC  states=          4 depth=  3 (miss<1e-28) -> VIOLATION
+    RULE: node 0 was called by node 1, which the mesh's schedule has node 0 call
+    trace: T2:node 1's writer finds nothing reservable, marks and sleeps ; T1:node 1 visits its connection, a writer's mark ; T0:node 0 answers a call from node 1 ; T0: CHECK FAILED: RULE: node 0 was called by node 1, which the mesh's schedule has node 0 call
+data_wire/call_per_need/writers01/helper-/no-fault           SC  states=        145 depth= 19 (miss<1e-25) -> VIOLATION
+    ONCE: node 0 began a second call for its data wire toward node 1
+    trace: T3:node 1's writer finds nothing reservable, marks and sleeps ; T2:node 0's writer finds nothing reservable, marks and sleeps ; T1:node 1 visits its connection, a writer's mark ; T0:node 0 reads node 1's request for the data wire ; T0:node 0 visits its connection, a writer's mark ; T0: CHECK FAILED: ONCE: node 0 began a second call for its data wire toward node 1
+data_wire/no_ask/writers1/helper-/no-fault                   SC  states=          3 depth=  2 (miss<6e-29) -> STUCK
+    T2 blocked at pc 3 (nd)
+    trace: T2:node 1's writer finds nothing reservable, marks and sleeps ; T1:node 1 visits its connection, a writer's mark
+data_wire/no_visit/writers1/helper-/no-fault                 SC  states=          7 depth=  6 (miss<3e-28) -> STUCK
+    T2 blocked at pc 3 (nd)
+    trace: T2:node 1's writer finds nothing reservable, marks and sleeps ; T1:node 1 visits its connection, a writer's mark ; T0:node 0 reads node 1's request for the data wire ; T1:node 1 answers node 0's hello ; T0:node 0 confirms and attaches its end ; T1:node 1 reads node 0's confirmation and attaches its end
+data_wire/abandon_answered/writers1/helper-/exit@1           SC  states=        270 depth= 19 (miss<5e-25) -> VIOLATION
+    STATUS: node 0 ended with a failure, an end of stream without its goodbye, where a PE of node 1 gave its status
+    trace: T2:node 1's writer finds nothing reservable, marks and sleeps ; T3:a PE of node 1 calls shmem_global_exit ; T2:node 1's writer ends with the job ; T1:node 1 visits its connection, a writer's mark ; T0:node 0 reads node 1's request for the data wire ; T1:node 1 answers node 0's hello ; T0:node 0 confirms and attaches its end ; T1:node 1 begins its abort (it learnt 2) ; T1:node 1 has sent its goodbyes ; T1:node 1's processes exit ; T1:check ok ; T0:node 0 reads the end of node 1's data wire ; T0:node 0 begins its abort (it learnt 1) ; T0:node 0 has sent its goodbyes ; T0:node 0's processes exit ; T0: CHECK FAILED: STATUS: node 0 ended with a failure, an end of stream without its goodbye, where a PE of node 1 gave its status
+data_wire/no_goodbye_new_wire/writers1/helper-/exit@1        SC  states=        267 depth= 20 (miss<4e-25) -> VIOLATION
+    STATUS: node 0 ended with a failure, an end of stream without its goodbye, where a PE of node 1 gave its status
+    trace: T2:node 1's writer finds nothing reservable, marks and sleeps ; T3:a PE of node 1 calls shmem_global_exit ; T2:node 1's writer ends with the job ; T1:node 1 visits its connection, a writer's mark ; T0:node 0 reads node 1's request for the data wire ; T1:node 1 answers node 0's hello ; T1:node 1 begins its abort (it learnt 2) ; T0:node 0 confirms and attaches its end ; T1:node 1 reads node 0's confirmation and attaches its end ; T1:node 1 has sent its goodbyes ; T1:node 1's processes exit ; T1:check ok ; T0:node 0 reads the end of node 1's data wire ; T0:node 0 begins its abort (it learnt 1) ; T0:node 0 has sent its goodbyes ; T0:node 0's processes exit ; T0: CHECK FAILED: STATUS: node 0 ended with a failure, an end of stream without its goodbye, where a PE of node 1 gave its status
+data_wire/no_goodbye_new_wire/writers1/helper1/exit@1        SC  states=        539 depth= 24 (miss<2e-24) -> VIOLATION
+    STATUS: node 0 ended with a failure, an end of stream without its goodbye, where a PE of node 1 gave its status
+    trace: T3:node 1's writer finds nothing reservable, marks and sleeps ; T4:a PE of node 1 calls shmem_global_exit ; T3:node 1's writer ends with the job ; T2:node 1's helper visits its connection, a writer's mark ; T2:node 1's helper begins its abort ; T1:node 1 takes its helper's request for the data wire ; T0:node 0 reads node 1's request for the data wire ; T1:node 1 answers node 0's hello ; T1:node 1 begins its abort (it learnt 2) ; T0:node 0 confirms and attaches its end ; T1:node 1 reads node 0's confirmation and attaches its end ; T2:node 1's helper attaches the socket its lead handed it ; T1:node 1 has sent its goodbyes ; T1:node 1's processes exit ; T2:node 1's helper ends with its process ; T1:check ok ; T0:node 0 reads the end of node 1's data wire ; T0:node 0 begins its abort (it learnt 1) ; T0:node 0 has sent its goodbyes ; T0:node 0's processes exit ; T0: CHECK FAILED: STATUS: node 0 ended with a failure, an end of stream without its goodbye, where a PE of node 1 gave its status
+data_wire/keep_calling/writers0/helper-/exit@1               SC  states=     11,247 depth= 27 (miss<8e-22) -> TRAPPED
+    this step enters a set of states from which no finished state is reachable: from here the model can run forever without finishing
+    trace: T3:a PE of node 1 calls shmem_global_exit ; T2:node 0's writer finds nothing reservable, marks and sleeps ; T1:node 1 begins its abort (it learnt 2) ; T0:node 0 visits its connection, a writer's mark ; TRAPPED: no finished state is reachable from here
+data_wire/abort_waits_wire/writers1/helper-/exit@0           SC  states=     11,221 depth= 28 (miss<8e-22) -> TRAPPED
+    this step enters a set of states from which no finished state is reachable: from here the model can run forever without finishing
+    trace: T3:a PE of node 0 calls shmem_global_exit ; T2:node 1's writer finds nothing reservable, marks and sleeps ; T1:node 1 visits its connection, a writer's mark ; T0:node 0 begins its abort (it learnt 2) ; TRAPPED: no finished state is reachable from here

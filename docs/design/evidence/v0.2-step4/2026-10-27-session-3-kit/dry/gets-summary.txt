@@ -1,0 +1,112 @@
+== ~/kit-s3/dry/session-3/gets
+jobs: 15, of which 3 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -
+their voluntary context switches, which every turnover's wake of all its
+writers raises (S1) - and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  get-1m     pes=1 h=-                 job 7144 (n=1)
+                                       node 1418 (1390-1468, n=5)
+                                       cpu/GiB 0.374 (n=1)
+                                       sleeps a 64 KiB 0.295 (0.245-0.298, n=5)
+                                       peers in calls 0.898 (0.894-0.898, n=5)
+                                       with quiets 1.00 (0.999-1.00, n=5), in quiets 0.102 (0.102-0.106, n=5), over 10.0 (10.00-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 13690 MiB/s, hop 15.8 us, message 1.83 us; unsent limit 1837457 B
+  get-1m     pes=1 h=- zone=262144     job 7042 (n=1)
+                                       node 1412 (1369-1462, n=5)
+                                       cpu/GiB 0.340 (n=1)
+                                       sleeps a 64 KiB 0.419 (0.394-0.442, n=5)
+                                       peers in calls 0.978 (0.977-0.978, n=5)
+                                       with quiets 1.00 (1.00-1.00, n=5), in quiets 0.0220 (0.0220-0.0230, n=5), over 10.0 (10.0-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 9689 MiB/s, hop 18.9 us, message 2.72 us; unsent limit 1300448 B
+  get-1m     pes=1 h=- zone=1048576    job 7132 (n=1)
+                                       node 1437 (1376-1458, n=5)
+                                       cpu/GiB 0.375 (n=1)
+                                       sleeps a 64 KiB 0.414 (0.385-0.474, n=5)
+                                       peers in calls 0.897 (0.893-0.900, n=5)
+                                       with quiets 1.00 (0.999-1.00, n=5), in quiets 0.102 (0.0990-0.106, n=5), over 10.0 (10.0-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 1.000
+                                       link 11388 MiB/s, hop 16.9 us, message 1.78 us; unsent limit 1528432 B
+  get-1m     pes=4 h=-                 job 6159 (n=1)
+                                       node 1230 (1216-1258, n=5)
+                                       cpu/GiB 0.444 (n=1)
+                                       sleeps a 64 KiB 0.510 (0.503-0.527, n=5)
+                                       peers in calls 2.30 (2.27-2.31, n=5)
+                                       with quiets 2.53 (2.51-2.56, n=5), in quiets 0.131 (0.127-0.132, n=5), over 10.00 (10.00-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 12365 MiB/s, hop 16.2 us, message 1.85 us; unsent limit 1659649 B
+  get-1m     pes=4 h=- zone=262144     job 6294 (n=1)
+                                       node 1248 (1209-1310, n=5)
+                                       cpu/GiB 0.428 (n=1)
+                                       sleeps a 64 KiB 0.662 (0.636-0.700, n=5)
+                                       peers in calls 2.30 (2.25-2.33, n=5)
+                                       with quiets 2.34 (2.29-2.37, n=5), in quiets 0.0260 (0.0260-0.0270, n=5), over 10.0 (10.00-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 8446 MiB/s, hop 17.2 us, message 3.27 us; unsent limit 1133541 B
+  get-1m     pes=4 h=- zone=1048576    job 5938 (n=1)
+                                       node 1186 (1178-1204, n=5)
+                                       cpu/GiB 0.474 (n=1)
+                                       sleeps a 64 KiB 0.515 (0.478-0.535, n=5)
+                                       peers in calls 2.32 (2.32-2.34, n=5)
+                                       with quiets 2.54 (2.53-2.56, n=5), in quiets 0.124 (0.122-0.127, n=5), over 10.0 (9.99-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 11141 MiB/s, hop 16.4 us, message 3.25 us; unsent limit 1495259 B
+  get-1m     pes=8 h=-                 job 5952 (n=1)
+                                       node 1192 (1176-1204, n=5)
+                                       cpu/GiB 0.443 (n=1)
+                                       sleeps a 64 KiB 0.669 (0.630-0.678, n=5)
+                                       peers in calls 2.52 (2.50-2.54, n=5)
+                                       with quiets 2.65 (2.62-2.66, n=5), in quiets 0.0610 (0.0580-0.0640, n=5), over 10.00 (9.99-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.999
+                                       link 11326 MiB/s, hop 16.1 us, message 3.41 us; unsent limit 1520185 B
+  get-1m     pes=8 h=- zone=262144     job 5920 (n=1)
+                                       node 1182 (1151-1212, n=5)
+                                       cpu/GiB 0.448 (n=1)
+                                       sleeps a 64 KiB 0.754 (0.748-0.769, n=5)
+                                       peers in calls 2.56 (2.51-2.60, n=5)
+                                       with quiets 2.59 (2.54-2.63, n=5), in quiets 0.0260 (0.0250-0.0260, n=5), over 10.0 (10.0-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 15933 MiB/s, hop 17.1 us, message 4.39 us; unsent limit 2138556 B
+  get-1m     pes=8 h=- zone=1048576    job 5869 (n=1)
+                                       node 1169 (1166-1194, n=5)
+                                       cpu/GiB 0.465 (n=1)
+                                       sleeps a 64 KiB 0.736 (0.736-0.744, n=5)
+                                       peers in calls 2.63 (2.60-2.66, n=5)
+                                       with quiets 2.90 (2.87-2.91, n=5), in quiets 0.113 (0.111-0.118, n=5), over 9.99 (9.99-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.998
+                                       link 10115 MiB/s, hop 16.4 us, message 2.20 us; unsent limit 1357593 B
+  get-1m     pes=16 h=-                job 5817 (n=1)
+                                       node 1176 (1131-1188, n=5)
+                                       cpu/GiB 0.427 (n=1)
+                                       sleeps a 64 KiB 0.903 (0.887-0.917, n=5)
+                                       peers in calls 2.22 (2.19-2.28, n=5)
+                                       with quiets 2.26 (2.23-2.32, n=5), in quiets 0.0240 (0.0240-0.0240, n=5), over 10.0 (10.00-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 9569 MiB/s, hop 19.7 us, message 3.83 us; unsent limit 1284324 B
+  get-1m     pes=16 h=- zone=262144    job 5810 (n=1)
+                                       node 1162 (1146-1181, n=5)
+                                       cpu/GiB 0.419 (n=1)
+                                       sleeps a 64 KiB 0.899 (0.880-0.911, n=5)
+                                       peers in calls 2.28 (2.24-2.33, n=5)
+                                       with quiets 2.32 (2.29-2.37, n=5), in quiets 0.0250 (0.0230-0.0260, n=5), over 10.0 (10.00-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 9662 MiB/s, hop 16.5 us, message 5.13 us; unsent limit 1296782 B
+  get-1m     pes=16 h=- zone=1048576   job 5918 (n=1)
+                                       node 1163 (1144-1274, n=5)
+                                       cpu/GiB 0.415 (n=1)
+                                       sleeps a 64 KiB 0.866 (0.864-0.873, n=5)
+                                       peers in calls 2.27 (2.23-2.40, n=5)
+                                       with quiets 2.54 (2.52-2.68, n=5), in quiets 0.0630 (0.0610-0.0660, n=5), over 10.0 (10.00-10.0, n=5) s
+                                       each node's least peer over its most, the least of all: 0.996
+                                       link 10437 MiB/s, hop 17.3 us, message 1.49 us; unsent limit 1400815 B

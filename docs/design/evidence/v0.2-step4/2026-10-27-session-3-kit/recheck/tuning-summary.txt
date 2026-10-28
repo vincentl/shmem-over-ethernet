@@ -1,0 +1,78 @@
+== ~/kit-s3/recheck/std/tuning
+jobs: 11, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+mailbox: messages a second (median, range)
+  mailbox-default pes=2 h=None  29467 (n=1)
+    link 9864 MiB/s, hop 15.8 us, message 2.80 us; unsent limit 1323924 B
+  mailbox-tuned pes=2 h=None  31122 (n=1)
+    link 10738 MiB/s, hop 17.1 us, message 1.53 us; unsent limit 1441168 B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  bench-default pes=None h=-
+    barrier                  62.9 (n=1)
+    link 3798 MiB/s, hop 46.4 us, message 0 us; unsent limit 509697 B
+  bench-tuned pes=None h=-
+    barrier                  63.5 (n=1)
+    link 4000 MiB/s, hop 37.3 us, message 0 us; unsent limit 536882 B
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-default                alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-default                stream median 129 (n=1)              p99 309 (n=1)              stream 9460 (n=1)
+                             link 10291 MiB/s, hop 15.8 us, message 0 us; unsent limit 1381230 B
+  hol-tuned                  alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-tuned                  stream median 127 (n=1)              p99 306 (n=1)              stream 9455 (n=1)
+                             link 11540 MiB/s, hop 19.2 us, message 0 us; unsent limit 1548894 B
+
+ping: the average round trip, milliseconds (median, range, count)
+  ping-default             0.0800 (n=1)
+  ping-tuned               0.0790 (n=1)
+
+outcomes
+  mailbox-default-pes2-r1.txt: osoe-pacer failures=0 seconds=4.9
+  mailbox-tuned-pes2-r1.txt: osoe-pacer failures=0 seconds=5.4
+
+bench-default-r1.txt
+  osoe: node 0 connected its mesh in 192 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 201 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=49.7 fastest_us=44.0
+  latency get target=1 where=remote bytes=8 median_us=58.9 fastest_us=38.3
+  latency put+quiet target=1 where=remote bytes=64 median_us=55.1 fastest_us=47.8
+  latency get target=1 where=remote bytes=64 median_us=56.1 fastest_us=52.7
+  latency put+quiet target=1 where=remote bytes=512 median_us=56.2 fastest_us=50.2
+  latency get target=1 where=remote bytes=512 median_us=55.4 fastest_us=53.8
+  latency put+quiet target=1 where=remote bytes=4096 median_us=57.7 fastest_us=51.3
+  latency get target=1 where=remote bytes=4096 median_us=58.0 fastest_us=54.9
+  latency put+quiet target=1 where=remote bytes=32768 median_us=62.5 fastest_us=53.0
+  latency get target=1 where=remote bytes=32768 median_us=62.3 fastest_us=58.2
+  latency put+quiet target=1 where=remote bytes=262144 median_us=89.5 fastest_us=80.2
+  latency get target=1 where=remote bytes=262144 median_us=90.8 fastest_us=82.0
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=155.0 fastest_us=148.5
+  latency get target=1 where=remote bytes=1048576 median_us=200.7 fastest_us=180.5
+  atomic fetch-add target=1 where=remote median_us=55.2 fastest_us=46.5
+
+bench-tuned-r1.txt
+  osoe: node 1 connected its mesh in 66 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe: node 0 connected its mesh in 136 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=2 remote_target=1 local_target=-1
+  latency put+quiet target=1 where=remote bytes=8 median_us=49.9 fastest_us=43.7
+  latency get target=1 where=remote bytes=8 median_us=38.9 fastest_us=35.8
+  latency put+quiet target=1 where=remote bytes=64 median_us=31.4 fastest_us=30.2
+  latency get target=1 where=remote bytes=64 median_us=55.7 fastest_us=50.3
+  latency put+quiet target=1 where=remote bytes=512 median_us=55.7 fastest_us=49.7
+  latency get target=1 where=remote bytes=512 median_us=54.9 fastest_us=52.5
+  latency put+quiet target=1 where=remote bytes=4096 median_us=56.7 fastest_us=49.2
+  latency get target=1 where=remote bytes=4096 median_us=56.5 fastest_us=54.3
+  latency put+quiet target=1 where=remote bytes=32768 median_us=61.0 fastest_us=57.8
+  latency get target=1 where=remote bytes=32768 median_us=61.6 fastest_us=57.9
+  latency put+quiet target=1 where=remote bytes=262144 median_us=88.8 fastest_us=57.2
+  latency get target=1 where=remote bytes=262144 median_us=90.5 fastest_us=84.6
+  latency put+quiet target=1 where=remote bytes=1048576 median_us=154.0 fastest_us=147.9
+  latency get target=1 where=remote bytes=1048576 median_us=200.9 fastest_us=188.7
+  atomic fetch-add target=1 where=remote median_us=55.2 fastest_us=46.7

@@ -140,6 +140,31 @@ int main(void)
     CHECK(chosen == floor);
 
     /*
+     * On demand (H23; the author, 2026-10-27): the buffers chosen as eagerly,
+     * so that on demand refuses nothing eager runs - every peer at 2,049 nodes
+     * and at 4,097 - and past the budget's reach the floor and a count: 4,096
+     * data wires a node at 4,098 nodes and at 12,288, where eagerly the area
+     * refuses the job (the count is every peer then, the refusal the area's).
+     * The area a node can write is its words and its count's buffers, which
+     * /dev/shm must hold, not the nominal 2(n - 1) buffers past the count.
+     */
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 2049, true) == 2048);
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 4097, true) == 4096);
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 4098, true) == 4096);
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 12288, true) == 4096);
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 4098, false) == 4097);
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 2, true) == 1);
+    CHECK(osoe_am_data_wires_most(chunk, standard, budget, 1, true) == 0);
+    /* A budget of less than a pair of the floor's buffers allows none, which
+     * the area refuses as eagerly; of two pairs, two wires among three peers. */
+    CHECK(osoe_am_data_wires_most(KB(1), KB(4), KB(2), 4, true) == 0);
+    CHECK(osoe_am_data_wires_most(KB(1), KB(4), KB(8), 4, true) == 2);
+    CHECK(osoe_am_area_written_bytes(4098, 0, floor, 4096) < osoe_am_area_bytes(4098, 0, floor));
+    CHECK(osoe_am_area_written_bytes(4098, 0, floor, 4096) - budget ==
+          osoe_am_area_written_bytes(4098, 0, floor, 0));
+    CHECK(osoe_am_area_written_bytes(500, 0, floor, 499) == osoe_am_area_bytes(500, 0, floor));
+
+    /*
      * No PE dimension anywhere. The area is a function of node count and
      * buffer size only, which is the §1 constraint stated as an assertion: a
      * node of 1 PE and a node of 256 PEs cost exactly the same, because every

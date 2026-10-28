@@ -10,12 +10,20 @@
 # it: nothing checks that its streams ran at once. The servers, the clients and
 # iperf3 are each a job of one task (on and spawn, common.sh), unbound: the
 # node's every core may serve them, since slurm-setup.sh's TaskPlugin is
-# task/none.
+# task/none. PARTS ("floor echo-uring iperf3") names which of the three run.
+# echo-uring is a fault of the kit's on the cluster: in both sessions, at 1, 2
+# and 16 connections, the clients toward the first node met the 300 s timeout
+# (exit 124) while the other direction finished - 15 of the second session's
+# 17 minutes here, 25 of the first's 26 - and no result depended on it; not
+# fixed, and the third session runs PARTS=iperf3 (docs/decisions/2026-10-27.md,
+# the author's second answer).
 # usage: floor.sh NODES OUTDIR
 : "${KIT_TIMEOUT:=300}"
 source "$(dirname "$0")/common.sh"
 kit_start "$1" "$2"
 CONNECTIONS=${CONNECTIONS:-1 2 4 8 16}
+PARTS=${PARTS:-floor echo-uring iperf3}
+part() { case " $PARTS " in *" $1 "*) return 0 ;; esac; return 1; }
 ECHO_MEBIBYTES=${ECHO_MEBIBYTES:-1024}
 SERVER=$(node 1)
 CLIENT=$(node 2)
@@ -26,7 +34,7 @@ ECHO=$KIT_BUILD/tools/echo-uring/echo-uring
 
 # The one task a node every core of it, as docs/pi-cluster.md §5 gives the Pi's:
 # its main thread, its agent and the floor's echo would otherwise share one.
-KIT_SALLOC="$KIT_SALLOC $(pair)" KIT_SRUN="$KIT_SRUN --cpus-per-task=${FLOOR_CPUS:-4}" \
+part floor && KIT_SALLOC="$KIT_SALLOC $(pair)" KIT_SRUN="$KIT_SRUN --cpus-per-task=${FLOOR_CPUS:-4}" \
     launch 2 1 "$OUT/floor.txt" -- "$KIT_BUILD/shmem/tests/shmem_test_floor"
 
 # echo-uring's servers on both nodes, one a port; each node's clients toward the
@@ -40,7 +48,9 @@ end_after() {   # PID SECONDS: wait for PID, ending it after SECONDS
     wait "$1"
     kill "$guard" 2> /dev/null
 }
-for k in $CONNECTIONS; do
+ECHO_CONNECTIONS=$CONNECTIONS
+part echo-uring || ECHO_CONNECTIONS=
+for k in $ECHO_CONNECTIONS; do
     f=$OUT/echo-$k.txt
     echo "# $(date -u +%H:%M:%S) $k connections each way between $CLIENT and $SERVER" > "$f"
     spawn "$SERVER" "$OUT/echo-$k-servers-1.txt" bash "$KIT/echo-servers.sh" "$ECHO" "$k"
@@ -69,7 +79,7 @@ for k in $CONNECTIONS; do
     echo "$(date -u +%H:%M:%S) echo-uring $k connections each way done" >> "$LOG"
 done
 
-if command -v iperf3 > /dev/null; then
+if part iperf3 && command -v iperf3 > /dev/null; then
     for k in $CONNECTIONS; do
         spawn "$SERVER" "$OUT/iperf3-$k-server.txt" iperf3 -s -1 -p 5201
         server=$!
@@ -84,7 +94,7 @@ if command -v iperf3 > /dev/null; then
         end_after "$server" 30
         echo "$(date -u +%H:%M:%S) iperf3 $k streams each way done" >> "$LOG"
     done
-else
+elif part iperf3; then
     echo "iperf3 is not installed: no cross-check" >> "$LOG"
 fi
 echo "# done $(date -u +%H:%M:%S)" >> "$LOG"

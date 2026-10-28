@@ -1,0 +1,92 @@
+lima-osoe     16.61%  swapper          [kernel.kallsyms]      [k] do_idle                                  -      -            
+lima-osoe     16.18%  multistream      [kernel.kallsyms]      [k] finish_task_switch.isra.0                -      -            
+lima-osoe     11.62%  osoe-agent       [kernel.kallsyms]      [k] try_to_wake_up                           -      -            
+lima-osoe      4.46%  osoe-agent       [kernel.kallsyms]      [k] __arch_copy_to_user                      -      -            
+lima-osoe      4.05%  osoe-agent       libc.so.6              [.] 0x00000000000a3440                       -      -            
+lima-osoe      3.11%  multistream      libc.so.6              [.] 0x00000000000a3440                       -      -            
+lima-osoe      3.03%  osoe-agent       [kernel.kallsyms]      [k] __arch_copy_from_user                    -      -            
+lima-osoe      2.50%  multistream      [vdso]                 [.] __kernel_clock_gettime                   -      -            
+lima-osoe      1.94%  multistream      libosoe.so.0.1.0       [.] reserve_waiting.part.0                   -      -            
+lima-osoe      1.90%  multistream      [kernel.kallsyms]      [k] hrtimer_start_range_ns                   -      -            
+lima-osoe      1.70%  multistream      libc.so.6              [.] syscall                                  -      -            
+lima-osoe      1.62%  multistream      [kernel.kallsyms]      [k] gup_fast_fallback                        -      -            
+lima-osoe      1.53%  multistream      [kernel.kallsyms]      [k] fpsimd_load_state                        -      -            
+lima-osoe      1.35%  multistream      [kernel.kallsyms]      [k] el0_svc                                  -      -            
+lima-osoe      1.02%  multistream      libosoe.so.0.1.0       [.] osoe_metrics_block                       -      -            
+lima-osoe      0.94%  multistream      [kernel.kallsyms]      [k] hrtimer_cancel                           -      -            
+lima-osoe      0.93%  multistream      libosoe.so.0.1.0       [.] osoe_futex_wait_bitset                   -      -            
+lima-osoe      0.88%  swapper          [kernel.kallsyms]      [k] default_idle_call                        -      -            
+lima-osoe      0.86%  multistream      [kernel.kallsyms]      [k] __schedule                               -      -            
+lima-osoe      0.82%  multistream      libosoe.so.0.1.0       [.] osoe_connection_reserve_up_to            -      -            
+lima-osoe      0.79%  multistream      libosoe.so.0.1.0       [.] osoe_deadline_expired                    -      -            
+lima-osoe      0.73%  multistream      libosoe.so.0.1.0       [.] osoe_wait_ends                           -      -            
+lima-osoe      0.68%  multistream      [kernel.kallsyms]      [k] get_futex_key                            -      -            
+lima-osoe      0.67%  osoe-agent       [kernel.kallsyms]      [k] arch_counter_get_cntvct                  -      -            
+lima-osoe      0.66%  multistream      libc.so.6              [.] clock_gettime                            -      -            
+lima-osoe      0.62%  multistream      libosoe.so.0.1.0       [.] clock_gettime@plt                        -      -            
+lima-osoe      0.57%  multistream      libosoe.so.0.1.0       [.] osoe_progress_host_wake                  -      -            
+lima-osoe      0.57%  osoe-agent       [kernel.kallsyms]      [k] __pi_clear_page                          -      -            
+lima-osoe      0.55%  multistream      libosoe.so.0.1.0       [.] osoe_progress_host_wake_deferred.part.0  -      -            
+lima-osoe      0.54%  multistream      [kernel.kallsyms]      [k] invoke_syscall                           -      -            
+lima-osoe      0.50%  multistream      [kernel.kallsyms]      [k] __list_add_valid_or_report               -      -            
+lima-osoe the progress threads' symbols, with their callers:
+lima-osoe     11.76%  [k] try_to_wake_up                        -      -            
+lima-osoe             |          
+lima-osoe              --11.42%--futex_wake
+lima-osoe                        __arm64_sys_futex_wake
+lima-osoe                        invoke_syscall
+lima-osoe                        el0_svc_common.constprop.0
+lima-osoe                        do_el0_svc
+lima-osoe                        el0_svc
+lima-osoe                        el0t_64_sync_handler
+lima-osoe                        el0t_64_sync
+lima-osoe                        syscall
+lima-osoe                        osoe_futex_wake
+lima-osoe                        |          
+lima-osoe                         --11.38%--osoe_progress_poll
+lima-osoe                                   osoe_progress_host_poll
+lima-osoe                                   agent_main
+lima-osoe                                   |          
+lima-osoe                                   |--6.18%--0xffff807761d8
+lima-osoe                                   |          0xffff807de15c
+lima-osoe                                   |          
+lima-osoe                                    --5.21%--0xffff8dff61d8
+lima-osoe                                              0xffff8e05e15c
+lima-osoe      4.46%  [k] __arch_copy_to_user                   -      -            
+lima-osoe             |
+lima-osoe             ---simple_copy_to_iter
+lima-osoe                __skb_datagram_iter
+lima-osoe                skb_copy_datagram_iter
+lima-osoe                tcp_recvmsg_locked
+lima-osoe                tcp_recvmsg
+lima-osoe                inet_recvmsg
+lima-osoe                sock_recvmsg
+lima-osoe                io_recv
+lima-osoe                io_issue_sqe
+lima-osoe                |          
+lima-osoe                 --3.71%--io_poll_issue
+lima-osoe                           io_poll_task_func
+lima-osoe                           io_handle_tw_list
+lima-osoe                           tctx_task_work_run
+lima-osoe                           tctx_task_work
+lima-osoe                           task_work_run
+lima-osoe                           |          
+lima-osoe                            --3.23%--get_signal
+lima-osoe                                      do_signal
+lima-osoe                                      do_notify_resume
+lima-osoe                                      |          
+lima-osoe                                       --2.65%--el0_svc
+lima-osoe                                                 el0t_64_sync_handler
+lima-osoe                                                 el0t_64_sync
+lima-osoe      3.14%  [k] __arch_copy_from_user                 -      -            
+lima-osoe             |          
+lima-osoe              --3.03%--tcp_sendmsg_locked
+lima-osoe                        tcp_sendmsg
+lima-osoe                        inet_sendmsg
+lima-osoe                        __sock_sendmsg
+lima-osoe                        sock_sendmsg
+lima-osoe                        io_send
+lima-osoe                        io_issue_sqe
+lima-osoe                        |          
+lima-osoe                         --3.00%--io_submit_sqes
+lima-osoe                                   __arm64_sys_io_uring_enter

@@ -188,6 +188,10 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
         osoe_epoch_wake_all(&b->arrived);
 
     if (lead) {
+        /* osoe-stat's summary is told the lead is in it, its members first
+         * (node.h, the tree state's data fields; D1). */
+        if (t->internode)
+            osoe_collective_data_open(&b->tree, k + 1);
         /* A reduction's internode phase is told of it before the lead waits
          * for its members, so that what the nodes below need first - the
          * generic implementation's grants, for a large one - leaves now
@@ -221,6 +225,7 @@ static void data_collective_at(const char *routine, struct osoe_team *t, void *d
             else
                 osoe_internode_broadcast(t->block_index, k + 1, root_index(t, root_rank, routine),
                                          accumulator, bytes, routine);
+            osoe_collective_data_close(&b->tree, k + 1);
         }
 
         /* The final dest is written; now the release, and the copy-outs. */
@@ -514,6 +519,8 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
         osoe_epoch_wake_all(&b->arrived);
 
     if (lead) {
+        if (t->internode)
+            osoe_collective_data_open(&b->tree, k + 1);     /* D1, as above */
         osoe_epoch_wait_eq(&b->arrived, (k + 1) * members, routine);
         osoe_call_compare(routine, t, k + 1, &call);
         unsigned char *result = dest;
@@ -533,6 +540,8 @@ static int gather(const char *routine, struct osoe_team *t, void *dest, const vo
                                           places[members], own->reverse, routine);
         else if (t->internode)
             osoe_internode_collect(t->block_index, k + 1, result, total, block, places, routine);
+        if (t->internode)
+            osoe_collective_data_close(&b->tree, k + 1);
         if (lengths)
             prefix_sums(routine, dest, t->members);
         if (!osoe_epoch_release_bump_eq(&b->released, k + 1))
@@ -826,6 +835,8 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
         by_scan = way == OSOE_COLLECT_WAY_SCAN;
         bool reduced = way == OSOE_COLLECT_WAY_MEMBERS || way == OSOE_COLLECT_WAY_TOTALS;
         uint64_t summed = way == OSOE_COLLECT_WAY_MEMBERS ? members : by_scan ? 1 : t->nodes;
+        if (t->internode)
+            osoe_collective_data_open(&b->tree, k + 1);     /* D1, as data_collective_at */
         if (t->internode && reduced)
             osoe_internode_reduce_enter(t->block_index, k + 1, summed, OSOE_REDUCTION_SUM,
                                         length, routine);
@@ -862,6 +873,7 @@ static int collect_varying(const char *routine, struct osoe_team *t, void *dest,
             atomic_store_explicit(&b->tree.collect_lengths, (uint32_t)summed,
                                   memory_order_release);
             atomic_store_explicit(&b->tree.collect_way, (uint32_t)way, memory_order_release);
+            osoe_collective_data_close(&b->tree, k + 1);
         }
         *(uint64_t *)member_copy(lead_local_id, total_at) = total;
         if (!osoe_epoch_release_bump_eq(&b->released, k + 1))

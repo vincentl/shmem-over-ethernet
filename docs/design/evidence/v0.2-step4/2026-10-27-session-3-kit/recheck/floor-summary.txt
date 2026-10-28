@@ -1,0 +1,26 @@
+== ~/kit-s3/recheck/std/floor
+jobs: 1, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+the floor test's ratios, the median of its pairs (range)
+  fastest get/floor=1.975 (1.87-2.13)
+  fastest put_quiet/floor=1.998 (1.84-2.15)
+  fastest fetch_add/floor=1.982 (1.84-2.16)
+  median put_quiet/get=0.998 (0.99-1.00)
+  median fetch_add/get=0.993 (0.99-1.00)
+  stream library/floor=0.739 (0.730-0.760)
+  reported: median get/floor=1.998 (1.96-2.02)
+  reported: median put_quiet/floor=1.996 (1.96-2.01)
+  reported: median fetch_add/floor=1.984 (1.96-2.00)
+    link 4313 MiB/s, hop 35.5 us, message 0 us; unsent limit 578933 B
+
+the bare aggregate, MiB/s, between two nodes both ways at once: iperf3's sum
+over its ten seconds, a node's share each way half of it, and echo-uring's
+per-connection medians summed over both ways - an upper bound, since nothing
+checks that its streams ran at once. A node's rate in the helpers' table is
+what it sent, one way, to all its peers: set it beside a node's share each
+way at as many streams as a node has peers
+    1 each way  iperf3         -   echo-uring     18062 (1 connection)
+    2 each way  iperf3         -   echo-uring     35568 (2 connections)

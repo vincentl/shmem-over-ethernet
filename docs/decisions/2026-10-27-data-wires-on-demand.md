@@ -1,0 +1,263 @@
+# 2026-10-27: H23's data wires on demand
+
+## The brief
+
+The last piece of H23, built as the author decided it on 2026-10-25 (`docs/decisions/2026-10-24.md`,
+"The author's answers", item 4): the data wires alone on demand, the control wires eager to every
+node; the schedule's caller always dialling, a node that needs a data wire its peer would call
+asking the peer over their control wire, so that no two calls cross; a setting, eager by default,
+on demand forced by tests until a large cluster measures it; a stalled data wire told as any wait
+is; and, following from them, the listener open for the job's life in this mode alone, and one
+model first - a data wire made while traffic waits for it. The session's brief, from the session
+that started it, named the code's places and asked for the model, the build, the internode suite
+run in on-demand mode, a stalled-wire test, mutants, tier 3 at 64 logical nodes, the README's row,
+and a stop at any choice the decisions leave open. Branch `claude/confident-swanson-5dd897`.
+
+## The model
+
+`tools/modelcheck/data_wire_model.py`, registered as `model.data_wire` (label `model`), on
+`engine.py` as `rendezvous_model.py` is: two nodes whose control wire is up and data wire not, the
+schedule having node 0 call; a writer on either or both, putting once and waiting in a quiet for
+the peer to have applied it; each node's lead, owning its data wire unless the case gives the node
+a progress helper; that helper; and a fault that fires once at any moment - a PE's global exit
+(status 2) or fatal on either node, or a node killed. Each wire is FIFO each way - segments, then
+the abortive goodbye, then the end of stream - and the call has the listener's phases
+`mesh_model.py` gives it: dialled, answered, confirmed and attached by the caller, attached by the
+callee, and dropped where a socket of it closes first, a call dropped before its confirmation being
+dialled again as a retry. A node's processes exiting end every stream it holds. The writer's side
+is the one the reservation protocol already has: nothing reservable, a mark, a sleep on the
+turnover.
+
+Checked, in every interleaving: nothing sent before the wire is up (EARLY), no wire made twice
+(ONCE), no call against the schedule (RULE), every node of a global exit ending with the caller's
+status, never the failure a FIN without a goodbye leaves (STATUS, `abort_model.py`'s property over
+the wire being made), and no hang - every put applied, or every node gone - as STUCK at a terminal
+state and TRAPPED by the engine's trapped-state check. 54 design cases (three sets of writers,
+three helper placements, six faults), all holding, the largest 514,885 states, 3.6 million in all,
+75 seconds on the Mac. Ten breakages, each failing its property with a trace: a buffer opened before
+the wire, as the eager mesh's first pass does, at the lead and at a helper (EARLY); the node the
+schedule does not have call dialling too (RULE); a call begun for every need (ONCE); no request
+over the control wire (STUCK); no visit when the wire attaches, the writer's mark already taken
+(STUCK); an aborting callee closing a caller it has answered, whose end the caller may have
+attached (STATUS); no goodbye on a wire attached during the abort, at the lead and at a helper
+(STATUS); a caller keeping its call through its abort (TRAPPED); and an abort waiting for its wire
+(TRAPPED).
+
+The model gave the design one rule the brief did not name: **an aborting callee serves a caller it
+has answered to the confirmation, or its end, and sends its abortive goodbye on the wire so made**.
+The confirmation is the hello's last step and the caller attaches its end the moment it has sent
+it, so a callee that dropped an answered caller on its abort left the caller an end of stream with
+no goodbye - a death, where a global exit had given a status.
+
+## The build
+
+- **The setting.** `OSOE_MESH_DATA_WIRES=eager|on-demand`, `eager` by default (`bootstrap.c`),
+  carried in each node's backend blob beside its mesh port and compared by every lead after the
+  rendezvous, before any wire is made: a job whose nodes differ is refused by name, every lead
+  naming the first node that differs from node 0 (`progress-host.c`). Only AM's blob changes, so
+  the rendezvous's report keeps its shape. The handler table has a message more, so its checksum
+  differs from 0.2's earlier builds, which the rendezvous refuses by name as it refuses any.
+- **Start-up** (`wire.c`'s `osoe_wires_open`): on demand the schedule makes the control wires
+  alone, a data wire's caller that comes meanwhile told to come back, and the listener is left
+  open; the rings are opened for every wire alike, a data wire with no socket arming nothing
+  (`ring.c` skips it at enable).
+- **The writer's side is unchanged.** A connection with no data wire keeps both buffers sealed, as
+  every connection starts (§3.5): a writer reserves nothing, marks, wakes the owner and waits on
+  the turnover. The engine (`progress.c`'s `attach_or_ask`): a connection with no wire is not
+  busy and opens nothing; the visit a writer's mark brings asks the host for the wire, once, or
+  attaches a socket the host has handed over, arms its receive, and goes on as any visit, whose
+  open's turnover releases the writers; aborting, a connection still without one has nobody to
+  tell; closing, no goodbye. A node with a wire wanted is neither idle nor quiet for the deadlock
+  detector.
+- **The lead's half** (`data-wires.c`, new): the needs, taken from a bitmap any owner sets - a
+  seq_cst read-modify-write and a claimed wake of the agent, `lead_wake_model.py`'s writer side,
+  the agent looking at the bitmap after it raises its flag; a need acted on once, a call where the
+  schedule has the node call the peer and `OSOE_AM_DATA_WIRE_WANTED` on their control wire where it
+  does not (`progress.c` seals it, application work the detector waits on); a peer's request
+  refused by name where the schedule does not have this node dial; the calls start-up's,
+  `listener.h`'s calls part-way, at most eight in flight; the callers served by `listener.c`
+  unchanged, judged by the schedule's rule; a made socket stored for its connection's owner, the
+  connection marked in the owner's dirty bitmap and the owner woken; and the owner attaching it on
+  its own thread with the unsent limit it last took, counting it in its record for `osoe-stat`.
+- **The listener on the ring.** One epoll set holds the listening socket, the callers part-way
+  through the hello and the calls' sockets as `listener.h`'s poll asks for them, and one poll on
+  owner 0's ring watches the set (`ring.c`'s watch, one more submission and completion in the
+  ring's bounds), so the agent's idle wait ends when any of them moves, and by their earliest
+  deadline. **Not the multishot accept** that design §6.2 once sketched and the record of
+  2026-10-25 repeated as a consequence: one would accept connections that the listener's set of
+  sixteen callers has no place for, where the set, its hello's limits and its calls' retries are
+  start-up's, unchanged, and an accept is the listener's own `accept4` as at start-up.
+- **The abort** (`abort_wires`): the agent closes the hand-over (a release store), closes its
+  listening socket and drops every caller it has not answered, abandons its calls before their
+  confirmation, serves an answered caller to the confirmation or its end and writes the abortive
+  goodbye on the socket so made, and waits for none of its wires; a helper finishes its abort only
+  after a pass begun once the hand-over is closed, so that every socket handed to it before is
+  attached and told. So the hand-over needs no race argument: the socket's store and its mark are
+  before the closing store on the agent's thread, and the helper's pass after its acquire load
+  finds the mark.
+- **A stalled data wire told as any wait is**: the lead's notice once a call, or a request to the
+  peer, has waited 30 s and every minute after - "node 0 has waited 30 s to make its data wire
+  toward node 1, for node 1 (pi1, at 10.0.0.2) to answer on port 40213: connected, and its hello
+  not yet answered, 1.0 s ago; still waiting", or "node 1 has waited 30 s for node 0 (pi0, at
+  10.0.0.1) to dial their data wire, which it asked for on their control wire; still waiting" -
+  and, under `OSOE_NO_PROGRESS_TIMEOUT`, its fatal; the waiting writer's own no-progress fatal
+  says its connection's data wire is not yet made. The blocked kind for `osoe-stat` is the
+  layout-42 slice's, not merged when this was built: left out, as the brief allowed.
+- `SHMEM_DEBUG` has each lead say each data wire it makes on demand, how - "it dialled", "the
+  peer dialled, as asked", "the peer dialled for its own need" - and how long its first need
+  waited; the tests read it.
+- **What on demand makes in practice.** Every program makes the collective tree's data wires at
+  its first collective that carries data - `shmem_malloc`'s check of its arguments (P23) among
+  them - and `shmem_init`'s last step, which measures the link between nodes 0 and 1 and hands it
+  out, makes them too unless the `OSOE_LINK_*` settings give the link: *N* - 1 wires job-wide,
+  before the program's own. The README says so.
+
+## The tests
+
+- `shmem.data-wires.*` (`data-wires.sh`, `test-data-wires.c`), every one on demand: a ring over
+  five nodes of a PE each, whose wires their callers dial for their own need; a step of three over
+  the same five, whose wires outside the collective tree the nodes the schedule does not have
+  call ask for over their control wires; the ring over four nodes of two PEs at two progress
+  helpers, each wire handed by the lead to the helper that owns it. Each checks the job's values,
+  that every lead's mesh was its control wires alone, that a wire - both ends - was made for every
+  pair the PEs talk across and every edge of the collective tree and for no other, 7 of the 10
+  pairs at five nodes, and that every "it dialled" is on the schedule's caller. A wire held back
+  at its caller (`OSOE_TEST_HOLD_DATA_WIRES`, new) and at its callee, each told by the other
+  node's notice at 1 s and then made; one held 6 s past the deadlock detector's quiet of 1 s,
+  which must not take it for a deadlock; one held past `OSOE_NO_PROGRESS_TIMEOUT=2`, which ends
+  the job naming it; and a global exit by node 0's PE while the other nodes' first `shmem_malloc`
+  waits for its held wire - node 1 having asked, node 2 having dialled - which ends the job with
+  status 3 within 6 s, no wire made, no goodbye lost. The stalls' and the exit's link is set by
+  hand, since a measured link is a data wire of `shmem_init`'s own, which a hold would stall.
+- `shmem.data-wires.disagree.0-1`: node 0 eager and node 1 on demand, refused by both leads before
+  any wire, naming node 1; and the two settings' malformed values refused by name
+  (`shmem.start-up.mesh-data-wires.invalid`, `shmem.start-up.test-hold-data-wires.invalid`).
+- **The internode suite run on demand** (`OSOE_MESH_DATA_WIRES=on-demand ctest -L internode`):
+  593 tests before this change, 605 with it, 602 until the budget's three below. On the first
+  run 589 of 593 passed, the four that failed tests of the eager mesh's own arithmetic:
+  `shmem.unsent.{set,floor,fixed}`, whose lead's line counts the data wires start-up made, and
+  `shmem.start-up.descriptors.16-nodes`, which needs two sockets a node at start-up to pass its
+  descriptor limit. Each now sets `OSOE_MESH_DATA_WIRES=eager`, saying so; `shmem.unsent.measured`
+  had passed on demand only because the link's measurement made the wires its line counted. Then,
+  on the debug build: eager 602 of 602; on demand 601 of 602 at no helpers and 601 of 602 at two,
+  the one failure the disagreement's own test, which the suite's environment had made agree, now
+  pinning node 0 to eager.
+
+## The mutants
+
+Each of the model's breakages that the C can make, and a few of the C's own, made in the
+development tree, built, and run against the tests of what it breaks, the file restored after
+from a copy of the pristine one (`mutants.sh`, in the evidence); a mutant whose edit changed
+nothing is reported as such, and three were, the runner's field separator having been `|`, until
+it was `~`. **Caught, eight**: a buffer opened before the wire (the ring's test: the send meets
+the socket that is not there); the other node dialling too (the skip's: the caller refuses it by
+name); no request over the control wire (the skip's: a hang to the launcher's limit); a call for
+every need (both: "connected to twice"); no mark when a socket is handed over (both - the callee
+of a pair whose PEs send nothing has no writer of its own to bring the visit, so the caller's
+put is never applied, where the model's breakage had the asking writer's mark taken: the visit
+is needed on both sides); no receive armed at the attach (the ring's); an abort waiting for the
+wire it asked for (the exit's: 10 s, the abort's grace, past its bound of 6); and no check of the
+setting between nodes (the disagreement's: the eager node waits for ever for data wires).
+
+**Survived, seven, each for a reason**: the two checks that a node making a wire is not quiet,
+removed one at a time and both together (`shmem.data-wires.stall-long` still passes: a writer
+waiting for room or for a wire ends and begins its wait again at every sweep, 100 ms, which is
+activity to the deadlock detector - so it could never take that wait for a deadlock, and the
+checks are a second layer, kept so that the property does not rest on the shape of the writer's
+loop); an aborting callee dropping a caller it has answered, no goodbye on a socket the abort
+made, and a helper finishing its abort before the hand-over closes (each a window between two
+steps the tests do not land in - the model's `abandon_answered`, `no_goodbye_new_wire` and its
+helper cases are where they are held); the agent not looking at the helpers' needs after it
+raises its flag (latency only: its sleep ends at the sweep - the rule is lead_wake_model.py's);
+and the kernel's unsent limit not applied to a wire made on demand, which no test observes (a
+performance setting, §3.2).
+
+## The author's answer
+
+On 2026-10-27, through the session that started this one, which recorded it too in the day's other
+record (`2026-10-27.md`, the third cluster session's plan), to the one choice the decisions of
+2026-10-25 left open - what `OSOE_AM_BUFFER_BUDGET` bounds on demand:
+
+1. **(a), "Size as eager does"**, as recommended: each data wire's buffer chosen as eager mode
+   chooses it, halving to the floor, so that on demand never refuses what eager runs; past 4,097
+   nodes at the defaults the floor, and the data wire past budget / (2 x floor) - 4,096 a node -
+   refused by name; the rings sized from the same count.
+
+The question as asked, with the evidence: `h23-on-demand-question-budget.md` in the session's notes
+folder. A node's connection area holds two buffers a peer, and tmpfs allocates a page only when it
+is first written; an idle peer's buffers are never written, opening a buffer writing the shared
+words beside it, so in either mode memory is spent only on the peers a node sends to. What capped
+a job at 4,097 nodes, and halved the buffers past 2,049, was arithmetic at start: the floor of
+2 x `OSOE_AM_CHUNK` times 2(N - 1) against the 1 GiB budget, and the advisory `/dev/shm` check of the
+nominal size. The other options were (b) the buffer as asked, 256 KiB, counted from the first wire -
+2,048 a node, which refuses mid-run a job eager runs at 2,050 to 4,097 nodes - and (c) no count,
+which lets a program talking to every peer run `/dev/shm` out mid-job, a SIGBUS in whichever
+process touches the page.
+
+**As built**: `osoe_am_data_wires_most` (`connection-area.c`) gives the count - every peer eagerly
+and wherever the budget holds every peer at the chosen size, otherwise budget / (2 x the floor) -
+and the area keeps every peer's place at the floor: in the development VM, tmpfs sized a file at
+four times `/dev/shm`'s own capacity, 15,879 MiB, and charged it 12 KiB for the three pages written
+into it. Each lead says the count once ("connection buffers reduced from 4096 to 2048 bytes, and at
+most 2 data wires a node, to fit OSOE_AM_BUFFER_BUDGET=8192 over 4 nodes"); the `/dev/shm` check
+compares the area's words and the count's buffers (`osoe_am_area_written_bytes`); `data-wires.c`
+counts every wire the node makes or begins - its own call, its request, or a peer's call for the
+peer's own need - and ends the job naming the node, the peer, the count, the budget and the floor
+at the one past it, from the agent, as the reply pool's exhaustion is ended. The rings' bounds count
+the wires that can hold a socket (`osoe_ring_open`'s `active`): owner 0's ring the control wires
+and as many data wires as the count, a helper's the lesser of its share and the count; so the
+ceiling at no helpers is 12,288 nodes where eagerly it is 8,192, and 16,384 with helpers either way
+(`osoe_ring_refuses`, `shmem.wire.ring-ceiling`). Tested: the count's arithmetic
+(`shmem.am-size`), and three jobs of four nodes whose budget holds two pairs of buffers a node where
+every peer's would take three (`shmem.data-wires.budget-*`) - the collective tree's wires fit and
+the job runs, no lead making more than two; a program needing a third ends naming it; and eagerly
+the same settings are refused at start, as they always were.
+
+## Verified
+
+The tree of `8d9806e4`, packed from the worktree and checked file by file against the commit, in
+the development VM under its lock, 23:26 to 00:15 VM time (`verify.sh`; its summary, the static
+checks', the models' and the result of every test this change touches, in each run, are the
+evidence's `verify/`): built in the four presets, the single-node build and tier 3's without a
+warning; the static checks 14 of 14; release 1,180 of 1,180 and the single-node build 579 of 579,
+the models apart; debug 1,180 of 1,180, AddressSanitizer 1,140 of 1,140 and ThreadSanitizer 816
+of 816 through its gate; the internode suite on demand, 605 of 605 in debug at no helpers and 605
+of 605 at two, 582 of 582 under AddressSanitizer and 266 of 266 under ThreadSanitizer; tier 3's
+suite 138 of 138; and `model.data_wire`, `model.mesh`, `model.mesh.digest`, `model.mesh_timing`,
+`model.lead_wake`, `model.visit` and `model.selftest`, 7 of 7. The VM's log has no process
+killed for memory.
+
+**Tier 3 at 64 logical nodes** (`tier3-64.sh`, on that tree's tier-3 build, at 01:14 VM time):
+each node in a network namespace of its own over tier 3's Pi-like link, the kernel's neighbour
+table raised for the run as the record of 2026-10-19 has a larger rehearsal do, and set back
+after; two rounds each of `osoe-bench barrier quick` eagerly and on demand, and of
+`test-data-wires`' ring on demand. Every job ended with status 0, the ring's check passed in both
+rounds, and the neighbour table overflowed nowhere. On demand every lead's mesh was its 63
+control wires, 32 answered and 31 called or 31 and 32, connected in 49 and 43 ms at the median
+of the 64 leads and in 68 and 51 at most, where eagerly, with the data wires beside them, it took
+80 and 76, and 99 and 83 at most. The barrier, which runs on the control wires, made only the
+collective tree's 63 data wires, which `shmem_init`'s last step makes; the ring made 126, its own
+64 and the tree's 63, the pair of nodes 0 and 1 being both. The end that dialled a wire had
+waited 0.9 to 1.2 ms at the median from the need that began it, 0.46 the least and 13 the most,
+in the barrier's first round; an end that asked its peer to dial, 1.6 to 2.8 ms, a trip more,
+and 16 the most (`tier3/`, `wire-waits.sh`).
+
+## For the author
+
+1. **The listener served by an epoll set and a poll on the ring, not a multishot accept**
+   (above): the record of 2026-10-25 named the multishot accept as a consequence, not a question,
+   and this keeps the listener's set of sixteen callers and its hello's limits start-up's. Said
+   here so that the author can reverse it.
+2. **The README's start-up promise** on demand (its "How a job starts"): the control wires give
+   the start what it gives eagerly; a data wire that cannot be made is met where it is first
+   needed - for the collective tree's wires still the end of `shmem_init`, whose last step uses
+   them - and told as the start's calls are.
+3. **The reply pool is still sized for every peer**, as eagerly: at the default credit 65
+   descriptors, 3 KiB, a peer - 37 MiB a lead at 12,288 nodes. §3.8's argument that sizes it bounds
+   it by the connections that can hold traffic, so the count could size it as it sizes the rings;
+   left for the author, since the answer named the rings.
+
+## What is left
+
+- `osoe-stat`'s blocked kind for a writer waiting for its data wire, with the layout-42 slice.
+- A large cluster's measurement, before on demand could be the default (the author's condition).

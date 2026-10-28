@@ -1,0 +1,19 @@
+# 2026-10-28T04:47:54Z gets.sh on lima-osoe
+# kit f6b46f952137a8611b3fcc6ebf7bc3838a966328
+# launcher osoe-launch, build ~/kit-s3/src/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+04:47:54 exit 2 get-pieces-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/kit-s3/src/build/release/kit/get-pieces 21 67108864
+04:48:04 exit 0 get-1m-pes1-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:48:14 exit 0 get-1m-pes4-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:48:24 exit 0 get-1m-pes8-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:48:34 exit 0 get-1m-pes16-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:48:34 exit 2 get-pieces-r1.txt:  ~/kit-s3/src/build/release/kit/get-pieces 21 67108864
+04:48:44 exit 0 get-1m-pes1-r1.txt:  ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:48:54 exit 0 get-1m-pes4-r1.txt:  ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:49:05 exit 0 get-1m-pes8-r1.txt:  ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:49:15 exit 0 get-1m-pes16-r1.txt:  ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:49:15 exit 2 get-pieces-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/kit-s3/src/build/release/kit/get-pieces 21 67108864
+04:49:25 exit 0 get-1m-pes1-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:49:35 exit 0 get-1m-pes4-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:49:45 exit 0 get-1m-pes8-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+04:49:55 exit 0 get-1m-pes16-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/kit-s3/src/build/release/kit/multistream get 1048576 10
+# done 04:49:55

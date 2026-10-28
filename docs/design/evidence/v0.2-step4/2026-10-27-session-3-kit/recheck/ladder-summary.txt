@@ -1,0 +1,41 @@
+== ~/kit-s3/recheck/std/ladder
+jobs: 11, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-buffer-128k            alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-buffer-128k            stream median 77.0 (n=1)             p99 243 (n=1)              stream 4666 (n=1)
+                             link 6098 MiB/s, hop 16.4 us, message 0 us; unsent limit 818460 B
+  hol-buffer-1m              alone  median 56.0 (n=1)             p99 62.0 (n=1)            
+  hol-buffer-1m              stream median 711 (n=1)              p99 878 (n=1)              stream 12272 (n=1)
+                             link 8980 MiB/s, hop 17.4 us, message 0 us; unsent limit 1205266 B
+  hol-buffer-4m              alone  median 56.0 (n=1)             p99 62.0 (n=1)            
+  hol-buffer-4m              stream median 577 (n=1)              p99 1794 (n=1)             stream 12275 (n=1)
+                             link 9660 MiB/s, hop 16.2 us, message 0 us; unsent limit 1296542 B
+  hol-receive-16kx256        alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-receive-16kx256        stream median 166 (n=1)              p99 1034 (n=1)             stream 10066 (n=1)
+                             link 10993 MiB/s, hop 15.7 us, message 0 us; unsent limit 1475417 B
+  hol-receive-64kx64         alone  median 57.0 (n=1)             p99 63.0 (n=1)            
+  hol-receive-64kx64         stream median 119 (n=1)              p99 383 (n=1)              stream 9201 (n=1)
+                             link 12192 MiB/s, hop 19.0 us, message 0 us; unsent limit 1636391 B
+  hol-unsent-0               alone  median 56.0 (n=1)             p99 62.0 (n=1)            
+  hol-unsent-0               stream median 145 (n=1)              p99 366 (n=1)              stream 9700 (n=1)
+                             link 14159 MiB/s, hop 16.4 us, message 0 us; unsent limit 0 B (0: the system's)
+  hol-unsent-1m              alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-unsent-1m              stream median 125 (n=1)              p99 287 (n=1)              stream 9365 (n=1)
+                             link 8612 MiB/s, hop 16.5 us, message 0 us; unsent limit 1048576 B
+  hol-unsent-256k            alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-unsent-256k            stream median 130 (n=1)              p99 384 (n=1)              stream 9720 (n=1)
+                             link 12090 MiB/s, hop 15.8 us, message 0 us; unsent limit 262144 B
+  hol-unsent-4m              alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-unsent-4m              stream median 125 (n=1)              p99 286 (n=1)              stream 9314 (n=1)
+                             link 10002 MiB/s, hop 16.0 us, message 0 us; unsent limit 4194304 B
+  hol-unsent-64k             alone  median 55.0 (n=1)             p99 60.0 (n=1)            
+  hol-unsent-64k             stream median 125 (n=1)              p99 290 (n=1)              stream 9431 (n=1)
+                             link 12925 MiB/s, hop 16.3 us, message 0 us; unsent limit 65536 B
+  hol-unsent-rule            alone  median 56.0 (n=1)             p99 61.0 (n=1)            
+  hol-unsent-rule            stream median 125 (n=1)              p99 291 (n=1)              stream 9350 (n=1)
+                             link 10210 MiB/s, hop 16.1 us, message 0 us; unsent limit 1370328 B

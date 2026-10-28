@@ -1,0 +1,9 @@
+# 2026-10-28T05:19:44Z many-pes.sh on lima-osoe
+# kit d5b61886286bc7a843b183ee111ea0c2e30fd0e6
+# launcher osoe-launch, build ~/kit-s3/src2/build/release, nodes 2, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+05:19:55 exit 0 put-1m-wake-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/kit-s3/src2/build/release/tools/stat/osoe-stat ~/kit-s3/src2/build/release/kit/multistream put 1048576 10
+05:20:05 exit 0 put-64k-wake-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/kit-s3/src2/build/release/tools/stat/osoe-stat ~/kit-s3/src2/build/release/kit/multistream put 65536 10
+05:20:16 exit 0 put-1m-wake-profiled-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 ~/kit-s3/src2/build/release/kit/multistream put 1048576 10 (beside: bash '~/kit-s3/src2/docs/fast-link/profile.sh' 5)
+05:20:22 exit 0 collectives-wake-check-off-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=0 ~/kit-s3/src2/build/release/tools/bench/osoe-bench quick barrier collectives
+05:20:28 exit 0 collectives-wake-check-on-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=1 ~/kit-s3/src2/build/release/tools/bench/osoe-bench quick barrier collectives
+# done 05:20:28

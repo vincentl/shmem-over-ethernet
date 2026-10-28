@@ -23,6 +23,7 @@ add_library(osoe_base OBJECT
   epoch.c
   hostlist.c
   order.c
+  pid-namespace.c
   print-line.c
   siphash.c
   size.c

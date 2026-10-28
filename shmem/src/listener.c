@@ -612,6 +612,24 @@ uint32_t osoe_listener_part_way(const struct osoe_listener *l)
     return part;
 }
 
+uint32_t osoe_listener_answered(const struct osoe_listener *l)
+{
+    uint32_t answered = 0;
+    for (uint32_t i = 0; l->callers && i < OSOE_LISTENER_CALLERS; i++)
+        answered += l->callers[i].fd >= 0 && l->callers[i].answered;
+    return answered;
+}
+
+void osoe_listener_stop_answering(struct osoe_listener *l)
+{
+    if (l->fd >= 0)
+        close(l->fd);
+    l->fd = -1;
+    for (uint32_t i = 0; l->callers && i < OSOE_LISTENER_CALLERS; i++)
+        if (l->callers[i].fd >= 0 && !l->callers[i].answered)
+            caller_drop(&l->callers[i]);
+}
+
 uint32_t osoe_listener_poll(struct osoe_listener *l, uint32_t purposes, struct pollfd *p,
                             uint64_t *serve_by_ns)
 {
@@ -641,7 +659,7 @@ uint32_t osoe_listener_poll(struct osoe_listener *l, uint32_t purposes, struct p
         p[count] = (struct pollfd){ .fd = c->fd, .events = POLLIN };
         l->polled[count++] = i;
     }
-    if (room) {
+    if (room && l->fd >= 0) {
         p[count] = (struct pollfd){ .fd = l->fd, .events = POLLIN };
         l->polled[count++] = UINT32_MAX;
     }
@@ -1108,6 +1126,12 @@ int osoe_listener_call_step(struct osoe_listener_call *c, short revents)
         return fd;
     }
     return -1;
+}
+
+void osoe_listener_call_abandon(struct osoe_listener_call *c)
+{
+    call_close(c);
+    c->state = CALL_IDLE;
 }
 
 void osoe_listener_call_describe(const struct osoe_listener_call *c, char *text, size_t len)

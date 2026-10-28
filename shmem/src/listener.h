@@ -156,6 +156,20 @@ uint32_t osoe_listener_poll(struct osoe_listener *l, uint32_t purposes, struct p
                             uint64_t *serve_by_ns);
 /* How many callers it holds part-way through the hello, for a notice. */
 uint32_t osoe_listener_part_way(const struct osoe_listener *l);
+
+/* How many of them it has answered, each waiting for its confirmation - after
+ * which the caller has attached its end of the connection. */
+uint32_t osoe_listener_answered(const struct osoe_listener *l);
+
+/*
+ * An aborting lead's listener (H23, on demand): its listening socket closed,
+ * so the kernel refuses whoever calls from here, and every caller it has not
+ * answered dropped - nobody has attached an end of theirs. A caller it has
+ * answered is kept, and served to its confirmation or its end: it may have
+ * sent the confirmation and attached its end already (data_wire_model.py,
+ * `abandon_answered`).
+ */
+void osoe_listener_stop_answering(struct osoe_listener *l);
 int osoe_listener_serve(struct osoe_listener *l, uint32_t purposes, struct pollfd *p,
                         uint32_t *peer, enum osoe_hello_purpose *purpose);
 
@@ -196,6 +210,11 @@ int osoe_listener_call_step(struct osoe_listener_call *c, short revents);
 /* For a notice: whom it calls and what it last met - "node 5 (pi5, at
  * 10.0.0.5) to answer on port 40213: Connection refused, 0.2 s ago". */
 void osoe_listener_call_describe(const struct osoe_listener_call *c, char *text, size_t len);
+
+/* Give a call up before it is made: its socket closed, before the
+ * confirmation that would have had its callee attach an end (an aborting
+ * lead's calls, H23). It may be begun again. */
+void osoe_listener_call_abandon(struct osoe_listener_call *c);
 
 /*
  * Node `node`'s address from the host list: OSOE_STEP_NODELIST, which mirrors

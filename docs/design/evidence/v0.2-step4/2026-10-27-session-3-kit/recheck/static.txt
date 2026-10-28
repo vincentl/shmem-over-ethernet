@@ -1,0 +1,44 @@
+Internal ctest changing into directory: ~/kit-s3/src2/build/release
+Test project ~/kit-s3/src2/build/release
+      Start  15: shmem.exports
+      Start  17: shmem.version.library
+      Start  18: shmem.boundary
+      Start  19: shmem.settings-documented
+ 1/17 Test  #17: shmem.version.library ...............   Passed    0.01 sec
+      Start  20: shmem.settings-known
+ 2/17 Test  #15: shmem.exports .......................   Passed    0.06 sec
+      Start  21: shmem.pass-expressions
+ 3/17 Test  #19: shmem.settings-documented ...........   Passed    0.07 sec
+      Start  22: shmem.whole-lines
+ 4/17 Test  #22: shmem.whole-lines ...................   Passed    0.01 sec
+      Start  23: shmem.license-lines
+ 5/17 Test  #20: shmem.settings-known ................   Passed    0.13 sec
+      Start  24: shmem.memory-orders
+ 6/17 Test  #23: shmem.license-lines .................   Passed    0.08 sec
+      Start  25: shmem.static-link
+ 7/17 Test  #24: shmem.memory-orders .................   Passed    0.06 sec
+      Start  26: shmem.strict-c11
+ 8/17 Test  #18: shmem.boundary ......................   Passed    0.60 sec
+      Start  27: shmem.single-node.configure
+ 9/17 Test  #27: shmem.single-node.configure .........   Passed    0.47 sec
+      Start 894: shmem.version.start-up
+10/17 Test #894: shmem.version.start-up ..............   Passed    0.00 sec
+      Start 895: shmem.version.info
+11/17 Test #895: shmem.version.info ..................   Passed    0.00 sec
+      Start 896: shmem.version.start-up.sma
+12/17 Test #896: shmem.version.start-up.sma ..........   Passed    0.00 sec
+      Start 897: shmem.version.info.sma
+13/17 Test #897: shmem.version.info.sma ..............   Passed    0.00 sec
+      Start 900: shmem.version.info.every-variable
+14/17 Test #900: shmem.version.info.every-variable ...   Passed    0.05 sec
+15/17 Test  #25: shmem.static-link ...................   Passed    3.57 sec
+16/17 Test  #21: shmem.pass-expressions ..............   Passed   12.02 sec
+17/17 Test  #26: shmem.strict-c11 ....................   Passed   36.95 sec
+
+100% tests passed, 0 tests failed out of 17
+
+Label Time Summary:
+tier1    =  54.03 sec*proc (12 tests)
+tier2    =   0.06 sec*proc (5 tests)
+
+Total Test time (real) =  37.17 sec

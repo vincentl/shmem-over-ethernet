@@ -1,0 +1,24 @@
+# 2026-10-28T04:43:03Z window.sh on lima-osoe
+# kit f6b46f952137a8611b3fcc6ebf7bc3838a966328
+# launcher osoe-launch, build ~/kit-s3/src/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 180 s
+04:43:07 exit 0 shapes-link-d8-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:11 exit 0 shapes-link-d4-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=4 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:15 exit 0 shapes-fixed-k4-d8-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:18 exit 0 shapes-tree-d8-pes8-r1.txt: OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:22 exit 0 shapes-tree-d8-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:26 exit 0 shapes-fixed-k4-d8-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:30 exit 0 shapes-link-d4-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=4 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:33 exit 0 shapes-link-d8-pes8-r2.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:37 exit 0 shapes-fixed-k4-d8-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:41 exit 0 shapes-tree-d8-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:44 exit 0 shapes-link-d8-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:49 exit 0 shapes-link-d4-pes8-r3.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=4 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:53 exit 0 shapes-link-d4-pes8-r4.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=4 ~/kit-s3/src/build/release/kit/shapes 100
+04:43:57 exit 0 shapes-link-d8-pes8-r4.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:44:00 exit 0 shapes-tree-d8-pes8-r4.txt: OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:44:04 exit 0 shapes-fixed-k4-d8-pes8-r4.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:44:08 exit 0 shapes-link-d8-pes8-r5.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:44:13 exit 0 shapes-link-d4-pes8-r5.txt: OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=4 ~/kit-s3/src/build/release/kit/shapes 100
+04:44:17 exit 0 shapes-fixed-k4-d8-pes8-r5.txt: OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=4 OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+04:44:20 exit 0 shapes-tree-d8-pes8-r5.txt: OSOE_COLLECTIVE_SHAPE=tree OSOE_COLLECTIVE_PIPELINE=8 ~/kit-s3/src/build/release/kit/shapes 100
+# done 04:44:20

@@ -10,9 +10,15 @@
 # FANOUTS and WINDOWS (OSOE_COLLECTIVE_SHAPE=fixed with OSOE_COLLECTIVE_FANOUT
 # and OSOE_COLLECTIVE_PIPELINE), ROUNDS times in another order each round:
 # where a fixed shape beats the chooser's at a size, the chooser's costs are
-# off on this link, which the Pi's table fitted (shape_timing.py).
+# off on this link, which the Pi's table fitted (shape_timing.py). CASES,
+# given, replaces that list: link, tree, link-dD and tree-dD (the chooser, or
+# its trees, at a window of D, OSOE_COLLECTIVE_PIPELINE=D) and fixed-kK-dD -
+# the third session's four are "link-d4 link-d8 tree-d8 fixed-k4-d8", P37's
+# default of 8 timed against today's 4 and the best fixed tree of the second
+# session (docs/prompts/cluster-session-3-plan.md).
 #   ROUNDS (3), PES_PER_NODE (8), FANOUTS ("2 4 8"), WINDOWS ("1 2 4 8"),
-#   TRIPS (100), SIZES (shapes.c's own)
+#   CASES (link, tree and every fixed shape of those), TRIPS (100),
+#   SIZES (shapes.c's own)
 # usage: window.sh NODES OUTDIR
 : "${KIT_TIMEOUT:=180}"
 source "$(dirname "$0")/common.sh"
@@ -23,22 +29,29 @@ FANOUTS=${FANOUTS:-2 4 8}
 WINDOWS=${WINDOWS:-1 2 4 8}
 TRIPS=${TRIPS:-100}
 SIZES=${SIZES:-}
-CASES="link tree"
-for k in $FANOUTS; do
-    for d in $WINDOWS; do
-        CASES="$CASES fixed-k$k-d$d"
+if [ -z "${CASES:-}" ]; then
+    CASES="link tree"
+    for k in $FANOUTS; do
+        for d in $WINDOWS; do
+            CASES="$CASES fixed-k$k-d$d"
+        done
     done
-done
+fi
 settings() {
     case $1 in
         link)  echo OSOE_COLLECTIVE_SHAPE=link ;;
         tree)  echo OSOE_COLLECTIVE_SHAPE=tree ;;
+        link-d* | tree-d*)
+            echo OSOE_COLLECTIVE_SHAPE=${1%-d*} OSOE_COLLECTIVE_PIPELINE=${1#*-d} ;;
         fixed-k*)
             local k=${1#fixed-k}
             echo OSOE_COLLECTIVE_SHAPE=fixed OSOE_COLLECTIVE_FANOUT=${k%-d*} \
                  OSOE_COLLECTIVE_PIPELINE=${1#*-d} ;;
+        *)     echo "no case $1" >&2; exit 2 ;;
     esac
 }
+# Every case known before any job runs: an unknown one ends the section here.
+for c in $CASES; do settings "$c" > /dev/null; done
 for ((round = 1; round <= ROUNDS; round++)); do
     for c in $(rotate "$CASES" "$round"); do
         # shellcheck disable=SC2046,SC2086

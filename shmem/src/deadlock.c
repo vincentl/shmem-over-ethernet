@@ -340,6 +340,9 @@ static void describe(const struct osoe_blocked_copy *w, char *out, size_t size)
     case OSOE_BLOCKED_DETAIL_TEAM_NUMBER:
         snprintf(out, size, " (pending team number %" PRIu64 ")", w->detail);
         break;
+    case OSOE_BLOCKED_DETAIL_CONNECTING:
+        snprintf(out, size, " (data wire to node %" PRIu64 ", connecting)", w->detail);
+        break;
     case OSOE_BLOCKED_DETAIL_NONE:
         out[0] = '\0';
         break;

@@ -45,8 +45,10 @@
  * table of ranks where the node's interleave with another's. Each PE checks
  * its descriptors against the map and runs the collectives on each, and
  * osoe-stat names teams 3 and 4 by their numbers, with their records as the
- * map implies them, and the node's own. Then team 4 is destroyed, and its
- * record is gone from the dump: since the team redesign's step D the last of
+ * map implies them, and the node's own - none where it is a team of one, a
+ * node's one PE or a PE alone under force-remote, which claims no block (P7).
+ * Then team 4 is destroyed, and its record is gone from the dump: since the
+ * team redesign's step D the last of
  * a team's members on a node to leave its block retracts the record and gives
  * the block back (node.h). The two left alive at the end are the session's
  * end to free. And a fourth team, the world again, has node 0's record
@@ -85,7 +87,7 @@ static int me, npes;
  * this PE's node reversed, whose number its node's claim decides. */
 static shmem_team_t again_team = SHMEM_TEAM_INVALID, reverse_team = SHMEM_TEAM_INVALID,
                     node_team = SHMEM_TEAM_INVALID;
-static uint32_t node_team_number;
+static uint32_t node_team_number, node_team_members;
 
 /* A comma-separated list of numbers into `values`, up to `capacity`; how many. */
 static uint32_t read_list(const char *list, uint32_t *values, uint32_t capacity)
@@ -318,6 +320,7 @@ static void check_created_teams(const uint32_t *node_of, uint32_t nodes, const u
     const struct osoe_team *t = osoe_team_of("test-team-storage", node_team);
     const struct osoe_team *shared = osoe_team_of("test-team-storage", SHMEM_TEAM_SHARED);
     node_team_number = t->number;
+    node_team_members = (uint32_t)n;
     CHECK(node_team_number >= 5);
     /* A split of a table is a table (team.h). */
     CHECK((t->world_of_rank != NULL) == (shared->world_of_rank != NULL));
@@ -520,9 +523,21 @@ static void check_stat(const uint32_t *node_of, uint32_t nodes, const uint32_t *
     }
     check_record(out, "3", local, nodes, lowest_of);
     check_record(out, "4", local, nodes, highest_of);
+    /* The node reversed: its record, but for a team of one - a node of one PE,
+     * or a PE alone in SHMEM_TEAM_SHARED under force-remote, as every PE of the
+     * node is then - which claims no block, and so has none (P7, layout 42). */
     char label[16];
     snprintf(label, sizeof label, "%u", node_team_number);
-    check_record(out, label, osoe.job.force_remote ? 1 : local, 1, NULL);
+    if (node_team_members > 1) {
+        check_record(out, label, local, 1, NULL);
+    } else {
+        char name[64];
+        snprintf(name, sizeof name, "\n    team.%s.record.published ", label);
+        if (strstr(out, name))
+            fprintf(stderr, "PE %d: osoe-stat -d shows a record of team %s, a team of one\n", me,
+                    label);
+        CHECK(strstr(out, name) == NULL);
+    }
 
     CHECK(run_stat("--summary", out, sizeof out) == 0);
     CHECK(summary_has(out, osoe.job.node, "world"));

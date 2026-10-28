@@ -1,0 +1,35 @@
+== out-smoke and out-alone
+built h0: node 0 us a wake 143.1 (89.7 to 157.1, 6); other nodes us a put 63.2 (44.5 to 88.7, 18); idle ms a second (a node) 0.6 (0.2 to 1.6, 24); passes a wake 5.0 (5.0 to 5.0, 6)
+spin  h0: node 0 us a wake 347.4 (283.4 to 368.6, 6); other nodes us a put 283.0 (245.4 to 353.0, 18); idle ms a second (a node) 2.6 (2.4 to 5.3, 24); passes a wake 5.0 (5.0 to 5.0, 6)
+built h2: node 0 us a wake 137.0 (107.2 to 175.9, 6); other nodes us a put 74.2 (54.9 to 96.4, 18); idle ms a second (a node) 0.7 (0.4 to 1.4, 24); passes a wake 5.0 (5.0 to 5.0, 6)
+spin  h2: node 0 us a wake 360.6 (351.7 to 384.1, 6); other nodes us a put 313.5 (296.0 to 340.2, 18); idle ms a second (a node) 7.0 (6.2 to 8.5, 24); passes a wake 5.0 (5.0 to 5.1, 6)
+h0: the spin over as built - node 0 a wake 2.4 times (worst pair 1.8), other nodes a put 4.5 times, idle 4.6 times
+h2: the spin over as built - node 0 a wake 2.6 times (worst pair 2.0), other nodes a put 4.2 times, idle 10.4 times
+== out-gap10
+built h0: node 0 us a wake 157.8 (150.0 to 165.5, 2); other nodes us a put 70.3 (52.2 to 145.0, 6); idle ms a second (a node) 0.5 (0.5 to 0.6, 8); passes a wake 5.0 (5.0 to 5.0, 2)
+spin  h0: node 0 us a wake 421.2 (413.4 to 429.0, 2); other nodes us a put 292.9 (279.7 to 340.2, 6); idle ms a second (a node) 2.6 (2.5 to 8.7, 8); passes a wake 5.0 (5.0 to 5.0, 2)
+built h2: node 0 us a wake 162.6 (147.4 to 177.7, 2); other nodes us a put 99.8 (86.7 to 163.6, 6); idle ms a second (a node) 1.1 (0.5 to 2.0, 8); passes a wake 5.2 (5.2 to 5.2, 2)
+spin  h2: node 0 us a wake 412.1 (388.0 to 436.2, 2); other nodes us a put 441.1 (433.4 to 459.5, 6); idle ms a second (a node) 6.5 (6.3 to 7.1, 8); passes a wake 5.2 (5.2 to 5.2, 2)
+h0: the spin over as built - node 0 a wake 2.7 times (worst pair 2.5), other nodes a put 4.2 times, idle 4.7 times
+h2: the spin over as built - node 0 a wake 2.5 times (worst pair 2.2), other nodes a put 4.4 times, idle 5.7 times
+== out-loaded1
+built h0: node 0 us a wake 14.9 (14.1 to 16.6, 3); other nodes us a put 11.4 (9.8 to 12.2, 9); idle ms a second (a node) 0.1 (0.1 to 0.3, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+spin  h0: node 0 us a wake 216.2 (212.2 to 216.5, 3); other nodes us a put 214.1 (209.2 to 215.6, 9); idle ms a second (a node) 2.1 (2.1 to 2.3, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+built h2: node 0 us a wake 14.1 (13.2 to 16.0, 3); other nodes us a put 10.8 (9.1 to 13.6, 9); idle ms a second (a node) 0.3 (0.1 to 0.4, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+spin  h2: node 0 us a wake 221.0 (219.1 to 222.6, 3); other nodes us a put 245.1 (241.9 to 248.1, 9); idle ms a second (a node) 6.1 (5.9 to 6.2, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+h0: the spin over as built - node 0 a wake 14.5 times (worst pair 12.8), other nodes a put 18.8 times, idle 15.0 times
+h2: the spin over as built - node 0 a wake 15.7 times (worst pair 13.7), other nodes a put 22.7 times, idle 21.1 times
+== out-loaded
+built h0: node 0 us a wake 18.7 (13.3 to 28.9, 3); other nodes us a put 17.3 (13.1 to 38.3, 9); idle ms a second (a node) 0.1 (0.1 to 0.2, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+spin  h0: node 0 us a wake 212.1 (211.8 to 212.9, 3); other nodes us a put 220.9 (209.2 to 248.8, 9); idle ms a second (a node) 2.1 (2.1 to 2.2, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+built h2: node 0 us a wake 18.2 (12.5 to 36.9, 3); other nodes us a put 20.2 (7.5 to 59.3, 9); idle ms a second (a node) 0.3 (0.1 to 0.9, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+spin  h2: node 0 us a wake 231.2 (218.2 to 262.8, 3); other nodes us a put 253.9 (237.3 to 312.1, 9); idle ms a second (a node) 6.4 (6.2 to 7.4, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+h0: the spin over as built - node 0 a wake 11.3 times (worst pair 7.3), other nodes a put 12.8 times, idle 15.8 times
+h2: the spin over as built - node 0 a wake 12.7 times (worst pair 5.9), other nodes a put 12.6 times, idle 20.3 times
+== out-loaded8
+built h0: node 0 us a wake 6.8 (6.8 to 16.8, 3); other nodes us a put 6.2 (5.5 to 24.3, 9); idle ms a second (a node) 0.1 (0.1 to 0.2, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+spin  h0: node 0 us a wake 211.5 (203.9 to 225.4, 3); other nodes us a put 213.7 (202.0 to 381.0, 9); idle ms a second (a node) 2.0 (1.9 to 2.1, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+built h2: node 0 us a wake 9.5 (8.6 to 17.3, 3); other nodes us a put 12.4 (6.0 to 19.9, 9); idle ms a second (a node) 0.1 (0.1 to 0.2, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+spin  h2: node 0 us a wake 217.1 (210.9 to 240.2, 3); other nodes us a put 238.1 (234.0 to 331.4, 9); idle ms a second (a node) 6.1 (6.0 to 6.3, 12); passes a wake 5.0 (5.0 to 5.0, 3)
+h0: the spin over as built - node 0 a wake 31.1 times (worst pair 12.1), other nodes a put 34.5 times, idle 21.4 times
+h2: the spin over as built - node 0 a wake 22.9 times (worst pair 12.2), other nodes a put 19.2 times, idle 48.8 times

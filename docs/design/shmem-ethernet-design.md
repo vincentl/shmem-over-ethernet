@@ -1470,7 +1470,12 @@ at every helper count, a control wire and a data wire (§3.1,
   every reader sums; and since layout 40 the instant its last pass ended, on
   the coarse monotonic clock, whose age `osoe-stat` shows beside its passes:
   an idle owner passes ten times a second, so an old one is an owner stuck in
-  a pass or not running (D8).
+  a pass or not running (D8). Since layout 42 it counts too the flags it
+  raised more than 10 µs after the pass that moved nothing before it, timed on
+  the fine clock (`late_flags`; T38): as built only a store or two lies between,
+  and a spin before the flag - which every wake count passes, the flag raised
+  late still finding its waker - makes one at each idle pass, which
+  `shmem.late-flags` bounds a wake.
 
 **Non-lead agents never touch a ring or a socket.** Each sleeps on a futex word in
 the node segment and is woken only for work that must run in its own address
@@ -1877,10 +1882,19 @@ headers would pass whenever the library agreed with itself.
   walk down from the root, O(log N) visits, and `node.hostname` — also layout 12 —
   says which machine to ask next. `osoe-stat --summary` prints one line per node
   and team for exactly this walk - of a barrier or a sync, whose epochs the
-  progress thread keeps: the data collectives' generic phase runs on the
-  calling thread and publishes none, so a team hung in one reads "nothing
-  open" there, and the PE lines say where its PEs wait (round six's Q5-1; its
-  own walk is after the release). *Measured* (`shmem.hang-walk`, and the
+  progress thread keeps - and since node layout 42 one more while the node's
+  lead is in a data collective (D1; round six's Q5-1): the generic phase runs on
+  the calling thread, and its lead publishes the epoch it is in and, as each of
+  its waits begins, what it waits for and the node whose word ends the wait -
+  the child or parent in the tree, a round's sender or receiver in Träff's, a
+  step's peer in Bruck's - or its own members, so that the same walk goes from
+  node to node to one whose lead is not in it, or waits for its members. A
+  count several leads add to - Träff's grants, the exchange of collect's totals
+  - cannot say whose is missing, and the line says how many are and names no
+  node; a scan's members, a tree of PEs rather than of leads, name the PE they
+  wait on in their blocked records. Before layout 42 a team hung in a data
+  collective read "nothing open", and the PE lines alone said where its PEs
+  waited. *Measured* (`shmem.hang-walk`, and the
   transcript in the commit): one PE of eight logical nodes never calls the second
   barrier, and three visits find it — node 0 names child 2, node 2 names child 6,
   node 6 has no epoch open and its own members not arrived, so its PE lines say
@@ -2418,8 +2432,9 @@ agent's, which C leaves undefined and which could end the process with main's
 status (found in review; `abort_exit_model.py`, `finalize_returns`). A fatal
 ends at once, on whichever thread finds it, as it did before: its status is a
 failure whoever ends the process, and on the eager mesh every node reads the
-dying lead's end of stream itself. With on-demand connections a fatal will need
-the agent's goodbye too. On the caller's PE, `exit` from the agent runs the
+dying lead's end of stream itself. *(With the data wires on demand, as built
+for H23 on 2026-10-27, the control wires are still eager to every node, so it
+still does: §6.2.)* On the caller's PE, `exit` from the agent runs the
 process's atexit handlers beside whatever other threads the program has; a
 handler that calls into the library then waits out the grace. No PE returns from `shmem_init` before its
 node's lead's agent runs, which the lead publishes in the node's rendezvous
@@ -2453,9 +2468,9 @@ as an end of stream without a goodbye, and a node that reads a dying node's end
 of stream before the tree's message reaches it ends with a failure where
 `shmem_global_exit`'s caller gave a status. The abortive goodbye is read first
 by construction. It costs O(open connections) a node, once: the eager mesh's N,
-which is what a normal goodbye costs too, and O(k + active peers) with on-demand
-connections (§6.2), which still reach every node through the tree's own
-connections. At 4,096 nodes that is 4,095 segments of 56 bytes from each lead. A
+which is what a normal goodbye costs too - and with the data wires on demand
+(§6.2, as built for H23) the N - 1 control wires, still eager, and the data
+wires made. At 4,096 nodes that is 4,095 segments of 56 bytes from each lead. A
 connection with nobody to tell is skipped: one whose normal goodbye has gone,
 whose peer died, or whose peer's own abortive goodbye has arrived — and a peer
 whose abortive goodbye has arrived is sent nothing more of the job's, since its
@@ -2517,7 +2532,11 @@ or a kernel or sandbox refusing the call — the PE is watched by `kill(pid, 0)`
 instead, after one line saying so, rather than the job ending for it; and init
 raises the soft `RLIMIT_NOFILE` to the hard limit, as §6.2 always said it did
 and the code had not. Like the reclaim of a dead job's objects (§6.2), this
-assumes a node's PEs share a pid namespace. The design put the lead's pidfds on
+assumes a node's PEs share a pid namespace, which since node layout 42 the
+join checks (D26): each PE publishes its namespace in its slot, every PE
+compares them once the node has joined and refuses a node whose PEs differ,
+naming two, and until then a node-mate judges its lead by pid only from inside
+the lead's namespace, recorded beside its pid in the header. The design put the lead's pidfds on
 its ring, which a single-node job does not have, and had non-leads check the
 lead with `kill(pid, 0)` at a library wait's sweep, which a computing PE never
 reaches; the agent's own sweep serves both, the same way on every job. It is up
@@ -5719,7 +5738,9 @@ on every parent PE, where PEs that passed others had waited or split apart.
 Every parent PE reads the same result: `split_strided` takes the lowest bit,
 `split_2d` the lowest for every row and the next for every column, since rows
 share no PE, nor columns. Before contributing, the would-be local lead of each
-new team on each node claims the team's block from the pool, so that a dry pool
+new team of more than one PE on each node claims the team's block from the
+pool - a team of one claims none since node layout 42, touching nothing of the
+node's (P7) - so that a dry pool
 fails the split alike - said by the PE that found it dry, naming
 `OSOE_TEAM_BLOCKS` and its node - and so does a mask with no bit left, said once
 by the parent's rank 0, naming `OSOE_MAX_TEAMS`; a block claimed for a split that
@@ -6715,7 +6736,12 @@ small for the node's heaps, among them. Three rules close it:
   false deadlock). A new lead with the dead lead's pid would defeat the check,
   which on one node and within a requeue is a coincidence of `pid_max` - though
   a launch in its own pid namespace makes equal pids likely, if `/dev/shm`
-  outlives the launch.
+  outlives the launch. Since node layout 42 the control segment records its
+  creator's pid namespace beside its pid (D26), and a leftover of another
+  namespace is refused as such, by name, and never reclaimed, whatever process
+  its pid names here - where a pid that another process held here had been
+  named as that process's, a running job's (round six's portability Q5) - and
+  `osoe-stat --gc` leaves it alone, saying why.
 - *The lead makes the segment before anything that can refuse*: the `/dev/shm`
   check comes after it exists and refuses through `failed`; the pages the lead
   writes first are allocated, not only sized, so a `/dev/shm` too full even for
@@ -6870,7 +6896,8 @@ four pairs' two wires - each begun no earlier than its slot, `OSOE_MESH_SLOT`
 apart from the rendezvous's release, and never skipped. A lead has at most N
 callers' connections, both wires of N/2 callers, which `min(N, 4096)` holds to
 4,097 nodes, where the last lead before had 2(N - 1). The listener closes once
-every caller the schedule gives the lead is in.
+every caller the schedule gives the lead is in - eagerly; with the data wires
+on demand it stays open, served on the lead's ring (below).
 `tools/modelcheck/mesh_model.py` searches every lead's calls and accepts for a
 lead that waits for ever; `mesh_timing.py` times the schedule against the order
 before it.
@@ -7015,28 +7042,103 @@ that can see and inject its packets after the hello: that would take encrypting
 the traffic, and the network is still trusted that far, as Slurm's own is (§3.4).
 Off by default, since §3.4's trust boundary is unchanged.
 
-**The mesh is still eager, and what on-demand would need.** Every lead connects
-to every higher node at init: *N*(*N* − 1)/2 connections job-wide, 8.4 M at 4,096
-nodes, and a listen backlog of *N* − 1 (capped by `somaxconn`), which at 4,096
-nodes turns the last connections into SYN retries rather than failures. Nothing
-in this slice made laziness harder. On-demand would need: a connection opened at
-the first operation toward a node, which the per-connection state already allows
-— a wire, a ring slot and the connection area's buffers are all per peer slot, and
-the dirty set and the busy bitmap only visit what has work; the lead's listener
-kept open for the life of the job, served by a multishot accept on the ring
-rather than closed after init; a writer that finds no connection toward a node
-posting a request to the lead rather than reserving, since only the lead
-connects (§3.12); and a rule for two leads that connect to each other at once —
-the lower node's connection wins, as §6.2's direction already says. *(Since
-H23 the direction is the mesh's schedule's, which a rule of the same kind would
-follow: the connection the schedule makes wins.)* The ring's
-bounds would then follow the active peers rather than *N*. *(Decided on 2026-10-25,
-not yet built: the data wires alone on demand, behind a setting, eager by default -
-the control wires stay eager to every node, so the trees, the abort, keepalive and
-the silent-peer check keep theirs; the schedule's caller always dials, the other side
-asking it over their control wire, so no two calls cross; a stalled data wire is
-told as any wait is; the listener stays open for the job's life in on-demand mode
-alone. `docs/decisions/2026-10-24.md`, "The author's answers".)*
+**The mesh is eager by default, and its data wires on demand under
+`OSOE_MESH_DATA_WIRES=on-demand`.** Eagerly, every lead connects to every other
+node at init: *N*(*N* − 1) connections job-wide, two a pair, 16.8 M at 4,097
+nodes, each lead holding 2(*N* − 1), and the connection area's buffers for every
+peer counted against `OSOE_AM_BUFFER_BUDGET`, which halves them past 2,049 nodes
+and refuses a job past 4,097. *As first written here, before H23:* on demand
+would need a connection opened at the first operation toward a node, which the
+per-connection state already allowed; the lead's listener kept open for the life
+of the job; a writer that finds no connection posting a request to the lead
+rather than reserving, since only the lead connects (§3.12); a rule for two
+leads that connect to each other at once; and the ring's bounds following the
+active peers rather than *N*.
+
+*As built since H23 (2026-10-27), by the author's decisions of 2026-10-25*
+(`docs/decisions/2026-10-24.md`, "The author's answers", item 4;
+`data-wires.h`; `tools/modelcheck/data_wire_model.py`), behind the setting,
+eager by default until a large cluster measures it:
+
+- **The data wires alone are made on demand.** The control wires stay eager to
+  every node, made by the start-up schedule as before, so start-up still proves
+  every node reachable, and the barrier's and the deadlock detector's trees, the
+  abort's goodbyes, keepalive, the silent-peer check and `osoe-stat`'s owners
+  keep their wires. The schedule makes the control wires alone, and a data
+  wire's caller that comes during start-up is told to come back.
+- **Nothing on the writer's side changes.** A connection whose data wire has no
+  socket keeps both buffers sealed, as every connection starts (§3.5), so a
+  writer finds nothing reservable, marks the connection for its owner, wakes it
+  and waits on the turnover - the wait it makes whenever no buffer has room. Its
+  owner opens nothing until the wire is attached, so nothing is sent before the
+  wire is up, and asks the lead's agent for the wire once (`progress.c`'s
+  `attach_or_ask`); with progress helpers the helper owning the connection asks
+  through a bitmap the agent takes, woken as a writer wakes an owner
+  (`lead_wake_model.py`'s protocol).
+- **The schedule's caller always dials** (`mesh-schedule.h`): where the lead is
+  the caller of the pair, the need is a call, start-up's three-step hello, at
+  most eight in flight; where it is not, it asks the peer to dial, one
+  `OSOE_AM_DATA_WIRE_WANTED` on their control wire, application work the
+  detector waits on. No two calls cross, so no rule has to settle a crossing:
+  the one sketched above is not needed. A call against the schedule, or a
+  second wire, is refused by name as at start-up.
+- **The listener stays open for the job's life** in this mode alone, served on
+  the agent's ring: one epoll set holds the listening socket, the callers
+  part-way through the hello and the calls in flight, as `listener.h`'s poll
+  asks for them, and one poll on the ring watches it (`ring.h`'s watch), so the
+  agent's idle wait ends when any of them moves, and by the earliest deadline
+  of a dial, a back-off or a hello. The listener's set of sixteen callers, its
+  hello's limits and its calls' retries are start-up's, unchanged - where a
+  multishot accept, which this paragraph once sketched, would take connections
+  the full set has no place for.
+- **The socket goes to its connection's owner**: stored, then the connection
+  marked in the owner's dirty bitmap and the owner woken, so that its next visit
+  attaches the socket to its own ring, whose only submitter it is, opens a
+  buffer, and with the turnover releases the writers.
+- **An abort waits for no wire.** The agent's abort closes the hand-over, closes
+  its listening socket and drops every caller it has not answered, and abandons
+  its calls before their confirmation - nobody has attached an end of any of
+  them - but serves a caller it has answered to the confirmation or its end,
+  since that caller attaches its end the moment it has confirmed, and sends the
+  abortive goodbye on the socket so made itself: an end of stream without one
+  would be a death to the caller where a global exit gave a status
+  (`abort_model.py`'s STATUS, here `data_wire_model.py`'s). A helper finishes
+  its own abort only after a pass begun once the hand-over is closed, so every
+  socket handed to it before is attached and told.
+- **A stalled data wire is told as any wait is** (§3.15): the lead's notice once
+  a call, or a request to the peer, has waited 30 s, and every minute after,
+  naming the node, its address and the last call's error, as start-up's calls
+  say; `OSOE_NO_PROGRESS_TIMEOUT` ends the job if set, and so does the waiting
+  writer's own wait, whose fatal says that its connection's data wire is not yet
+  made. A node making a wire is neither idle nor quiet, so the deadlock detector
+  never takes a stalled wire for a deadlock. `osoe-stat`'s blocked kind for the
+  wait, `OSOE_BLOCKED_DETAIL_CONNECTING`, is the layout-42 slice's: named, but
+  set by no writer yet - H23's one open part.
+- **The budget counts the data wires a node makes** (the author, 2026-10-27;
+  `docs/decisions/2026-10-27-data-wires-on-demand.md`): on demand the buffers
+  are chosen as eagerly, halving to the floor, so that on demand refuses nothing
+  an eager job runs; past where even the floor holds every peer - 4,097 nodes at
+  the defaults - it takes the floor and a node may make budget / (2 × floor)
+  data wires, 4,096 at the defaults, each lead saying so once and the one past
+  the count ending the job by name (`osoe_am_data_wires_most`, `data-wires.c`).
+  The area keeps every peer's place at the floor, for nothing: tmpfs allocates a
+  page as it is first written, and a file four times `/dev/shm`'s own size, in
+  the development VM, took the three pages written into it alone; so the
+  `/dev/shm` check compares the area's words and the count's buffers. The rings'
+  bounds count the wires that can hold a socket - the control wires, and as many
+  data wires as the count - so the lead's io_uring holds a job of 12,288
+  nodes at no helpers, where eagerly it holds 8,192, and 16,384 with helpers
+  either way.
+- **What it saves** is the data wires' sockets and their part of start-up, for a
+  program whose nodes each talk to few others, and past 4,097 nodes at the
+  defaults the budget's refusal of the job - which still makes the collective
+  tree's data wires at its first collective that carries data:
+  `shmem_malloc`'s check of its arguments (P23) and the link's measurement and
+  hand-out at the end of `shmem_init` among them, *N* − 1 wires job-wide. The
+  reply pool and the connections' bookkeeping are still a lead's for every peer:
+  at the default credit 65 descriptors, 3 KiB, a peer, 37 MiB at 12,288 nodes,
+  which the count could bound by §3.8's argument as it bounds the rings, and
+  does not yet.
 
 **`set_range` is not acted on here** (§4.10, §7.1 step 3). A TCP backend has
 nothing to prepare before the network touches memory: it receives into its own

@@ -840,6 +840,7 @@ static void check_details(void)
         { OSOE_SEGMENT_DETAIL_GETS_IN_FLIGHT, "nonblocking gets, 3 bytes in flight" },
         { OSOE_SEGMENT_DETAIL_STATICS_OFFSET, "statics offset 0x3" },
         { OSOE_SEGMENT_DETAIL_TEAM_NUMBER, "pending team number 3" },
+        { OSOE_SEGMENT_DETAIL_CONNECTING, "data wire to node 3, connecting" },
         { 99, "+0x3" },
     };
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {

@@ -1,0 +1,9 @@
+== ~/kit-s3/dry/session-3/setup
+jobs: 2, of which 0 failed (run.txt)
+
+start-up: shmem_init, milliseconds - the slowest PE's, the launcher's spread
+with it, and the fastest's, nearer init's own cost
+  startup-32 pes=None  slowest 135 (n=1)  fastest 81.2 (n=1)
+== ~/kit-s3/dry/session-3/setup-build
+== ~/kit-s3/dry/session-3/setup-facts
+jobs: 1, of which 0 failed (run.txt)

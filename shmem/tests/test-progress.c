@@ -352,7 +352,7 @@ int main(void)
     static struct osoe_progress_connection connections[1];
     static uint64_t busy[1];
     struct osoe_progress_host host = { resolve, notify, release, NULL, NULL, landing_request,
-                                       NULL, completed, NULL, aborting, NULL };
+                                       NULL, completed, NULL, aborting, NULL, NULL, NULL, NULL };
     /* One owner, the lead's agent, holding both wires (owner-map.h). */
     struct osoe_progress p;
     static struct osoe_progress_owner owner;

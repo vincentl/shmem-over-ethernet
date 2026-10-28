@@ -256,6 +256,31 @@ static inline uint32_t osoe_test_team_block(uint32_t number)
     return block;
 }
 
+/*
+ * How many teams this PE holds whose published epoch names no block - its
+ * teams of one, which claim none since layout 42 (P7) - counted as those with
+ * an epoch past their first collective beside no block: a word at its take,
+ * epoch 0 and no block, is a number held by no team. -1 if the segment cannot
+ * be read.
+ */
+static inline int osoe_test_teams_without_block(void)
+{
+    char name[OSOE_SEGMENT_NAME_MAX], err[256];
+    osoe_test_segment_name(name, sizeof name, 0);
+    const char *local = osoe_test_launcher("LOCALID");
+    struct osoe_segment s;
+    if (!local || osoe_segment_open(&s, name, err, sizeof err) != 0) {
+        fprintf(stderr, "teams without a block: %s\n", local ? err : "no local id");
+        return -1;
+    }
+    int count = 0;
+    uint32_t block = UINT32_MAX, epoch = 0, id = (uint32_t)strtoul(local, NULL, 10);
+    for (uint32_t number = 0; osoe_segment_epoch(&s, id, number, &block, &epoch); number++)
+        count += block == UINT32_MAX && epoch != 0;
+    osoe_segment_close(&s);
+    return count;
+}
+
 /* How many records this node's connection scope has (0 on a one-node job). */
 static inline uint32_t osoe_test_connection_count(void)
 {

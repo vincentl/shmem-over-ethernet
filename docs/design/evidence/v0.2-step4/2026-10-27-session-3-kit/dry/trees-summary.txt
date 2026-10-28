@@ -1,0 +1,133 @@
+== ~/kit-s3/dry/session-3/trees
+jobs: 20, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -
+their voluntary context switches, which every turnover's wake of all its
+writers raises (S1) - and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  put-1m-2dcf8d6 pes=None h=-          job 11641 (n=1)
+                                       node 5820 (5820-5821, n=2)
+                                       cpu/GiB 0.165 (n=1)
+                                       sleeps a 64 KiB 0.464 (0.463-0.465, n=2)
+                                       peers in calls 0.988 (0.987-0.988, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0635 (0.0630-0.0640, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 7972 MiB/s, hop 16.4 us, message 0 us; unsent limit 1069952 B
+  put-1m-3ee3357 pes=None h=-          job 5326 (n=1)
+                                       node 2663 (2646-2679, n=2)
+                                       cpu/GiB 0.328 (n=1)
+                                       sleeps a 64 KiB 1.61 (1.60-1.61, n=2)
+                                       peers in calls 1.000 (0.999-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0160 (0.0160-0.0160, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 4062 MiB/s, hop 18.9 us, message 0 us
+  put-1m-49c62d3 pes=None h=-          job 10153 (n=1)
+                                       node 5077 (4829-5324, n=2)
+                                       cpu/GiB 0.187 (n=1)
+                                       sleeps a 64 KiB 0.435 (0.432-0.439, n=2)
+                                       peers in calls 0.962 (0.960-0.964, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0920 (0.0860-0.0980, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 11208 MiB/s, hop 16.7 us, message 0 us; unsent limit 1504323 B
+  put-1m-de3dc42 pes=None h=-          job 8269 (n=1)
+                                       node 4134 (4132-4138, n=2)
+                                       cpu/GiB 0.226 (n=1)
+                                       sleeps a 64 KiB 0.911 (0.910-0.912, n=2)
+                                       peers in calls 0.996 (0.995-0.996, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0320 (0.0310-0.0330, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 3737 MiB/s, hop 18.2 us, message 0 us
+  put-1m-main pes=None h=-             job 11566 (n=1)
+                                       node 5783 (5660-5906, n=2)
+                                       cpu/GiB 0.166 (n=1)
+                                       sleeps a 64 KiB 0.460 (0.457-0.462, n=2)
+                                       peers in calls 0.988 (0.988-0.989, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0650 (0.0640-0.0660, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 12105 MiB/s, hop 16.2 us, message 0 us; unsent limit 1624728 B
+  put-64k-2dcf8d6 pes=None h=-         job 11446 (n=1)
+                                       node 5723 (5676-5770, n=2)
+                                       cpu/GiB 0.168 (n=1)
+                                       sleeps a 64 KiB 0.470 (0.469-0.471, n=2)
+                                       peers in calls 0.986 (0.985-0.986, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0675 (0.0660-0.0690, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 2989 MiB/s, hop 16.0 us, message 0 us; unsent limit 401155 B
+  put-64k-3ee3357 pes=None h=-         job 5211 (n=1)
+                                       node 2606 (2552-2659, n=2)
+                                       cpu/GiB 0.328 (n=1)
+                                       sleeps a 64 KiB 1.63 (1.62-1.64, n=2)
+                                       peers in calls 0.999 (0.999-0.999, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0155 (0.0150-0.0160, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 4986 MiB/s, hop 18.9 us, message 0 us
+  put-64k-49c62d3 pes=None h=-         job 9826 (n=1)
+                                       node 4913 (3711-6114, n=2)
+                                       cpu/GiB 0.190 (n=1)
+                                       sleeps a 64 KiB 0.414 (0.381-0.447, n=2)
+                                       peers in calls 0.942 (0.915-0.969, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.160 (0.0850-0.235, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 8893 MiB/s, hop 17.2 us, message 0 us; unsent limit 1193654 B
+  put-64k-de3dc42 pes=None h=-         job 8114 (n=1)
+                                       node 4057 (4056-4059, n=2)
+                                       cpu/GiB 0.230 (n=1)
+                                       sleeps a 64 KiB 0.936 (0.933-0.939, n=2)
+                                       peers in calls 0.994 (0.994-0.995, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0350 (0.0340-0.0360, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 3486 MiB/s, hop 17.3 us, message 0 us
+  put-64k-main pes=None h=-            job 11604 (n=1)
+                                       node 5802 (5676-5928, n=2)
+                                       cpu/GiB 0.165 (n=1)
+                                       sleeps a 64 KiB 0.471 (0.470-0.472, n=2)
+                                       peers in calls 0.985 (0.985-0.985, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0700 (0.0690-0.0710, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 9852 MiB/s, hop 20.0 us, message 0 us; unsent limit 1322368 B
+
+mailbox: messages a second (median, range)
+  mailbox-2dcf8d6 pes=None h=None  135727 (n=1)
+    link 10715 MiB/s, hop 16.9 us, message 0 us; unsent limit 1438088 B
+  mailbox-3ee3357 pes=None h=None  137329 (n=1)
+    link 3211 MiB/s, hop 17.1 us, message 0 us
+  mailbox-49c62d3 pes=None h=None  136694 (n=1)
+    link 3769 MiB/s, hop 16.5 us, message 0 us; unsent limit 505852 B
+  mailbox-de3dc42 pes=None h=None  137644 (n=1)
+    link 3697 MiB/s, hop 16.6 us, message 0 us
+  mailbox-main pes=None h=None  138205 (n=1)
+    link 9294 MiB/s, hop 16.4 us, message 0 us; unsent limit 1247479 B
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-2dcf8d6                alone  median 55.0 (n=1)             p99 67.0 (n=1)            
+  hol-2dcf8d6                stream median 126 (n=1)              p99 292 (n=1)              stream 9489 (n=1)
+                             link 6632 MiB/s, hop 16.1 us, message 0 us; unsent limit 890179 B
+  hol-3ee3357                alone  median 56.0 (n=1)             p99 63.0 (n=1)            
+  hol-3ee3357                stream median 51.0 (n=1)             p99 99.0 (n=1)             stream 2679 (n=1)
+                             link 3851 MiB/s, hop 16.8 us, message 0 us
+  hol-49c62d3                alone  median 56.0 (n=1)             p99 63.0 (n=1)            
+  hol-49c62d3                stream median 311 (n=1)              p99 428 (n=1)              stream 9433 (n=1)
+                             link 7401 MiB/s, hop 15.6 us, message 0 us; unsent limit 993400 B
+  hol-de3dc42                alone  median 55.0 (n=1)             p99 69.0 (n=1)            
+  hol-de3dc42                stream median 71.0 (n=1)             p99 169 (n=1)              stream 4916 (n=1)
+                             link 3528 MiB/s, hop 16.1 us, message 0 us
+  hol-main                   alone  median 57.0 (n=1)             p99 64.0 (n=1)            
+  hol-main                   stream median 125 (n=1)              p99 288 (n=1)              stream 9203 (n=1)
+                             link 13389 MiB/s, hop 16.0 us, message 0 us; unsent limit 1797051 B
+
+outcomes
+  mailbox-2dcf8d6-r1.txt: osoe-pacer failures=0 seconds=20.0
+  mailbox-3ee3357-r1.txt: osoe-pacer failures=0 seconds=20.0
+  mailbox-49c62d3-r1.txt: osoe-pacer failures=0 seconds=20.0
+  mailbox-de3dc42-r1.txt: osoe-pacer failures=0 seconds=20.0
+  mailbox-main-r1.txt: osoe-pacer failures=0 seconds=20.0

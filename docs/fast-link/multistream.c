@@ -68,8 +68,9 @@
  * job:
  *
  *   multistream node=N pes=P mib_per_s=R progress_cpu_s=C program_cpu_s=Q
- *               progress_cpu_s_per_gib=G peers_in_calls=A
- *               peers_in_calls_with_quiets=B quiet_share=S peers_window_s=W
+ *               progress_cpu_s_per_gib=G program_sleeps=Z sleeps_per_64kib=K
+ *               peers_in_calls=A peers_in_calls_with_quiets=B quiet_share=S
+ *               peers_window_s=W
  *   multistream node=N peer_mib=M1,M2,... (to nodes in order, or from them in
  *               get mode, itself skipped)
  *   multistream job mode=put bytes=B seconds=S nodes=N pes=P helpers=H
@@ -78,7 +79,14 @@
  * where progress is the CPU the node's threads named osoe-agent and
  * osoe-helper-N spent over the window, read from /proc/self/task, and program
  * the rest of its PEs' threads: a byte's cost in the library's progress, which
- * the helpers move off the PEs' cores. A node's rate counts what its PEs sent
+ * the helpers move off the PEs' cores. program_sleeps are the voluntary context
+ * switches of those other threads over the window, and sleeps_per_64kib the
+ * same over the node's bytes in 64 KiB: a PE that finds its connection's buffer
+ * full sleeps until the buffer's turnover wakes it, and sleeps again if the
+ * room was taken first, since a turnover wakes every writer then asleep (the
+ * release fixes' review, S1, which measured this figure: 0.75 at one writer,
+ * 8.4 to 9.1 at 16 and 16 to 23 at 32 under the rule then, 1.0 waking one) - a
+ * quiet's sleeps count too. A node's rate counts what its PEs sent
  * (put) or fetched (get). The helper count printed is OSOE_PROGRESS_HELPERS as
  * the job was given it. A node with nothing to sweep - a job of one node -
  * prints no peer figures; the peer line is for jobs of at most PEER_NODES nodes.
@@ -108,10 +116,11 @@ static double now(void)
 
 /* Nanoseconds on a CPU of this process's threads: those that run the library's
  * progress (osoe-agent, osoe-helper-N) in progress, the rest in program. Read
- * from schedstat, or from stat's ticks where the kernel has no schedstat. */
-static void thread_cpu(uint64_t *progress, uint64_t *program)
+ * from schedstat, or from stat's ticks where the kernel has no schedstat. And
+ * the rest's sleeps, their voluntary context switches, from status. */
+static void thread_cpu(uint64_t *progress, uint64_t *program, uint64_t *sleeps)
 {
-    *progress = *program = 0;
+    *progress = *program = *sleeps = 0;
     DIR *d = opendir("/proc/self/task");
     if (!d)
         return;
@@ -156,10 +165,20 @@ static void thread_cpu(uint64_t *progress, uint64_t *program)
                 fclose(f);
             }
         }
-        if (strcmp(name, "osoe-agent") == 0 || strncmp(name, "osoe-helper-", 12) == 0)
+        if (strcmp(name, "osoe-agent") == 0 || strncmp(name, "osoe-helper-", 12) == 0) {
             *progress += ns;
-        else
-            *program += ns;
+            continue;
+        }
+        *program += ns;
+        snprintf(path, sizeof path, "/proc/self/task/%s/status", e->d_name);
+        if ((f = fopen(path, "r")) != NULL) {
+            while (fgets(line, sizeof line, f))
+                if (strncmp(line, "voluntary_ctxt_switches:", 24) == 0) {
+                    *sleeps += strtoull(line + 24, NULL, 10);
+                    break;
+                }
+            fclose(f);
+        }
     }
     closedir(d);
 }
@@ -201,7 +220,8 @@ _Static_assert(sizeof(struct block_record) == 24, "the records' bound counts 24 
  * PEER_NODES nodes, each node's bytes to each peer node, by node index. Each
  * PE has room for RECORDS_A_NODE records over the largest node's PEs. */
 enum { PEER_NODES = 64, RECORDS_A_NODE = 1 << 20 };
-static uint64_t node_bytes[4096], node_progress[4096], node_program[4096], node_pes[4096];
+static uint64_t node_bytes[4096], node_progress[4096], node_program[4096], node_sleeps[4096],
+    node_pes[4096];
 static uint64_t peer_bytes[PEER_NODES][PEER_NODES];
 /* At PE 0, indexed by the node's first PE, the node's figures from its records,
  * which that PE puts there; a window of 0 where it had nothing to sweep. */
@@ -410,8 +430,8 @@ int main(int argc, char **argv)
         dump("start");
     shmem_barrier_all();
 
-    uint64_t progress0, program0;
-    thread_cpu(&progress0, &program0);
+    uint64_t progress0, program0, sleeps0;
+    thread_cpu(&progress0, &program0, &sleeps0);
     double start = now(), stop = start + seconds;
     loop_start = start;
     uint64_t moved = 0;
@@ -439,8 +459,8 @@ int main(int argc, char **argv)
         shmem_quiet();
     }
     double elapsed = now() - start;
-    uint64_t progress1, program1;
-    thread_cpu(&progress1, &program1);
+    uint64_t progress1, program1, sleeps1;
+    thread_cpu(&progress1, &program1, &sleeps1);
     shmem_barrier_all();
     if (me == 0)
         dump("end");
@@ -448,6 +468,7 @@ int main(int argc, char **argv)
     shmem_uint64_atomic_add(&node_bytes[first], moved, 0);
     shmem_uint64_atomic_add(&node_progress[first], progress1 - progress0, 0);
     shmem_uint64_atomic_add(&node_program[first], program1 - program0, 0);
+    shmem_uint64_atomic_add(&node_sleeps[first], sleeps1 - sleeps0, 0);
     shmem_uint64_atomic_add(&node_pes[first], 1, 0);
     if (nodes_count <= PEER_NODES)
         for (int n = 0; n < nodes_count; n++)
@@ -486,11 +507,14 @@ int main(int argc, char **argv)
             uint64_t b = shmem_uint64_atomic_fetch(&node_bytes[n], 0);
             uint64_t c = shmem_uint64_atomic_fetch(&node_progress[n], 0);
             uint64_t q = shmem_uint64_atomic_fetch(&node_program[n], 0);
+            uint64_t z = shmem_uint64_atomic_fetch(&node_sleeps[n], 0);
             double gib = (double)b / (double)(1u << 30);
             printf("multistream node=%d pes=%llu mib_per_s=%.1f progress_cpu_s=%.3f "
-                   "program_cpu_s=%.3f progress_cpu_s_per_gib=%.4f",
+                   "program_cpu_s=%.3f progress_cpu_s_per_gib=%.4f program_sleeps=%llu "
+                   "sleeps_per_64kib=%.3f",
                    nodes - 1, (unsigned long long)pes, (double)b / (1 << 20) / slowest,
-                   (double)c * 1e-9, (double)q * 1e-9, gib > 0 ? (double)c * 1e-9 / gib : 0.0);
+                   (double)c * 1e-9, (double)q * 1e-9, gib > 0 ? (double)c * 1e-9 / gib : 0.0,
+                   (unsigned long long)z, b > 0 ? (double)z / ((double)b / 65536.0) : 0.0);
             if (node_window[n] > 0)
                 printf(" peers_in_calls=%.3f peers_in_calls_with_quiets=%.3f quiet_share=%.3f "
                        "peers_window_s=%.3f",

@@ -11,6 +11,7 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
+#include "base/pid-namespace.h"
 #include "base/print-line.h"
 #include "fatal.h"
 #include "shm-object.h"
@@ -32,7 +33,8 @@ static int check_owner(int fd, const char *name, char *err, size_t errlen)
     return 0;
 }
 
-int osoe_shm_create(const char *name, long owner_offset, char *err, size_t errlen)
+int osoe_shm_create(const char *name, long owner_offset, long namespace_offset, char *err,
+                    size_t errlen)
 {
     for (int attempt = 0; attempt < 2; attempt++) {
         int fd = shm_open(name, O_CREAT | O_EXCL | O_RDWR, 0600);
@@ -56,24 +58,47 @@ int osoe_shm_create(const char *name, long owner_offset, char *err, size_t errle
             return -1;
         }
         int32_t pid = 0;
+        struct osoe_pid_namespace made_in = { 0, 0 };
         if (owner_offset != OSOE_SHM_NO_OWNER &&
             pread(old, &pid, sizeof pid, (off_t)owner_offset) != (ssize_t)sizeof pid)
             pid = 0;                    /* shorter than the header: never initialized */
+        if (namespace_offset != OSOE_SHM_NO_NAMESPACE &&
+            pread(old, &made_in, sizeof made_in, (off_t)namespace_offset) !=
+                (ssize_t)sizeof made_in)
+            made_in = (struct osoe_pid_namespace){ 0, 0 };
         close(old);
-        if (pid > 0 && !(kill((pid_t)pid, 0) != 0 && errno == ESRCH)) {
-            /* A creator with this process's own pid is none of this start's:
-             * the name was left from another PID namespace, where pids repeat,
-             * and no pid can judge it (the review of step D's merge point,
-             * portability Q2). */
-            if (pid == (int32_t)getpid())
+        /*
+         * A creator in another PID namespace is none this pid can judge: the
+         * same number names another process here, or none (D26). Nor is one
+         * with this process's own pid, where no namespace is recorded: pids
+         * repeat between namespaces (the review of step D's merge point,
+         * portability Q2). Either is refused, and never reclaimed - its
+         * creator may be running there - saying so, where until layout 42 a
+         * pid that another process held here was named as that process's
+         * (round six's portability Q5).
+         */
+        struct osoe_pid_namespace here = osoe_pid_namespace_own();
+        bool foreign = osoe_pid_namespace_differ(made_in, here);
+        if (pid > 0 && (foreign || !(kill((pid_t)pid, 0) != 0 && errno == ESRCH))) {
+            if (foreign) {
+                char theirs[48], ours[48];
+                osoe_pid_namespace_text(made_in, theirs, sizeof theirs);
+                osoe_pid_namespace_text(here, ours, sizeof ours);
+                snprintf(err, errlen, "/dev/shm%s already exists, made in another PID "
+                         "namespace, %s, where this process is in %s: its creator's pid, %d, "
+                         "says nothing here (a node's PEs must share one); if no job of these "
+                         "ids runs, rm -f /dev/shm/osoe.<job id>.*", name, theirs, ours,
+                         (int)pid);
+            } else if (pid == (int32_t)getpid()) {
                 snprintf(err, errlen, "/dev/shm%s already exists, its creator's pid %d this "
                          "process's own: another PID namespace left it (a node's PEs must "
                          "share one); if no job of these ids runs, rm -f "
                          "/dev/shm/osoe.<job id>.*", name, (int)pid);
-            else
+            } else {
                 snprintf(err, errlen, "/dev/shm%s already exists, and its creator, pid %d, is "
                          "still running: is another job using these job and step ids?", name,
                          (int)pid);
+            }
             return -1;
         }
         /* A leftover of a job that died during init: its creator is gone, or
