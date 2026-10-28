@@ -19,6 +19,10 @@
 # PROGRAM is any program that initializes, once, and finishes.
 set -u
 LAUNCHER=$1 PROGRAM=$2 MAP=$3 MODE=$4
+# Every data wire made at start-up, so that each lead's line counts them all:
+# on demand (H23) a wire made later is limited as it is attached, after the
+# line (progress-host.c's attach_wire).
+export OSOE_MESH_DATA_WIRES=eager
 ranks=$(printf '%s\n' "$MAP" | tr ',' '\n' | wc -l | tr -d ' ')
 nodes=$(printf '%s\n' "$MAP" | tr ',' '\n' | sort -u | wc -l | tr -d ' ')
 peers=$((nodes - 1))

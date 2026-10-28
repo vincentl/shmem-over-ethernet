@@ -639,8 +639,15 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
     struct am_wait w;
-    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER, "the connection's buffer turnover",
-                  peer, pe, turnover(connection));
+    /* A connection never opened, on demand, is one whose data wire is not yet
+     * made (H23): its no-progress fatal says so, its lead's notice what the
+     * wire waits for (data-wires.h). */
+    uint64_t opened = turnover(connection);
+    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER,
+                  osoe.bootstrap.data_wires_on_demand && opened == 0
+                      ? "the turnover of a connection whose data wire is not yet made"
+                      : "the connection's buffer turnover",
+                  peer, pe, opened);
     osoe_wait_word_enter(word);
     uint32_t slept_on = 0;
     bool swept = false;

@@ -32,6 +32,7 @@
 #include "am-state.h"
 #include "blocked.h"
 #include "connection-area.h"
+#include "data-wires.h"
 #include "deadlock.h"
 #include "fatal.h"
 #include "internode.h"
@@ -347,6 +348,52 @@ static bool node_aborting(void *context)
     return osoe_abort_pending();
 }
 
+static void wake_owner(uint32_t owner);
+static uint32_t unsent_bytes(uint64_t asked);
+
+/* On demand (H23; progress.h): a connection with no data wire, which a writer
+ * waits for - the agent asked for it, and woken where the owner is a helper,
+ * as a writer wakes an owner, the needs being the bits (lead_wake_model.py;
+ * raise_flag_and_look looks at them). */
+static void want_wire(void *context, const struct osoe_progress_owner *o, uint32_t index)
+{
+    (void)context;
+    osoe_data_wires_want(osoe_owner_slot(o->index, index, osoe_am.area.helpers));
+    if (o->index != 0)
+        wake_owner(0);
+}
+
+/* And the socket the agent made for it, if it has handed one over: attached on
+ * the owner's thread, with the unsent limit the owner last took
+ * (take_unsent_request), and counted in the owner's record, which says the
+ * wires it holds (node.h) - its one writer. */
+static bool attach_wire(void *context, struct osoe_progress_owner *o, uint32_t index)
+{
+    (void)context;
+    uint32_t slot = osoe_owner_slot(o->index, index, osoe_am.area.helpers);
+    int fd = osoe_data_wires_take(slot);
+    if (fd < 0)
+        return false;
+    struct osoe_wire *w = &o->wire[index];
+    osoe_wire_attach(w, o->ring, index, fd, slot < osoe.job.node ? slot : slot + 1,
+                     &osoe.bootstrap);
+    uint64_t asked = osoe_am.owner[o->index].unsent_taken;
+    if (asked)
+        osoe_wire_limit_unsent(w, unsent_bytes(asked));
+    _Atomic uint32_t *held = &o->metrics->data_wires;
+    atomic_store_explicit(held, atomic_load_explicit(held, memory_order_acquire) + 1,
+                          memory_order_release);
+    return true;
+}
+
+/* A peer asks this node, the mesh's caller of their pair, to dial their data
+ * wire: owner 0's, from the control wire's pass. */
+static void data_wire_wanted(void *context, uint32_t node)
+{
+    (void)context;
+    osoe_data_wires_requested(node);
+}
+
 /* ---- waking the engine (§3.12) ------------------------------------------ */
 
 /* The word owner `owner` sleeps on: a helper's in the area, and the lead's
@@ -637,7 +684,8 @@ static bool raise_flag_and_look(uint32_t owner)
     for (uint32_t w = 0; w < words->dirty_words; w++)
         if (atomic_load_explicit(&words->dirty[w], memory_order_seq_cst) != 0)
             return true;
-    return false;
+    /* And the agent the helpers' needs of a data wire (H23, on demand). */
+    return owner == 0 && osoe_data_wires_wanted();
 }
 
 /* ---- lifecycle --------------------------------------------------------- */
@@ -706,6 +754,10 @@ void osoe_progress_host_advertise(void *blob)
                         "(OSOE_MESH_PORT_RANGE=%u-%u)\n",
                         b->node, (unsigned)port, b->mesh_port_low, b->mesh_port_high);
     memcpy(blob, &port, sizeof port);
+    /* And whether this node makes its data wires on demand (H23), which every
+     * node must agree on, checked once the rendezvous has carried every blob
+     * (osoe_progress_host_start). */
+    ((unsigned char *)blob)[sizeof port] = b->data_wires_on_demand ? 1 : 0;
 }
 
 /* The progress helper a test hook's setting names, or 0, which is none: refused
@@ -879,14 +931,36 @@ void osoe_progress_host_start(uint32_t session)
      */
     if (every_node_loopback && !osoe.bootstrap.keepalive_set)
         osoe.bootstrap.keepalive_off = true;
+    /*
+     * OSOE_MESH_DATA_WIRES alike on every node (H23): a node making its data
+     * wires on demand would wait for no data wire at start-up, and an eager one
+     * would wait there for ever for that node's. Each lead reads every node's
+     * blob and names the first that differs from node 0's - every lead the
+     * same one - before any wire is made.
+     */
+    bool on_demand = osoe.bootstrap.data_wires_on_demand;
+    const unsigned char *blob0 = osoe_job_backend_blob(&osoe.job, 0);
+    unsigned char first = blob0[sizeof(uint16_t)];
+    for (uint32_t n = 1; n < osoe.job.node_count; n++)
+        if (((const unsigned char *)osoe_job_backend_blob(&osoe.job, n))[sizeof(uint16_t)] != first)
+            osoe_fatal("node %u makes its data wires %s and node 0 %s "
+                       "(OSOE_MESH_DATA_WIRES): every node of a job must make them alike",
+                       n, first ? "eagerly" : "on demand", first ? "on demand" : "eagerly");
     struct osoe_mesh mesh = { &mesh_listener, peers_address };
     osoe_wires_open(osoe_am.wire, rings, helpers, &osoe.bootstrap, session, &mesh);
+    /* On demand the data wires are the agent's to make from here, through the
+     * listener left open (data-wires.h). */
+    if (on_demand)
+        osoe_data_wires_start(&osoe.bootstrap, session, &mesh_listener, peers_address);
     free(peers_address);
     free(rings);
 
     struct osoe_progress_host host = { resolve, notify, release, NULL, abort_arrived,
                                        landing_request, landed, completed, deadlock_arrived,
-                                       node_aborting, describe_node };
+                                       node_aborting, describe_node,
+                                       on_demand ? want_wire : NULL,
+                                       on_demand ? attach_wire : NULL,
+                                       on_demand ? data_wire_wanted : NULL };
     osoe_progress_init(&osoe_am.progress, &osoe_am.area, engine_owners, &host);
     /* OSOE_TEST_HOLD_GOODBYE=FROM:TO: node FROM's abortive goodbye to node TO
      * held half a second from its abort's start (progress.c, goodbye_held;
@@ -949,7 +1023,8 @@ void osoe_progress_host_start(uint32_t session)
     for (uint32_t o = 0; o < owners; o++) {
         struct osoe_am_owner_metrics *record = &osoe.node.owner_metrics[o];
         engine_owners[o].metrics = record;
-        atomic_store_explicit(&record->data_wires, osoe_owner_wires(o, peers, helpers),
+        atomic_store_explicit(&record->data_wires,
+                              on_demand ? 0 : osoe_owner_wires(o, peers, helpers),
                               memory_order_release);
         atomic_store_explicit(&record->control_wires, o == 0 ? peers : 0, memory_order_release);
     }
@@ -1191,6 +1266,17 @@ static void hold_pass(uint32_t helper, uint32_t request)
     }
 }
 
+/* How long the agent may wait at the most: `most`, or less where a data wire
+ * being made has a deadline sooner (data-wires.h). */
+static uint64_t data_wires_wait_ns(uint64_t most)
+{
+    uint64_t due = osoe_data_wires_due_ns();
+    if (due == UINT64_MAX)
+        return most;
+    uint64_t now = osoe_now_ns();
+    return due <= now ? 0 : due - now < most ? due - now : most;
+}
+
 /*
  * Owner `o`'s part of the job's end, on its thread: tell every peer of its
  * wires - an abortive goodbye on each that still has someone to tell - and keep
@@ -1217,13 +1303,33 @@ static void abort_wires(struct osoe_progress_owner *o, const struct osoe_deadlin
     if (!o->ring->enabled)
         osoe_ring_enable(o->ring);
     osoe_progress_abort(o, pe, status, (uint32_t)how, how == OSOE_ABORT_GLOBAL_EXIT);
-    /* Each wait asks its condition again after a poll that moved nothing, as
+    /* On demand, the agent's data wires being made (data-wires.h): the
+     * hand-over closed, its listener answering no one new, its calls
+     * abandoned, a caller it answered served to its confirmation and told. */
+    if (o->index == 0)
+        osoe_data_wires_abort(pe, status, (uint32_t)how, how == OSOE_ABORT_GLOBAL_EXIT);
+    /*
+     * Each wait asks its condition again after a poll that moved nothing, as
      * close_connections does: an end of stream taken by the poll would
      * otherwise be seen a sweep late, which under srun -K1 is the window in
-     * which the first node to end can have another node's PEs killed. */
-    while (!osoe_progress_aborted(o) && !osoe_deadline_expired(grace))
-        if (!osoe_progress_poll(o) && !osoe_progress_aborted(o))
-            osoe_ring_wait(o->ring, OSOE_SWEEP_NS);
+     * which the first node to end can have another node's PEs killed. A helper
+     * is done only after a pass begun once the agent has closed the hand-over,
+     * which every socket handed to it before has marked, so that the pass
+     * attaches each and its goodbye goes (data-wires.h).
+     */
+    for (;;) {
+        bool closed = osoe_data_wires_handover_closed();
+        bool moved = osoe_progress_poll(o);
+        if (o->index == 0)
+            moved |= osoe_data_wires_poll(o->ring);
+        bool done = closed && osoe_progress_aborted(o) &&
+                    (o->index != 0 || osoe_data_wires_aborted());
+        if (done || osoe_deadline_expired(grace))
+            return;
+        if (!moved)
+            osoe_ring_wait(o->ring, o->index == 0 ? data_wires_wait_ns(OSOE_SWEEP_NS)
+                                                  : OSOE_SWEEP_NS);
+    }
 }
 
 /* A helper that has seen the node's abort, at a turn or at a sweep of its
@@ -1630,6 +1736,7 @@ void osoe_progress_host_limit_unsent(uint32_t bytes, bool by_hand, bool say)
 void osoe_progress_host_stop(void)
 {
     if (osoe_am.lead) {
+        osoe_data_wires_stop();
         free(osoe_am.owner);
         free(osoe_am.progress.owner);
         free(osoe_am.wire);
@@ -1688,7 +1795,11 @@ bool osoe_progress_host_poll(void)
         }
     }
     bool moved = osoe_internode_am_take_arrivals();
-    if (osoe_progress_poll(o) || moved)
+    moved |= osoe_progress_poll(o);
+    /* After the engine's pass, whose reap fired the data wires' watch and
+     * took the requests of peers (H23, on demand). */
+    moved |= osoe_data_wires_poll(o->ring);
+    if (moved)
         return true;
     if (raise_flag_and_look(0))
         return true;
@@ -1706,7 +1817,7 @@ bool osoe_progress_host_idle(uint64_t *applied)
         return true;
     }
     *applied = osoe_counter_word_read(&osoe_am.progress.owner[0].application_applied);
-    bool idle = osoe_progress_idle(&osoe_am.progress.owner[0]);
+    bool idle = osoe_progress_idle(&osoe_am.progress.owner[0]) && !osoe_data_wires_making();
     return helpers_say(REQUEST_IDLE, applied) && idle;
 }
 
@@ -1716,7 +1827,10 @@ bool osoe_progress_host_quiet(uint64_t *applied)
         *applied = 0;
         return true;
     }
-    bool quiet = osoe_progress_quiet(&osoe_am.progress.owner[0], applied);
+    /* A node making a data wire, for a writer that waits, is not quiet: a
+     * stalled wire is told as any wait is, never as a deadlock (H23). */
+    bool quiet = osoe_progress_quiet(&osoe_am.progress.owner[0], applied) &&
+                 !osoe_data_wires_making();
     return helpers_say(REQUEST_QUIET, applied) && quiet;
 }
 
@@ -1734,7 +1848,8 @@ bool osoe_progress_host_wait(_Atomic uint32_t *wake, uint32_t seen)
      * (§3.10); every other agent of the job has only the word. Either way the
      * wait ends by a sweep interval at the latest (§4.10). */
     if (osoe_am.lead)
-        return osoe_ring_wait_wake(&osoe_am.owner[0].ring, wake, seen, OSOE_SWEEP_NS);
+        return osoe_ring_wait_wake(&osoe_am.owner[0].ring, wake, seen,
+                                   data_wires_wait_ns(OSOE_SWEEP_NS));
     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
     return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;
 }

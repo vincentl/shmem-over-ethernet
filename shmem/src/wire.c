@@ -214,6 +214,7 @@ struct mesh {
     const struct osoe_bootstrap *b;
     struct osoe_listener *listener;
     uint32_t peers, helpers;
+    bool on_demand;                         /* the control wires alone (OSOE_MESH_DATA_WIRES) */
     struct mesh_call *calls;
     uint32_t call_count, begun, made;
     uint32_t expected, answered;            /* callers' wires, as the schedule gives */
@@ -225,7 +226,7 @@ static bool lacks_a_wire(const struct mesh *m, uint32_t peer)
 {
     static const enum osoe_hello_purpose purposes[2] = { OSOE_HELLO_CONTROL_WIRE,
                                                          OSOE_HELLO_DATA_WIRE };
-    for (uint32_t k = 0; k < 2; k++) {
+    for (uint32_t k = 0; k < (m->on_demand ? 1u : 2u); k++) {
         struct osoe_ring *ring;
         uint32_t ring_index;
         if (wire_of(m->wires, m->rings, peer_slot(peer, m->b->node), purposes[k], m->peers,
@@ -339,8 +340,16 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
      * offset 1 every lead calls the next - so a lead never waits in one call:
      * one loop answers its listener and takes each call a step on as its
      * socket allows (mesh_model.py: blocking calls wait for ever).
+     *
+     * With OSOE_MESH_DATA_WIRES=on-demand (H23; the author, 2026-10-25) the
+     * schedule makes the control wires alone, and the listener stays open for
+     * the data wires the job makes later (data-wires.h): a data wire's caller
+     * that comes meanwhile is told to come back, as a caller of a purpose a
+     * lead is not yet waiting for always is. Not for the tests below the
+     * library, which make a mesh without a rendezvous.
      */
     uint32_t n = b->node_count, peers = n - 1;
+    bool on_demand = mesh && b->data_wires_on_demand;
     for (uint32_t i = 0; i < 2 * peers; i++)
         wires[i] = (struct osoe_wire){ .fd = -1 };
     struct osoe_listener own, *l = mesh ? mesh->listener : &own;
@@ -357,9 +366,10 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
 
     uint32_t slots = osoe_mesh_schedule_slots(n);
     uint32_t *offsets = malloc((slots ? slots : 1) * sizeof *offsets);
-    struct mesh m = { wires, rings, b, l, peers, helpers,
+    struct mesh m = { wires, rings, b, l, peers, helpers, on_demand,
                       malloc((slots ? 2 * slots : 1) * sizeof *m.calls), 0, 0, 0,
-                      2 * osoe_mesh_schedule_callers(b->node, n), 0, { NULL }, { 0 } };
+                      (on_demand ? 1 : 2) * osoe_mesh_schedule_callers(b->node, n), 0, { NULL },
+                      { 0 } };
     if (!offsets || !m.calls)
         osoe_fatal("out of memory for the mesh's schedule of %u nodes", n);
     osoe_mesh_schedule_order(b->job, b->step, n, offsets);
@@ -368,7 +378,8 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
         if (peer == n)
             continue;
         m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_CONTROL_WIRE, s };
-        m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_DATA_WIRE, s };
+        if (!on_demand)
+            m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_DATA_WIRE, s };
     }
     free(offsets);
     for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++) {
@@ -377,7 +388,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
     }
 
     const uint32_t purposes = OSOE_HELLO_PURPOSE(OSOE_HELLO_CONTROL_WIRE) |
-                              OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE);
+                              (on_demand ? 0 : OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE));
     struct pollfd p[OSOE_LISTENER_POLLED + OSOE_MESH_CALLS_IN_FLIGHT];
     uint32_t polled_call[OSOE_MESH_CALLS_IN_FLIGHT];
     struct osoe_stall_watch watch;
@@ -482,7 +493,11 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
                                            osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
         }
     }
-    osoe_listener_close(l);
+    /* On demand the listener serves the data wires for the job's life
+     * (data-wires.h), and eagerly a stranger probing it afterwards is refused
+     * rather than left unanswered. */
+    if (!on_demand)
+        osoe_listener_close(l);
     for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++)
         osoe_listener_call_free(m.flying[k]);
     free(m.calls);
@@ -490,9 +505,11 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
      * rendezvous's release to its last wire (H23's timing). */
     if (b->debug)
         osoe_print_line("osoe: node %u connected its mesh in %llu us: %u wires answered and %u "
-                        "called, in %u slots of %llu us, %u calls in flight at most\n", b->node,
-                        (unsigned long long)((now_ns() - begun_ns) / 1000), m.answered, m.made,
-                        slots, (unsigned long long)(slot_ns / 1000), OSOE_MESH_CALLS_IN_FLIGHT);
+                        "called, in %u slots of %llu us, %u calls in flight at most%s\n",
+                        b->node, (unsigned long long)((now_ns() - begun_ns) / 1000), m.answered,
+                        m.made, slots, (unsigned long long)(slot_ns / 1000),
+                        OSOE_MESH_CALLS_IN_FLIGHT,
+                        on_demand ? "; its data wires on demand" : "");
     for (uint32_t o = 0; o <= helpers; o++)
         ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
                   osoe_ring_wires(o, peers, helpers), osoe_owner_wires(o, peers, helpers), b,

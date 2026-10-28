@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,8 +36,8 @@
 
 /* What a completion is for, in its user data's low four bits; a send's region
  * in the next four (wire.h); the wire's index on the ring the rest (0 for the
- * futex wait, which is the ring's, not a wire's). */
-enum { RECEIVE = 1, SEND, FUTEX };
+ * futex wait and the watch, which are the ring's, not a wire's). */
+enum { RECEIVE = 1, SEND, FUTEX, WATCH };
 
 static uint64_t tag(uint32_t index, unsigned kind)
 {
@@ -59,7 +60,7 @@ static uint32_t next_power_of_two(uint32_t n)
 const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, char *why, size_t len)
 {
     uint32_t peers = node_count > 1 ? node_count - 1 : 0;
-    uint32_t most_wires = (OSOE_RING_SUBMISSIONS_MOST - 1) / 2;
+    uint32_t most_wires = (OSOE_RING_SUBMISSIONS_MOST - 2) / 2;
     for (uint32_t owner = 0; owner <= helpers; owner++) {
         uint64_t wires = osoe_ring_wires(owner, peers, helpers);
         if (wires <= most_wires)
@@ -69,7 +70,7 @@ const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, char *why, 
                  "asks io_uring for %llu submissions where the kernel allows %u "
                  "(IORING_MAX_ENTRIES): at most %u nodes at OSOE_PROGRESS_HELPERS=%u%s",
                  node_count, (unsigned long long)wires,
-                 owner == 0 ? "lead" : "progress helper", 2 * (unsigned long long)wires + 1,
+                 owner == 0 ? "lead" : "progress helper", 2 * (unsigned long long)wires + 2,
                  OSOE_RING_SUBMISSIONS_MOST, (helpers == 0 ? most_wires / 2 : most_wires) + 1,
                  helpers,
                  helpers == 0 ? ", and 16384 with progress helpers, which take the data wires "
@@ -107,14 +108,15 @@ void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_
                              .buffer_count = buffer_count, .buffer_bytes = buffer_bytes };
     /*
      * §3.3's two bounds, each "can never fill". Submission: a receive re-arm and
-     * a send per wire between two submits, and the one futex wait (§3.10).
-     * Completion: every provided buffer filled once, a terminal completion per
-     * armed receive, a send per wire, the futex wait - and the notifications
-     * each wire that may lend may owe, with the zero-copy send on.
+     * a send per wire between two submits, the one futex wait (§3.10) and the
+     * one watch. Completion: every provided buffer filled once, a terminal
+     * completion per armed receive, a send per wire, the futex wait, the watch
+     * - and the notifications each wire that may lend may owe, with the
+     * zero-copy send on.
      */
-    r->submission_bound = 2 * wire_count + 1;
+    r->submission_bound = 2 * wire_count + 2;
     r->completion_bound = buffer_count + 2 * wire_count +
-                          notifications_per_wire * lending_count + 1;
+                          notifications_per_wire * lending_count + 2;
     struct io_uring_params p = {
         .flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_R_DISABLED | IORING_SETUP_CQSIZE,
         .cq_entries = r->completion_bound,
@@ -156,7 +158,7 @@ struct io_uring_sqe *osoe_ring_entry(struct osoe_ring *r)
     struct io_uring_sqe *sqe = io_uring_get_sqe(&r->uring);
     if (!sqe)
         osoe_fatal("the io_uring's submission queue is full: its bound of %u, 2 per "
-                   "connection and 1, is broken (§3.3)", r->submission_bound);
+                   "connection and 2, is broken (§3.3)", r->submission_bound);
     return sqe;
 }
 
@@ -177,9 +179,29 @@ void osoe_ring_enable(struct osoe_ring *r)
     if (e < 0)
         osoe_fatal("cannot enable the io_uring: %s", strerror(-e));
     r->enabled = true;
+    /* A data wire made on demand has no socket yet: its receive is armed when
+     * it is attached. */
     for (uint32_t i = 0; i < r->wire_count; i++)
-        osoe_ring_arm_receive(r, i);
+        if (r->wires[i].fd >= 0)
+            osoe_ring_arm_receive(r, i);
     osoe_ring_submit(r);
+}
+
+void osoe_ring_watch(struct osoe_ring *r, int fd)
+{
+    if (r->watch_armed)
+        return;
+    struct io_uring_sqe *sqe = osoe_ring_entry(r);
+    io_uring_prep_poll_add(sqe, fd, POLLIN);
+    io_uring_sqe_set_data64(sqe, tag(0, WATCH));
+    r->watch_armed = true;
+}
+
+bool osoe_ring_take_watch(struct osoe_ring *r)
+{
+    bool fired = r->watch_fired;
+    r->watch_fired = false;
+    return fired;
 }
 
 void osoe_ring_submit(struct osoe_ring *r)
@@ -260,6 +282,13 @@ void osoe_ring_reap(struct osoe_ring *r)
             r->futex_armed = false;
             if (cqe->res == 0 || cqe->res == -EAGAIN)
                 r->counts.wakes++;
+            continue;
+        }
+        if ((data & 0xf) == WATCH) {
+            /* Whatever it says - ready, or an error the watcher's own poll of
+             * its set will meet - the watcher looks, and arms it again. */
+            r->watch_armed = false;
+            r->watch_fired = true;
             continue;
         }
         uint32_t index = (uint32_t)(data >> 8);

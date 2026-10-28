@@ -18,7 +18,9 @@
  * had gone wrong waited in silence). That is a notice, never an end: it reads
  * how long the wait has lasted, not whether anything moved, and changes
  * nothing. A wait asks for it by beginning with osoe_stall_watch_begin_noticed,
- * which reads the clock once more; the waits of a running job never do.
+ * which reads the clock once more; the waits of a running job do not - but for
+ * a data wire made on demand, start-up's call made later (H23; the lead's, in
+ * shmem/src/data-wires.h).
  */
 #ifndef OSOE_BASE_STALL_WATCH_H
 #define OSOE_BASE_STALL_WATCH_H

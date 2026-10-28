@@ -24,6 +24,7 @@ if(OSOE_BACKEND STREQUAL "am")
     src/am.c
     src/connection.c
     src/connection-area.c
+    src/data-wires.c
     src/internode-am.c
     src/listener.c
     src/mesh-schedule.c

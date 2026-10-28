@@ -77,6 +77,15 @@ enum osoe_am_handler {
      * its activity, nor needs it applied to be quiet.
      */
     OSOE_AM_DEADLOCK,
+    /*
+     * A node pair's data wire, asked for (H23, on demand): the node that is not
+     * the mesh's caller of the pair needs the wire and asks the caller, on
+     * their control wire, to dial it, so that only the caller ever dials and no
+     * two calls cross (mesh-schedule.h; data_wire_model.py). Application work,
+     * as the tree's messages are: the detector counts it, and a node that asked
+     * is not quiet until the wire is up.
+     */
+    OSOE_AM_DATA_WIRE_WANTED,
     OSOE_AM_HANDLER_COUNT
 };
 
@@ -181,7 +190,15 @@ struct osoe_am_deadlock {
     uint32_t from_node;
 };
 
+/* A data wire asked for: the node that asks, which the receiver holds to the
+ * control wire it came on. */
+struct osoe_am_data_wire_wanted {
+    uint32_t from_node;
+    uint32_t reserved;
+};
+
 _Static_assert(sizeof(struct osoe_am_put) % 8 == 0, "a fixed part must keep the payload 8-byte aligned");
+_Static_assert(sizeof(struct osoe_am_data_wire_wanted) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_deadlock) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_abort) % 8 == 0, "as above");
 _Static_assert(sizeof(struct osoe_am_barrier) % 8 == 0, "as above");

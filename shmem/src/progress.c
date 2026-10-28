@@ -96,7 +96,7 @@ static const char *node_words(const struct osoe_progress *p, uint32_t node, char
 static bool control_kind(uint16_t kind)
 {
     return kind == OSOE_AM_BARRIER_ARRIVE || kind == OSOE_AM_BARRIER_RELEASE ||
-           kind == OSOE_AM_DEADLOCK;
+           kind == OSOE_AM_DEADLOCK || kind == OSOE_AM_DATA_WIRE_WANTED;
 }
 
 /* A message's kind as the job's last words name it. */
@@ -112,6 +112,7 @@ static const char *message_kind_name(uint16_t kind)
     case OSOE_AM_BARRIER_RELEASE: return "barrier release";
     case OSOE_AM_ABORT: return "abort";
     case OSOE_AM_DEADLOCK: return "deadlock detector message";
+    case OSOE_AM_DATA_WIRE_WANTED: return "request for a data wire";
     default: return "message of no known kind";
     }
 }
@@ -801,6 +802,24 @@ static void complete(void *context, const struct osoe_message_header *header,
         break;
     }
 
+    case OSOE_AM_DATA_WIRE_WANTED: {
+        /* A peer that needs its data wire and does not call this node asks it
+         * to dial (H23, on demand): only the mesh's caller of a pair dials, so
+         * no two calls cross. On a node whose wires were all made at start-up
+         * no peer of the same settings asks (progress-host.c checks them). */
+        struct osoe_am_data_wire_wanted m;
+        memcpy(&m, fixed, sizeof m);
+        char who[192];
+        if (m.from_node != peer)
+            osoe_fatal("node %u: a request for a data wire from %s names node %u", p->node,
+                       node_words(p, peer, who, sizeof who), m.from_node);
+        if (!p->host.data_wire_wanted)
+            osoe_fatal("node %u: %s asked for a data wire, and this node made every data wire "
+                       "at start-up", p->node, node_words(p, peer, who, sizeof who));
+        p->host.data_wire_wanted(p->host.context, peer);
+        break;
+    }
+
     default:
         break;
     }
@@ -1239,6 +1258,45 @@ static bool flush_aborting(struct osoe_progress_owner *o, uint32_t i,
     return moved || n > 0;
 }
 
+/*
+ * A connection whose data wire is not made (H23, on demand). Its buffers stay
+ * sealed, as every connection's start (§3.5), so no writer reserves toward the
+ * peer and nothing is sent before the wire is up (data_wire_model.py, EARLY):
+ * a writer that finds nothing reservable marks the connection, and this visit
+ * asks the host for the wire, once. A socket the host has handed over is
+ * attached, and the visit goes on as any connection's: its first buffer opens,
+ * and the turnover that opens it releases the writers waiting. Aborting, a
+ * connection still without one has nobody to tell - and one attached now gets
+ * its abortive goodbye; closing, it has no goodbye to say. True with the wire
+ * attached; `*moved` says whether anything changed.
+ */
+static bool attach_or_ask(struct osoe_progress_owner *o, uint32_t i, bool *moved)
+{
+    struct osoe_progress_connection *c = &o->connection[i];
+    const struct osoe_progress_host *host = &o->engine->host;
+    if (!host->attach_wire)
+        return false;
+    if (host->attach_wire(host->context, o, i)) {
+        osoe_ring_arm_receive(o->ring, i);
+        c->wire_wanted = false;
+        c->abort_done = false;          /* aborting, it has someone to tell after all */
+        *moved = true;
+        return true;
+    }
+    if (o->aborting) {
+        if (!c->abort_done)
+            *moved = true;
+        c->abort_done = true;
+        return false;
+    }
+    if (!o->closing && !c->wire_wanted) {
+        c->wire_wanted = true;
+        host->want_wire(host->context, o, i);
+        *moved = true;
+    }
+    return false;
+}
+
 static bool flush(struct osoe_progress_owner *o, uint32_t i)
 {
     struct osoe_progress_connection *c = &o->connection[i];
@@ -1246,8 +1304,11 @@ static bool flush(struct osoe_progress_owner *o, uint32_t i)
     struct osoe_wire *w = &o->wire[i];
     if (!connection)
         return false;
+    bool attached = false;
+    if (w->fd < 0 && !attach_or_ask(o, i, &attached))
+        return attached;
     if (o->aborting)
-        return flush_aborting(o, i, connection);
+        return flush_aborting(o, i, connection) || attached;
     /* A peer whose abortive goodbye has arrived is ending: nothing more of the
      * job's goes to it, and its exit may already have reset the connection,
      * which a send would take for a failure - a fatal on this thread, ending
@@ -1471,7 +1532,21 @@ static void seal_control(struct osoe_progress_owner *o, uint32_t slot)
     uint32_t used = header, count = 0, application = 0;
     /* Decided by the queue, not by an empty segment: one sealed only to
      * acknowledge is empty too (the adversarial read of Part 2, N3). */
-    bool goodbye = o->closing && osoe_reply_peek(&c->queue) == OSOE_REPLY_NONE;
+    bool goodbye = o->closing && osoe_reply_peek(&c->queue) == OSOE_REPLY_NONE &&
+                   !c->data_wire_asked;
+    /* A request for the pair's data wire first (H23, on demand), which always
+     * fits an empty segment: application work, as the tree's messages are, so
+     * that the detector waits for it to be applied. */
+    if (c->data_wire_asked) {
+        struct osoe_am_data_wire_wanted m = { .from_node = p->node };
+        struct osoe_message_header h = { OSOE_AM_DATA_WIRE_WANTED, 0, (uint32_t)sizeof m };
+        memcpy(c->buffer + used, &h, sizeof h);
+        memcpy(c->buffer + used + sizeof h, &m, sizeof m);
+        used += osoe_message_padded(h.len);
+        c->data_wire_asked = false;
+        application++;
+        count++;
+    }
     while (osoe_reply_peek(&c->queue) != OSOE_REPLY_NONE) {
         struct osoe_reply *r = osoe_reply_at(&o->pool, osoe_reply_peek(&c->queue));
         uint32_t len = osoe_message_padded(r->kind == OSOE_REPLY_DEADLOCK
@@ -1595,7 +1670,7 @@ static bool flush_control(struct osoe_progress_owner *o, uint32_t slot)
     }
     if (c->goodbye != OSOE_GOODBYE_NONE)
         return moved;
-    if (c->queue.depth != 0 || o->closing || c->owe_ack ||
+    if (c->queue.depth != 0 || o->closing || c->owe_ack || c->data_wire_asked ||
         request_owed(c->acked, c->flagged, c->detector_wanted)) {
         if (release_held(c))            /* OSOE_TEST_HOLD_RELEASE: the queue keeps its RELEASE */
             return moved;
@@ -1619,7 +1694,7 @@ static bool control_busy(const struct osoe_progress_owner *o, uint32_t slot)
     if (c->goodbye != OSOE_GOODBYE_NONE)
         return c->bytes != 0;
     return c->bytes != 0 || c->queue.depth != 0 || c->owe_ack || o->closing ||
-           request_owed(c->acked, c->flagged, c->detector_wanted);
+           c->data_wire_asked || request_owed(c->acked, c->flagged, c->detector_wanted);
 }
 
 static void settle_control(struct osoe_progress_owner *o, uint32_t slot)
@@ -1683,11 +1758,14 @@ void osoe_progress_attach(struct osoe_progress *p, uint32_t owner, struct osoe_r
     o->connection = connections;
     o->busy = busy;
     osoe_reply_pool_init(&o->pool, descriptors, descriptor_count);
-    /* Every connection starts busy - it has no buffer open yet - so the first
-     * pass visits each once (O(N), once), and after that only what is active. */
+    /* Every connection with a wire starts busy - it has no buffer open yet - so
+     * the first pass visits each once (O(N), once), and after that only what is
+     * active. One whose wire is made on demand has none yet, and nothing to
+     * open until it has (flush). */
     memset(busy, 0, (size_t)((o->count + 63) / 64) * sizeof *busy);
     for (uint32_t i = 0; i < o->count; i++)
-        mark_busy(o, i);
+        if (wires[i].fd >= 0)
+            mark_busy(o, i);
     for (uint32_t i = 0; i < o->count; i++) {
         struct osoe_progress_connection *c = &o->connection[i];
         memset(c, 0, sizeof *c);
@@ -1736,6 +1814,11 @@ void osoe_progress_attach_control(struct osoe_progress *p, struct osoe_wire *wir
 static bool busy(const struct osoe_progress_owner *o, uint32_t i)
 {
     const struct osoe_progress_connection *c = &o->connection[i];
+    /* A data wire not yet made has no buffer to open, nothing sealed and no
+     * goodbye: a writer's mark, or the socket's hand-over, brings its visit
+     * (flush). Aborting, one visit says it has nobody to tell. */
+    if (o->wire[i].fd < 0)
+        return o->aborting && !c->abort_done;
     if (o->aborting)
         return !c->abort_done;
     return c->open == OSOE_CONNECTION_NONE || c->sending != OSOE_CONNECTION_NONE ||
@@ -1952,6 +2035,13 @@ bool osoe_progress_idle(struct osoe_progress_owner *o)
         return false;
     for (uint32_t i = 0; i < o->count; i++) {
         struct osoe_progress_connection *c = &o->connection[i];
+        /* A data wire not yet made owes nothing - unless a writer waits for
+         * it, which a stalled wire then tells, never a deadlock (H23). */
+        if (o->wire[i].fd < 0) {
+            if (c->wire_wanted)
+                return false;
+            continue;
+        }
         if (o->wire[i].send_error)
             continue;                   /* a peer that reset the connection is owed nothing */
         if (c->sending != OSOE_CONNECTION_NONE || c->sealed != OSOE_CONNECTION_NONE)
@@ -1969,10 +2059,12 @@ bool osoe_progress_idle(struct osoe_progress_owner *o)
         if (used > header)
             return false;
     }
-    /* And owner 0's control wires: nothing queued, nothing on the wire. */
+    /* And owner 0's control wires: nothing queued, nothing on the wire, no
+     * request for a data wire to send. */
     for (uint32_t slot = 0; slot < o->controls; slot++) {
         const struct osoe_progress_control *c = &o->control[slot];
-        if (!o->control_wire[slot].send_error && (c->bytes != 0 || c->queue.depth != 0))
+        if (!o->control_wire[slot].send_error &&
+            (c->bytes != 0 || c->queue.depth != 0 || c->data_wire_asked))
             return false;
     }
     return true;
@@ -2026,6 +2118,18 @@ void osoe_progress_abort(struct osoe_progress_owner *o, uint32_t pe, int32_t sta
     o->aborting = true;
     o->abort_keeps_stream = keep_stream;
     o->abort_held_until_ns = o->engine->abort_hold ? monotonic_ns() + ABORT_HOLD_NS : 0;
+    o->abort_segment_bytes = osoe_progress_abort_segment(o->abort_segment, pe, status,
+                                                         disposition);
+    /* Every wire is visited until its abortive goodbye has gone (O(N), once). */
+    for (uint32_t i = 0; i < o->count; i++)
+        mark_busy(o, i);
+    for (uint32_t slot = 0; slot < o->controls; slot++)
+        mark_control_busy(o, slot);
+}
+
+uint32_t osoe_progress_abort_segment(unsigned char *at, uint32_t pe, int32_t status,
+                                     uint32_t disposition)
+{
     /* One segment for every peer: a header, and one message whose fixed part is
      * the abort. Its seq and ack are the ones nothing checks at the end of a
      * stream; the goodbye flag is what the peer's end of stream is judged by. */
@@ -2036,18 +2140,13 @@ void osoe_progress_abort(struct osoe_progress_owner *o, uint32_t pe, int32_t sta
     struct osoe_am_segment_header sh = { .flags = OSOE_AM_SEGMENT_GOODBYE, .message_count = 1,
                                          .total_len = bytes };
     _Static_assert(sizeof(struct osoe_am_segment_header) + sizeof(struct osoe_message_header) +
-                   sizeof(struct osoe_am_abort) <= sizeof o->abort_segment,
+                   sizeof(struct osoe_am_abort) <= OSOE_PROGRESS_ABORT_SEGMENT_BYTES,
                    "the abortive goodbye fits its buffer");
-    memset(o->abort_segment, 0, sizeof o->abort_segment);
-    memcpy(o->abort_segment, &sh, sizeof sh);
-    memcpy(o->abort_segment + sizeof sh, &h, sizeof h);
-    memcpy(o->abort_segment + sizeof sh + sizeof h, &m, sizeof m);
-    o->abort_segment_bytes = bytes;
-    /* Every wire is visited until its abortive goodbye has gone (O(N), once). */
-    for (uint32_t i = 0; i < o->count; i++)
-        mark_busy(o, i);
-    for (uint32_t slot = 0; slot < o->controls; slot++)
-        mark_control_busy(o, slot);
+    memset(at, 0, OSOE_PROGRESS_ABORT_SEGMENT_BYTES);
+    memcpy(at, &sh, sizeof sh);
+    memcpy(at + sizeof sh, &h, sizeof h);
+    memcpy(at + sizeof sh + sizeof h, &m, sizeof m);
+    return bytes;
 }
 
 bool osoe_progress_aborted(const struct osoe_progress_owner *o)
@@ -2108,8 +2207,8 @@ static bool peer_carries_another(const struct osoe_progress_owner *o, bool contr
 bool osoe_progress_peers_ended(const struct osoe_progress_owner *o, uint32_t carrier)
 {
     for (uint32_t i = 0; i < o->count; i++) {
-        if (peer_carries_another(o, false, i, carrier))
-            continue;
+        if (peer_carries_another(o, false, i, carrier) || o->wire[i].fd < 0)
+            continue;                   /* a data wire never made has no stream to end */
         if (!osoe_wire_ended(&o->wire[i]) && !o->wire[i].error)
             return false;
     }
@@ -2126,6 +2225,8 @@ bool osoe_progress_closed(const struct osoe_progress_owner *o)
 {
     for (uint32_t i = 0; i < o->count; i++) {
         const struct osoe_progress_connection *c = &o->connection[i];
+        if (o->wire[i].fd < 0)
+            continue;                   /* a data wire never made: no goodbye either way */
         /* A connection whose sends met the peer's reset needs no goodbye of this
          * side's once the peer's own has arrived and its stream ended: the peer
          * reads nothing more - it crashed during the close (abort_model.py). */
@@ -2215,6 +2316,17 @@ void osoe_progress_deadlock_send(struct osoe_progress *p, uint32_t node,
                                      (uint64_t)m->phase << 48,
                             .token = m->ok };
     enqueue_control(p, slot, &r);
+}
+
+void osoe_progress_ask_data_wire(struct osoe_progress *p, uint32_t node)
+{
+    uint32_t slot = osoe_progress_slot(p, node);
+    struct osoe_progress_owner *o = &p->owner[0];
+    if (slot == OSOE_CONNECTION_NONE || slot >= o->controls)
+        osoe_fatal("node %u: no control wire toward node %u to ask for a data wire", p->node,
+                   node);
+    o->control[slot].data_wire_asked = true;
+    mark_control_busy(o, slot);
 }
 
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer)
