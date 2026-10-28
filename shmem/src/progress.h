@@ -46,6 +46,7 @@
 #include "reply.h"
 
 struct osoe_deadlock_message;
+struct osoe_progress_owner;
 
 /* The engine holds these by pointer; wire.h and ring.h bring liburing.h, whose
  * POSIX types a strict-C11 file would then have to ask for. */
@@ -123,6 +124,22 @@ struct osoe_progress_host {
      * engine's own tests, whose messages name the index alone.
      */
     void (*describe_node)(void *context, uint32_t node, char *words, size_t len);
+    /*
+     * Data wires made on demand (H23, OSOE_MESH_DATA_WIRES=on-demand): a
+     * connection whose wire has no socket keeps both buffers sealed, so a
+     * writer reserves nothing, marks the connection and waits for its turnover.
+     * `want_wire`: the visit that mark brings asks the host for the wire, once,
+     * on the owner's thread - the lead dials, or asks the peer over their
+     * control wire (data-wires.c). `attach_wire`: whether the host has handed
+     * over a socket for connection `index` of owner `o`, which it then attaches
+     * to the connection's wire, on the owner's thread. `data_wire_wanted`: a
+     * peer asks this node, the mesh's caller of their pair, to dial it the wire
+     * (OSOE_AM_DATA_WIRE_WANTED), on owner 0's thread. All three NULL where
+     * every wire is made at start-up: the engine's own tests, and the default.
+     */
+    void (*want_wire)(void *context, const struct osoe_progress_owner *o, uint32_t index);
+    bool (*attach_wire)(void *context, struct osoe_progress_owner *o, uint32_t index);
+    void (*data_wire_wanted)(void *context, uint32_t node);
 };
 
 /*
@@ -279,6 +296,10 @@ struct osoe_progress_connection {
     bool peer_aborted;
     uint32_t peer_abort_origin;
     uint32_t abort_sent;
+    /* On demand (H23): its data wire has no socket yet, and the host has been
+     * asked for one (progress_host's want_wire) - a writer waits for it, so the
+     * owner is neither idle nor quiet until the wire is attached. */
+    bool wire_wanted;
     struct osoe_am_parser parser;
     struct osoe_reply_queues queues;
 };
@@ -286,6 +307,9 @@ struct osoe_progress_connection {
 /* A control wire's private send buffer: the most one segment of the control
  * plane's messages takes, header included. */
 #define OSOE_PROGRESS_CONTROL_BYTES 4096u
+
+/* The most an abortive goodbye takes: a segment of one OSOE_AM_ABORT. */
+#define OSOE_PROGRESS_ABORT_SEGMENT_BYTES 64u
 
 /*
  * A node pair's control wire, as owner 0 keeps it (the progress helpers
@@ -333,6 +357,10 @@ struct osoe_progress_control {
      * is sealed on this wire before this instant (CLOCK_MONOTONIC), or 0 for no
      * window. */
     uint64_t release_held_until_ns;
+    /* On demand (H23): this node asks the peer, the mesh's caller of their
+     * pair, to dial their data wire - one OSOE_AM_DATA_WIRE_WANTED in its next
+     * segment (osoe_progress_ask_data_wire). */
+    bool data_wire_asked;
     struct osoe_am_parser parser;
     unsigned char buffer[OSOE_PROGRESS_CONTROL_BYTES];
 };
@@ -378,7 +406,7 @@ struct osoe_progress_owner {
     bool aborting;
     bool abort_keeps_stream;                    /* a global exit's (osoe_progress_abort) */
     uint64_t abort_held_until_ns;               /* OSOE_TEST_HOLD_GOODBYE's end, or 0 */
-    unsigned char abort_segment[64];
+    unsigned char abort_segment[OSOE_PROGRESS_ABORT_SEGMENT_BYTES];
     uint32_t abort_segment_bytes;
     /* The replies its connections' queues hold (§3.8): the owner's own pool,
      * sized over its connections - and, owner 0's, the control plane's forwards
@@ -605,6 +633,18 @@ bool osoe_progress_quiet(struct osoe_progress_owner *o, uint64_t *applied);
  * wire to it: the control plane's (the progress helpers proposal's §3.1). */
 void osoe_progress_deadlock_send(struct osoe_progress *p, uint32_t node,
                                  const struct osoe_deadlock_message *m);
+
+/* Ask `node`, the mesh's caller of this node's pair with it, to dial their data
+ * wire (H23, on demand): one OSOE_AM_DATA_WIRE_WANTED on owner 0's control wire
+ * toward it, at its next seal. On owner 0's thread. */
+void osoe_progress_ask_data_wire(struct osoe_progress *p, uint32_t node);
+
+/* An abortive goodbye's bytes, into `at` (OSOE_PROGRESS_ABORT_SEGMENT_BYTES at
+ * the most): what osoe_progress_abort sends on every wire, for a socket the
+ * engine does not hold - a data wire the lead made while its node aborts
+ * (data-wires.c). Returns their count. */
+uint32_t osoe_progress_abort_segment(unsigned char *at, uint32_t pe, int32_t status,
+                                     uint32_t disposition);
 
 /* The highest sequence number `peer` has applied (§4.6's completion evidence). */
 uint64_t osoe_progress_acked(const struct osoe_progress *p, uint32_t peer);

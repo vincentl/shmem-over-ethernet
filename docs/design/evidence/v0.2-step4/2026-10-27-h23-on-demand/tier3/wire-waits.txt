@@ -1,0 +1,12 @@
+barrier-on-demand-1 [it dialled]: n=63 min=466 median=1233 p90=8878 max=12865 us
+barrier-on-demand-1 [the peer dialled, as asked]: n=34 min=718 median=2795 p90=13619 max=16088 us
+  barrier-on-demand-1 [the peer dialled for its own need]: n=29
+barrier-on-demand-2 [it dialled]: n=63 min=485 median=872 p90=5283 max=8616 us
+barrier-on-demand-2 [the peer dialled, as asked]: n=34 min=756 median=1826 p90=6794 max=10670 us
+  barrier-on-demand-2 [the peer dialled for its own need]: n=29
+ring-on-demand-1 [it dialled]: n=126 min=479 median=1095 p90=2834 max=5224 us
+ring-on-demand-1 [the peer dialled, as asked]: n=33 min=793 median=1598 p90=5948 max=7628 us
+  ring-on-demand-1 [the peer dialled for its own need]: n=93
+ring-on-demand-2 [it dialled]: n=126 min=457 median=942 p90=2243 max=7718 us
+ring-on-demand-2 [the peer dialled, as asked]: n=30 min=753 median=1877 p90=5077 max=9092 us
+  ring-on-demand-2 [the peer dialled for its own need]: n=96

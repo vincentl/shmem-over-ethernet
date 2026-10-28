@@ -25,15 +25,24 @@
  *   re-arms: both are normal.
  * - **Send: one in flight per wire** (§3.3, invariant 2), started by
  *   osoe_wire_send and finished by the reap.
+ * - **A watch: one poll at a time on one descriptor** (H23, on demand): the
+ *   lead's epoll set of the data wires it is making - its listener, its
+ *   callers part-way through the hello and its calls (data-wires.c) - so that
+ *   the owner's idle wait ends when any of them moves.
+ *
+ * A wire with no socket - a data wire not yet made, on demand - has nothing
+ * armed and nothing in flight, and its receive is armed once it is attached
+ * (osoe_ring_arm_receive), so the bounds below hold for any number of them.
  *
  * **Both bounds are asserted at open** (§3.3). The submission queue holds what
- * one pass can queue between two submits - a re-arm and a send per wire, and the
- * futex wait - and the completion queue what can complete between two reaps:
- * one completion per provided buffer (a buffer is refilled only after the pass
- * has emptied it), one terminal completion per armed recv, one per send, the
- * futex wait, and with the zero-copy send on the notifications a wire may owe
- * (OSOE_WIRE_ZERO_COPY_OWED_MOST, wire-settings.h). Sized that way neither can
- * overflow, so nothing depends on the kernel's overflow list.
+ * one pass can queue between two submits - a re-arm and a send per wire, the
+ * futex wait and the watch - and the completion queue what can complete between
+ * two reaps: one completion per provided buffer (a buffer is refilled only after
+ * the pass has emptied it), one terminal completion per armed recv, one per
+ * send, the futex wait, the watch, and with the zero-copy send on the
+ * notifications a wire may owe (OSOE_WIRE_ZERO_COPY_OWED_MOST,
+ * wire-settings.h). Sized that way neither can overflow, so nothing depends on
+ * the kernel's overflow list.
  *
  * Private to the thread that drives it, like the rest of the engine (§3.12):
  * nothing here is shared memory, so nothing here is atomic.
@@ -64,6 +73,8 @@ struct osoe_ring {
     uint32_t submission_bound, completion_bound;
     bool enabled;
     bool futex_armed;               /* §3.10: at most one armed wait per ring */
+    bool watch_armed;               /* the watch's poll is armed (osoe_ring_watch) */
+    bool watch_fired;               /* and has completed since osoe_ring_take_watch */
     /* §3.14, the node's `am` record when inside a job; the engine binds it. */
     struct osoe_ring_counts {
         uint64_t completions, receives, enobufs, rearms, sends, short_sends;
@@ -89,34 +100,42 @@ struct osoe_ring {
 #define OSOE_RING_COMPLETIONS_MOST UINT32_C(65536)
 
 /* The most submissions io_uring gives a ring (the kernel's IORING_MAX_ENTRIES).
- * osoe_ring_open asks for two a wire and one, rounded up to a power of two, so
- * a ring holds 16,383 wires at most: owner 0's, which carries every control
- * wire and, at no helpers, every data wire too, holds 2(n - 1) - past 8,192
- * nodes, more - and with helpers n - 1, past 16,384 (P17). */
+ * osoe_ring_open asks for two a wire with a socket and two, rounded up to a
+ * power of two, so a ring holds 16,383 such wires at most: owner 0's, which
+ * carries every control wire and, at no helpers, every data wire too, holds
+ * 2(n - 1) - past 8,192 nodes, more - and with helpers n - 1, past 16,384
+ * (P17). On demand its data wires are at most the count a node may make
+ * (connection-area.h's osoe_am_data_wires_most; H23): 12,288 nodes at no
+ * helpers at the defaults. */
 #define OSOE_RING_SUBMISSIONS_MOST UINT32_C(32768)
 
 /*
- * Whether each node of a job of `node_count` nodes at `helpers` progress helpers
- * can make its rings: NULL if it can, or why not, written into `why`, naming the
- * node counts it can and OSOE_PROGRESS_HELPERS. The backend's check asks it
- * before anything is created (osoe_internode_backend_check), so a job past the
- * ceiling is refused by name rather than by io_uring's EINVAL at the end of
- * the mesh, "cannot create an io_uring for 16384 connections".
+ * Whether each node of a job of `node_count` nodes at `helpers` progress helpers,
+ * of which a node may make `data_wires_most` data wires - every peer, but on
+ * demand past the buffer budget's reach (connection-area.h) - can make its
+ * rings: NULL if it can, or why not, written into `why`, naming the node counts
+ * it can and OSOE_PROGRESS_HELPERS. The backend's check asks it before anything
+ * is created (osoe_internode_backend_check), so a job past the ceiling is
+ * refused by name rather than by io_uring's EINVAL at the end of the mesh,
+ * "cannot create an io_uring for 16384 connections".
  */
-const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, char *why, size_t len);
+const char *osoe_ring_refuses(uint32_t node_count, uint32_t helpers, uint32_t data_wires_most,
+                              char *why, size_t len);
 
 /*
  * Create the ring for `wire_count` wires with `buffer_count` provided buffers
- * of `buffer_bytes` each, disabled until osoe_ring_enable. Its first
- * `lending_count` wires may send by reference and owe up to
- * `notifications_per_wire` notifications each: an owner's data wires, which
- * come before owner 0's control wires on its ring (owner-map.h), and a control
- * wire never lends. Fatal if the kernel gives smaller queues than the bounds
- * above.
+ * of `buffer_bytes` each, disabled until osoe_ring_enable. At most `active` of
+ * the wires have a socket at once - every one eagerly, and on demand the
+ * control wires and as many data wires as the node may make (H23) - and the
+ * bounds above are counted over those; at most `lending_active` of them may
+ * send by reference and owe up to `notifications_per_wire` notifications each:
+ * an owner's data wires, which come before owner 0's control wires on its ring
+ * (owner-map.h), and a control wire never lends. Fatal if the kernel gives
+ * smaller queues than the bounds above.
  */
 void osoe_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t wire_count,
-                    uint32_t lending_count, uint32_t buffer_count, uint32_t buffer_bytes,
-                    uint32_t notifications_per_wire);
+                    uint32_t active, uint32_t lending_active, uint32_t buffer_count,
+                    uint32_t buffer_bytes, uint32_t notifications_per_wire);
 
 /* A send's user data: its wire's index on the ring, and the region it lends
  * by reference - or OSOE_WIRE_LENT_REGIONS for a send that copies (wire.h). */
@@ -162,6 +181,14 @@ struct io_uring_sqe *osoe_ring_entry(struct osoe_ring *r);
 
 /* Arm wire `index`'s multishot receive. */
 void osoe_ring_arm_receive(struct osoe_ring *r, uint32_t index);
+
+/* Arm the watch on `fd` - one poll for input, at most one at a time - unless
+ * it is armed; the reap that finds its completion marks it fired. On the
+ * ring's submitter. */
+void osoe_ring_watch(struct osoe_ring *r, int fd);
+
+/* Whether the watch has fired since the last time this was asked. */
+bool osoe_ring_take_watch(struct osoe_ring *r);
 
 void osoe_ring_close(struct osoe_ring *r);
 

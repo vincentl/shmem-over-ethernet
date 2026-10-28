@@ -1,0 +1,37 @@
+Internal ctest changing into directory: /var/tmp/h23-verify/build/release
+Test project /var/tmp/h23-verify/build/release
+      Start 12: base.serializing-fence
+ 1/14 Test #12: base.serializing-fence ...........   Passed    0.03 sec
+      Start 15: shmem.exports
+ 2/14 Test #15: shmem.exports ....................   Passed    0.06 sec
+      Start 16: shmem.profiling_aliases
+ 3/14 Test #16: shmem.profiling_aliases ..........   Passed    0.44 sec
+      Start 17: shmem.version.library
+ 4/14 Test #17: shmem.version.library ............   Passed    0.01 sec
+      Start 18: shmem.boundary
+ 5/14 Test #18: shmem.boundary ...................   Passed    0.62 sec
+      Start 19: shmem.settings-documented
+ 6/14 Test #19: shmem.settings-documented ........   Passed    0.06 sec
+      Start 20: shmem.settings-known
+ 7/14 Test #20: shmem.settings-known .............   Passed    0.12 sec
+      Start 21: shmem.pass-expressions
+ 8/14 Test #21: shmem.pass-expressions ...........   Passed   13.11 sec
+      Start 22: shmem.whole-lines
+ 9/14 Test #22: shmem.whole-lines ................   Passed    0.01 sec
+      Start 23: shmem.license-lines
+10/14 Test #23: shmem.license-lines ..............   Passed    0.08 sec
+      Start 24: shmem.memory-orders
+11/14 Test #24: shmem.memory-orders ..............   Passed    0.04 sec
+      Start 25: shmem.static-link
+12/14 Test #25: shmem.static-link ................   Passed    3.30 sec
+      Start 26: shmem.strict-c11
+13/14 Test #26: shmem.strict-c11 .................   Passed   38.16 sec
+      Start 27: shmem.single-node.configure
+14/14 Test #27: shmem.single-node.configure ......   Passed    0.35 sec
+
+100% tests passed, 0 tests failed out of 14
+
+Label Time Summary:
+tier1    =  56.40 sec*proc (14 tests)
+
+Total Test time (real) =  56.42 sec

@@ -1,0 +1,24 @@
+Internal ctest changing into directory: /var/tmp/h23-verify/build/release
+Test project /var/tmp/h23-verify/build/release
+    Start  965: model.lead_wake
+1/7 Test  #965: model.lead_wake ..................   Passed   56.49 sec
+    Start  985: model.visit
+2/7 Test  #985: model.visit ......................   Passed    0.05 sec
+    Start  992: model.mesh
+3/7 Test  #992: model.mesh .......................   Passed  105.35 sec
+    Start  994: model.data_wire
+4/7 Test  #994: model.data_wire ..................   Passed   60.96 sec
+    Start  995: model.selftest
+5/7 Test  #995: model.selftest ...................   Passed   24.31 sec
+    Start 1001: model.mesh.digest
+6/7 Test #1001: model.mesh.digest ................   Passed    0.05 sec
+    Start 1002: model.mesh_timing
+7/7 Test #1002: model.mesh_timing ................   Passed    2.60 sec
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+model    = 249.81 sec*proc (7 tests)
+tier1    = 249.81 sec*proc (7 tests)
+
+Total Test time (real) = 249.84 sec

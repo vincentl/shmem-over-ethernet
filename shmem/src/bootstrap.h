@@ -75,6 +75,11 @@ struct osoe_bootstrap {
      * OSOE_DEFAULT_MESH_SLOT_US, so that a bootstrap built by hand keeps it. */
     uint32_t mesh_slot_us;
     bool mesh_slot_set;
+    /* OSOE_MESH_DATA_WIRES (H23; the author, 2026-10-25): `on-demand` makes a
+     * node pair's data wire at the first traffic between them, the control
+     * wires staying eager to every node; `eager`, the default, makes every
+     * wire at start-up. Every node of a job must agree (progress-host.c). */
+    bool data_wires_on_demand;
     const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */
@@ -95,6 +100,10 @@ struct osoe_bootstrap {
     /* OSOE_TEST_MESH_HOLD=NODE:MS, a testing hook (H23): node NODE's lead
      * reaches its mesh MS milliseconds late; 0 milliseconds for none. */
     uint32_t mesh_hold_node, mesh_hold_ms;
+    /* OSOE_TEST_HOLD_DATA_WIRES=NODE:MS, a testing hook (H23, on demand): node
+     * NODE's lead dials and answers no data wire for MS milliseconds after
+     * start-up, a stalled data wire's stand-in; 0 for none. */
+    uint32_t data_wire_hold_node, data_wire_hold_ms;
 };
 
 /* The default OSOE_KEEPALIVE (§3.15): a node that has vanished is found one to

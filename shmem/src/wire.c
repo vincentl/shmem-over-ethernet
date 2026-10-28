@@ -45,9 +45,11 @@ static size_t truncate_to(const struct osoe_wire *w, uint64_t site, uint64_t n)
 
 /* osoe_wire_ring_open, saying the settings that are said (OSOE_WIRE_SPLIT's
  * line) only where `announce` asks: once a node, by owner 0's ring (the
- * adversarial read of Part 1, N7). */
+ * adversarial read of Part 1, N7). `active` of the `count` wires can have a
+ * socket at once, `lending` of them data wires (ring.h). */
 static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
-                      uint32_t lending, const struct osoe_bootstrap *b, bool announce)
+                      uint32_t active, uint32_t lending, const struct osoe_bootstrap *b,
+                      bool announce)
 {
     struct osoe_wire_settings s;
     osoe_wire_settings_read(&s, b, announce);
@@ -56,14 +58,14 @@ static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t cou
      * where that passes io_uring's own most, rather than failing to create a
      * ring for a reason the setting does not name. A control wire never lends,
      * so it owes none (the adversarial read of Part 2, S2). */
-    uint64_t completions = (uint64_t)s.buffer_count + 2 * (uint64_t)count +
-                           (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST * lending + 1;
+    uint64_t completions = (uint64_t)s.buffer_count + 2 * (uint64_t)active +
+                           (uint64_t)OSOE_WIRE_ZERO_COPY_OWED_MOST * lending + 2;
     if (s.zero_copy && completions > OSOE_RING_COMPLETIONS_MOST)
         osoe_fatal("OSOE_WIRE_ZERO_COPY=on: %u peer nodes' data wires and %u receive buffers "
                    "need a completion queue of %llu, more than io_uring's %u; turn the "
                    "zero-copy send off, or lower OSOE_WIRE_BUFFERS", lending, s.buffer_count,
                    (unsigned long long)completions, OSOE_RING_COMPLETIONS_MOST);
-    osoe_ring_open(r, wires, count, lending, s.buffer_count, s.buffer_bytes,
+    osoe_ring_open(r, wires, count, active, lending, s.buffer_count, s.buffer_bytes,
                    s.zero_copy ? OSOE_WIRE_ZERO_COPY_OWED_MOST : 0);
     if (!s.zero_copy)
         return;
@@ -81,7 +83,7 @@ static void ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t cou
 void osoe_wire_ring_open(struct osoe_ring *r, struct osoe_wire *wires, uint32_t count,
                          uint32_t lending, const struct osoe_bootstrap *b)
 {
-    ring_open(r, wires, count, lending, b, true);
+    ring_open(r, wires, count, count, lending, b, true);
 }
 
 void osoe_wire_attach(struct osoe_wire *w, struct osoe_ring *r, uint32_t index, int fd,
@@ -214,6 +216,7 @@ struct mesh {
     const struct osoe_bootstrap *b;
     struct osoe_listener *listener;
     uint32_t peers, helpers;
+    bool on_demand;                         /* the control wires alone (OSOE_MESH_DATA_WIRES) */
     struct mesh_call *calls;
     uint32_t call_count, begun, made;
     uint32_t expected, answered;            /* callers' wires, as the schedule gives */
@@ -225,7 +228,7 @@ static bool lacks_a_wire(const struct mesh *m, uint32_t peer)
 {
     static const enum osoe_hello_purpose purposes[2] = { OSOE_HELLO_CONTROL_WIRE,
                                                          OSOE_HELLO_DATA_WIRE };
-    for (uint32_t k = 0; k < 2; k++) {
+    for (uint32_t k = 0; k < (m->on_demand ? 1u : 2u); k++) {
         struct osoe_ring *ring;
         uint32_t ring_index;
         if (wire_of(m->wires, m->rings, peer_slot(peer, m->b->node), purposes[k], m->peers,
@@ -339,8 +342,16 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
      * offset 1 every lead calls the next - so a lead never waits in one call:
      * one loop answers its listener and takes each call a step on as its
      * socket allows (mesh_model.py: blocking calls wait for ever).
+     *
+     * With OSOE_MESH_DATA_WIRES=on-demand (H23; the author, 2026-10-25) the
+     * schedule makes the control wires alone, and the listener stays open for
+     * the data wires the job makes later (data-wires.h): a data wire's caller
+     * that comes meanwhile is told to come back, as a caller of a purpose a
+     * lead is not yet waiting for always is. Not for the tests below the
+     * library, which make a mesh without a rendezvous.
      */
     uint32_t n = b->node_count, peers = n - 1;
+    bool on_demand = mesh && b->data_wires_on_demand;
     for (uint32_t i = 0; i < 2 * peers; i++)
         wires[i] = (struct osoe_wire){ .fd = -1 };
     struct osoe_listener own, *l = mesh ? mesh->listener : &own;
@@ -357,9 +368,10 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
 
     uint32_t slots = osoe_mesh_schedule_slots(n);
     uint32_t *offsets = malloc((slots ? slots : 1) * sizeof *offsets);
-    struct mesh m = { wires, rings, b, l, peers, helpers,
+    struct mesh m = { wires, rings, b, l, peers, helpers, on_demand,
                       malloc((slots ? 2 * slots : 1) * sizeof *m.calls), 0, 0, 0,
-                      2 * osoe_mesh_schedule_callers(b->node, n), 0, { NULL }, { 0 } };
+                      (on_demand ? 1 : 2) * osoe_mesh_schedule_callers(b->node, n), 0, { NULL },
+                      { 0 } };
     if (!offsets || !m.calls)
         osoe_fatal("out of memory for the mesh's schedule of %u nodes", n);
     osoe_mesh_schedule_order(b->job, b->step, n, offsets);
@@ -368,7 +380,8 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
         if (peer == n)
             continue;
         m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_CONTROL_WIRE, s };
-        m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_DATA_WIRE, s };
+        if (!on_demand)
+            m.calls[m.call_count++] = (struct mesh_call){ peer, OSOE_HELLO_DATA_WIRE, s };
     }
     free(offsets);
     for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++) {
@@ -377,7 +390,7 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
     }
 
     const uint32_t purposes = OSOE_HELLO_PURPOSE(OSOE_HELLO_CONTROL_WIRE) |
-                              OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE);
+                              (on_demand ? 0 : OSOE_HELLO_PURPOSE(OSOE_HELLO_DATA_WIRE));
     struct pollfd p[OSOE_LISTENER_POLLED + OSOE_MESH_CALLS_IN_FLIGHT];
     uint32_t polled_call[OSOE_MESH_CALLS_IN_FLIGHT];
     struct osoe_stall_watch watch;
@@ -482,7 +495,11 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
                                            osoe_stall_watch_limit_beyond(b->no_progress_ns, 1));
         }
     }
-    osoe_listener_close(l);
+    /* On demand the listener serves the data wires for the job's life
+     * (data-wires.h), and eagerly a stranger probing it afterwards is refused
+     * rather than left unanswered. */
+    if (!on_demand)
+        osoe_listener_close(l);
     for (uint32_t k = 0; k < OSOE_MESH_CALLS_IN_FLIGHT; k++)
         osoe_listener_call_free(m.flying[k]);
     free(m.calls);
@@ -490,13 +507,22 @@ void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, ui
      * rendezvous's release to its last wire (H23's timing). */
     if (b->debug)
         osoe_print_line("osoe: node %u connected its mesh in %llu us: %u wires answered and %u "
-                        "called, in %u slots of %llu us, %u calls in flight at most\n", b->node,
-                        (unsigned long long)((now_ns() - begun_ns) / 1000), m.answered, m.made,
-                        slots, (unsigned long long)(slot_ns / 1000), OSOE_MESH_CALLS_IN_FLIGHT);
-    for (uint32_t o = 0; o <= helpers; o++)
+                        "called, in %u slots of %llu us, %u calls in flight at most%s\n",
+                        b->node, (unsigned long long)((now_ns() - begun_ns) / 1000), m.answered,
+                        m.made, slots, (unsigned long long)(slot_ns / 1000),
+                        OSOE_MESH_CALLS_IN_FLIGHT,
+                        on_demand ? "; its data wires on demand" : "");
+    /* Each ring's bounds over the wires that can have a socket at once: on
+     * demand past the buffer budget's reach, the control wires and the count of
+     * data wires a node may make (connection-area.h; the author, 2026-10-27). */
+    uint32_t most = mesh && mesh->data_wires_most ? mesh->data_wires_most : peers;
+    for (uint32_t o = 0; o <= helpers; o++) {
+        uint32_t data = osoe_owner_wires(o, peers, helpers);
+        uint32_t data_active = data < most ? data : most;
         ring_open(rings[o], &wires[osoe_ring_first(o, peers, helpers)],
-                  osoe_ring_wires(o, peers, helpers), osoe_owner_wires(o, peers, helpers), b,
-                  o == 0);
+                  osoe_ring_wires(o, peers, helpers), data_active + (o == 0 ? peers : 0),
+                  data_active, b, o == 0);
+    }
 }
 
 /* osoe_wire_send and osoe_wire_send_lent: `lent` is the region the bytes are

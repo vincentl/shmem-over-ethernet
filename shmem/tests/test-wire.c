@@ -310,21 +310,36 @@ static int misuse(const char *what)
 /* The rings' ceiling refused by name (ring.h, osoe_ring_refuses; P17): 8,192
  * nodes at no helpers, where owner 0's ring holds 2(n - 1) wires, and 16,384
  * with helpers, where it holds the control wires alone; one node more each
- * refused, naming the counts and OSOE_PROGRESS_HELPERS. */
+ * refused, naming the counts and OSOE_PROGRESS_HELPERS. On demand past the
+ * buffer budget's reach (H23; the author, 2026-10-27) a node makes at most its
+ * count of data wires, 4,096 at the defaults, and the lead's ring holds n - 1
+ * control wires and those: 12,288 nodes at no helpers. */
 static int ring_ceiling(void)
 {
     char why[512];
-    CHECK(osoe_ring_refuses(8192, 0, why, sizeof why) == NULL);
-    CHECK(osoe_ring_refuses(8193, 0, why, sizeof why) == why);
+    CHECK(osoe_ring_refuses(8192, 0, 8191, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(8193, 0, 8192, why, sizeof why) == why);
     CHECK(strstr(why, "a job of 8193 nodes needs a ring of 16384 connections on each node's "
                       "lead") != NULL);
     CHECK(strstr(why, "at most 8192 nodes at OSOE_PROGRESS_HELPERS=0, and 16384 with progress "
                       "helpers") != NULL);
-    CHECK(osoe_ring_refuses(8193, 1, why, sizeof why) == NULL);
-    CHECK(osoe_ring_refuses(16384, 3, why, sizeof why) == NULL);
-    CHECK(osoe_ring_refuses(16385, 3, why, sizeof why) == why);
+    CHECK(osoe_ring_refuses(8193, 1, 8192, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(16384, 3, 16383, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(16385, 3, 16384, why, sizeof why) == why);
     CHECK(strstr(why, "at most 16384 nodes at OSOE_PROGRESS_HELPERS=3") != NULL);
-    CHECK(osoe_ring_refuses(1, 0, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(1, 0, 0, why, sizeof why) == NULL);
+    /* On demand, the count of data wires the default budget allows past 4,097
+     * nodes: the lead's ring is 12,287 control wires and 4,096 data wires at
+     * 12,288 nodes, one too many at 12,289; with helpers the control wires
+     * alone, as eagerly. */
+    CHECK(osoe_ring_refuses(12288, 0, 4096, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(12289, 0, 4096, why, sizeof why) == why);
+    CHECK(strstr(why, "a job of 12289 nodes needs a ring of 16384 connections on each node's "
+                      "lead") != NULL);
+    CHECK(strstr(why, "at most 12288 nodes at OSOE_PROGRESS_HELPERS=0, its data wires on "
+                      "demand, and 16384 with progress helpers") != NULL);
+    CHECK(osoe_ring_refuses(16384, 2, 4096, why, sizeof why) == NULL);
+    CHECK(osoe_ring_refuses(16385, 2, 4096, why, sizeof why) == why);
     if (!CHECK_DONE())
         printf("RING CEILING OK\n");
     return CHECK_DONE();

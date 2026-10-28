@@ -547,6 +547,15 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                    getenv("OSOE_MESH_SLOT"), (unsigned)OSOE_MESH_SLOT_MOST_US);
     b->mesh_slot_set = slot == OSOE_ENVIRONMENT_OK;
 
+    /* OSOE_MESH_DATA_WIRES (H23; the author, 2026-10-25): which data wires the
+     * mesh makes at start-up - every one, or none, each then made at the
+     * first traffic of its pair. Checked between nodes after the rendezvous,
+     * which carries each node's in its blob (progress-host.c). */
+    const char *data_wires = getenv("OSOE_MESH_DATA_WIRES");
+    if (data_wires && strcmp(data_wires, "eager") != 0 && strcmp(data_wires, "on-demand") != 0)
+        osoe_fatal("OSOE_MESH_DATA_WIRES='%s' is not eager or on-demand", data_wires);
+    b->data_wires_on_demand = data_wires && strcmp(data_wires, "on-demand") == 0;
+
     /*
      * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map
      * does too: where each node's lead listens, for the rendezvous (§6.2).
@@ -674,6 +683,19 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
                        "1 to 60000 milliseconds", hold, b->node_count);
         b->mesh_hold_node = node;
         b->mesh_hold_ms = ms;
+    }
+    /* And its on-demand half: a lead that makes no data wire for a while, a
+     * stalled wire's stand-in, refused by name in the same way. */
+    hold = getenv("OSOE_TEST_HOLD_DATA_WIRES");
+    if (hold) {
+        unsigned node, ms;
+        int used = 0;
+        if (sscanf(hold, "%u:%u%n", &node, &ms, &used) != 2 || hold[used] != '\0' ||
+            node >= b->node_count || ms < 1 || ms > 600000)
+            osoe_fatal("OSOE_TEST_HOLD_DATA_WIRES='%s' is not NODE:MS, a node of this job of %u "
+                       "and 1 to 600000 milliseconds", hold, b->node_count);
+        b->data_wire_hold_node = node;
+        b->data_wire_hold_ms = ms;
     }
 }
 

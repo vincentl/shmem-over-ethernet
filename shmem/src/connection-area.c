@@ -173,6 +173,27 @@ uint64_t osoe_am_area_bytes(uint32_t nodes, uint32_t helpers, uint64_t buffer)
     return layout_of(nodes, helpers).data + (uint64_t)(nodes - 1) * 2 * buffer;
 }
 
+uint64_t osoe_am_area_written_bytes(uint32_t nodes, uint32_t helpers, uint64_t buffer,
+                                    uint32_t wires)
+{
+    if (nodes < 2)
+        return 0;
+    return layout_of(nodes, helpers).data + (uint64_t)wires * 2 * buffer;
+}
+
+uint32_t osoe_am_data_wires_most(uint64_t chunk, uint64_t requested, uint64_t budget,
+                                 uint32_t nodes, bool on_demand)
+{
+    if (nodes < 2)
+        return 0;
+    uint64_t buffer;
+    if (osoe_am_choose_buffer(chunk, requested, budget, nodes, &buffer) != OSOE_AM_SIZE_NO_ROOM ||
+        !on_demand)
+        return nodes - 1;
+    uint64_t most = budget / (2 * buffer);      /* the floor, where the choice landed */
+    return most < nodes - 1 ? (uint32_t)most : nodes - 1;
+}
+
 enum osoe_am_size_status osoe_am_choose_buffer(uint64_t chunk, uint64_t requested,
                                                uint64_t budget, uint32_t nodes,
                                                uint64_t *chosen)
@@ -229,7 +250,28 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     a->credits = config.credits;
 
     uint64_t buffer;
-    switch (osoe_am_choose_buffer(config.chunk, config.buffer, config.budget, nodes, &buffer)) {
+    enum osoe_am_size_status size =
+        osoe_am_choose_buffer(config.chunk, config.buffer, config.budget, nodes, &buffer);
+    a->budget = config.budget;
+    a->data_wires_most = osoe_am_data_wires_most(config.chunk, config.buffer, config.budget, nodes,
+                                                 b->data_wires_on_demand);
+    if (size == OSOE_AM_SIZE_NO_ROOM && a->data_wires_most > 0 && a->data_wires_most < nodes - 1) {
+        /*
+         * On demand past the budget's reach (H23; the author, 2026-10-27): the
+         * floor, and a count of the data wires a node may make, since it pages
+         * in only the buffers it writes (tmpfs allocates a page as it is first
+         * written; an idle peer's buffers never are). Said once a node, from its
+         * lead, as the shrink below is: it is a limit the operator chose neither.
+         */
+        if (b->local_id == 0)
+            osoe_print_line("osoe: connection buffers reduced from %llu to %llu bytes, and at "
+                            "most %u data wires a node, to fit OSOE_AM_BUFFER_BUDGET=%llu over "
+                            "%u nodes (OSOE_MESH_DATA_WIRES=on-demand)\n",
+                            (unsigned long long)config.buffer, (unsigned long long)buffer,
+                            a->data_wires_most, (unsigned long long)config.budget, nodes);
+        size = OSOE_AM_SIZE_OK;
+    }
+    switch (size) {
     case OSOE_AM_SIZE_OK:
         break;
     case OSOE_AM_SIZE_SHRUNK:
@@ -263,16 +305,18 @@ void osoe_connection_area_open(struct osoe_connection_area *a, const struct osoe
     uint32_t peers = nodes - 1;
     int fd;
     if (a->creator) {
-        /* The node's buffers to every peer; checked before any of it exists
-         * (shm-object.h). */
+        /* The node's buffers to every peer - or to as many as its count of data
+         * wires allows, on demand past the budget's reach, the rest never
+         * written (H23); checked before any of it exists (shm-object.h). */
         uint64_t free_bytes;
-        if (!osoe_shm_room(a->bytes, &free_bytes)) {
+        uint64_t written = osoe_am_area_written_bytes(nodes, helpers, buffer, a->data_wires_most);
+        if (!osoe_shm_room(written, &free_bytes)) {
             char msg[256];
             snprintf(msg, sizeof msg, "/dev/shm has %llu MiB free, but this node's "
                      "connection area for %u nodes needs %llu MiB: lower OSOE_AM_BUFFER, "
                      "or enlarge /dev/shm",
                      (unsigned long long)(free_bytes >> 20), nodes,
-                     (unsigned long long)((a->bytes + (1u << 20) - 1) >> 20));
+                     (unsigned long long)((written + (1u << 20) - 1) >> 20));
             osoe_shm_short(b->shm_capacity_warning_only, msg);
         }
         char err[256];

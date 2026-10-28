@@ -1,0 +1,33 @@
+== 2026-10-28T03:26:05Z h23-verify from tree.tar; load 4.18 8.46 8.98
+memory available: 5020 MiB
+built release: 0 warnings
+built debug: 0 warnings
+built asan: 0 warnings
+built tsan: 0 warnings
+built tier3: 0 warnings
+built single-node: 0 warnings
+static: 100% tests passed, 0 tests failed out of 14
+-- 03:29:21 release
+release: 100% tests passed, 0 tests failed out of 1180
+-- 03:34:43 debug
+debug: 100% tests passed, 0 tests failed out of 1180
+-- 03:41:36 asan
+asan: 100% tests passed, 0 tests failed out of 1140
+-- 03:47:14 tsan
+tsan: 100% tests passed, 0 tests failed out of 816
+-- 03:52:31 single-node
+single-node: 100% tests passed, 0 tests failed out of 579
+-- 03:53:44 on-demand
+on-demand: 100% tests passed, 0 tests failed out of 605
+-- 03:58:21 on-demand-helpers
+on-demand-helpers: 100% tests passed, 0 tests failed out of 605
+-- 04:03:02 on-demand-asan
+on-demand-asan: 100% tests passed, 0 tests failed out of 582
+-- 04:06:35 on-demand-tsan
+on-demand-tsan: 100% tests passed, 0 tests failed out of 266
+-- 04:09:41 tier3
+tier3: 100% tests passed, 0 tests failed out of 138
+-- 04:11:49 models ^model\.(data_wire|mesh|mesh\.digest|mesh_timing|lead_wake|visit|selftest)$
+models: 100% tests passed, 0 tests failed out of 7
+counts: debug 1180, of them internode 605; tsan 816, internode 266; single-node 625; release without models 1180; tier3 138
+== 04:15:59 exit 0: done

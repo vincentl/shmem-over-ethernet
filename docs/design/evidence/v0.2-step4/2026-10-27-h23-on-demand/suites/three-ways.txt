@@ -1,0 +1,11 @@
+== 02:30:43 eager: OSOE_MESH_DATA_WIRES=eager ctest -L internode -j4 --timeout 300
+100% tests passed, 0 tests failed out of 602
+== 02:35:23 done
+== 02:35:49 on-demand: OSOE_MESH_DATA_WIRES=on-demand ctest -L internode -j4 --timeout 300
+99% tests passed, 1 tests failed out of 602
+	187 - shmem.data-wires.disagree.0-1 (Failed)            internode tier2
+== 02:40:32 done
+== 02:40:33 on-demand-helpers: OSOE_MESH_DATA_WIRES=on-demand OSOE_PROGRESS_HELPERS=2 ctest -L internode -j4 --timeout 300
+99% tests passed, 1 tests failed out of 602
+	187 - shmem.data-wires.disagree.0-1 (Failed)            internode tier2
+== 02:45:31 done

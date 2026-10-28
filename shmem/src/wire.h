@@ -107,6 +107,9 @@ struct osoe_wire {
 struct osoe_mesh {
     struct osoe_listener *listener;
     const struct sockaddr_in *peers;
+    /* The most data wires the node may make (connection-area.h's
+     * osoe_am_data_wires_most; H23), which bounds its rings; 0 for every peer. */
+    uint32_t data_wires_most;
 };
 
 /*
@@ -122,6 +125,11 @@ struct osoe_mesh {
  * (owner-map.h), and `rings` helpers + 1: owner o's ring carries
  * osoe_ring_wires(o) of them from osoe_ring_first(o) - owner 0's its data
  * wires and then every control wire. Fatal on failure (§3.15).
+ *
+ * With OSOE_MESH_DATA_WIRES=on-demand and a mesh (H23) the schedule makes the
+ * control wires alone, every data wire's left with no socket (-1), and the
+ * listener stays open for data-wires.h, which makes them later; the rings are
+ * opened for every wire alike.
  */
 void osoe_wires_open(struct osoe_wire *wires, struct osoe_ring *const *rings, uint32_t helpers,
                      const struct osoe_bootstrap *b, uint32_t session,

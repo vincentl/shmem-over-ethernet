@@ -1071,6 +1071,8 @@ foreach(case_expect
     "mesh-slot-large|OSOE_MESH_SLOT|100001|OSOE_MESH_SLOT='100001' is not a whole number of microseconds from 0 to 100000"
     "test-mesh-hold|OSOE_TEST_MESH_HOLD|3|OSOE_TEST_MESH_HOLD='3' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds"
     "test-mesh-hold-node|OSOE_TEST_MESH_HOLD|1:100|OSOE_TEST_MESH_HOLD='1:100' is not NODE:MS, a node of this job of 1 and 1 to 60000 milliseconds"
+    "mesh-data-wires|OSOE_MESH_DATA_WIRES|lazy|OSOE_MESH_DATA_WIRES='lazy' is not eager or on-demand"
+    "test-hold-data-wires|OSOE_TEST_HOLD_DATA_WIRES|0:0|OSOE_TEST_HOLD_DATA_WIRES='0:0' is not NODE:MS, a node of this job of 1 and 1 to 600000 milliseconds"
     "test-team-generation|OSOE_TEST_TEAM_GENERATION|abc|OSOE_TEST_TEAM_GENERATION='abc' is not a generation from 0 to [0-9]+"
     "test-team-generation-large|OSOE_TEST_TEAM_GENERATION|18446744073709551615|OSOE_TEST_TEAM_GENERATION='18446744073709551615' is not a generation from 0 to [0-9]+")
   string(REPLACE "|" ";" parts "${case_expect}")
@@ -1101,6 +1103,57 @@ if(OSOE_INTERNODE)
       PASS_REGULAR_EXPRESSION "MESH START OK")
     osoe_internode_label(shmem.mesh.${mode})
   endforeach()
+  # Data wires made on demand (H23; OSOE_MESH_DATA_WIRES=on-demand, the author's
+  # decisions of 2026-10-25; data-wires.sh): a ring over five nodes of a PE
+  # each, whose wires their callers dial for their own need, and none else
+  # made; a step of three over the same five, every wire outside the collective
+  # tree asked for over the control wire by the node the schedule does not have
+  # call; the ring over four nodes of two PEs at two progress helpers, each wire
+  # handed by the lead to the helper that owns it; a data wire held back at its
+  # caller and at its callee, each told by the other node's notice and then
+  # made; one held past the deadlock detector's quiet, which must not take it
+  # for a deadlock; one held past OSOE_NO_PROGRESS_TIMEOUT, which ends the job
+  # naming it; a global exit while every other PE's first allocation waits for
+  # a wire held back, which ends the job with the caller's status
+  # (data_wire_model.py's STATUS); and the count of data wires a node may make
+  # past the buffer budget's reach (the author, 2026-10-27) - four nodes whose
+  # budget holds two pairs of buffers a node where every peer's would take
+  # three: the collective tree's wires fit, a third is refused by name, and
+  # eagerly the same job is refused at start.
+  add_executable(shmem_test_data_wires test-data-wires.c)
+  target_link_libraries(shmem_test_data_wires PRIVATE osoe)
+  osoe_warnings(shmem_test_data_wires)
+  foreach(case "ring|0,1,2,3,4|0" "skip|0,1,2,3,4|0" "ring|0,0,1,1,2,2,3,3|2"
+               "stall-caller|0,1|0" "stall-callee|0,1|0" "stall-long|0,1|0"
+               "stall-timeout|0,1|0" "exit|0,1,2|0" "budget-fits|0,1,2,3|0"
+               "budget-refused|0,1,2,3|0" "budget-eager|0,1,2,3|0")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 mode)
+    list(GET parts 1 map)
+    list(GET parts 2 helpers)
+    set(name shmem.data-wires.${mode})
+    if(mode MATCHES "^(ring|skip)$")
+      string(REPLACE "," "-" label "${map}")
+      set(name shmem.data-wires.${mode}.${label})
+      if(NOT helpers EQUAL 0)
+        set(name ${name}.helpers-${helpers})
+      endif()
+    endif()
+    add_test(NAME ${name}
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/data-wires.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_data_wires> ${mode} ${map} ${helpers})
+    set_tests_properties(${name} PROPERTIES LABELS "tier2" TIMEOUT 90
+      PASS_REGULAR_EXPRESSION "DATA WIRES OK")
+    osoe_internode_label(${name})
+  endforeach()
+  # And every node must make them alike: node 1 on demand where node 0 is
+  # eager, refused by both leads before any wire is made, naming node 1.
+  osoe_refusal_test(shmem.data-wires.disagree.0-1 2 0
+    LAUNCH -n 2 -m 0,1 -e 0:OSOE_MESH_DATA_WIRES=eager -e 1:OSOE_MESH_DATA_WIRES=on-demand
+    PATTERNS "osoe: PE 0: node 1 makes its data wires on demand and node 0 eagerly [(]OSOE_MESH_DATA_WIRES[)]: every node of a job must make them alike"
+             "osoe: PE 1: node 1 makes its data wires on demand and node 0 eagerly [(]OSOE_MESH_DATA_WIRES[)]: every node of a job must make them alike"
+    PROGRAM $<TARGET_FILE:shmem_test_data_wires>)
+  osoe_internode_label(shmem.data-wires.disagree.0-1)
   # OSOE_MESH_PORT_RANGE (P18; mesh-ports.sh): three leads each on a port of the
   # range, as their SHMEM_DEBUG lines say; and a range of one port for two
   # logical nodes of one host, which share its ports - one takes it, the other
@@ -1366,9 +1419,11 @@ if(OSOE_INTERNODE)
   # PE's limit 32, which a lead's two sockets for each of fifteen other nodes
   # and its rings pass. The refusal says what the descriptors are for and which
   # limit to raise, where it said "Too many open files" alone (D14; round four's
-  # readiness Q5-6).
+  # readiness Q5-6). Of the eager mesh, whose data wires are made at start-up
+  # (H23).
   add_test(NAME shmem.start-up.descriptors.16-nodes
-    COMMAND $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 60 --
+    COMMAND ${CMAKE_COMMAND} -E env OSOE_MESH_DATA_WIRES=eager
+            $<TARGET_FILE:osoe-launch> -n 16 -m 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 -t 60 --
             sh -c "ulimit -n 32; exec \"$0\" \"$@\"" $<TARGET_FILE:shmem_test_init>)
   set_tests_properties(shmem.start-up.descriptors.16-nodes PROPERTIES LABELS "tier2" TIMEOUT 90
     PASS_REGULAR_EXPRESSION

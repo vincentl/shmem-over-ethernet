@@ -1,0 +1,7 @@
+== 02:16:16 internode-on-demand: OSOE_MESH_DATA_WIRES=on-demand ctest -L internode -j4 --timeout 300
+99% tests passed, 4 tests failed out of 593
+	124 - shmem.unsent.set.0-1 (Failed)                     internode tier2
+	125 - shmem.unsent.floor.0-1-2 (Failed)                 internode tier2
+	126 - shmem.unsent.fixed.0-1 (Failed)                   internode tier2
+	200 - shmem.start-up.descriptors.16-nodes (Failed)      internode tier2
+== 02:21:07 done
