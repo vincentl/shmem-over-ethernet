@@ -1,0 +1,183 @@
+diff --git a/shmem/tests/CMakeLists.txt b/shmem/tests/CMakeLists.txt
+index 4f5d7fb8..1202b55a 100644
+--- a/shmem/tests/CMakeLists.txt
++++ b/shmem/tests/CMakeLists.txt
+@@ -2088,6 +2088,11 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+   osoe_internode_label(shmem.helper-wake.agent.0-1-2-3)
+ endif()
+ 
++# T38's measurement (test-wake-cost.c): the CPU a wake costs under a trickle.
++if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=")
++  osoe_tier2_map_test(wake-cost 0,1,2,3 OSOE_PROGRESS_HELPERS=2 OSOE_DEADLOCK_SECONDS=0)
++endif()
++
+ # Keepalive off by default where every node has a loopback address, and on as
+ # OSOE_KEEPALIVE sets it there (§3.15; the review of v0.2 step 4's merge point,
+ # correctness Q2-1; test-keepalive.c): each node's lead reads SO_KEEPALIVE on
+diff --git a/shmem/tests/test-wake-cost.c b/shmem/tests/test-wake-cost.c
+new file mode 100644
+index 00000000..ed548659
+--- /dev/null
++++ b/shmem/tests/test-wake-cost.c
+@@ -0,0 +1,161 @@
++/* SPDX-License-Identifier: LGPL-3.0-or-later */
++/*
++ * What a wake costs (T38; round nine's scale S4) - the measuring form.
++ *
++ * PE 0, alone on its node, puts to each peer node in turn, a gap apart, so that
++ * every owner of every node is asleep at each put and woken by it. Each node's
++ * lead reads, for every owner of its node, the CPU its thread used
++ * (/proc/self/task/<tid>/schedstat, the scheduler's count, user and system),
++ * its wakes (transport.am.wakes) and its passes (transport.am.passes), over an
++ * idle window and then over the trickle, and prints them.
++ *
++ * usage: shmem_test_wake-cost [PUTS [GAP_US [IDLE_MS]]]
++ */
++#define _GNU_SOURCE
++#include <stdbool.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++
++#include <shmem.h>
++
++#include "check.h"
++#include "invariants.h"
++#include "launcher.h"
++
++enum { OWNERS_MOST = 65 };
++
++static struct osoe_segment segment;
++static uint32_t owners;
++
++struct sample {
++    long wall_ns;
++    uint64_t cpu_ns[OWNERS_MOST], wakes[OWNERS_MOST], passes[OWNERS_MOST];
++};
++
++static long now_ns(void)
++{
++    struct timespec t;
++    clock_gettime(CLOCK_MONOTONIC, &t);
++    return t.tv_sec * 1000000000L + t.tv_nsec;
++}
++
++static void sleep_ns(long ns)
++{
++    struct timespec t = { ns / 1000000000L, ns % 1000000000L };
++    while (nanosleep(&t, &t) != 0)
++        ;
++}
++
++static uint64_t owner_metric(const char *name, uint32_t owner)
++{
++    uint64_t value = 0;
++    CHECK_FATAL(osoe_segment_read_name(&segment, name, owner, &value));
++    return value;
++}
++
++/* The CPU thread `tid` of this process has used, in nanoseconds. */
++static uint64_t thread_cpu_ns(int32_t tid)
++{
++    char path[64];
++    snprintf(path, sizeof path, "/proc/self/task/%d/schedstat", (int)tid);
++    FILE *f = fopen(path, "r");
++    CHECK_FATAL(f != NULL);
++    unsigned long long ns = 0;
++    int got = fscanf(f, "%llu", &ns);
++    fclose(f);
++    CHECK_FATAL(got == 1);
++    return ns;
++}
++
++static void take(struct sample *s)
++{
++    s->wall_ns = now_ns();
++    for (uint32_t o = 0; o < owners; o++) {
++        s->cpu_ns[o] = thread_cpu_ns((int32_t)owner_metric("transport.am.tid", o));
++        s->wakes[o] = owner_metric("transport.am.wakes", o);
++        s->passes[o] = owner_metric("transport.am.passes", o);
++    }
++}
++
++static void report(const char *phase, int node, const struct sample *a, const struct sample *b,
++                   long puts)
++{
++    uint64_t cpu = 0, wakes = 0, passes = 0;
++    for (uint32_t o = 0; o < owners; o++) {
++        uint64_t c = b->cpu_ns[o] - a->cpu_ns[o], w = b->wakes[o] - a->wakes[o],
++                 p = b->passes[o] - a->passes[o];
++        printf("wake-cost %s node %d owner %u: %.1f us of CPU, %llu wakes, %llu passes\n", phase,
++               node, o, (double)c / 1e3, (unsigned long long)w, (unsigned long long)p);
++        cpu += c;
++        wakes += w;
++        passes += p;
++    }
++    double seconds = (double)(b->wall_ns - a->wall_ns) / 1e9;
++    printf("wake-cost %s node %d: %.1f us of CPU in %.3f s (%.3f ms a second), %llu wakes, "
++           "%llu passes, %ld puts; %.1f us a wake, %.1f us a put, %.2f passes a wake\n",
++           phase, node, (double)cpu / 1e3, seconds, (double)cpu / 1e6 / seconds,
++           (unsigned long long)wakes, (unsigned long long)passes, puts,
++           wakes ? (double)cpu / 1e3 / (double)wakes : 0.0,
++           puts ? (double)cpu / 1e3 / (double)puts : 0.0,
++           wakes ? (double)passes / (double)wakes : 0.0);
++}
++
++int main(int argc, char **argv)
++{
++    long puts = argc > 1 ? atol(argv[1]) : 300;
++    long gap_ns = (argc > 2 ? atol(argv[2]) : 2000) * 1000L;
++    long idle_ns = (argc > 3 ? atol(argv[3]) : 500) * 1000000L;
++    shmem_init();
++    int me = shmem_my_pe(), npes = shmem_n_pes();
++    long *x = shmem_malloc(sizeof *x), *done = shmem_malloc(sizeof *done);
++    CHECK_FATAL(x != NULL && done != NULL && npes >= 2);
++    *x = 0;
++    *done = 0;
++    char name[OSOE_SEGMENT_NAME_MAX], err[256];
++    osoe_test_segment_name(name, sizeof name, 0);
++    if (osoe_segment_open(&segment, name, err, sizeof err) != 0) {
++        fprintf(stderr, "%s\n", err);
++        CHECK_FATAL(false);
++    }
++    CHECK_FATAL(segment.table_usable);
++    owners = segment.owner_count;
++    CHECK_FATAL(owners >= 1 && owners <= OWNERS_MOST);
++    shmem_barrier_all();
++
++    struct sample start, idle_end, end;
++    sleep_ns(50L * 1000 * 1000);
++    take(&start);
++    sleep_ns(idle_ns);
++    take(&idle_end);
++    long received = puts / (npes - 1) + (me >= 1 && me <= puts % (npes - 1) ? 1 : 0);
++    if (me == 0) {
++        for (long i = 1; i <= puts; i++) {
++            sleep_ns(gap_ns);
++            int node = 1 + (int)((i - 1) % (npes - 1));
++            shmem_putmem(x, &i, sizeof i, node);
++        }
++        shmem_quiet();
++        sleep_ns(50L * 1000 * 1000);
++        take(&end);
++        long one = 1;
++        for (int node = 1; node < npes; node++)
++            shmem_putmem(done, &one, sizeof one, node);
++        shmem_quiet();
++    } else {
++        shmem_long_wait_until(done, SHMEM_CMP_EQ, 1);
++        take(&end);
++    }
++    report("idle", me, &start, &idle_end, 0);
++    report("trickle", me, &idle_end, &end, me == 0 ? puts : received);
++    fflush(stdout);
++
++    shmem_barrier_all();
++    osoe_segment_close(&segment);
++    shmem_free(done);
++    shmem_free(x);
++    shmem_finalize();
++    return CHECK_DONE();
++}

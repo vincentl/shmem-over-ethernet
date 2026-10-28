@@ -1,0 +1,17 @@
+wake-cost idle node 0 owner 0: 551.3 us of CPU, 0 wakes, 5 passes
+wake-cost idle node 0: 551.3 us of CPU in 0.503 s (1.096 ms a second), 0 wakes, 5 passes, 0 puts; 0.0 us a wake, 0.0 us a put, 0.00 passes a wake
+wake-cost trickle node 0 owner 0: 42501.5 us of CPU, 300 wakes, 1504 passes
+wake-cost trickle node 0: 42501.5 us of CPU in 0.842 s (50.458 ms a second), 300 wakes, 1504 passes, 300 puts; 141.7 us a wake, 141.7 us a put, 5.01 passes a wake
+wake-cost idle node 1 owner 0: 396.1 us of CPU, 0 wakes, 5 passes
+wake-cost idle node 1: 396.1 us of CPU in 0.500 s (0.792 ms a second), 0 wakes, 5 passes, 0 puts; 0.0 us a wake, 0.0 us a put, 0.00 passes a wake
+wake-cost trickle node 1 owner 0: 7027.3 us of CPU, 0 wakes, 210 passes
+wake-cost trickle node 1: 7027.3 us of CPU in 0.846 s (8.309 ms a second), 0 wakes, 210 passes, 100 puts; 0.0 us a wake, 70.3 us a put, 0.00 passes a wake
+wake-cost idle node 3 owner 0: 192.8 us of CPU, 0 wakes, 5 passes
+wake-cost idle node 3: 192.8 us of CPU in 0.502 s (0.384 ms a second), 0 wakes, 5 passes, 0 puts; 0.0 us a wake, 0.0 us a put, 0.00 passes a wake
+wake-cost trickle node 3 owner 0: 6709.1 us of CPU, 0 wakes, 208 passes
+wake-cost trickle node 3: 6709.1 us of CPU in 0.844 s (7.952 ms a second), 0 wakes, 208 passes, 100 puts; 0.0 us a wake, 67.1 us a put, 0.00 passes a wake
+wake-cost idle node 2 owner 0: 317.6 us of CPU, 0 wakes, 5 passes
+wake-cost idle node 2: 317.6 us of CPU in 0.501 s (0.634 ms a second), 0 wakes, 5 passes, 0 puts; 0.0 us a wake, 0.0 us a put, 0.00 passes a wake
+wake-cost trickle node 2 owner 0: 7142.4 us of CPU, 0 wakes, 210 passes
+wake-cost trickle node 2: 7142.4 us of CPU in 0.846 s (8.443 ms a second), 0 wakes, 210 passes, 100 puts; 0.0 us a wake, 71.4 us a put, 0.00 passes a wake
+exit 0
