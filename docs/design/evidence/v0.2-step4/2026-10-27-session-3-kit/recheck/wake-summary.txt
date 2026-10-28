@@ -1,0 +1,125 @@
+== ~/kit-s3/recheck/wake
+jobs: 5, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -
+their voluntary context switches, which every turnover's wake of all its
+writers raises (S1) - and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  put-1m-wake pes=64 h=0               job 4460 (n=1)
+                                       node 2230 (2002-2458, n=2)
+                                       cpu/GiB 0.284 (n=1)
+                                       sleeps a 64 KiB 12.7 (12.5-12.8, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00550 (0.00500-0.00600, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 10258 MiB/s, hop 31.0 us, message 0 us; unsent limit 1376770 B
+  put-1m-wake-profiled pes=64 h=0      job 4311 (n=1)
+                                       node 2156 (1880-2432, n=2)
+                                       cpu/GiB 0.282 (n=1)
+                                       sleeps a 64 KiB 14.1 (13.7-14.6, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00400 (0.00300-0.00500, n=2), over 10.00 (10.00-10.00, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 10799 MiB/s, hop 11.1 us, message 0 us; unsent limit 1449369 B
+  put-64k-wake pes=64 h=0              job 4565 (n=1)
+                                       node 2282 (2121-2444, n=2)
+                                       cpu/GiB 0.264 (n=1)
+                                       sleeps a 64 KiB 13.6 (13.1-14.1, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00450 (0.00400-0.00500, n=2), over 10.00 (10.00-10.00, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 11887 MiB/s, hop 25.7 us, message 0 us; unsent limit 1595466 B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  collectives-wake-check-off pes=64 h=0
+    barrier                  193 (n=1)
+    reduce bytes=8           220 (n=1)
+    broadcast bytes=8        244 (n=1)
+    reduce bytes=65536       495 (n=1)
+    broadcast bytes=65536    308 (n=1)
+    fcollect block=8         311 (n=1)
+    alltoall block=8         832 (n=1)
+    fcollect block=4096      1087 (n=1)
+    alltoall block=4096      10158 (n=1)
+    link 10961 MiB/s, hop 20.5 us, message 0 us; unsent limit 1471130 B
+  collectives-wake-check-on pes=64 h=0
+    barrier                  207 (n=1)
+    reduce bytes=8           296 (n=1)
+    broadcast bytes=8        266 (n=1)
+    reduce bytes=65536       509 (n=1)
+    broadcast bytes=65536    319 (n=1)
+    fcollect block=8         310 (n=1)
+    alltoall block=8         863 (n=1)
+    fcollect block=4096      1092 (n=1)
+    alltoall block=4096      10362 (n=1)
+    link 9107 MiB/s, hop 20.8 us, message 0 us; unsent limit 1222264 B
+
+OSOE_CHECK_COLLECTIVES's cost: each line's median with the check, its median
+without, and the first over the second (P24)
+  collectives-wake pes=64 h=0
+    barrier                        207       193  1.071
+    reduce bytes=8                 296       220  1.347
+    broadcast bytes=8              266       244  1.088
+    reduce bytes=65536             509       495  1.028
+    broadcast bytes=65536          319       308  1.035
+    fcollect block=8               310       311  0.997
+    alltoall block=8               863       832  1.037
+    fcollect block=4096           1092      1087  1.005
+    alltoall block=4096          10362     10158  1.020
+
+counters that moved over the window (PE 0's node; median, range)
+  put-1m-wake pes=64 h=0 buffers=None: receive_enobufs 9880 (n=1), receive_rearms 9880 (n=1), reserve_stalls 186200 (n=1), sends 104138 (n=1)
+  put-64k-wake pes=64 h=0 buffers=None: receive_enobufs 10248 (n=1), receive_rearms 10248 (n=1), reserve_stalls 152879 (n=1), sends 86890 (n=1)
+
+profile-wake-pes64-h0-r1.txt
+  lima-osoe     16.61%  swapper          [kernel.kallsyms]      [k] do_idle                                  -      -            
+  lima-osoe     16.18%  multistream      [kernel.kallsyms]      [k] finish_task_switch.isra.0                -      -            
+  lima-osoe     11.62%  osoe-agent       [kernel.kallsyms]      [k] try_to_wake_up                           -      -            
+  lima-osoe      4.46%  osoe-agent       [kernel.kallsyms]      [k] __arch_copy_to_user                      -      -            
+  lima-osoe      4.05%  osoe-agent       libc.so.6              [.] 0x00000000000a3440                       -      -            
+  lima-osoe      3.11%  multistream      libc.so.6              [.] 0x00000000000a3440                       -      -            
+  lima-osoe      3.03%  osoe-agent       [kernel.kallsyms]      [k] __arch_copy_from_user                    -      -            
+  lima-osoe      2.50%  multistream      [vdso]                 [.] __kernel_clock_gettime                   -      -            
+  lima-osoe      1.94%  multistream      libosoe.so.0.1.0       [.] reserve_waiting.part.0                   -      -            
+  lima-osoe      1.90%  multistream      [kernel.kallsyms]      [k] hrtimer_start_range_ns                   -      -            
+  lima-osoe      1.70%  multistream      libc.so.6              [.] syscall                                  -      -            
+  lima-osoe      1.62%  multistream      [kernel.kallsyms]      [k] gup_fast_fallback                        -      -            
+  lima-osoe      1.53%  multistream      [kernel.kallsyms]      [k] fpsimd_load_state                        -      -            
+  lima-osoe      1.35%  multistream      [kernel.kallsyms]      [k] el0_svc                                  -      -            
+  lima-osoe      1.02%  multistream      libosoe.so.0.1.0       [.] osoe_metrics_block                       -      -            
+  lima-osoe      0.94%  multistream      [kernel.kallsyms]      [k] hrtimer_cancel                           -      -            
+  lima-osoe      0.93%  multistream      libosoe.so.0.1.0       [.] osoe_futex_wait_bitset                   -      -            
+  lima-osoe      0.88%  swapper          [kernel.kallsyms]      [k] default_idle_call                        -      -            
+  lima-osoe      0.86%  multistream      [kernel.kallsyms]      [k] __schedule                               -      -            
+  lima-osoe      0.82%  multistream      libosoe.so.0.1.0       [.] osoe_connection_reserve_up_to            -      -            
+  lima-osoe      0.79%  multistream      libosoe.so.0.1.0       [.] osoe_deadline_expired                    -      -            
+  lima-osoe      0.73%  multistream      libosoe.so.0.1.0       [.] osoe_wait_ends                           -      -            
+  lima-osoe      0.68%  multistream      [kernel.kallsyms]      [k] get_futex_key                            -      -            
+  lima-osoe      0.67%  osoe-agent       [kernel.kallsyms]      [k] arch_counter_get_cntvct                  -      -            
+  lima-osoe      0.66%  multistream      libc.so.6              [.] clock_gettime                            -      -            
+  lima-osoe      0.62%  multistream      libosoe.so.0.1.0       [.] clock_gettime@plt                        -      -            
+  lima-osoe      0.57%  multistream      libosoe.so.0.1.0       [.] osoe_progress_host_wake                  -      -            
+  lima-osoe      0.57%  osoe-agent       [kernel.kallsyms]      [k] __pi_clear_page                          -      -            
+  lima-osoe      0.55%  multistream      libosoe.so.0.1.0       [.] osoe_progress_host_wake_deferred.part.0  -      -            
+  lima-osoe      0.54%  multistream      [kernel.kallsyms]      [k] invoke_syscall                           -      -            
+  lima-osoe      0.50%  multistream      [kernel.kallsyms]      [k] __list_add_valid_or_report               -      -            
+  lima-osoe the progress threads' symbols, with their callers:
+  lima-osoe     11.76%  [k] try_to_wake_up                        -      -            
+  lima-osoe             |          
+  lima-osoe              --11.42%--futex_wake
+  lima-osoe                        __arm64_sys_futex_wake
+  lima-osoe                        invoke_syscall
+  lima-osoe                        el0_svc_common.constprop.0
+  lima-osoe                        do_el0_svc
+  lima-osoe                        el0_svc

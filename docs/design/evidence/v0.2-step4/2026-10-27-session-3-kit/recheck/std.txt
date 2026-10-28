@@ -1,0 +1,31 @@
+== facts 05:20:28
+exit 0, jobs that failed: 0
+== floor 05:20:52
+exit 0, jobs that failed: 0
+== helpers 05:20:59
+exit 0, jobs that failed: 0
+== ladder 05:21:42
+exit 0, jobs that failed: 0
+== zero-copy 05:22:36
+exit 0, jobs that failed: 0
+== gets 05:22:53
+exit 0, jobs that failed: 0
+== fan-in 05:23:01
+exit 0, jobs that failed: 0
+== scale 05:23:03
+exit 0, jobs that failed: 0
+== collect 05:23:32
+exit 0, jobs that failed: 0
+== behind 05:23:34
+exit 0, jobs that failed: 0
+== window 05:26:18
+exit 0, jobs that failed: 0
+== tuning 05:26:28
+exit 0, jobs that failed: 0
+== trees 05:27:19
+exit 1, jobs that failed: 0
+== claims 05:27:19
+exit 0, jobs that failed: 0
+== link-cost 05:27:19
+exit 0, jobs that failed: 0
+DONE 05:27:20

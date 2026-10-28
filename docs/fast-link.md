@@ -14,7 +14,9 @@ the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
 `c4-standard-16`; §8's loop over PE counts and §12 to §16, added by the third
 cloud session for B14 of `docs/prompts/v0.2-open-items.md`, have run only in
 that session's dry run, on an x86-64 sandbox's logical nodes,
-`docs/prompts/cloud-session-3-manifest.md`). The first session on a cluster, on 2026-10-12
+`docs/prompts/cloud-session-3-manifest.md`; §20 and the third session's chain,
+§21, in the development VM's dry run of 2026-10-27,
+`2026-10-27-session-3-kit/`). The first session on a cluster, on 2026-10-12
 (`docs/fast-link-results.md`), ran §1 and §2, §3's probe and suite, §4, §6, §8
 and §9 on eight `c4-standard-16`; §5, §7 and §10 have run only in the VM, and
 so has `verify.sh`, which made that session's by-hand `cluster-verify.sh` a
@@ -325,7 +327,14 @@ it, since nothing checks that its streams ran at once. Every process is
 unbound, free to use every core of its node - each a job of one task, which
 `slurm-setup.sh`'s `TaskPlugin=task/none` leaves unbound (§1); a client whose
 server is not yet listening tries again, and servers whose client never came
-are ended. About fifteen minutes.
+are ended. About fifteen minutes. `PARTS` names which of the three run
+(`floor echo-uring iperf3`, all by default). `echo-uring` is a fault of the
+kit's on the cluster: in both sessions, at 1, 2 and 16 connections, its clients
+toward the first node met the 300 s timeout while the other direction
+finished, 15 of the second session's 17 minutes here and 25 of the first's
+26, and no result depended on it. It is not fixed; the third session runs `iperf3` alone
+(`PARTS=iperf3`), about a minute, the yardstick its sums from the first session
+to the second matched to within 1 MiB/s.
 
 ## 5. The progress helpers
 
@@ -429,11 +438,18 @@ where the kit runs `task/none`. `docs/fast-link/binding.sh NODES site` switches
 every node to that binding - it restarts slurmctld and every slurmd, and ends with
 a job's two tasks' allowed CPUs, one core each - and `binding.sh NODES none`
 switches back, which every other section needs. Under it, run this section's
-streams and collectives at 0, 1, 2 and 4 helpers at one count of PEs, Slurm's
-binding left on (`KIT_SRUN='-K1 --overcommit'`, without `--cpu-bind=none`), and
-again with a core reserved for the helpers (`--cpus-per-task=2`), beside the
-unbound rows above: a helper shares its PE's core unless the job reserves one.
-Tried on the development VM's one-node Slurm, both ways (2026-10-13).
+streams and collectives at 0, 1, 2 and 4 helpers at one count of PEs, each PE
+bound to one CPU, as a site's `srun` binds a task of one CPU
+(`KIT_SRUN='-K1 --cpu-bind=threads'`), and again with two CPUs a PE
+(`KIT_SRUN='-K1 --cpus-per-task=2'`) - on a `c4-standard-16`, two hyperthreads
+a core, the PE's whole core - beside the unbound rows above: a helper shares
+its PE's CPU unless the job reserves one. The binding must be asked for: in a
+whole-node allocation, as every kit job is, a step's tasks of one CPU are bound
+to nothing - in the development VM's own Slurm (`task/affinity`) each had every
+CPU, with `--overcommit` or without - where `--cpu-bind=threads` bound each to
+its own and `--cpus-per-task=2` each to two (2026-10-28). Each variant's jobs'
+allowed CPUs are recorded first. Tried on the development VM's one-node Slurm,
+both ways (2026-10-13).
 
 ## 6. The ladder
 
@@ -543,7 +559,11 @@ names the directory of its programs, built as `docs/pi-cluster.md` §8 builds
 them - the suite fetched into the reading corpus first, which the repository
 does not hold - at the same path on every node: inside the tree but not under
 `build/`, and built before `build.sh` runs, or with `build.sh` run again after
-it, so that `build.sh` copies it. The first session ran osoe on x86-64 hardware
+it, so that `build.sh` copies it. Or by `docs/fast-link/sos.sh NODES build/sos`
+on a head node, which does all of it: the suite fetched outside the tree
+(`~/osoe-corpus`), the library built there for `oshcc`, each program built
+beside its source as §8 builds them, and the directory copied to every node;
+then `SOS_BUILD=build/sos`. The first session ran osoe on x86-64 hardware
 and on eight nodes already (§3, §8, §9); here `osoe-bench`, `osoe-pacer` and SOS
 run across them for the first time, and a failure is the first finding to bring
 back. About an hour.
@@ -582,6 +602,10 @@ The README's sentences the numbers replace or confirm:
   Pi (§14);
 - **Behind a stream and tuned:** the "What does not scale" entry on helpers and
   the README's latency sentences, with what §13 and §15 find.
+- **Many PEs a node:** the Limits entry "By default one thread a node moves
+  every message between nodes", whose turnover's wakes "under the present one,
+  and at 256, it has not been measured", and the `OSOE_CHECK_COLLECTIVES` row's
+  "Off by default until timed at many PEs a node" (§20).
 
 What the kit once left out is in it now: a barrier, a fetch-add and the
 collectives behind a stream at each helper count, TCP's retransmissions around
@@ -672,7 +696,11 @@ shape of fan-outs 2, 4 and 8 and windows 1, 2, 4 and 8
 costs were fitted to the Pi's table (`shape_timing.py`); where a fixed shape
 beats the one it takes at a size, they are off on this link, and the
 `OSOE_COLLECTIVE_*` rows say so. 42 jobs of about fifteen seconds: about ten
-minutes.
+minutes. `CASES` runs others: `link-dD` and `tree-dD` are the chooser and its
+trees at a window of D (`OSOE_COLLECTIVE_PIPELINE`); the third session's are
+P37's four, `link-d4 link-d8 tree-d8 fixed-k4-d8`, five rounds - the default
+of 8, decided on 2026-10-25, against today's 4 and the best fixed tree of the
+second session.
 
 ## 15. Latency tuning
 
@@ -714,8 +742,9 @@ two PEs each, every tree and the kit's own in another order each round, three
 rounds: `multistream put` at 64 KiB and at 1 MiB blocks - the rungs' own
 measures (`docs/decisions/2026-10-07-one-thread-profile.md`) - `hol`'s
 fetch-add alone and behind the stream, and the mailbox. Each case's files
-carry its tree's commit, `main` for the kit's. Building four trees takes a few
-minutes a node; the 60 jobs about fifteen.
+carry its tree's commit, `main` for the kit's. A tree's build is of the library
+and the three tools its cases run (`TARGETS`), not of its tests; the 60 jobs
+take about fifteen minutes.
 
 ## 17. Not in the kit: io_uring's flags
 
@@ -781,3 +810,110 @@ much longer, and each child comes to a timed message from the same idle; run
 again, the section shows whether the bandwidth and the message cost now hold
 from job to job - the second session's read 1.9 to 5.1 GB/s, and 0 to 159 µs
 on three nodes.
+
+## 20. Many PEs a node (H12)
+
+```sh
+docs/fast-link/many-pes.sh NODES out/many-pes
+```
+
+H12: a node with many times as many PEs as cores, which no session had run
+past 32 PEs a node nor any machine past 64, for the two decisions waiting on
+it. **P2**, the hand-on wake (`docs/decisions/2026-10-24.md`, item 3: whether
+to build it at all, no loss being shown at 32): each reopening of a
+connection's buffer wakes every writer then asleep for its room
+(`osoe_connection_open`'s wake of all, the release fixes' review, S1), a herd
+on the node's one progress thread that grows with the PEs sending toward one
+other node at once. **P24**, `OSOE_CHECK_COLLECTIVES`'s cost before it may
+become a default (`docs/decisions/2026-10-20.md`): the PE that meets every
+arrival of its node compares each one's call, so its loads grow with its
+node's PEs, where at 4 PEs in the VM nothing was measurable.
+
+Between the list's first two nodes, so that every PE of a node sends to the
+other's on the one connection between them: at 16, 32 and 64 PEs a node - one,
+two and four a vCPU of a `c4-standard-16` - §5's workloads, `multistream`'s
+put stream in 1 MiB and 64 KiB blocks and its get stream in 1 MiB, ten seconds
+each, PE 0 printing its node's counters around each window, the mailbox for
+twenty, and `osoe-bench quick barrier collectives` twice, with
+`OSOE_CHECK_COLLECTIVES` off and on. Then at 256 PEs a node, sixteen a vCPU,
+the wake's cost alone: the two put streams, the 1 MiB one again with both
+nodes' CPUs profiled for five seconds, five in (§13's `profile.sh`; the chain
+of §21 gives it `PERF="sudo -n perf"`, the image's `perf_event_paranoid` being
+3), and the collectives with the check off and on, its files named `-wake`. No
+helpers (`HELPERS`): a
+pair has one peer, which one helper holds whatever their count, and
+`OSOE_PROGRESS_HELPERS=auto` gives a pair none. One round, the author's
+(`docs/decisions/2026-10-27.md`).
+
+What answers P2 is, beside each case's rate and the progress threads' CPU a
+GiB, **the PEs' sleeps a 64 KiB** moved: `multistream`'s node lines now give
+their voluntary context switches over the window (`program_sleeps`,
+`sleeps_per_64kib`), S1's own measure - a writer the turnover woke that finds
+the room taken sleeps again, so a herd's sleeps a 64 KiB rise toward half the
+writers: 0.75 at one, 8.4 to 9.1 at 16 and 16 to 23 at 32 in S1's VM under the
+rule then, 1.0 waking one. Under today's, a put's part takes the room it finds,
+so fewer should; this says how many at 16 to 256 PEs a node, and whether the
+rate falls or the CPU a GiB rises with them, which is the loss P2 would buy
+back. The counters that moved (`summarize.py`) now include
+`am.reserve_stalls`, the reservations that waited for room; and at 256 the
+profile's share of `osoe-agent`'s samples in the kernel's wakes (`futex_wake`,
+`try_to_wake_up`) is the wake's own cost. What answers P24 is `summarize.py`'s
+table of each `osoe-bench` line's median with the check, its median without,
+and the first over the second, at every count. In the development VM's dry
+run, two logical nodes on four vCPUs and so a preview of what the section
+reads, not a result, the 1 MiB stream's sleeps a 64 KiB were 3.3, 5.7 and 12.8
+at 16, 32 and 64 PEs a node, about a fifth of the writers where S1's rule gave
+a half, and at 64 the agent's `try_to_wake_up`, from `futex_wake` in its poll,
+was 11.8% of every sample.
+
+Every job's heap is 16 MiB (`HEAP`, `SHMEM_SYMMETRIC_SIZE`), the same at every
+count: a PE's `/dev/shm` object is its heap and the library's region beside
+it, about 15.6 MiB at the defaults (`shmem/src/node.c`), so 256 PEs ask about
+7.9 GiB of a node, which a `c4-standard-16`'s 29 GiB holds; the development
+VM's 3.9 GiB holds two logical nodes of 64, and its dry run takes
+`WAKE_PES=64`. 23 jobs: 18 at 16 to 64 PEs a node of ten to twenty seconds
+and the collectives' few, and 5 at 256 whose collectives no session has timed -
+about seven minutes, at most twelve.
+
+## 21. The third session as one chain
+
+```sh
+docs/fast-link/session-3.sh NODES out
+```
+
+The author's plan for the third session (`docs/prompts/cluster-session-3-plan.md`,
+2026-10-27) as one script on the head node, the sections in turn and one
+measurement at a time: the wait for every machine's start-up script, by its
+unit's state (§1), then the setup - the packages on every machine at once,
+since the start-up scripts leave out `linux-perf`; `slurm-setup.sh`;
+`build.sh`; the facts; the probe; a job of 32 PEs a node; and tier 2 on the
+first node, T35's `shmem.quiet.litmus.L2` among it, natively on x86-64 - with
+SOS fetched and built on the head node meanwhile (`sos.sh`, §10's `SOS_BUILD`).
+Then §4 with `iperf3` alone (`PARTS=iperf3`); §19 at its five rounds; §14 at
+P37's four cases (`CASES="link-d4 link-d8 tree-d8 fixed-k4-d8"`) and five
+rounds; §20; §8 at one round; §13 at 0 and 2 helpers and one round; §16 at one
+round; §10 with a `mix` of 300 s and SOS; H26, §5's workloads at 0 and 2
+helpers and 8 PEs a node under `binding.sh site`, two rounds bound to one
+CPU a PE (`-K1 --cpu-bind=threads`) and two with two CPUs a PE
+(`--cpus-per-task=2`), each first recording its tasks' allowed CPUs, then
+`binding.sh none`; and the outputs packed beside themselves, `out.tar.gz`, to
+bring back (§11).
+
+Each section's result is written as it ends: its line in `out/sections.txt` -
+done or FAILED, its minutes beside the plan's, its jobs and how many failed -
+its table in `out/SECTION-summary.txt` and its log in `out/SECTION.log`. A
+section that fails is said and passed; the wait and the setup's packages,
+Slurm and build, which the rest stand on, stop the chain where they fail, and
+`SECTIONS` runs the sections left. `out/summary.txt` is the whole, with the
+setup's verdicts - the probe on every node, the job of 32 PEs a node, tier 2
+and the litmus - and SOS's count of programs built. Run it from the head
+node's clone, whose `.git` §16 needs, from an ssh session that forwards the
+agent, kept open: the setup, `sos.sh`, `trees.sh` and `binding.sh` reach the
+nodes by ssh - in a session of its own (`setsid nohup`), so that a dropped
+connection costs the agent and not the chain, and with ssh's keepalives, as the
+plan's "Running it" says, which also says how to stop it. Its dry run is
+`SECTIONS=session-3 docs/fast-link/dry-run.sh OUT` (`CHAIN_SECTIONS` for some
+of its sections), with `TREE_TARS` on a machine without git and `SOS_SOURCE`
+the corpus's `tests-sos`. On 2026-10-28 it took 31.6 minutes in the
+development VM, every section done; on the cluster the chain should take about
+52 (`docs/decisions/2026-10-27-session-3-kit.md`).

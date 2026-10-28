@@ -1,0 +1,265 @@
+== ~/kit-s3/dry/session-3/many-pes
+jobs: 23, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -
+their voluntary context switches, which every turnover's wake of all its
+writers raises (S1) - and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  get-1m     pes=16 h=0                job 6851 (n=1)
+                                       node 3426 (3323-3528, n=2)
+                                       cpu/GiB 0.261 (n=1)
+                                       sleeps a 64 KiB 1.33 (1.29-1.36, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0260 (0.0260-0.0260, n=2), over 10.00 (10.00-10.00, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 12255 MiB/s, hop 20.6 us, message 0 us; unsent limit 1644838 B
+  put-1m     pes=16 h=0                job 8179 (n=1)
+                                       node 4090 (3539-4640, n=2)
+                                       cpu/GiB 0.211 (n=1)
+                                       sleeps a 64 KiB 3.28 (3.24-3.31, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0155 (0.0120-0.0190, n=2), over 10.0 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 13248 MiB/s, hop 16.2 us, message 0 us; unsent limit 1778112 B
+  put-64k    pes=16 h=0                job 10262 (n=1)
+                                       node 5131 (4765-5497, n=2)
+                                       cpu/GiB 0.165 (n=1)
+                                       sleeps a 64 KiB 3.38 (3.32-3.43, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0150 (0.0150-0.0150, n=2), over 4.27 (3.96-4.58, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 13861 MiB/s, hop 16.1 us, message 0 us; unsent limit 1860359 B
+  get-1m     pes=32 h=0                job 5298 (n=1)
+                                       node 2649 (2648-2650, n=2)
+                                       cpu/GiB 0.314 (n=1)
+                                       sleeps a 64 KiB 3.23 (3.19-3.27, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0130 (0.0130-0.0130, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 11665 MiB/s, hop 21.5 us, message 0 us; unsent limit 1565691 B
+  put-1m     pes=32 h=0                job 6383 (n=1)
+                                       node 3192 (3146-3237, n=2)
+                                       cpu/GiB 0.244 (n=1)
+                                       sleeps a 64 KiB 5.74 (5.69-5.78, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0110 (0.0100-0.0120, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 13217 MiB/s, hop 16.0 us, message 0 us; unsent limit 1774015 B
+  put-64k    pes=32 h=0                job 7891 (n=1)
+                                       node 3946 (3375-4516, n=2)
+                                       cpu/GiB 0.187 (n=1)
+                                       sleeps a 64 KiB 6.28 (6.26-6.29, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0105 (0.00900-0.0120, n=2), over 8.01 (6.03-10.00, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 10772 MiB/s, hop 16.8 us, message 0 us; unsent limit 1445756 B
+  get-1m     pes=64 h=0                job 4616 (n=1)
+                                       node 2308 (2283-2332, n=2)
+                                       cpu/GiB 0.338 (n=1)
+                                       sleeps a 64 KiB 3.99 (3.98-4.00, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00650 (0.00600-0.00700, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 12307 MiB/s, hop 33.2 us, message 0 us; unsent limit 1651869 B
+  put-1m     pes=64 h=0                job 4453 (n=1)
+                                       node 2227 (1997-2456, n=2)
+                                       cpu/GiB 0.284 (n=1)
+                                       sleeps a 64 KiB 12.8 (12.2-13.3, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00550 (0.00500-0.00600, n=2), over 10.00 (10.00-10.00, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 12265 MiB/s, hop 16.5 us, message 0 us; unsent limit 1646181 B
+  put-1m-profiled pes=64 h=0           job 4294 (n=1)
+                                       node 2147 (1957-2337, n=2)
+                                       cpu/GiB 0.285 (n=1)
+                                       sleeps a 64 KiB 14.1 (13.6-14.6, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00350 (0.00300-0.00400, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 9492 MiB/s, hop 33.1 us, message 0 us; unsent limit 1274021 B
+  put-64k    pes=64 h=0                job 4654 (n=1)
+                                       node 2327 (1870-2784, n=2)
+                                       cpu/GiB 0.264 (n=1)
+                                       sleeps a 64 KiB 13.8 (12.3-15.3, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00550 (0.00300-0.00800, n=2), over 8.47 (8.42-8.53, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 10280 MiB/s, hop 17.4 us, message 0 us; unsent limit 1379700 B
+
+mailbox: messages a second (median, range)
+  mailbox pes=16 h=0  13563 (n=1)
+    link 11860 MiB/s, hop 20.1 us, message 0 us; unsent limit 1591780 B
+  mailbox pes=32 h=0  12998 (n=1)
+    link 9215 MiB/s, hop 28.3 us, message 0 us; unsent limit 1236843 B
+  mailbox pes=64 h=0  13132 (n=1)
+    link 10950 MiB/s, hop 16.5 us, message 0 us; unsent limit 1469724 B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  collectives-check-off pes=16 h=0
+    barrier                  87.8 (n=1)
+    reduce bytes=8           158 (n=1)
+    broadcast bytes=8        154 (n=1)
+    reduce bytes=65536       237 (n=1)
+    broadcast bytes=65536    175 (n=1)
+    fcollect block=8         161 (n=1)
+    alltoall block=8         218 (n=1)
+    fcollect block=4096      213 (n=1)
+    alltoall block=4096      506 (n=1)
+    link 3597 MiB/s, hop 19.7 us, message 0 us; unsent limit 482786 B
+  collectives-check-on pes=16 h=0
+    barrier                  88.5 (n=1)
+    reduce bytes=8           157 (n=1)
+    broadcast bytes=8        146 (n=1)
+    reduce bytes=65536       263 (n=1)
+    broadcast bytes=65536    193 (n=1)
+    fcollect block=8         140 (n=1)
+    alltoall block=8         268 (n=1)
+    fcollect block=4096      220 (n=1)
+    alltoall block=4096      528 (n=1)
+    link 9363 MiB/s, hop 16.8 us, message 0 us; unsent limit 1256685 B
+  collectives-check-off pes=32 h=0
+    barrier                  119 (n=1)
+    reduce bytes=8           202 (n=1)
+    broadcast bytes=8        197 (n=1)
+    reduce bytes=65536       327 (n=1)
+    broadcast bytes=65536    255 (n=1)
+    fcollect block=8         185 (n=1)
+    alltoall block=8         368 (n=1)
+    fcollect block=4096      396 (n=1)
+    alltoall block=4096      2339 (n=1)
+    link 15053 MiB/s, hop 17.9 us, message 0 us; unsent limit 2020323 B
+  collectives-check-on pes=32 h=0
+    barrier                  128 (n=1)
+    reduce bytes=8           203 (n=1)
+    broadcast bytes=8        204 (n=1)
+    reduce bytes=65536       336 (n=1)
+    broadcast bytes=65536    258 (n=1)
+    fcollect block=8         212 (n=1)
+    alltoall block=8         366 (n=1)
+    fcollect block=4096      396 (n=1)
+    alltoall block=4096      2364 (n=1)
+    link 11482 MiB/s, hop 17.4 us, message 0 us; unsent limit 1541116 B
+  collectives-check-off pes=64 h=0
+    barrier                  194 (n=1)
+    reduce bytes=8           220 (n=1)
+    broadcast bytes=8        240 (n=1)
+    reduce bytes=65536       499 (n=1)
+    broadcast bytes=65536    309 (n=1)
+    fcollect block=8         306 (n=1)
+    alltoall block=8         872 (n=1)
+    fcollect block=4096      1120 (n=1)
+    alltoall block=4096      10458 (n=1)
+    link 8613 MiB/s, hop 33.6 us, message 0 us; unsent limit 1156049 B
+  collectives-check-on pes=64 h=0
+    barrier                  203 (n=1)
+    reduce bytes=8           216 (n=1)
+    broadcast bytes=8        279 (n=1)
+    reduce bytes=65536       490 (n=1)
+    broadcast bytes=65536    374 (n=1)
+    fcollect block=8         284 (n=1)
+    alltoall block=8         867 (n=1)
+    fcollect block=4096      1119 (n=1)
+    alltoall block=4096      11075 (n=1)
+    link 9702 MiB/s, hop 32.2 us, message 0 us; unsent limit 1302118 B
+
+OSOE_CHECK_COLLECTIVES's cost: each line's median with the check, its median
+without, and the first over the second (P24)
+  collectives pes=16 h=0
+    barrier                       88.5      87.8  1.008
+    reduce bytes=8                 157       158  0.997
+    broadcast bytes=8              146       154  0.954
+    reduce bytes=65536             263       237  1.108
+    broadcast bytes=65536          193       175  1.107
+    fcollect block=8               140       161  0.871
+    alltoall block=8               268       218  1.232
+    fcollect block=4096            220       213  1.034
+    alltoall block=4096            528       506  1.044
+  collectives pes=32 h=0
+    barrier                        128       119  1.077
+    reduce bytes=8                 203       202  1.001
+    broadcast bytes=8              204       197  1.034
+    reduce bytes=65536             336       327  1.028
+    broadcast bytes=65536          258       255  1.015
+    fcollect block=8               212       185  1.147
+    alltoall block=8               366       368  0.994
+    fcollect block=4096            396       396  0.998
+    alltoall block=4096           2364      2339  1.011
+  collectives pes=64 h=0
+    barrier                        203       194  1.048
+    reduce bytes=8                 216       220  0.980
+    broadcast bytes=8              279       240  1.164
+    reduce bytes=65536             490       499  0.983
+    broadcast bytes=65536          374       309  1.212
+    fcollect block=8               284       306  0.928
+    alltoall block=8               867       872  0.995
+    fcollect block=4096           1119      1120  0.999
+    alltoall block=4096          11075     10458  1.059
+
+counters that moved over the window (PE 0's node; median, range)
+  get-1m pes=16 h=0 buffers=None: receive_enobufs 18276 (n=1), receive_rearms 18276 (n=1), reserve_stalls 143376 (n=1), sends 202836 (n=1)
+  put-1m pes=16 h=0 buffers=None: receive_enobufs 16540 (n=1), receive_rearms 16540 (n=1), reserve_stalls 274393 (n=1), sends 182784 (n=1)
+  put-64k pes=16 h=0 buffers=None: receive_enobufs 11262 (n=1), receive_rearms 11262 (n=1), reserve_stalls 410398 (n=1), sends 276512 (n=1)
+  get-1m pes=32 h=0 buffers=None: receive_enobufs 18043 (n=1), receive_rearms 18043 (n=1), reserve_stalls 259244 (n=1), sends 159505 (n=1)
+  put-1m pes=32 h=0 buffers=None: receive_enobufs 18160 (n=1), receive_rearms 18160 (n=1), reserve_stalls 270466 (n=1), sends 148053 (n=1)
+  put-64k pes=32 h=0 buffers=None: receive_enobufs 13287 (n=1), receive_rearms 13287 (n=1), reserve_stalls 328517 (n=1), sends 195068 (n=1)
+  get-1m pes=64 h=0 buffers=None: receive_enobufs 16827 (n=1), receive_rearms 16827 (n=1), reserve_stalls 232334 (n=1), sends 136722 (n=1)
+  put-1m pes=64 h=0 buffers=None: receive_enobufs 13434 (n=1), receive_rearms 13434 (n=1), reserve_stalls 146951 (n=1), sends 82944 (n=1)
+  put-64k pes=64 h=0 buffers=None: receive_enobufs 15645 (n=1), receive_rearms 15645 (n=1), reserve_stalls 122729 (n=1), sends 75227 (n=1)
+
+outcomes
+  mailbox-pes16-h0-r1.txt: osoe-pacer failures=0 seconds=19.8
+  mailbox-pes32-h0-r1.txt: osoe-pacer failures=0 seconds=19.8
+  mailbox-pes64-h0-r1.txt: osoe-pacer failures=0 seconds=20.1
+
+profile-pes64-h0-r1.txt
+  lima-osoe     16.36%  multistream      [kernel.kallsyms]      [k] finish_task_switch.isra.0                -      -            
+  lima-osoe     16.21%  swapper          [kernel.kallsyms]      [k] do_idle                                  -      -            
+  lima-osoe     10.98%  osoe-agent       [kernel.kallsyms]      [k] try_to_wake_up                           -      -            
+  lima-osoe      4.88%  osoe-agent       [kernel.kallsyms]      [k] __arch_copy_to_user                      -      -            
+  lima-osoe      4.43%  osoe-agent       libc.so.6              [.] 0x00000000000a3440                       -      -            
+  lima-osoe      3.52%  multistream      libc.so.6              [.] 0x00000000000a3440                       -      -            
+  lima-osoe      2.77%  multistream      [vdso]                 [.] __kernel_clock_gettime                   -      -            
+  lima-osoe      2.50%  osoe-agent       [kernel.kallsyms]      [k] __arch_copy_from_user                    -      -            
+  lima-osoe      2.34%  multistream      libosoe.so.0.1.0       [.] reserve_waiting.part.0                   -      -            
+  lima-osoe      2.03%  multistream      [kernel.kallsyms]      [k] hrtimer_start_range_ns                   -      -            
+  lima-osoe      1.68%  multistream      [kernel.kallsyms]      [k] gup_fast_fallback                        -      -            
+  lima-osoe      1.63%  multistream      libc.so.6              [.] syscall                                  -      -            
+  lima-osoe      1.44%  multistream      [kernel.kallsyms]      [k] el0_svc                                  -      -            
+  lima-osoe      1.42%  multistream      [kernel.kallsyms]      [k] fpsimd_load_state                        -      -            
+  lima-osoe      1.05%  multistream      libosoe.so.0.1.0       [.] osoe_futex_wait_bitset                   -      -            
+  lima-osoe      0.99%  multistream      [kernel.kallsyms]      [k] hrtimer_cancel                           -      -            
+  lima-osoe      0.96%  multistream      libosoe.so.0.1.0       [.] osoe_metrics_block                       -      -            
+  lima-osoe      0.86%  multistream      [kernel.kallsyms]      [k] __schedule                               -      -            
+  lima-osoe      0.85%  multistream      libc.so.6              [.] clock_gettime                            -      -            
+  lima-osoe      0.85%  swapper          [kernel.kallsyms]      [k] default_idle_call                        -      -            
+  lima-osoe      0.81%  multistream      libosoe.so.0.1.0       [.] osoe_deadline_expired                    -      -            
+  lima-osoe      0.75%  multistream      libosoe.so.0.1.0       [.] osoe_connection_reserve_up_to            -      -            
+  lima-osoe      0.73%  multistream      [kernel.kallsyms]      [k] get_futex_key                            -      -            
+  lima-osoe      0.69%  multistream      libosoe.so.0.1.0       [.] osoe_progress_host_wake                  -      -            
+  lima-osoe      0.66%  multistream      libosoe.so.0.1.0       [.] osoe_wait_ends                           -      -            
+  lima-osoe      0.64%  osoe-agent       [kernel.kallsyms]      [k] arch_counter_get_cntvct                  -      -            
+  lima-osoe      0.58%  multistream      [kernel.kallsyms]      [k] plist_add                                -      -            
+  lima-osoe      0.56%  multistream      libosoe.so.0.1.0       [.] clock_gettime@plt                        -      -            
+  lima-osoe      0.54%  osoe-agent       [kernel.kallsyms]      [k] __pi_clear_page                          -      -            
+  lima-osoe the progress threads' symbols, with their callers:
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported
+  lima-osoe unwind: get_proc_name unsupported

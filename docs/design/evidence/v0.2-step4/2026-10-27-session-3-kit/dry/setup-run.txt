@@ -1,0 +1,5 @@
+# 2026-10-28T04:43:00Z session-3.sh on lima-osoe
+# kit f6b46f952137a8611b3fcc6ebf7bc3838a966328
+# launcher osoe-launch, build ~/kit-s3/src/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 900 s
+04:43:01 exit 0 probe.txt:  ~/kit-s3/src/build/release/tools/probe/probe
+04:43:01 exit 0 startup-32.txt:  ~/kit-s3/src/build/release/kit/startup

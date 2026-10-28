@@ -1,0 +1,46 @@
+# 2026-10-28T04:43:01Z link-cost.sh on lima-osoe
+# kit f6b46f952137a8611b3fcc6ebf7bc3838a966328
+# launcher osoe-launch, build ~/kit-s3/src/build/release, nodes 5, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 120 s
+04:43:01 exit 0 link-first.txt:  ~/kit-s3/src/build/release/kit/startup
+# the link set: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002
+04:43:01 exit 0 startup-set-nodes2-pes1-r1.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-measured-nodes2-pes1-r1.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-set-nodes2-pes8-r1.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-measured-nodes2-pes8-r1.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-set-nodes3-pes1-r1.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-measured-nodes3-pes1-r1.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-set-nodes3-pes8-r1.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:01 exit 0 startup-measured-nodes3-pes8-r1.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes2-pes1-r2.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes2-pes1-r2.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes2-pes8-r2.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes2-pes8-r2.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes3-pes1-r2.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes3-pes1-r2.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes3-pes8-r2.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes3-pes8-r2.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes2-pes1-r3.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes2-pes1-r3.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes2-pes8-r3.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes2-pes8-r3.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes3-pes1-r3.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes3-pes1-r3.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes3-pes8-r3.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes3-pes8-r3.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-measured-nodes2-pes1-r4.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:02 exit 0 startup-set-nodes2-pes1-r4.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes2-pes8-r4.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes2-pes8-r4.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes3-pes1-r4.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes3-pes1-r4.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes3-pes8-r4.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes3-pes8-r4.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes2-pes1-r5.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes2-pes1-r5.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes2-pes8-r5.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes2-pes8-r5.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes3-pes1-r5.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes3-pes1-r5.txt:  ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-set-nodes3-pes8-r5.txt: OSOE_LINK_HOP_NS=17437 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=13131274002 ~/kit-s3/src/build/release/kit/startup
+04:43:03 exit 0 startup-measured-nodes3-pes8-r5.txt:  ~/kit-s3/src/build/release/kit/startup
+# done 04:43:03

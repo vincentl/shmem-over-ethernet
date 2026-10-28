@@ -1,0 +1,10 @@
+== ~/kit-s3/recheck/std/claims
+jobs: 4, of which 0 failed (run.txt)
+
+claims (P9): microseconds - the last PE's splits done after the start, and a
+split's time a claim; each the job's median or percentile, median (range) over
+the rounds
+  claims-after-keep1 pes=2  last_us 1.10 (n=1)  last_p90_us 2.00 (n=1)  split_us 0.790 (n=1)  split_p90_us 1.33 (n=1)  split_p99_us 7.42 (n=1)
+  claims-after-keep1 pes=4  last_us 1.40 (n=1)  last_p90_us 2.60 (n=1)  split_us 1.17 (n=1)  split_p90_us 1.79 (n=1)  split_p99_us 4.13 (n=1)
+  claims-after-keep2 pes=2  last_us 1.60 (n=1)  last_p90_us 1.80 (n=1)  split_us 0.750 (n=1)  split_p90_us 0.830 (n=1)  split_p99_us 2.40 (n=1)
+  claims-after-keep2 pes=4  last_us 2.00 (n=1)  last_p90_us 3.00 (n=1)  split_us 0.940 (n=1)  split_p90_us 1.27 (n=1)  split_p99_us 3.44 (n=1)

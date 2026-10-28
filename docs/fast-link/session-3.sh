@@ -27,9 +27,9 @@
 #    8 trees      §16, H6: the four trees built, then one round
 #    9 scale      §10, H11 and B8's SOS: mix for 300 s, SOS at 2 PEs a node
 #   10 binding    §5 under binding.sh site, H26: 0 and 2 helpers at 8 PEs a
-#                 node, two rounds bound, then two with a core reserved
-#                 (--cpus-per-task=2); then binding.sh none. Last, since it
-#                 restarts Slurm
+#                 node, two rounds bound to one CPU a PE, then two with two
+#                 CPUs a PE (--cpus-per-task=2); then binding.sh none. Last,
+#                 since it restarts Slurm
 #   11 pack       OUTDIR packed beside itself as OUTDIR.tar.gz, to bring back (§11)
 #
 #   SECTIONS          the sections to run, in the order above (default: all)
@@ -43,6 +43,8 @@
 #   PERF              perf's command (sudo -n perf: perf_event_paranoid is 3
 #                     on the image, and in the development VM)
 #   SOS_SOURCE        sos.sh's
+#   H26_BOUND, H26_RESERVED  H26's two steps' srun options (-K1
+#                     --cpu-bind=threads, and -K1 --cpus-per-task=2)
 #
 # Run it from the tree on the head node - a clone, whose .git trees.sh needs -
 # from an ssh session that forwards the agent, kept open to the end: the setup,
@@ -81,6 +83,8 @@ SUITE_JOBS=${SUITE_JOBS:-8}
 CLUSTER=1
 [ "$KIT_LAUNCHER" = osoe-launch ] && CLUSTER=0
 export PERF=${PERF:-sudo -n perf}
+H26_BOUND=${H26_BOUND:--K1 --cpu-bind=threads}
+H26_RESERVED=${H26_RESERVED:--K1 --cpus-per-task=2}
 SOS_DIR=$REPOSITORY/build/sos
 SSH="ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10"
 HERE=$(hostname -s)
@@ -90,9 +94,9 @@ COMMIT=${KIT_COMMIT:-$(git -C "$REPOSITORY" rev-parse HEAD 2>/dev/null || echo u
 # The plan's minutes for each section, beside which each one's own are said.
 planned() {
     case $1 in
-        wait) echo 4 ;; setup) echo 6.5 ;; floor) echo 1 ;; link-cost) echo 0.2 ;;
-        window) echo 2.5 ;; many-pes) echo 12 ;; gets) echo 2.3 ;; behind) echo 3.5 ;;
-        trees) echo 6.5 ;; scale) echo 12.5 ;; binding) echo 8 ;; pack) echo 2 ;;
+        wait) echo 4 ;; setup) echo 5 ;; floor) echo 1 ;; link-cost) echo 0.2 ;;
+        window) echo 2 ;; many-pes) echo 7 ;; gets) echo 2.3 ;; behind) echo 5 ;;
+        trees) echo 6 ;; scale) echo 9.5 ;; binding) echo 8 ;; pack) echo 2 ;;
     esac
 }
 
@@ -293,9 +297,15 @@ section_scale() {
     MIX_SECONDS=300 SOS_BUILD=$sos bash "$KIT/scale.sh" "$NODES" "$CHAIN/scale"
 }
 
-# 10. H26: §5's workloads under a site's binding, each PE bound to its core,
-# and again with a core reserved a PE; first each variant's tasks' allowed
-# CPUs, the binding's record; then the binding switched back for the kit.
+# 10. H26: §5's workloads under a site's binding, each PE bound to one CPU, as
+# a site's srun binds a task of one CPU, and again with two CPUs a PE
+# (--cpus-per-task=2), a CPU for its helpers - on a c4-standard-16 the PE's
+# whole core, its two hyperthreads; first each variant's tasks' allowed CPUs,
+# the binding's record; then the binding switched back for the kit. The binding
+# is asked for: in a whole-node allocation, as the kit's jobs are, a step's
+# tasks of one CPU are bound to nothing - in the VM's own Slurm
+# (task/affinity) each had every CPU, with --overcommit or without - where
+# --cpu-bind=threads bound each to its own and --cpus-per-task=2 each to two.
 section_binding() {
     local status=0 variant srun
     if [ "$CLUSTER" = 1 ]; then
@@ -309,8 +319,8 @@ section_binding() {
         echo "one machine: no Slurm to bind, and the cases run as osoe-launch starts them"
     fi
     for variant in bound reserved; do
-        srun="-K1 --overcommit"
-        [ "$variant" = reserved ] && srun="$srun --cpus-per-task=2"
+        srun=$H26_BOUND
+        [ "$variant" = reserved ] && srun=$H26_RESERVED
         ( kit_start "$NODES" "$CHAIN/binding-$variant"
           # shellcheck disable=SC2016
           KIT_SRUN=$srun launch "$NODE_COUNT" 8 "$CHAIN/binding-$variant/cpus-allowed.txt" -- \
