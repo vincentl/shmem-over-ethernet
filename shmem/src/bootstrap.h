@@ -82,6 +82,11 @@ struct osoe_bootstrap {
      * wires staying eager to every node; `eager`, the default, makes every
      * wire at start-up. Every node of a job must agree (progress-host.c). */
     bool data_wires_on_demand;
+    /* OSOE_TURNOVER_WAKE (P2; the author, 2026-10-28): `hand-on` has a
+     * connection's reopened buffer wake one writer waiting for its room, who
+     * wakes the next if it leaves room worth another; `all`, the default, wakes
+     * every one (connection.h, transport-internode.c's reserve_waiting). */
+    bool turnover_hand_on;
     const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */

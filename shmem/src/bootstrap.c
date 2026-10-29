@@ -580,6 +580,14 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_MESH_DATA_WIRES='%s' is not eager or on-demand", data_wires);
     b->data_wires_on_demand = data_wires && strcmp(data_wires, "on-demand") == 0;
 
+    /* OSOE_TURNOVER_WAKE (P2): which writers a connection's reopened buffer
+     * wakes - every one waiting for its room, or one, the wake then handed on.
+     * A node's own: no other node sees how its writers wake. */
+    const char *turnover_wake = getenv("OSOE_TURNOVER_WAKE");
+    if (turnover_wake && strcmp(turnover_wake, "all") != 0 && strcmp(turnover_wake, "hand-on") != 0)
+        osoe_fatal("OSOE_TURNOVER_WAKE='%s' is not all or hand-on", turnover_wake);
+    b->turnover_hand_on = turnover_wake && strcmp(turnover_wake, "hand-on") == 0;
+
     /*
      * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map
      * does too: where each node's lead listens, for the rendezvous (§6.2).

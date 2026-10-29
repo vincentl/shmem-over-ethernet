@@ -27,7 +27,11 @@
  * takes the room it finds (v0.2 step 4), and a whole message larger than the
  * room left sleeps again (the release fixes' review, S1, where a buffer of
  * twice the chunk had room for one message of OSOE_AM_CHUNK). A credit, which
- * only one waiter can take, is not one of them.
+ * only one waiter can take, is not one of them. **Or one, handed on**: under
+ * OSOE_TURNOVER_WAKE=hand-on (P2) a connection's turnover wakes one writer,
+ * and the writers wake one another as the room allows (transport-internode.c,
+ * reserve_waiting; docs/design/evidence/hand-on-wake/turnover_wake_model.py) -
+ * the same two sides, waking one.
  *
  * The value is the caller's, and so are its stores and loads: this holds only
  * the word and the count, and says nothing about what the value is.
@@ -37,6 +41,7 @@
 
 #include <limits.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base/futex.h"
@@ -76,6 +81,35 @@ static inline void osoe_wait_word_wake_all(struct osoe_wait_word *w)
         return;
     atomic_fetch_add_explicit(&w->word, 1, memory_order_seq_cst);
     osoe_futex_wake(&w->word, INT_MAX, OSOE_FUTEX_SHARED);
+}
+
+/*
+ * The same step waking one waiter, not every one: the agent's as it opens a
+ * buffer, and a writer's after a reservation that leaves room worth another,
+ * under the hand-on. True if anyone was registered, and so the word moved.
+ */
+static inline bool osoe_wait_word_wake_one(struct osoe_wait_word *w)
+{
+    if (atomic_load_explicit(&w->waiters, memory_order_seq_cst) == 0)
+        return false;
+    atomic_fetch_add_explicit(&w->word, 1, memory_order_seq_cst);
+    osoe_futex_wake(&w->word, 1, OSOE_FUTEX_SHARED);
+    return true;
+}
+
+/*
+ * A registered waiter's wake of one other, the hand-on's pass: true if another
+ * was registered - more than the caller itself - and so the word moved. The
+ * caller then loads the word afresh before it sleeps, or its own bump returns
+ * that sleep at once.
+ */
+static inline bool osoe_wait_word_pass_on(struct osoe_wait_word *w)
+{
+    if (atomic_load_explicit(&w->waiters, memory_order_seq_cst) <= 1)
+        return false;
+    atomic_fetch_add_explicit(&w->word, 1, memory_order_seq_cst);
+    osoe_futex_wake(&w->word, 1, OSOE_FUTEX_SHARED);
+    return true;
 }
 
 #endif /* OSOE_BASE_WAIT_WORD_H */

@@ -14,6 +14,11 @@ reloads the word before it sleeps, since its own bump changed it.
 
 Properties: liveness (every writer leaves; LOST WAKE, STUCK and TRAPPED are the
 engine's), and PASSES: no generation sees more passes than writers.
+
+`floor` is the C's room worth a wake (transport-internode.c, room_worth_a_wake:
+a put's smallest part): a hand-on needs that much left after the reservation,
+and a pass that much found, where the cases without it take any room at all -
+so a writer needing less than the floor is woken only by an open.
 Breakages
   pass_always   a woken writer passes every time it finds too little: two
                 writers too large for the room pass the wake back and forth.
@@ -34,7 +39,7 @@ def wake(design, nxt):
     return ('fwaken', lambda L: WORD, lambda L: 1, lambda L: EVERY, nxt)
 
 
-def writer(design, least, writers):
+def writer(design, least, writers, floor=1):
     B = [('F0', ('load', lambda L: ROOM, 'r', '@F1')),
          ('F1', ('br', lambda L, t=least: L['r'] >= t, '@FC', '@REG')),
          ('FC', ('cas', lambda L: ROOM, lambda L: L['r'], lambda L, t=least: L['r'] - t, 'ok',
@@ -54,7 +59,7 @@ def writer(design, least, writers):
         B += [('PQ', ('br', lambda L: False, '@SLEEP', '@SLEEP'))]
     else:
         once = design != 'pass_always'
-        B += [('PQ', ('br', lambda L: L['woke'] == 1 and L['r'] > 0, '@PG', '@SLEEP')),
+        B += [('PQ', ('br', lambda L, f=floor: L['woke'] == 1 and L['r'] >= f, '@PG', '@SLEEP')),
               ('PG', ('load', lambda L: GEN, 'g', '@PG2')),
               ('PG2', ('br', lambda L, o=once: not o or L['g'] != L['passed'], '@PN', '@SLEEP')),
               ('PN', ('load', lambda L: WAITERS, 'n', '@PB')),
@@ -74,7 +79,7 @@ def writer(design, least, writers):
         B += [('GOT', ('br', lambda L: False, '@FIN', '@FIN'))]
     else:
         # The hand-on: room left after this reservation, and anyone registered.
-        B += [('GOT', ('br', lambda L, t=least: L['r'] - t > 0, '@HN', '@FIN')),
+        B += [('GOT', ('br', lambda L, t=least, f=floor: L['r'] - t >= f, '@HN', '@FIN')),
               ('HN', ('load', lambda L: WAITERS, 'n', '@HB')),
               ('HB', ('br', lambda L: L['n'] != 0, '@HW', '@FIN')),
               ('HW', ('add', lambda L: WORD, lambda L: 1, '_', '@HWK')),
@@ -107,11 +112,13 @@ def agent(design, cap, writers, opens):
     return assemble(B)
 
 
-def case(design, leasts, cap):
+def case(design, leasts, cap, floor=1):
     opens = len(leasts)
-    threads = [writer(design, t, len(leasts)) for t in leasts] + [agent(design, cap, len(leasts), opens)]
+    threads = ([writer(design, t, len(leasts), floor) for t in leasts] +
+               [agent(design, cap, len(leasts), opens)])
     mem = {ROOM: cap, GEN: 0, WORD: 0, WAITERS: 0, ASK: 0, DONE: 0, PASSES: 0}
-    return f'turnover/{design} cap={cap} leasts={",".join(map(str, leasts))}', threads, mem
+    name = f'turnover/{design} cap={cap} leasts={",".join(map(str, leasts))}'
+    return name + (f' floor={floor}' if floor != 1 else ''), threads, mem
 
 
 CASES = [
@@ -121,13 +128,18 @@ CASES = [
     ('hand_on', [2, 2, 1], 2, True),
     ('hand_on', [1, 1, 1], 2, True),
     ('pass_always', [2, 2, 1], 2, 'PASSES'),
+    # The C's floor: a writer below it (least 1), and ones at it and above.
+    ('hand_on', [1, 2], 2, True, 2),
+    ('hand_on', [1, 1, 2], 2, True, 2),
+    ('hand_on', [2, 2, 1], 2, True, 2),
+    ('hand_on', [3, 2, 1], 3, True, 2),
 ]
 
 if __name__ == '__main__':
     keep = select(sys.argv)
     ok = True
-    for design, leasts, cap, expect in CASES:
-        name, threads, mem0 = case(design, leasts, cap)
+    for design, leasts, cap, expect, *floor in CASES:
+        name, threads, mem0 = case(design, leasts, cap, *floor)
         if not keep(name):
             continue
         res = explore(name, threads, mem0, tso=False, max_seconds=600,

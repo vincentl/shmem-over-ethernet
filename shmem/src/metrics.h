@@ -89,6 +89,10 @@ enum osoe_counter {
      * lead to seal it and try again (§3.5, §3.6). Not an error: it is the
      * publication-window stall made visible rather than assumed rare. */
     OSOE_C_AM_RESERVE_STALLS,
+    /* Under OSOE_TURNOVER_WAKE=hand-on (P2): a writer's wake of the next after
+     * a reservation that left room worth another, and a woken writer's pass
+     * of its wake to another when the room was short of its own message. */
+    OSOE_C_AM_TURNOVER_HAND_ONS, OSOE_C_AM_TURNOVER_PASSES,
     /* Wakes OSOE_TRANSPORT_MORE held back, each one a futex syscall the
      * following operation paid for instead (§4.10). */
     OSOE_C_AM_WAKES_DEFERRED,

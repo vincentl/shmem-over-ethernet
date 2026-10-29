@@ -1,0 +1,14 @@
+== hand-on: median longest puts: 1.90 20.31 1.88 1.58 1.68 2.33 1.78 2.07 1.93 2.20 1.89 3.99
+  TcpExtDelayedACKs 24
+  TcpExtTCPFromZeroWindowAdv 9
+  TcpExtTCPToZeroWindowAdv 9
+  TcpExtTCPWantZeroWindowAdv 8
+== all: median longest puts: 3.03 17.00 3.48 4.26 16.54 2.77 3.69 2.69 2.19 2.27 15.34 2.36
+  TcpRetransSegs 3
+  TcpExtDelayedACKs 24
+  TcpExtDelayedACKLost 3
+  TcpExtTCPFastRetrans 3
+  TcpExtTCPOFOQueue 1
+  TcpExtTCPFromZeroWindowAdv 1924
+  TcpExtTCPToZeroWindowAdv 1924
+  TcpExtTCPWantZeroWindowAdv 11645

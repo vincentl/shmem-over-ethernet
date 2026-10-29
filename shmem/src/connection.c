@@ -63,8 +63,10 @@ enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connectio
                 break;
             }
         }
-        if (k == OSOE_CONNECTION_NONE)
+        if (k == OSOE_CONNECTION_NONE) {
+            r->room = 0;
             return OSOE_RESERVATION_NONE;
+        }
 
         /*
          * As much of `most` as the room after this head holds, whole messages
@@ -78,8 +80,10 @@ enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connectio
          */
         uint32_t room = h < c->capacity ? c->capacity - h : 0;
         uint32_t len = most <= room ? most : room & ~(OSOE_MESSAGE_ALIGN - 1);
-        if (len < least)
+        if (len < least) {
+            r->room = room;
             return OSOE_RESERVATION_FULL;
+        }
 
         /*
          * A CAS, not a fetch_add: a writer that loses this race has changed
@@ -93,6 +97,7 @@ enum osoe_reservation_status osoe_connection_reserve_up_to(struct osoe_connectio
             r->buffer = k;
             r->off = h;
             r->len = len;
+            r->room = room - len;
             /*
              * Read the sequence number after the reservation, with no extra
              * synchronization. This is sound, and the comment is here because
@@ -136,9 +141,14 @@ void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq)
     /* The hand-over, and the value writers waiting for room are waiting on:
      * seq_cst, then wake them if any registered (base/wait-word.h). A release
      * store here lets the agent read the count before its store is visible and
-     * a writer check the old head - wait_word_model.py's release_level. */
+     * a writer check the old head - wait_word_model.py's release_level. Under
+     * the hand-on, one of them, who wakes the next if it leaves room (P2;
+     * transport-internode.c, reserve_waiting). */
     atomic_store_explicit(&s->buffer[k].head, extent, memory_order_seq_cst);
-    osoe_wait_word_wake_all(&s->turnover_wait);
+    if (c->hand_on)
+        osoe_wait_word_wake_one(&s->turnover_wait);
+    else
+        osoe_wait_word_wake_all(&s->turnover_wait);
 }
 
 void osoe_connection_seal(struct osoe_connection *c, uint32_t k)

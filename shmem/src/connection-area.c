@@ -454,6 +454,7 @@ again:;
         a->connection[i].s = (struct osoe_connection_shared *)((char *)p + l.conns) + i;
         a->connection[i].data = (unsigned char *)p + l.data + (uint64_t)i * 2 * buffer;
         a->connection[i].capacity = (uint32_t)buffer;
+        a->connection[i].hand_on = b->turnover_hand_on;
     }
 
     if (a->creator) {

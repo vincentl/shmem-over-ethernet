@@ -134,6 +134,7 @@ without the author, under a standing mandate, and the record carries the undo.
 - **Names.** The library is `libosoe` with hidden visibility; `OSOE_`/`osoe_` are internal, `SHMEM_` belongs to the specification. Design §1.
 - **`fixed` promises the same bits in every run of a version**, not 0.1.0's: separate launches compared, the README's 0.1.0 sentence weakened (T23). Author, [2026-10-18](2026-10-18.md), "The author's answers on the stopped items".
 - **A window of 8; the link's message cost from its least tries; two progress helpers by default, counting the machine under `osoe-launch`; the collectives' check on by default** (P37, P36 with `OSOE_MACHINE_PES`, P39), after the third cluster session; and P2's hand-on wake built, its model first. Author, [2026-10-28](2026-10-28.md), "The author's answers, that evening".
+- **A reopened buffer wakes every writer waiting for its room by default; the hand-on is a setting** (`OSOE_TURNOVER_WAKE=hand-on`, P2), built and timed against it before any default changes: in the VM it ends the herd and gains at 64 writers but loses 5 to 35% of the rate below, and a wake of the room's count, tried as an experiment, did better. Author, [2026-10-29](2026-10-29.md).
 
 ## How work is done
 

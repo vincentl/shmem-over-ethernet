@@ -1314,6 +1314,15 @@ third class, reply credits, is indivisible, and has the handoff below.
   this paragraph's own chain. The fix is a hand-on wake - a writer that reserves
   and leaves room wakes the next, and a woken writer that finds none passes the
   wake on - after release, `wait_word_model.py` first.
+  *As built behind `OSOE_TURNOVER_WAKE=hand-on`* (P2, 2026-10-29; its model
+  `docs/design/evidence/hand-on-wake/turnover_wake_model.py`, live, a pass a
+  writer a turnover): the open wakes one writer; a reservation that leaves room
+  for a put's smallest part, a sixteenth of the chunk, wakes the next; and a
+  woken writer whose own message that room cannot hold passes the wake on, once
+  a turnover, then sleeps on the word loaded after its own bump. Room less than
+  a put's part wakes no one - a smaller whole message waits for a later
+  turnover's wake, as under a bare wake-one. The default stays waking every
+  writer until the chain is timed against it.
 - Single descriptor frees (indivisible) → **wake one.** Waking more is a
   thundering herd; at 256 local PEs, 255 threads wake and immediately re-sleep.
 

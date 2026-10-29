@@ -1707,6 +1707,30 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.work-discovery PROPERTIES LABELS "tier2" TIMEOUT 150)
   osoe_internode_label(shmem.work-discovery)
 
+  # The turnover's wake (P2): eight PEs of node 0 put 16 MiB each to node 1's
+  # one PE at once, so that every reopening of their connection's buffer has
+  # writers asleep for its room; under OSOE_TURNOVER_WAKE unset, all and
+  # hand-on, every byte arrives and node 0's hand-on counters say which wake ran.
+  add_executable(shmem_test_turnover_wake test-turnover-wake.c
+    ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
+  target_include_directories(shmem_test_turnover_wake PRIVATE
+    ${PROJECT_SOURCE_DIR}/tools/stat)
+  target_link_libraries(shmem_test_turnover_wake PRIVATE osoe rt)
+  osoe_warnings(shmem_test_turnover_wake)
+  foreach(wake default all hand-on)
+    if(wake STREQUAL "default")
+      set(turnover_wake_env --unset=OSOE_TURNOVER_WAKE)
+    else()
+      set(turnover_wake_env OSOE_TURNOVER_WAKE=${wake})
+    endif()
+    add_test(NAME shmem.turnover-wake.${wake}
+      COMMAND ${CMAKE_COMMAND} -E env SHMEM_SYMMETRIC_SIZE=16M ${turnover_wake_env}
+              $<TARGET_FILE:osoe-launch> -n 9 -m 0,0,0,0,0,0,0,0,1 -t 120
+              -- $<TARGET_FILE:shmem_test_turnover_wake>)
+    set_tests_properties(shmem.turnover-wake.${wake} PROPERTIES LABELS "tier2" TIMEOUT 150)
+    osoe_internode_label(shmem.turnover-wake.${wake})
+  endforeach()
+
   # The same program with §8.1's force-remote flag on, which is what makes
   # osoe_transport_direct's call to the one locality function testable at all:
   # without it a PE on another node already has no mapped heap here, so the
@@ -2248,6 +2272,12 @@ osoe_refusal_test(shmem.start-up.machine-pes.invalid 2 0
   LAUNCH -n 2 -e 0:OSOE_MACHINE_PES=3 -e 1:OSOE_MACHINE_PES=3
   PATTERNS "osoe: PE 0: OSOE_MACHINE_PES='3' is not a count of the job's PEs from 1 to 2"
            "osoe: PE 1: OSOE_MACHINE_PES='3' is not a count of the job's PEs from 1 to 2"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.turnover-wake.invalid 2 0
+  ENV OSOE_TURNOVER_WAKE=one
+  LAUNCH -n 2
+  PATTERNS "osoe: PE 0: OSOE_TURNOVER_WAKE='one' is not all or hand-on"
+           "osoe: PE 1: OSOE_TURNOVER_WAKE='one' is not all or hand-on"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
