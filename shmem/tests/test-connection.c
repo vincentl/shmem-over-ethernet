@@ -64,7 +64,7 @@ struct payload {
 
 static struct osoe_connection_shared shared;
 static unsigned char storage[2 * CAP];
-static struct osoe_connection conn = { &shared, storage, CAP };
+static struct osoe_connection conn = { &shared, storage, CAP, OSOE_TURNOVER_WAKE_ALL, 0 };
 
 static _Atomic uint32_t writers_done;
 

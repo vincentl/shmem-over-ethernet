@@ -1,0 +1,130 @@
+--- a/shmem/src/connection.c
++++ b/shmem/src/connection.c
+@@ -1,5 +1,6 @@
+ /* SPDX-License-Identifier: LGPL-3.0-or-later */
+ #include <stdatomic.h>
++#include <stdlib.h>
+ 
+ #include "connection.h"
+ 
+@@ -145,7 +146,18 @@
+      * the hand-on, one of them, who wakes the next if it leaves room (P2;
+      * transport-internode.c, reserve_waiting). */
+     atomic_store_explicit(&s->buffer[k].head, extent, memory_order_seq_cst);
+-    if (c->hand_on)
++    /* The experiment (not the branch): DIAG_OPEN_WAKES writers at an open. */
++    static int open_wakes = -1;
++    if (open_wakes < 0) {
++        const char *e = getenv("DIAG_OPEN_WAKES");
++        open_wakes = e ? atoi(e) : 1;
++    }
++    if (c->hand_on && open_wakes > 1) {
++        if (atomic_load_explicit(&s->turnover_wait.waiters, memory_order_seq_cst) != 0) {
++            atomic_fetch_add_explicit(&s->turnover_wait.word, 1, memory_order_seq_cst);
++            osoe_futex_wake(&s->turnover_wait.word, open_wakes, OSOE_FUTEX_SHARED);
++        }
++    } else if (c->hand_on)
+         osoe_wait_word_wake_one(&s->turnover_wait);
+     else
+         osoe_wait_word_wake_all(&s->turnover_wait);
+--- a/shmem/src/transport-internode.c
++++ b/shmem/src/transport-internode.c
+@@ -648,6 +648,12 @@
+ static void hand_on(struct osoe_connection *connection, uint32_t peer,
+                     const struct osoe_reservation *r)
+ {
++    /* The experiment (not the branch): DIAG_NO_HAND_ON leaves the open's wake alone. */
++    static int no_hand_on = -1;
++    if (no_hand_on < 0)
++        no_hand_on = getenv("DIAG_NO_HAND_ON") != NULL;
++    if (no_hand_on)
++        return;
+     if (connection->hand_on && r->room >= room_worth_a_wake(connection, peer) &&
+         osoe_wait_word_wake_one(osoe_connection_turnover_wait(connection)))
+         osoe_count(OSOE_C_AM_TURNOVER_HAND_ONS, 1);
+@@ -688,6 +694,13 @@
+  * a put's part takes the room there is, and every other message passes its
+  * whole length as both.
+  */
++static uint64_t diag_now_ns(void)
++{
++    struct timespec t;
++    clock_gettime(CLOCK_MONOTONIC, &t);
++    return (uint64_t)t.tv_sec * 1000000000u + (uint64_t)t.tv_nsec;
++}
++
+ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, int pe,
+                             const char *routine, uint32_t len, uint32_t least,
+                             struct osoe_reservation *r)
+@@ -741,8 +754,25 @@
+             }
+         }
+         slept_on = seen;
++        uint64_t diag_began = diag_now_ns();
+         swept = sleep_on(word, seen);
+         woken = woken || !swept;
++        if (swept) {
++            struct osoe_connection_shared *ds = connection->s;
++            uint32_t h0 = atomic_load_explicit(&ds->buffer[0].head, memory_order_acquire);
++            uint32_t h1 = atomic_load_explicit(&ds->buffer[1].head, memory_order_acquire);
++            fprintf(stderr, "osoe-diag: PE %d swept after %.1f ms: head0=%#x head1=%#x "
++                    "filled0=%u filled1=%u seq0=%llu seq1=%llu waiters=%u word=%u seen=%u "
++                    "capacity=%u woken=%d passed=%llu least=%u\n", osoe.bootstrap.rank,
++                    (diag_now_ns() - diag_began) * 1e-6, h0, h1,
++                    atomic_load_explicit(&ds->buffer[0].filled, memory_order_acquire),
++                    atomic_load_explicit(&ds->buffer[1].filled, memory_order_acquire),
++                    (unsigned long long)atomic_load_explicit(&ds->buffer[0].seq, memory_order_acquire),
++                    (unsigned long long)atomic_load_explicit(&ds->buffer[1].seq, memory_order_acquire),
++                    atomic_load_explicit(&word->waiters, memory_order_acquire),
++                    atomic_load_explicit(&word->word, memory_order_acquire), seen,
++                    connection->capacity, (int)woken, (unsigned long long)passed_in, least);
++        }
+         uint64_t now = turnover(connection);
+         if (connecting && now != 0) {
+             osoe_blocked_leave();
+--- a/shmem/src/progress-host.c
++++ b/shmem/src/progress-host.c
+@@ -1867,9 +1867,40 @@
+     /* The lead waits in its ring, on its sockets and the word at once
+      * (§3.10); every other agent of the job has only the word. Either way the
+      * wait ends by a sweep interval at the latest (§4.10). */
+-    if (osoe_am.lead)
+-        return osoe_ring_wait_wake(&osoe_am.owner[0].ring, wake, seen,
+-                                   data_wires_wait_ns(OSOE_SWEEP_NS));
++    if (osoe_am.lead) {
++        uint32_t peer = osoe.job.node == 0 ? 1 : 0;
++        struct osoe_connection *dc = osoe_am.internode && osoe.job.node_count > 1 ?
++                                     osoe_connection_to(&osoe_am.area, peer) : NULL;
++        uint32_t b[6] = { 0 };
++        if (dc)
++            for (int k = 0; k < 2; k++) {
++                b[3 * k] = atomic_load_explicit(&dc->s->buffer[k].head, memory_order_acquire);
++                b[3 * k + 1] = atomic_load_explicit(&dc->s->buffer[k].filled, memory_order_acquire);
++                b[3 * k + 2] = (uint32_t)atomic_load_explicit(&dc->s->buffer[k].seq, memory_order_acquire);
++            }
++        uint32_t flag = atomic_load_explicit(osoe_am.area.owner[0].sleeping, memory_order_acquire);
++        uint64_t t0 = osoe_now_ns();
++        bool r = osoe_ring_wait_wake(&osoe_am.owner[0].ring, wake, seen,
++                                     data_wires_wait_ns(OSOE_SWEEP_NS));
++        uint64_t dt = osoe_now_ns() - t0;
++        if (dt >= 20000000 && dc)
++            fprintf(stderr, "osoe-diag agent node %u: waited %.1f ms (word %s, seen %u now %u, "
++                    "sleeping flag %u before, %u after); before: head0=%#x filled0=%u seq0=%u "
++                    "head1=%#x filled1=%u seq1=%u; after: head0=%#x filled0=%u seq0=%u "
++                    "head1=%#x filled1=%u seq1=%u; turnover waiters %u\n",
++                    osoe.job.node, dt * 1e-6, r ? "moved" : "not moved", seen,
++                    atomic_load_explicit(wake, memory_order_acquire), flag,
++                    atomic_load_explicit(osoe_am.area.owner[0].sleeping, memory_order_acquire),
++                    b[0], b[1], b[2], b[3], b[4], b[5],
++                    atomic_load_explicit(&dc->s->buffer[0].head, memory_order_acquire),
++                    atomic_load_explicit(&dc->s->buffer[0].filled, memory_order_acquire),
++                    (uint32_t)atomic_load_explicit(&dc->s->buffer[0].seq, memory_order_acquire),
++                    atomic_load_explicit(&dc->s->buffer[1].head, memory_order_acquire),
++                    atomic_load_explicit(&dc->s->buffer[1].filled, memory_order_acquire),
++                    (uint32_t)atomic_load_explicit(&dc->s->buffer[1].seq, memory_order_acquire),
++                    atomic_load_explicit(&dc->s->turnover_wait.waiters, memory_order_acquire));
++        return r;
++    }
+     struct osoe_deadline sweep = osoe_deadline_in(OSOE_SWEEP_NS);
+     return osoe_futex_wait(wake, seen, &sweep, OSOE_FUTEX_SHARED) == 0;
+ }

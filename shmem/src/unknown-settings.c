@@ -73,6 +73,7 @@ static const char *const known_settings[] = {
     "OSOE_TEST_SLOW_HELPER",
     "OSOE_TEST_STALE_HELPER",
     "OSOE_TEST_TEAM_GENERATION",
+    "OSOE_TURNOVER_WAKE",
     "OSOE_WIRE_BUFFERS",
     "OSOE_WIRE_BYTES",
     "OSOE_WIRE_SEED",

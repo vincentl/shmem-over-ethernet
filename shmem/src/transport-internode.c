@@ -613,6 +613,55 @@ static uint64_t turnover(const struct osoe_connection *connection)
     return a > b ? a : b;
 }
 
+static uint32_t payload_limit(struct osoe_connection *connection, uint32_t peer,
+                              uint32_t fixed_bytes);
+
+/* The least payload a put's part takes when it fills the room a buffer has
+ * left - a sixteenth of the largest, 4,094 bytes at the default chunk: below
+ * it the part waits for the next buffer, since each part pays a message's
+ * header and its parse at the peer, and a sliver of room is better left
+ * empty. */
+static uint32_t put_smallest_part(uint32_t limit)
+{
+    return limit / 16 ? limit / 16 : 1;
+}
+
+/* The least room worth a wake under the hand-on (P2): what a put's smallest
+ * part takes, below which a put waits for the next buffer anyway. A writer of
+ * a smaller whole message that such room would hold waits for a later
+ * turnover's wake instead, as every writer does under a bare wake of one -
+ * which the model found live (docs/design/evidence/hand-on-wake/). */
+static uint32_t room_worth_a_wake(struct osoe_connection *connection, uint32_t peer)
+{
+    uint32_t limit = payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_put));
+    return osoe_message_padded((uint32_t)sizeof(struct osoe_am_put) + put_smallest_part(limit));
+}
+
+/*
+ * The hand-on's first half (P2): after a reservation that left room worth
+ * another writer's, wake one writer waiting for room, if any is - the
+ * reservation's CAS, then this load of the count, the other side of a waiter's
+ * registration and then its look at the room (base/wait-word.h).
+ *
+ * Under OSOE_TURNOVER_WAKE=hand-on, every such reservation: a reopened buffer,
+ * which wakes one, wakes as many as it has room for, one after another. Under
+ * room, only a writer that `waited` and took less than a chunk: the open woke
+ * as many as the room holds messages of a chunk, so a woken writer that took
+ * less leaves room the count did not see - a room of small messages wakes as
+ * many as fit - while a writer that reserved without waiting took room the
+ * count gave others, and a woken one that took a chunk took its own.
+ */
+static void hand_on(struct osoe_connection *connection, uint32_t peer,
+                    const struct osoe_reservation *r, bool waited)
+{
+    bool wanted = connection->wake == OSOE_TURNOVER_WAKE_HAND_ON ||
+                  (connection->wake == OSOE_TURNOVER_WAKE_ROOM && waited &&
+                   r->len < connection->chunk);
+    if (wanted && r->room >= room_worth_a_wake(connection, peer) &&
+        osoe_wait_word_wake_one(osoe_connection_turnover_wait(connection)))
+        osoe_count(OSOE_C_AM_TURNOVER_HAND_ONS, 1);
+}
+
 /*
  * Reserve, waiting for room.
  *
@@ -621,13 +670,28 @@ static uint64_t turnover(const struct osoe_connection *connection)
  * it marks the connection and wakes the lead, which visits only connections
  * with work (§3.10) - and waits on the connection's turnover word, which the
  * agent bumps when it opens a buffer and anyone is registered
- * (base/wait-word.h, §3.11). Every waiter is woken: room is divisible, and each
- * has its own reservation to retry. A put's part takes the room it finds, so
- * writers of large puts each get some of a reopened buffer, where before v0.2
- * step 4 one 64 KiB message filled it and the rest slept again (the release
- * fixes' review, S1); a whole message larger than the room left still sleeps
- * again. It asks again before every sleep, since the buffer that just opened
- * may have filled before this writer got to it.
+ * (base/wait-word.h, §3.11). It asks again before every sleep, since the buffer
+ * that just opened may have filled before this writer got to it; a put's part
+ * takes the room it finds, and a whole message larger than the room left
+ * sleeps again.
+ *
+ * Which writers an open wakes is OSOE_TURNOVER_WAKE's (P2). **By default,
+ * room**: as many as the reopened room holds messages of a chunk, at once -
+ * four at the defaults, three whole messages and a part - and a woken writer
+ * that took less than a chunk hands on (hand_on), so that a room of small
+ * messages wakes as many as fit; the pass is the hand-on's. **all**, as osoe
+ * did until 2026-10-29, wakes every one, each to retry its own reservation:
+ * at every turnover every writer woke and most slept again, which H12
+ * measured at a quarter of a node's PEs a 64 KiB moved, each wake the node's
+ * agent's. **hand-on** wakes one, each reservation that leaves room worth
+ * another waking the next, and a woken writer that finds the room too little
+ * for its message but worth another's passing the wake on - once a turnover,
+ * or two such writers pass it back and forth, and then from a word loaded
+ * after its own bump. turnover_wake_model.py (docs/design/evidence/
+ * hand-on-wake/) holds all three: live, a pass a writer a turnover; and the
+ * evidence's timing why room is the default - waking every writer's rate kept
+ * below 64 writers and passed at 64, where the hand-on's chain sent buffers
+ * emptier.
  *
  * Step 2 slept 20 us and looked again instead, which on the ring held a stream
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer
@@ -641,8 +705,10 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
                             const char *routine, uint32_t len, uint32_t least,
                             struct osoe_reservation *r)
 {
-    if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK)
+    if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK) {
+        hand_on(connection, peer, r, false);
         return;
+    }
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
     struct am_wait w;
@@ -661,7 +727,8 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
                   peer, pe, opened);
     osoe_wait_word_enter(word);
     uint32_t slept_on = 0;
-    bool swept = false;
+    bool swept = false, woken = false;
+    uint64_t passed_in = UINT64_MAX;    /* the turnover this writer last passed a wake in */
     for (;;) {
         uint32_t seen = osoe_wait_word_load(word);
         if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK) {
@@ -675,8 +742,21 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
         osoe_wait_ends();
         osoe_connection_area_mark(&osoe_am.area, peer);
         osoe_progress_host_wake(peer);
+        /* The hand-on's second half: woken - by a wake, or by a word that
+         * moved before it slept - to room worth another's but not its own, a
+         * writer passes the wake on, once a turnover, and looks again. */
+        if (connection->wake != OSOE_TURNOVER_WAKE_ALL && woken &&
+            r->room >= room_worth_a_wake(connection, peer)) {
+            uint64_t now = turnover(connection);
+            if (now != passed_in && osoe_wait_word_pass_on(word)) {
+                passed_in = now;
+                osoe_count(OSOE_C_AM_TURNOVER_PASSES, 1);
+                continue;
+            }
+        }
         slept_on = seen;
         swept = sleep_on(word, seen);
+        woken = woken || !swept;
         uint64_t now = turnover(connection);
         if (connecting && now != 0) {
             osoe_blocked_leave();
@@ -687,6 +767,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
         am_wait_check(&w, now);
     }
     osoe_wait_word_leave(word);
+    hand_on(connection, peer, r, true);
     am_wait_end();
 }
 
@@ -724,11 +805,7 @@ static void remote_put(struct osoe_transport_context *c, int pe, enum osoe_regio
 
     uint32_t limit = payload_limit(connection, peer, (uint32_t)sizeof(struct osoe_am_put));
     uint32_t overhead = (uint32_t)(sizeof(struct osoe_message_header) + sizeof(struct osoe_am_put));
-    /* The least payload a part takes when it fills the room a buffer has left -
-     * a sixteenth of the largest, 4,094 bytes at the default chunk: below it the part
-     * waits for the next buffer, since each part pays a message's header and
-     * its parse at the peer, and a sliver of room is better left empty. */
-    uint32_t smallest_part = limit / 16 ? limit / 16 : 1;
+    uint32_t smallest_part = put_smallest_part(limit);
     const unsigned char *at = src;
     /* A zero-length put is a no-op the spec still allows to be issued; it must
      * not become a message, or the peer applies an empty write and the loop

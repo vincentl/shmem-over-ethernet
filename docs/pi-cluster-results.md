@@ -1073,3 +1073,31 @@ three, its spread, the ratio, and OSU's lines over the simulation's - are in
   both, from 1.51 to 1.54 ms to 1.89 to 2.15. At 4 × 1, one PE a node, OSU's
   reduce shows no such loss: 1.39 ms at 64 KiB bound, 1.37 unbound. A site
   that binds each PE to its core (B11, H26) is where it matters.
+
+## H29 and H22: the link both ways, and F1's control (2026-10-28 and 29)
+
+`main` at `d24c54e9` on the head node; evidence
+`docs/design/evidence/pi-cluster/2026-10-28-h22-h29/`; the records
+`docs/decisions/2026-10-28.md` and `docs/decisions/2026-10-29.md`.
+
+**H29.** A stream both ways at once against one way, two pairs of nodes, three
+rounds: bare TCP 112.0 to 112.3 MiB/s either way, osoe's 1 MiB puts 112.1 one
+way and 110 to 111 each way at once. The link carries both ways at the full
+rate, so H21's Träff's, 12 to 22% slower than its simulation, pays a cost the
+model lacks, not the link's.
+
+**H22, F1's control.** F1's trigger map (`h22.sh`: `shmem_fcollectmem` over
+the world, 200 calls after 20, a call over 20 ms slow) at 4 × 1, 4 × 2 and
+4 × 4 over F1's block sizes, twice, and with rank 0 on `pi-002`:
+
+| | offload off, 1.4 h after boot | offload on, 13 h after boot |
+|---|---|---|
+| slow calls | none at any size; the slowest 3.9 ms | 1 to 10 in 200 at 12 of the 38 points run - 32 to 49 KiB at 4 × 1, 16 and 20 KiB at 4 × 2, 28 and 32 KiB with rank 0 on `pi-002`, none at 4 × 4 - each 44 to 45 ms |
+| TCP retransmission timeouts | none | none |
+
+Offload on brings stalls back where F1 found them, but not F1's: 45 ms
+waits with no retransmission timeout, where F1's were 0.5 to 36 s, the timeout
+doubling. And the nodes were thirteen hours up where the baseline's were not
+two, so offload off again at the same uptime is what separates the offload from
+the uptime; H22 stays open for it.
+

@@ -21,13 +21,17 @@
  * breakages - the count read before the value's store, the registration after
  * the check, the value published by a release store - each lose a wake.
  *
- * **Every waiter is woken** (§3.11: the wake count tracks divisibility). The
- * values this carries are divisible, or nearly: each quiet waits for its own
- * sequence, and each writer has its own reservation to retry - a put's part
- * takes the room it finds (v0.2 step 4), and a whole message larger than the
- * room left sleeps again (the release fixes' review, S1, where a buffer of
- * twice the chunk had room for one message of OSOE_AM_CHUNK). A credit, which
- * only one waiter can take, is not one of them.
+ * **Every waiter is woken** (§3.11: the wake count tracks divisibility) where
+ * each can use the move: each quiet waits for its own sequence. A credit, which
+ * only one waiter can take, is not one of them. **Or some**, where the move is
+ * room that holds only so many: a connection's turnover wakes as many writers
+ * as the reopened room holds messages of a chunk (OSOE_TURNOVER_WAKE=room, the
+ * default since 2026-10-29, P2), or one, the writers waking one another as the
+ * room allows (hand-on) - since waking every writer, `all`, had every writer
+ * asleep at every turnover, each woken by the node's agent (the release fixes'
+ * review, S1; H12) (transport-internode.c, reserve_waiting;
+ * docs/design/evidence/hand-on-wake/turnover_wake_model.py). The same two
+ * sides, waking fewer.
  *
  * The value is the caller's, and so are its stores and loads: this holds only
  * the word and the count, and says nothing about what the value is.
@@ -37,6 +41,7 @@
 
 #include <limits.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base/futex.h"
@@ -76,6 +81,42 @@ static inline void osoe_wait_word_wake_all(struct osoe_wait_word *w)
         return;
     atomic_fetch_add_explicit(&w->word, 1, memory_order_seq_cst);
     osoe_futex_wake(&w->word, INT_MAX, OSOE_FUTEX_SHARED);
+}
+
+/*
+ * The same step waking up to `count` waiters, not every one: the agent's as it
+ * opens a buffer under the room count, as many as the room holds. True if
+ * anyone was registered, and so the word moved.
+ */
+static inline bool osoe_wait_word_wake_up_to(struct osoe_wait_word *w, uint32_t count)
+{
+    if (atomic_load_explicit(&w->waiters, memory_order_seq_cst) == 0)
+        return false;
+    atomic_fetch_add_explicit(&w->word, 1, memory_order_seq_cst);
+    osoe_futex_wake(&w->word, count < INT_MAX ? (int)count : INT_MAX, OSOE_FUTEX_SHARED);
+    return true;
+}
+
+/* And one: the agent's as it opens a buffer under the hand-on, and a writer's
+ * after a reservation that leaves room worth another. */
+static inline bool osoe_wait_word_wake_one(struct osoe_wait_word *w)
+{
+    return osoe_wait_word_wake_up_to(w, 1);
+}
+
+/*
+ * A registered waiter's wake of one other, the hand-on's pass: true if another
+ * was registered - more than the caller itself - and so the word moved. The
+ * caller then loads the word afresh before it sleeps, or its own bump returns
+ * that sleep at once.
+ */
+static inline bool osoe_wait_word_pass_on(struct osoe_wait_word *w)
+{
+    if (atomic_load_explicit(&w->waiters, memory_order_seq_cst) <= 1)
+        return false;
+    atomic_fetch_add_explicit(&w->word, 1, memory_order_seq_cst);
+    osoe_futex_wake(&w->word, 1, OSOE_FUTEX_SHARED);
+    return true;
 }
 
 #endif /* OSOE_BASE_WAIT_WORD_H */

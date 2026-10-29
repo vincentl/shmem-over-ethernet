@@ -66,7 +66,7 @@ struct part {
 
 static struct osoe_connection_shared shared;
 static unsigned char storage[2 * CAPACITY];
-static struct osoe_connection connection = { &shared, storage, CAPACITY };
+static struct osoe_connection connection = { &shared, storage, CAPACITY, OSOE_TURNOVER_WAKE_ALL, 0 };
 
 static _Atomic uint32_t writers_done;
 
