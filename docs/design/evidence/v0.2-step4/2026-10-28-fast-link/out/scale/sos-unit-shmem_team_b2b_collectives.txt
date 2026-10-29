@@ -1,0 +1,73 @@
+# 23:13:40 nodes=8 pes_per_node=2 
+# ~/osoe/build/sos/unit/shmem_team_b2b_collectives
+salloc: Granted job allocation 300
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 2 connected its mesh in 1009 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 6 connected its mesh in 1056 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 1134 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 4 connected its mesh in 1422 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 1348 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 7 connected its mesh in 1618 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 2043 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 1978 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (24667 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 10 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (24682 us of this start)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 14 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (25050 us of this start)
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 4 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (25389 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 12 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (25633 us of this start)
+osoe: PE 6 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (25177 us of this start)
+osoe: PE 2 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (25574 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 8 of 16 (local 0 of 2): segment /dev/shm/osoe.300.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (25306 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 15 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (23330 us of this start)
+osoe: PE 5 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (17349 us of this start)
+osoe: PE 13 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (15647 us of this start)
+osoe: PE 7 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (14276 us of this start)
+osoe: PE 3 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (24057 us of this start)
+osoe: PE 9 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (18976 us of this start)
+osoe: PE 11 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (24678 us of this start)
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 316866
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 316866
+osoe: PE 1 of 16 (local 1 of 2): segment /dev/shm/osoe.300.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 102484 ns, a message cost of 24724 ns, 2475516551 bytes a second (16819 us of this start)
+broadcast... passed.
+reduce... passed.
+osoe: PE 4: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 2: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 8: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 0: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 5: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 3: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 9: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 12: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+collect... osoe: PE 14: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 13: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 10: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 1: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 15: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 6: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 7: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 11: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 1280 bytes (spec §9.10.8: dest must hold every member's block)
+srun: error: slurm-node-02: tasks 2-3: Exited with exit code 1
+srun: Terminating StepId=300.0
+srun: error: slurm-node-01: tasks 0-1: Exited with exit code 1
+srun: error: slurm-node-05: tasks 8-9: Exited with exit code 1
+srun: error: slurm-node-08: tasks 14-15: Exited with exit code 1
+srun: error: slurm-node-07: tasks 12-13: Exited with exit code 1
+srun: error: slurm-node-06: tasks 10-11: Exited with exit code 1
+srun: error: slurm-node-04: tasks 6-7: Exited with exit code 1
+srun: error: slurm-node-03: tasks 4-5: Exited with exit code 1
+salloc: Relinquishing job allocation 300
+# exit 1

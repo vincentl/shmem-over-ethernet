@@ -1,0 +1,22 @@
+# 22:55:23 nodes=2 pes_per_node=1 OSOE_GET_LANDING_BYTES=1048576
+# ~/osoe/build/release/kit/get-pieces 21 67108864
+salloc: Granted job allocation 111
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 1 connected its mesh in 448 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 connected its mesh in 484 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.111.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 110898 ns, a message cost of 0 ns, 1731443441 bytes a second (10422 us of this start)
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.111.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 110898 ns, a message cost of 0 ns, 1731443441 bytes a second (10451 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 221624
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 221624
+get-pieces pes=2 peer=1 repetitions=21 (median microseconds)
+bytes=16384 put_quiet_us=196.5 get_us=205.2 get_nbi_quiet_us=189.6 get_over_put=1.04 nbi_over_put=0.97
+bytes=65536 put_quiet_us=250.7 get_us=326.9 get_nbi_quiet_us=295.4 get_over_put=1.30 nbi_over_put=1.18
+bytes=262144 put_quiet_us=349.3 get_us=486.3 get_nbi_quiet_us=162.6 get_over_put=1.39 nbi_over_put=0.47
+bytes=1048576 put_quiet_us=474.1 get_us=451.3 get_nbi_quiet_us=441.5 get_over_put=0.95 nbi_over_put=0.93
+bytes=4194304 put_quiet_us=1562.2 get_us=1553.4 get_nbi_quiet_us=1539.3 get_over_put=0.99 nbi_over_put=0.99
+bytes=16777216 put_quiet_us=5992.7 get_us=5977.2 get_nbi_quiet_us=5979.1 get_over_put=1.00 nbi_over_put=1.00
+bytes=67108864 put_quiet_us=23641.3 get_us=23633.1 get_nbi_quiet_us=23643.7 get_over_put=1.00 nbi_over_put=1.00
+salloc: Relinquishing job allocation 111
+# exit 0

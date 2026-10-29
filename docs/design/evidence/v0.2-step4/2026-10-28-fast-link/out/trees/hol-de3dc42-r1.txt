@@ -1,0 +1,12 @@
+# 23:01:25 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/de3dc42/build/release/kit/hol 10
+salloc: Granted job allocation 139
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.139.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 104343 ns, a message cost of 0 ns, 1518185047 bytes a second (6203 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.139.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 104343 ns, a message cost of 0 ns, 1518185047 bytes a second (2857 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.139.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 104343 ns, a message cost of 0 ns, 1518185047 bytes a second (8932 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.139.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 104343 ns, a message cost of 0 ns, 1518185047 bytes a second (8729 us of this start)
+hol phase=alone op=fetch-add bytes=8 operations=8624 median_us=74 p90_us=82 p99_us=308 max_us=530 stream_mib_per_s=0
+hol phase=stream op=fetch-add bytes=8 operations=6839 median_us=1724 p90_us=2265 p99_us=2485 max_us=3245 stream_mib_per_s=2705
+salloc: Relinquishing job allocation 139
+# exit 0

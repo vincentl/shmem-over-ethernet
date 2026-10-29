@@ -1,0 +1,101 @@
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+Warning: Permanently added 'slurm-controller' (ED25519) to the list of known hosts.
+Synchronizing state of munge.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable munge
+# The fast-link cluster's Slurm (docs/fast-link/slurm-setup.sh).
+ClusterName=fastlink
+SlurmctldHost=slurm-controller
+MpiDefault=none
+ProctrackType=proctrack/linuxproc
+# Nothing binds a step's tasks, so that a job of one task may use every core of
+# its node (docs/fast-link.md, §1).
+TaskPlugin=task/none
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core
+SchedulerType=sched/backfill
+PropagateResourceLimitsExcept=MEMLOCK
+InactiveLimit=120
+ReturnToService=2
+SlurmUser=slurm
+SlurmctldPidFile=/run/slurmctld/slurmctld.pid
+SlurmdPidFile=/run/slurmd.pid
+SlurmdSpoolDir=/var/lib/slurm/slurmd
+StateSaveLocation=/var/lib/slurm/slurmctld
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+NodeName=slurm-node-01 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-02 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-03 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-04 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-05 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-06 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-07 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+NodeName=slurm-node-08 CPUs=16 Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=2 RealMemory=59760
+PartitionName=main Nodes=ALL Default=YES MaxTime=INFINITE State=UP
+Synchronizing state of slurmctld.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmctld
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Synchronizing state of slurmd.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable slurmd
+Wed Oct 28 22:40:10 2026
+NODELIST       NODES PARTITION       STATE CPUS    S:C:T MEMORY TMP_DISK WEIGHT AVAIL_FE REASON              
+slurm-node-01      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-02      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-03      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-04      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-05      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-06      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-07      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-08      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurmstepd-slurm-node-04: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-05: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-04 memlock unlimited
+slurmstepd-slurm-node-02: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-05 memlock unlimited
+slurmstepd-slurm-node-01: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-02 memlock unlimited
+slurmstepd-slurm-node-04: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-01 memlock unlimited
+slurmstepd-slurm-node-05: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-02: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-01: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-03: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-03: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-03 memlock unlimited
+slurmstepd-slurm-node-06: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-06: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-06 memlock unlimited
+slurmstepd-slurm-node-07: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-08: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-07 memlock unlimited
+slurmstepd-slurm-node-07: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-08 memlock unlimited
+slurmstepd-slurm-node-08: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead

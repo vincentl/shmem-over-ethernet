@@ -1,0 +1,167 @@
+slurm-node-02     80.15%  swapper          [kernel.kallsyms]           [k] cpuidle_enter_state                        -      -            
+slurm-node-02      1.63%  swapper          [kernel.kallsyms]           [k] handle_softirqs                            -      -            
+slurm-node-02      1.24%  osoe-helper-1    [kernel.kallsyms]           [k] _copy_from_iter                            -      -            
+slurm-node-02      1.10%  multistream      libc.so.6                   [.] 0x000000000017bb72                         -      -            
+slurm-node-02      0.94%  osoe-helper-2    [kernel.kallsyms]           [k] _copy_from_iter                            -      -            
+slurm-node-02      0.92%  osoe-helper-1    [kernel.kallsyms]           [k] _copy_to_iter                              -      -            
+slurm-node-02      0.81%  osoe-helper-2    [kernel.kallsyms]           [k] _copy_to_iter                              -      -            
+slurm-node-02      0.79%  swapper          [kernel.kallsyms]           [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-02 the progress threads' symbols, with their callers:
+slurm-node-01     80.99%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-01      1.65%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-01      1.19%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-01      1.02%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-01      0.99%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-01      0.88%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-01      0.87%  swapper          [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-01      0.78%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-01      0.54%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+slurm-node-01 the progress threads' symbols, with their callers:
+slurm-node-04     80.37%  swapper        [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-04      1.90%  swapper        [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-04      1.18%  osoe-helper-1  [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-04      1.01%  multistream    libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-04      0.96%  osoe-helper-1  [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-04      0.92%  swapper        [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-04      0.79%  osoe-helper-2  [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-04      0.72%  osoe-helper-2  [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-04      0.50%  swapper        [kernel.kallsyms]     [k] skb_release_data                           -      -            
+slurm-node-04 the progress threads' symbols, with their callers:
+slurm-node-06     80.51%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-06      1.81%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-06      1.47%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-06      0.96%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-06      0.90%  swapper          [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-06      0.85%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-06      0.81%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-05     79.59%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-05      2.32%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-05      1.22%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-05      1.00%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-05      0.93%  swapper          [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-05      0.90%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-05      0.83%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-06      0.71%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-05      0.72%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-05      0.56%  swapper          [kernel.kallsyms]     [k] skb_release_data                           -      -            
+slurm-node-06 the progress threads' symbols, with their callers:
+slurm-node-05 the progress threads' symbols, with their callers:
+slurm-node-03     80.58%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-03      1.46%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-03      1.36%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-03      0.99%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-03      0.90%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-03      0.88%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-03      0.78%  swapper          [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-03      0.77%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-03 the progress threads' symbols, with their callers:
+slurm-node-07     79.36%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-07      2.19%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-07      1.20%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-07      0.99%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-07      0.97%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-07      0.92%  swapper          [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-07      0.90%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-07      0.77%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-07      0.56%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+slurm-node-07 the progress threads' symbols, with their callers:
+slurm-node-08     80.72%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-08      2.13%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-08      1.25%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-08      1.02%  osoe-helper-1    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-08      0.99%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-08      0.89%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-08      0.67%  osoe-helper-2    [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-08      0.59%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+slurm-node-08 the progress threads' symbols, with their callers:
+slurm-node-01      2.18%  [k] _copy_from_iter                            -      -            
+slurm-node-01             |
+slurm-node-01             ---tcp_sendmsg_locked
+slurm-node-01                tcp_sendmsg
+slurm-node-01                sock_sendmsg
+slurm-node-01                io_send
+slurm-node-01                io_issue_sqe
+slurm-node-02      2.18%  [k] _copy_from_iter                            -      -            
+slurm-node-02             |
+slurm-node-02             ---tcp_sendmsg_locked
+slurm-node-02                tcp_sendmsg
+slurm-node-02                sock_sendmsg
+slurm-node-02                io_send
+slurm-node-02                io_issue_sqe
+slurm-node-06      2.32%  [k] _copy_from_iter                        -      -            
+slurm-node-06             |
+slurm-node-06             ---tcp_sendmsg_locked
+slurm-node-06                tcp_sendmsg
+slurm-node-06                sock_sendmsg
+slurm-node-06                io_send
+slurm-node-06                io_issue_sqe
+slurm-node-06                |          
+slurm-node-06                 --2.08%--io_submit_sqes
+slurm-node-06                           __do_sys_io_uring_enter
+slurm-node-06                           do_syscall_64
+slurm-node-06                           entry_SYSCALL_64_after_hwframe
+slurm-node-06                           0x7f49f6f353ca
+slurm-node-06      2.30%  [k] handle_softirqs                        -      -            
+slurm-node-06             |          
+slurm-node-06              --2.30%--handle_softirqs
+slurm-node-06                        |          
+slurm-node-06                         --2.29%--__irq_exit_rcu
+slurm-node-06                                   |          
+slurm-node-06                                    --2.18%--common_interrupt
+slurm-node-06                                              asm_common_interrupt
+slurm-node-03      2.35%  [k] _copy_from_iter                            -      -            
+slurm-node-03             |
+slurm-node-03             ---tcp_sendmsg_locked
+slurm-node-03                tcp_sendmsg
+slurm-node-03                sock_sendmsg
+slurm-node-03                io_send
+slurm-node-03                io_issue_sqe
+slurm-node-03                |          
+slurm-node-03                 --2.30%--io_submit_sqes
+slurm-node-03                           __do_sys_io_uring_enter
+slurm-node-03                           do_syscall_64
+slurm-node-03                           entry_SYSCALL_64_after_hwframe
+slurm-node-03                           0x7f5de72103ca
+slurm-node-03      2.28%  [k] handle_softirqs                            -      -            
+slurm-node-03             |          
+slurm-node-03              --2.28%--__irq_exit_rcu
+slurm-node-03                        |          
+slurm-node-03                         --2.15%--common_interrupt
+slurm-node-03                                   asm_common_interrupt
+slurm-node-07      2.10%  [k] _copy_from_iter                        -      -            
+slurm-node-07             |
+slurm-node-07             ---tcp_sendmsg_locked
+slurm-node-07                tcp_sendmsg
+slurm-node-07                sock_sendmsg
+slurm-node-07                io_send
+slurm-node-07                io_issue_sqe
+slurm-node-05      2.06%  [k] _copy_from_iter                       -      -            
+slurm-node-05             |
+slurm-node-05             ---tcp_sendmsg_locked
+slurm-node-05                tcp_sendmsg
+slurm-node-05                sock_sendmsg
+slurm-node-05                io_send
+slurm-node-05                io_issue_sqe
+slurm-node-08      2.67%  [k] handle_softirqs                            -      -            
+slurm-node-08             |          
+slurm-node-08              --2.66%--handle_softirqs
+slurm-node-08                        |          
+slurm-node-08                         --2.66%--__irq_exit_rcu
+slurm-node-08                                   |          
+slurm-node-08                                    --2.57%--common_interrupt
+slurm-node-08                                              asm_common_interrupt
+slurm-node-08                                              |          
+slurm-node-08                                               --2.01%--cpuidle_enter_state
+slurm-node-08                                                         cpuidle_enter
+slurm-node-08                                                         do_idle
+slurm-node-08                                                         cpu_startup_entry
+slurm-node-08                                                         |          
+slurm-node-08                                                          --2.00%--start_secondary
+slurm-node-08                                                                    common_startup_64
+slurm-node-08      2.13%  [k] _copy_from_iter                            -      -            
+slurm-node-08             |
+slurm-node-08             ---tcp_sendmsg_locked
+slurm-node-08                tcp_sendmsg
+slurm-node-08                sock_sendmsg
+slurm-node-08                io_send
+slurm-node-08                io_issue_sqe

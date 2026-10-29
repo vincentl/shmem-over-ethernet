@@ -1,0 +1,22 @@
+# 22:44:13 nodes=3 pes_per_node=1 
+# ~/osoe/build/release/kit/startup
+salloc: Pending job allocation 23
+salloc: job 23 queued and waiting for resources
+salloc: job 23 has been allocated resources
+salloc: Granted job allocation 23
+salloc: Nodes slurm-node-[01-03] are ready for job
+osoe: node 1 connected its mesh in 509 us: 2 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 connected its mesh in 693 us: 2 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 1012 us: 2 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 3 (local 0 of 1): segment /dev/shm/osoe.23.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 3; link measured: a hop of 92421 ns, a message cost of 147735 ns, 2891230340 bytes a second (17046 us of this start)
+osoe: PE 1 of 3 (local 0 of 1): segment /dev/shm/osoe.23.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 3; link measured: a hop of 92421 ns, a message cost of 147735 ns, 2891230340 bytes a second (17576 us of this start)
+osoe: PE 2 of 3 (local 0 of 1): segment /dev/shm/osoe.23.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 3; link measured: a hop of 92421 ns, a message cost of 147735 ns, 2891230340 bytes a second (17179 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 2 connections to 370077
+osoe: node 0 limits the unsent bytes of each of its 2 connections to 370077
+osoe: node 1 limits the unsent bytes of each of its 2 connections to 370077
+startup pes=3 init_ms_pe0=75.5 init_ms_slowest=106.2 init_ms_fastest=75.5
+salloc: Relinquishing job allocation 23
+# exit 0

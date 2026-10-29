@@ -1,0 +1,94 @@
+# 23:13:42 nodes=8 pes_per_node=2 
+# ~/osoe/build/sos/unit/shmem_team_ptr
+salloc: Granted job allocation 305
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 1 connected its mesh in 1131 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 connected its mesh in 1062 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 connected its mesh in 1438 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 7 connected its mesh in 1656 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 1972 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 2078 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 2355 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 4 connected its mesh in 2743 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 3 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (24709 us of this start)
+osoe: PE 12 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (24370 us of this start)
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 349674
+12: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 15 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (24249 us of this start)
+14: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 6 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23282 us of this start)
+ 8: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 10 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23655 us of this start)
+ 2: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 1 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (18659 us of this start)
+13: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 8 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23150 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 349674
+15: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 349674
+ 6: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 2 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (24846 us of this start)
+ 1: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 13 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23002 us of this start)
+ 9: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 349674
+osoe: PE 14 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (24261 us of this start)
+ 4: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 7 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (21651 us of this start)
+ 3: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 11 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23269 us of this start)
+ 7: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 349674
+ 0: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 9 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23143 us of this start)
+ 5: Found 2 world team data segment peer(s) (14 were inaccessible)
+osoe: PE 5 of 16 (local 1 of 2): segment /dev/shm/osoe.305.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23402 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 349674
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 349674
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 349674
+osoe: PE 0 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (23919 us of this start)
+osoe: PE 4 of 16 (local 0 of 2): segment /dev/shm/osoe.305.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 112800 ns, a message cost of 5763 ns, 2731830223 bytes a second (24757 us of this start)
+10: Found 2 world team data segment peer(s) (14 were inaccessible)
+11: Found 2 world team data segment peer(s) (14 were inaccessible)
+ 0: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 1: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 6: Found 2 world team heap segment peer(s) (14 were inaccessible)
+13: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 8: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 5: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 2: Found 2 world team heap segment peer(s) (14 were inaccessible)
+12: Found 2 world team heap segment peer(s) (14 were inaccessible)
+10: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 9: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 4: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 3: Found 2 world team heap segment peer(s) (14 were inaccessible)
+14: Found 2 world team heap segment peer(s) (14 were inaccessible)
+15: Found 2 world team heap segment peer(s) (14 were inaccessible)
+11: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 7: Found 2 world team heap segment peer(s) (14 were inaccessible)
+ 1: Found 1 world team data segment peer(s) (7 were inaccessible)
+ 3: Found 1 world team data segment peer(s) (7 were inaccessible)
+13: Found 1 world team data segment peer(s) (7 were inaccessible)
+ 9: Found 1 world team data segment peer(s) (7 were inaccessible)
+ 5: Found 1 world team data segment peer(s) (7 were inaccessible)
+15: Found 1 world team data segment peer(s) (7 were inaccessible)
+ 7: Found 1 world team data segment peer(s) (7 were inaccessible)
+11: Found 1 world team data segment peer(s) (7 were inaccessible)
+ 1: Found 1 world team heap segment peer(s) (7 were inaccessible)
+ 3: Found 1 world team heap segment peer(s) (7 were inaccessible)
+13: Found 1 world team heap segment peer(s) (7 were inaccessible)
+15: Found 1 world team heap segment peer(s) (7 were inaccessible)
+ 9: Found 1 world team heap segment peer(s) (7 were inaccessible)
+ 5: Found 1 world team heap segment peer(s) (7 were inaccessible)
+ 7: Found 1 world team heap segment peer(s) (7 were inaccessible)
+11: Found 1 world team heap segment peer(s) (7 were inaccessible)
+salloc: Relinquishing job allocation 305
+# exit 0

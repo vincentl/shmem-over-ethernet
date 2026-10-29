@@ -1,0 +1,7 @@
+22:40:10 sos.sh: fetching tests-sos into ~/osoe-corpus
+tests-sos: fetching ca9cb12b13a10eda4b94844ccabdc119f6b48f88
+22:40:12 sos.sh: configuring the release build here, for oshcc
+22:40:14 sos.sh: building the library here
+22:40:25 sos.sh: building the programs, 4 at once
+22:40:39 sos.sh: 161 built, 2 not
+22:40:53 sos.sh: copied to every node of ~/NODES

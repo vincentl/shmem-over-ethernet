@@ -1,0 +1,18 @@
+# 23:02:06 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/3ee3357/build/release/kit/multistream put 1048576 10
+salloc: Pending job allocation 142
+salloc: job 142 queued and waiting for resources
+salloc: job 142 has been allocated resources
+salloc: Granted job allocation 142
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.142.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 116327 ns, a message cost of 0 ns, 1066799061 bytes a second (8134 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.142.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 116327 ns, a message cost of 0 ns, 1066799061 bytes a second (8147 us of this start)
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.142.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 116327 ns, a message cost of 0 ns, 1066799061 bytes a second (484 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.142.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 116327 ns, a message cost of 0 ns, 1066799061 bytes a second (2034 us of this start)
+multistream node=0 pes=2 mib_per_s=2641.1 progress_cpu_s=9.180 program_cpu_s=6.721 progress_cpu_s_per_gib=0.3558 program_sleeps=602897 sleeps_per_64kib=1.426 peers_in_calls=0.964 peers_in_calls_with_quiets=1.000 quiet_share=0.271 peers_window_s=9.999
+multistream node=0 peer_mib=26419.0
+multistream node=1 pes=2 mib_per_s=840.8 progress_cpu_s=9.958 program_cpu_s=2.721 progress_cpu_s_per_gib=1.2124 program_sleeps=269828 sleeps_per_64kib=2.005 peers_in_calls=0.977 peers_in_calls_with_quiets=1.000 quiet_share=0.074 peers_window_s=10.001
+multistream node=1 peer_mib=8411.0
+multistream job mode=put bytes=1048576 seconds=10.00 nodes=2 pes=4 pes_per_node=2 helpers=unset mib_per_s=3481.9 progress_cpu_s_per_gib=0.5627
+salloc: Relinquishing job allocation 142
+# exit 0

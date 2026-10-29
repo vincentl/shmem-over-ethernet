@@ -1,0 +1,15 @@
+# 23:04:01 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/2dcf8d6/build/release/kit/hol 10
+salloc: Granted job allocation 151
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 156459
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.151.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 172904 ns, a message cost of 0 ns, 1222340693 bytes a second (11612 us of this start)
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.151.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 172904 ns, a message cost of 0 ns, 1222340693 bytes a second (6748 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.151.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 172904 ns, a message cost of 0 ns, 1222340693 bytes a second (10695 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.151.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 172904 ns, a message cost of 0 ns, 1222340693 bytes a second (11880 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 156459
+hol phase=alone op=fetch-add bytes=8 operations=9295 median_us=73 p90_us=80 p99_us=225 max_us=401 stream_mib_per_s=0
+hol phase=stream op=fetch-add bytes=8 operations=19143 median_us=525 p90_us=610 p99_us=776 max_us=2145 stream_mib_per_s=2705
+salloc: Relinquishing job allocation 151
+salloc: Job allocation 151 has been revoked.
+# exit 0

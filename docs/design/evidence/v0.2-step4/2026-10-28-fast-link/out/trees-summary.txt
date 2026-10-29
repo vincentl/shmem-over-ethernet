@@ -1,0 +1,133 @@
+== ~/out/trees
+jobs: 20, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -
+their voluntary context switches, which every turnover's wake of all its
+writers raises (S1) - and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  put-1m-2dcf8d6 pes=None h=-          job 4166 (n=1)
+                                       node 2083 (1984-2183, n=2)
+                                       cpu/GiB 0.480 (n=1)
+                                       sleeps a 64 KiB 0.529 (0.527-0.531, n=2)
+                                       peers in calls 0.976 (0.968-0.983, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0835 (0.0790-0.0880, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1005 MiB/s, hop 119 us, message 0 us; unsent limit 134882 B
+  put-1m-3ee3357 pes=None h=-          job 3482 (n=1)
+                                       node 1741 (841-2641, n=2)
+                                       cpu/GiB 0.563 (n=1)
+                                       sleeps a 64 KiB 1.72 (1.43-2.00, n=2)
+                                       peers in calls 0.970 (0.964-0.977, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.173 (0.0740-0.271, n=2), over 10.0 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1017 MiB/s, hop 116 us, message 0 us
+  put-1m-49c62d3 pes=None h=-          job 4070 (n=1)
+                                       node 2035 (1843-2227, n=2)
+                                       cpu/GiB 0.484 (n=1)
+                                       sleeps a 64 KiB 0.524 (0.516-0.533, n=2)
+                                       peers in calls 0.976 (0.965-0.986, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0870 (0.0790-0.0950, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 845 MiB/s, hop 101 us, message 0 us; unsent limit 113351 B
+  put-1m-de3dc42 pes=None h=-          job 3860 (n=1)
+                                       node 1930 (1237-2623, n=2)
+                                       cpu/GiB 0.494 (n=1)
+                                       sleeps a 64 KiB 0.938 (0.830-1.05, n=2)
+                                       peers in calls 0.934 (0.923-0.945, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.261 (0.150-0.371, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1380 MiB/s, hop 108 us, message 0 us
+  put-1m-main pes=None h=-             job 4002 (n=1)
+                                       node 2001 (1996-2006, n=2)
+                                       cpu/GiB 0.494 (n=1)
+                                       sleeps a 64 KiB 0.524 (0.521-0.528, n=2)
+                                       peers in calls 0.974 (0.973-0.975, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0825 (0.0820-0.0830, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 791 MiB/s, hop 161 us, message 0 us; unsent limit 106140 B
+  put-64k-2dcf8d6 pes=None h=-         job 4444 (n=1)
+                                       node 2222 (1758-2686, n=2)
+                                       cpu/GiB 0.438 (n=1)
+                                       sleeps a 64 KiB 0.540 (0.533-0.547, n=2)
+                                       peers in calls 0.978 (0.971-0.986, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0925 (0.0750-0.110, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 774 MiB/s, hop 104 us, message 0 us; unsent limit 103899 B
+  put-64k-3ee3357 pes=None h=-         job 3793 (n=1)
+                                       node 1897 (1823-1970, n=2)
+                                       cpu/GiB 0.537 (n=1)
+                                       sleeps a 64 KiB 1.91 (1.88-1.93, n=2)
+                                       peers in calls 0.998 (0.998-0.998, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0245 (0.0230-0.0260, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1749 MiB/s, hop 121 us, message 0 us
+  put-64k-49c62d3 pes=None h=-         job 4237 (n=1)
+                                       node 2118 (1625-2612, n=2)
+                                       cpu/GiB 0.460 (n=1)
+                                       sleeps a 64 KiB 0.542 (0.533-0.551, n=2)
+                                       peers in calls 0.963 (0.939-0.987, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0905 (0.0690-0.112, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1618 MiB/s, hop 100 us, message 0 us; unsent limit 217115 B
+  put-64k-de3dc42 pes=None h=-         job 4186 (n=1)
+                                       node 2093 (1722-2464, n=2)
+                                       cpu/GiB 0.463 (n=1)
+                                       sleeps a 64 KiB 0.977 (0.934-1.02, n=2)
+                                       peers in calls 0.936 (0.929-0.943, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.229 (0.179-0.279, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 716 MiB/s, hop 103 us, message 0 us
+  put-64k-main pes=None h=-            job 4569 (n=1)
+                                       node 2284 (1981-2587, n=2)
+                                       cpu/GiB 0.433 (n=1)
+                                       sleeps a 64 KiB 0.532 (0.532-0.533, n=2)
+                                       peers in calls 0.970 (0.959-0.980, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0895 (0.0770-0.102, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1829 MiB/s, hop 138 us, message 0 us; unsent limit 245516 B
+
+mailbox: messages a second (median, range)
+  mailbox-2dcf8d6 pes=None h=None  93926 (n=1)
+    link 2705 MiB/s, hop 123 us, message 0 us; unsent limit 363080 B
+  mailbox-3ee3357 pes=None h=None  93652 (n=1)
+    link 2130 MiB/s, hop 133 us, message 0 us
+  mailbox-49c62d3 pes=None h=None  97709 (n=1)
+    link 731 MiB/s, hop 155 us, message 0 us; unsent limit 98105 B
+  mailbox-de3dc42 pes=None h=None  100200 (n=1)
+    link 1641 MiB/s, hop 91.2 us, message 0 us
+  mailbox-main pes=None h=None  99091 (n=1)
+    link 2504 MiB/s, hop 187 us, message 0 us; unsent limit 336056 B
+
+hol: an operation's time, microseconds - a fetch-add's round trip unless the case
+names another - alone and behind the stream; the stream's MiB/s
+  hol-2dcf8d6                alone  median 73.0 (n=1)             p99 225 (n=1)             
+  hol-2dcf8d6                stream median 525 (n=1)              p99 776 (n=1)              stream 2705 (n=1)
+                             link 1166 MiB/s, hop 173 us, message 0 us; unsent limit 156459 B
+  hol-3ee3357                alone  median 77.0 (n=1)             p99 215 (n=1)             
+  hol-3ee3357                stream median 1323 (n=1)             p99 3060 (n=1)             stream 2707 (n=1)
+                             link 1438 MiB/s, hop 152 us, message 0 us
+  hol-49c62d3                alone  median 74.0 (n=1)             p99 203 (n=1)             
+  hol-49c62d3                stream median 507 (n=1)              p99 667 (n=1)              stream 2703 (n=1)
+                             link 704 MiB/s, hop 103 us, message 0 us; unsent limit 94442 B
+  hol-de3dc42                alone  median 74.0 (n=1)             p99 308 (n=1)             
+  hol-de3dc42                stream median 1724 (n=1)             p99 2485 (n=1)             stream 2705 (n=1)
+                             link 1448 MiB/s, hop 104 us, message 0 us
+  hol-main                   alone  median 87.0 (n=1)             p99 220 (n=1)             
+  hol-main                   stream median 523 (n=1)              p99 687 (n=1)              stream 2705 (n=1)
+                             link 1139 MiB/s, hop 92.3 us, message 0 us; unsent limit 152940 B
+
+outcomes
+  mailbox-2dcf8d6-r1.txt: osoe-pacer failures=0 seconds=20.1
+  mailbox-3ee3357-r1.txt: osoe-pacer failures=0 seconds=20.1
+  mailbox-49c62d3-r1.txt: osoe-pacer failures=0 seconds=20.1
+  mailbox-de3dc42-r1.txt: osoe-pacer failures=0 seconds=20.1
+  mailbox-main-r1.txt: osoe-pacer failures=0 seconds=20.2

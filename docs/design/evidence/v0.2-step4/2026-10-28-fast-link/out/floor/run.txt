@@ -1,0 +1,9 @@
+# 2026-10-28T22:43:16Z floor.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+22:43:27 iperf3 1 streams each way done
+22:43:38 iperf3 2 streams each way done
+22:43:49 iperf3 4 streams each way done
+22:44:00 iperf3 8 streams each way done
+22:44:12 iperf3 16 streams each way done
+# done 22:44:12

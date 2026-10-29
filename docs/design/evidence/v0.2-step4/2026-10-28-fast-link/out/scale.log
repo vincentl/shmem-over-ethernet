@@ -1,0 +1,4 @@
+22:40:25 sos.sh: building the programs, 4 at once
+22:40:39 sos.sh: 161 built, 2 not
+22:40:53 sos.sh: copied to every node of ~/NODES
+161 programs built at 22:40:39, copied to every node of ~/NODES

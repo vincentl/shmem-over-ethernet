@@ -1,0 +1,15 @@
+# 23:01:56 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/3ee3357/build/release/kit/multistream put 65536 10
+salloc: Granted job allocation 141
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.141.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 121402 ns, a message cost of 0 ns, 1833858781 bytes a second (2960 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.141.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 121402 ns, a message cost of 0 ns, 1833858781 bytes a second (7348 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.141.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 121402 ns, a message cost of 0 ns, 1833858781 bytes a second (8482 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.141.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 121402 ns, a message cost of 0 ns, 1833858781 bytes a second (8427 us of this start)
+multistream node=0 pes=2 mib_per_s=1969.9 progress_cpu_s=9.927 program_cpu_s=6.906 progress_cpu_s_per_gib=0.5160 program_sleeps=593682 sleeps_per_64kib=1.884 peers_in_calls=0.998 peers_in_calls_with_quiets=1.000 quiet_share=0.026 peers_window_s=10.000
+multistream node=0 peer_mib=19699.2
+multistream node=1 pes=2 mib_per_s=1823.3 progress_cpu_s=9.954 program_cpu_s=6.568 progress_cpu_s_per_gib=0.5591 program_sleeps=562862 sleeps_per_64kib=1.929 peers_in_calls=0.998 peers_in_calls_with_quiets=1.000 quiet_share=0.023 peers_window_s=10.000
+multistream node=1 peer_mib=18232.8
+multistream job mode=put bytes=65536 seconds=10.00 nodes=2 pes=4 pes_per_node=2 helpers=unset mib_per_s=3793.1 progress_cpu_s_per_gib=0.5367
+salloc: Relinquishing job allocation 141
+# exit 0

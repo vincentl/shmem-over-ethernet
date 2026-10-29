@@ -1,0 +1,9 @@
+== ~/out/setup
+jobs: 2, of which 0 failed (run.txt)
+
+start-up: shmem_init, milliseconds - the slowest PE's, the launcher's spread
+with it, and the fastest's, nearer init's own cost
+  startup-32 pes=None  slowest 122 (n=1)  fastest 75.6 (n=1)
+== ~/out/setup-build
+== ~/out/setup-facts
+jobs: 1, of which 0 failed (run.txt)

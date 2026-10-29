@@ -1,0 +1,15 @@
+# 22:44:14 nodes=2 pes_per_node=1 
+# ~/osoe/build/release/kit/startup
+salloc: Granted job allocation 26
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 connected its mesh in 719 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 681 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 2 (local 0 of 1): segment /dev/shm/osoe.26.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 112479 ns, a message cost of 0 ns, 1380115262 bytes a second (10656 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 176654
+osoe: PE 1 of 2 (local 0 of 1): segment /dev/shm/osoe.26.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 112479 ns, a message cost of 0 ns, 1380115262 bytes a second (10671 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 176654
+startup pes=2 init_ms_pe0=69.1 init_ms_slowest=69.1 init_ms_fastest=55.3
+salloc: Relinquishing job allocation 26
+# exit 0

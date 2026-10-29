@@ -1,0 +1,19 @@
+# 22:44:17 nodes=3 pes_per_node=1 
+# ~/osoe/build/release/kit/startup
+salloc: Granted job allocation 39
+salloc: Nodes slurm-node-[01-03] are ready for job
+osoe: node 2 connected its mesh in 460 us: 2 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 580 us: 2 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 865 us: 2 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 3 (local 0 of 1): segment /dev/shm/osoe.39.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 3; link measured: a hop of 109106 ns, a message cost of 1106 ns, 2463662920 bytes a second (21068 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 2 connections to 315348
+osoe: PE 1 of 3 (local 0 of 1): segment /dev/shm/osoe.39.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 3; link measured: a hop of 109106 ns, a message cost of 1106 ns, 2463662920 bytes a second (21333 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 2 connections to 315348
+osoe: PE 2 of 3 (local 0 of 1): segment /dev/shm/osoe.39.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 3; link measured: a hop of 109106 ns, a message cost of 1106 ns, 2463662920 bytes a second (21308 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 2 connections to 315348
+startup pes=3 init_ms_pe0=71.2 init_ms_slowest=74.4 init_ms_fastest=70.0
+salloc: Relinquishing job allocation 39
+# exit 0

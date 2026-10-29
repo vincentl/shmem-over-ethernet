@@ -1,0 +1,31 @@
+slurm-controller: packages exit 0
+slurm-node-01: packages exit 0
+slurm-node-02: packages exit 0
+slurm-node-03: packages exit 0
+slurm-node-04: packages exit 0
+slurm-node-05: packages exit 0
+slurm-node-06: packages exit 0
+slurm-node-07: packages exit 0
+slurm-node-08: packages exit 0
+slurmstepd-slurm-node-06: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-06: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-06 memlock unlimited
+slurmstepd-slurm-node-07: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurmstepd-slurm-node-08: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-07 memlock unlimited
+slurmstepd-slurm-node-07: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+slurm-node-08 memlock unlimited
+slurmstepd-slurm-node-08: error: couldn't chdir to `~/osoe': No such file or directory: going to /tmp instead
+SOS's build started on this machine (sos.sh, its log ~/out/setup-sos.log)
+slurm-node-01: built, 0 warnings
+slurm-node-06: built, 0 warnings
+slurm-node-04: built, 0 warnings
+slurm-node-02: built, 0 warnings
+slurm-node-05: built, 0 warnings
+slurm-node-08: built, 0 warnings
+slurm-node-07: built, 0 warnings
+slurm-node-03: built, 0 warnings
+probe: PROBE PASSED on 8 of 8 nodes
+a job of 32 PEs a node: startup pes=256 init_ms_pe0=101.8 init_ms_slowest=122.0 init_ms_fastest=75.6
+tier 2 on slurm-node-01, exit 0: 100% tests passed, 0 tests failed out of 1071
+the litmus: 493/1071 Test #391: shmem.quiet.litmus.L2 Passed 7.11 sec

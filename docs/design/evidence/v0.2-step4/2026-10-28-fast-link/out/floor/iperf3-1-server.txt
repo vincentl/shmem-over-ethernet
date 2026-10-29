@@ -1,0 +1,33 @@
+-----------------------------------------------------------
+Server listening on 5201 (test #1)
+-----------------------------------------------------------
+Accepted connection from 10.10.0.12, port 47220
+[  5] local 10.10.0.11 port 5201 connected to 10.10.0.12 port 47222
+[  8] local 10.10.0.11 port 5201 connected to 10.10.0.12 port 47232
+[ ID][Role] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5][RX-S]   0.00-1.00   sec  2.63 GBytes  22.5 Gbits/sec                  
+[  8][TX-S]   0.00-1.00   sec  2.62 GBytes  22.5 Gbits/sec    0   1.85 MBytes       
+[  5][RX-S]   1.00-2.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   1.00-2.00   sec  2.66 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   2.00-3.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   2.00-3.00   sec  2.65 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   3.00-4.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   3.00-4.00   sec  2.65 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   4.00-5.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   4.00-5.00   sec  2.65 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   5.00-6.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   5.00-6.00   sec  2.65 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   6.00-7.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   6.00-7.00   sec  2.66 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   7.00-8.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   7.00-8.00   sec  2.65 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   8.00-9.00   sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   8.00-9.00   sec  2.66 GBytes  22.8 Gbits/sec    0   2.22 MBytes       
+[  5][RX-S]   9.00-10.00  sec  2.65 GBytes  22.8 Gbits/sec                  
+[  8][TX-S]   9.00-10.00  sec  2.66 GBytes  22.8 Gbits/sec    0   3.35 MBytes       
+[  5][RX-S]  10.00-10.00  sec  2.50 MBytes  21.1 Gbits/sec                  
+[  8][TX-S]  10.00-10.00  sec  5.38 MBytes  47.5 Gbits/sec    0   3.35 MBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID][Role] Interval           Transfer     Bitrate         Retr
+[  5][RX-S]   0.00-10.00  sec  26.5 GBytes  22.8 Gbits/sec                  receiver
+[  8][TX-S]   0.00-10.00  sec  26.5 GBytes  22.8 Gbits/sec    0            sender

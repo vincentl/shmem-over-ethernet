@@ -1,0 +1,17 @@
+# 23:04:42 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/49c62d3/build/release/kit/multistream put 1048576 10
+salloc: Granted job allocation 154
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.154.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 101181 ns, a message cost of 0 ns, 885555803 bytes a second (11227 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.154.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 101181 ns, a message cost of 0 ns, 885555803 bytes a second (30 us of this start)
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.154.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 101181 ns, a message cost of 0 ns, 885555803 bytes a second (8439 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.154.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 101181 ns, a message cost of 0 ns, 885555803 bytes a second (10945 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 113351
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 113351
+multistream node=0 pes=2 mib_per_s=2226.9 progress_cpu_s=9.460 program_cpu_s=2.419 progress_cpu_s_per_gib=0.4350 program_sleeps=184043 sleeps_per_64kib=0.516 peers_in_calls=0.965 peers_in_calls_with_quiets=1.000 quiet_share=0.095 peers_window_s=10.000
+multistream node=0 peer_mib=22271.0
+multistream node=1 pes=2 mib_per_s=1843.3 progress_cpu_s=9.787 program_cpu_s=1.942 progress_cpu_s_per_gib=0.5436 program_sleeps=157149 sleeps_per_64kib=0.533 peers_in_calls=0.986 peers_in_calls_with_quiets=1.000 quiet_share=0.079 peers_window_s=10.000
+multistream node=1 peer_mib=18435.0
+multistream job mode=put bytes=1048576 seconds=10.00 nodes=2 pes=4 pes_per_node=2 helpers=unset mib_per_s=4070.2 progress_cpu_s_per_gib=0.4842
+salloc: Relinquishing job allocation 154
+# exit 0

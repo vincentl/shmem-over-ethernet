@@ -1438,7 +1438,9 @@ at every helper count, a control wire and a data wire (§3.1,
   nodes or more where the node runs no more PEs than its machine has CPUs
   online, 0 otherwise - each PE of a node counting the same nodes, PEs and CPUs
   in its bootstrap, before anything is laid out by H, so its PEs agree. The
-  default stays 0 until the helpers are measured under a site's binding (H26).
+  default stays 0 until the author's word on the helpers measured under a site's
+  binding (H26, 2026-10-28: a core a PE, two helpers took the streams a fifth
+  faster and halved the mailbox; one CPU a PE, little either way).
 - **Writers wake the owner of their wire**, not the lead: the connection area
   holds a sleeping flag and a dirty bitmap an owner, and a helper's wake word,
   while the lead's agent sleeps on its PE slot's in the node segment, which stop
@@ -5573,7 +5575,9 @@ first target; a strided block is a put an element, element-strided within each
 block as the spec's Example 33 and SOS read §9.10.6.
 
 *As built since 2026-10-20 (P24):* the node's PEs are compared too, under
-`OSOE_CHECK_COLLECTIVES=1`, off by default until timed at many PEs a node (H12).
+`OSOE_CHECK_COLLECTIVES=1`, off by default; timed at many PEs a node (H12,
+2026-10-28), nothing one round could see from 16 to 64 PEs a node, and at 256
+nothing but the barrier's 672 µs to 975.
 Each member says its call - kind, operation, element and width, bytes where all
 must agree, a broadcast's root, an alltoall's strides, a scan's inclusiveness -
 in three spare words of its own internal region's release-counter line for the

@@ -1,0 +1,13 @@
+== ~/out/floor
+
+the bare aggregate, MiB/s, between two nodes both ways at once: iperf3's sum
+over its ten seconds, a node's share each way half of it, and echo-uring's
+per-connection medians summed over both ways - an upper bound, since nothing
+checks that its streams ran at once. A node's rate in the helpers' table is
+what it sent, one way, to all its peers: set it beside a node's share each
+way at as many streams as a node has peers
+    1 each way  iperf3      5429, a node's each way      2715   echo-uring         -
+    2 each way  iperf3      5431, a node's each way      2715   echo-uring         -
+    4 each way  iperf3      5426, a node's each way      2713   echo-uring         -
+    8 each way  iperf3      5425, a node's each way      2712   echo-uring         -
+   16 each way  iperf3      5423, a node's each way      2712   echo-uring         -

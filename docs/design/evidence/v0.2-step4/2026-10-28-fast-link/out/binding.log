@@ -1,0 +1,4 @@
+slurm-node-07      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-08      1     main*        idle 16      1:8:2  59760        0      1   (null) none                
+slurm-node-01 task 0: Cpus_allowed_list:	0
+slurm-node-01 task 1: Cpus_allowed_list:	8
