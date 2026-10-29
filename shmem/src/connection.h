@@ -63,6 +63,7 @@
 
 #include "base/cacheline.h"
 #include "base/wait-word.h"
+#include "bootstrap.h"
 #include "reply.h"
 
 /*
@@ -211,11 +212,14 @@ struct osoe_connection {
     struct osoe_connection_shared *s;
     unsigned char *data;        /* buffer k's bytes at data + k * capacity */
     uint32_t capacity;               /* bytes per buffer */
-    /* OSOE_TURNOVER_WAKE=hand-on (P2): an open wakes one writer waiting for
-     * room, not every one, and the writers hand the wake on
-     * (transport-internode.c, reserve_waiting). This process's setting: the
-     * lead's decides its agent's wake at an open, each writer's its own. */
-    bool hand_on;
+    /* OSOE_TURNOVER_WAKE (P2): which writers waiting for room an open wakes,
+     * and which of them wake others (transport-internode.c, reserve_waiting).
+     * This process's setting: the lead's decides its agent's wake at an open,
+     * each writer's its own. */
+    enum osoe_turnover_wake wake;
+    /* OSOE_AM_CHUNK's bytes, the largest message: what the room count counts
+     * a reopened buffer's room in. */
+    uint32_t chunk;
 };
 
 /* The progress thread's own bookkeeping, private to the lead (§3.5). Writers
@@ -328,7 +332,8 @@ static inline struct osoe_credit *osoe_connection_credit(struct osoe_connection 
  * are its own bookkeeping (§3.5). With two reservable buffers, one PE's later
  * operation can be sealed and sent first, which breaks fence,
  * signal-after-payload (invariant 5) and quiet. It wakes the writers waiting
- * for room - every one, or one under the hand-on (c->hand_on).
+ * for room - every one, one under the hand-on, or as many as the room holds
+ * messages of a chunk under the room count (c->wake).
  */
 void osoe_connection_open(struct osoe_connection *c, uint32_t k, uint64_t seq);
 /* ... and it opens past whatever osoe_connection_drain_reserve has put there. */

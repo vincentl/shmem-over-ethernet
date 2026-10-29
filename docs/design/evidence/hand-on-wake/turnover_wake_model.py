@@ -19,6 +19,16 @@ engine's), and PASSES: no generation sees more passes than writers.
 a put's smallest part): a hand-on needs that much left after the reservation,
 and a pass that much found, where the cases without it take any room at all -
 so a writer needing less than the floor is woken only by an open.
+
+The room-count design (room, the author's 2026-10-29): the open wakes as many
+writers as the room holds messages of a chunk, ceil(CAP / chunk) - the largest
+`least` a writer may have - and a writer that waited, whose reservation was
+smaller than a chunk, hands on as hand_on's does; a writer that reserves without
+waiting never does, its room being the count's. The pass is hand_on's.
+Breakage
+  room_count_before_open  the open's count from the room before its store, as
+                if read from the full buffer it reopens: a count of none leaves
+                a writer asleep with nothing left to wake it (LOST WAKE).
 Breakages
   pass_always   a woken writer passes every time it finds too little: two
                 writers too large for the room pass the wake back and forth.
@@ -32,21 +42,25 @@ ROOM, GEN, WORD, WAITERS, ASK, DONE, PASSES = (('room',), ('gen',), ('word',), (
 EVERY = 0xffffffff
 
 
-def wake(design, nxt):
-    """The agent's or a hand-on's wake: every waiter, or one."""
+ROOM_DESIGNS = ('room', 'room_count_before_open')
+
+
+def wake(design, nxt, count=lambda L: 1):
+    """The agent's or a hand-on's wake: every waiter, or `count` of them."""
     if design == 'wake_all':
         return ('fwake', lambda L: WORD, nxt)
-    return ('fwaken', lambda L: WORD, lambda L: 1, lambda L: EVERY, nxt)
+    return ('fwaken', lambda L: WORD, count, lambda L: EVERY, nxt)
 
 
-def writer(design, least, writers, floor=1):
+def writer(design, least, writers, floor=1, chunk=None):
     B = [('F0', ('load', lambda L: ROOM, 'r', '@F1')),
          ('F1', ('br', lambda L, t=least: L['r'] >= t, '@FC', '@REG')),
          ('FC', ('cas', lambda L: ROOM, lambda L: L['r'], lambda L, t=least: L['r'] - t, 'ok',
                  '@FC2')),
          ('FC2', ('br', lambda L: L['ok'], '@GOT', '@F0')),
          ('REG', ('add', lambda L: WAITERS, lambda L: 1, '_', '@W0')),
-         ('W0', ('set', 'woke', lambda L: 0, '@P0')),
+         ('W0', ('set', 'woke', lambda L: 0, '@WT')),
+         ('WT', ('set', 'waited', lambda L: 1, '@P0')),
          ('P0', ('set', 'passed', lambda L: -1, '@LOOP')),
          ('LOOP', ('load', lambda L: WORD, 'w', '@LR')),
          ('LR', ('load', lambda L: ROOM, 'r', '@LB')),
@@ -77,6 +91,14 @@ def writer(design, least, writers, floor=1):
           ('LEAVE', ('add', lambda L: WAITERS, lambda L: -1, '_', '@GOT'))]
     if design == 'wake_all':
         B += [('GOT', ('br', lambda L: False, '@FIN', '@FIN'))]
+    elif design in ROOM_DESIGNS:
+        # The room count's hand-on: a writer that waited, smaller than a chunk.
+        B += [('GOT', ('br', lambda L, t=least, f=floor, c=chunk:
+                       L['waited'] == 1 and t < c and L['r'] - t >= f, '@HN', '@FIN')),
+              ('HN', ('load', lambda L: WAITERS, 'n', '@HB')),
+              ('HB', ('br', lambda L: L['n'] != 0, '@HW', '@FIN')),
+              ('HW', ('add', lambda L: WORD, lambda L: 1, '_', '@HWK')),
+              ('HWK', wake(design, '@FIN'))]
     else:
         # The hand-on: room left after this reservation, and anyone registered.
         B += [('GOT', ('br', lambda L, t=least, f=floor: L['r'] - t >= f, '@HN', '@FIN')),
@@ -86,12 +108,20 @@ def writer(design, least, writers, floor=1):
               ('HWK', wake(design, '@FIN'))]
     B += [('FIN', ('add', lambda L: DONE, lambda L: 1, '_', '@CLEAN')),
           ('CLEAN', ('set', 'r', lambda L: DEL, '@CLEAN2')),
-          ('CLEAN2', ('set', 'w', lambda L: DEL, '@END')),
+          ('CLEAN2', ('set', 'w', lambda L: DEL, '@CLEAN3')),
+          ('CLEAN3', ('set', 'waited', lambda L: DEL, '@END')),
           ('END', ('done',))]
     return assemble(B)
 
 
-def agent(design, cap, writers, opens):
+def agent(design, cap, writers, opens, chunk=None):
+    if design == 'room':
+        count = lambda L, n=-(-cap // chunk): n
+    elif design == 'room_count_before_open':
+        count = lambda L, c=chunk: -(-L['before'] // c)
+    else:
+        count = lambda L: 1
+    before = design == 'room_count_before_open'
     B = [('A0', ('set', 'k', lambda L: 0, '@TOP')),
          ('TOP', ('br', lambda L, o=opens: L['k'] >= o, '@AEND', '@AW')),
          # Something to send - a reservation since the last open - or everyone gone. A
@@ -101,24 +131,28 @@ def agent(design, cap, writers, opens):
          ('AD', ('load', lambda L: DONE, 'd', '@AD2')),
          ('AD2', ('br', lambda L, n=writers: L['d'] == n, '@AEND', '@CLR')),
          ('CLR', ('store', lambda L: ASK, lambda L: 0, True, '@GEN')),
-         ('GEN', ('add', lambda L: GEN, lambda L: 1, '_', '@OPEN')),
+         ('GEN', ('add', lambda L: GEN, lambda L: 1, '_', '@BEFORE' if before else '@OPEN')),
+         # The room the open finds: its count's, in the breakage alone.
+         ('BEFORE', ('load', lambda L: ROOM, 'before', '@OPEN')),
          ('OPEN', ('store', lambda L: ROOM, lambda L, c=cap: c, True, '@CNT')),
          ('CNT', ('load', lambda L: WAITERS, 'n', '@ANY')),
-         ('ANY', ('br', lambda L: L['n'] != 0, '@BUMP', '@NEXT')),
+         ('ANY', ('br', lambda L: L['n'] != 0, '@BUMP', '@FORGET')),
          ('BUMP', ('add', lambda L: WORD, lambda L: 1, '_', '@WAKE')),
-         ('WAKE', wake(design, '@NEXT')),
+         ('WAKE', wake(design, '@FORGET', count)),
+         ('FORGET', ('set', 'before', lambda L: DEL, '@NEXT')),
          ('NEXT', ('set', 'k', lambda L: L['k'] + 1, '@TOP')),
          ('AEND', ('done',))]
     return assemble(B)
 
 
-def case(design, leasts, cap, floor=1):
+def case(design, leasts, cap, floor=1, chunk=None):
     opens = len(leasts)
-    threads = ([writer(design, t, len(leasts), floor) for t in leasts] +
-               [agent(design, cap, len(leasts), opens)])
+    threads = ([writer(design, t, len(leasts), floor, chunk) for t in leasts] +
+               [agent(design, cap, len(leasts), opens, chunk)])
     mem = {ROOM: cap, GEN: 0, WORD: 0, WAITERS: 0, ASK: 0, DONE: 0, PASSES: 0}
     name = f'turnover/{design} cap={cap} leasts={",".join(map(str, leasts))}'
-    return name + (f' floor={floor}' if floor != 1 else ''), threads, mem
+    return (name + (f' floor={floor}' if floor != 1 else '') +
+            (f' chunk={chunk}' if chunk else '')), threads, mem
 
 
 CASES = [
@@ -133,6 +167,14 @@ CASES = [
     ('hand_on', [1, 1, 2], 2, True, 2),
     ('hand_on', [2, 2, 1], 2, True, 2),
     ('hand_on', [3, 2, 1], 3, True, 2),
+    # The room count (2026-10-29): chunk 2, so the open wakes ceil(cap / 2); the
+    # writers need more than the room, so some wait.
+    ('room', [1, 1, 2], 2, True, 1, 2),
+    ('room', [1, 1, 1], 2, True, 1, 2),
+    ('room', [2, 2, 1], 4, True, 1, 2),
+    ('room', [2, 2, 2], 3, True, 1, 2),
+    ('room', [2, 1, 2], 4, True, 2, 2),
+    ('room_count_before_open', [2, 1], 2, 'LOST WAKE', 1, 2),
 ]
 
 if __name__ == '__main__':

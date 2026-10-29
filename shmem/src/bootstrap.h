@@ -13,6 +13,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/*
+ * OSOE_TURNOVER_WAKE (P2): which of the writers waiting for room in a
+ * connection's buffer its reopening wakes (connection.h; transport-internode.c,
+ * reserve_waiting).
+ */
+enum osoe_turnover_wake {
+    OSOE_TURNOVER_WAKE_ALL,         /* every one, the default */
+    OSOE_TURNOVER_WAKE_HAND_ON,     /* one, each writer waking the next as the room allows */
+    OSOE_TURNOVER_WAKE_ROOM,        /* as many as the room holds messages of a chunk; a
+                                     * writer that waited and took less wakes another */
+};
+
 struct osoe_bootstrap {
     const char *launcher;       /* "SLURM_" or "OSOE_": whose names were read; NULL
                                  * in a bootstrap built by hand, which means OSOE_ */
@@ -82,11 +94,8 @@ struct osoe_bootstrap {
      * wires staying eager to every node; `eager`, the default, makes every
      * wire at start-up. Every node of a job must agree (progress-host.c). */
     bool data_wires_on_demand;
-    /* OSOE_TURNOVER_WAKE (P2; the author, 2026-10-28): `hand-on` has a
-     * connection's reopened buffer wake one writer waiting for its room, who
-     * wakes the next if it leaves room worth another; `all`, the default, wakes
-     * every one (connection.h, transport-internode.c's reserve_waiting). */
-    bool turnover_hand_on;
+    /* OSOE_TURNOVER_WAKE (P2; the author, 2026-10-28 and 2026-10-29). */
+    enum osoe_turnover_wake turnover_wake;
     const char *node_list;      /* STEP_NODELIST (§6.1), when the job spans nodes */
     bool secured;               /* OSOE_JOB_SECRET is set (§6.2, §10) */
     unsigned char secret[16];   /* its 128 bits, the key every hello's proof is made with */

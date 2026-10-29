@@ -1322,7 +1322,21 @@ third class, reply credits, is indivisible, and has the handoff below.
   a turnover, then sleeps on the word loaded after its own bump. Room less than
   a put's part wakes no one - a smaller whole message waits for a later
   turnover's wake, as under a bare wake-one. The default stays waking every
-  writer until the chain is timed against it.
+  writer until the chain is timed against it. *Timed* (2026-10-29, in the VM,
+  4 to 64 writers): the herd ended, and 1.36 to 1.56 times the rate at 64
+  writers, but 5 to 35% of it lost below 64, a chain filling a buffer one
+  writer at a time and the self-clocked seal sending it emptier. *And the room
+  count, `OSOE_TURNOVER_WAKE=room`* (the author's, the same day): the open wakes
+  as many writers as the reopened room holds messages of a chunk, counted from
+  the room it made - from the full buffer it reopens the count is none, the
+  model's `room_count_before_open`, a lost wake - and a woken writer whose
+  reservation was smaller than a chunk hands on, so that a room of small
+  messages wakes as many as fit; a writer that reserves without waiting never
+  does, its room the count's. Its model's cases are live. *Timed* (the VM, 4 to
+  64 writers, puts of 64 B to 1 MiB): 0.91 to 1.18 times waking every writer's
+  rate below 64 writers and 1.13 to 1.94 at 64, the sleeps flat and the
+  writers fair, where the hand-on lost up to 40% with small messages, handing
+  on at nearly every put while anyone waited. The default the author's.
 - Single descriptor frees (indivisible) → **wake one.** Waking more is a
   thundering herd; at 256 local PEs, 255 threads wake and immediately re-sleep.
 

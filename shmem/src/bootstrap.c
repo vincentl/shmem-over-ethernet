@@ -581,12 +581,18 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
     b->data_wires_on_demand = data_wires && strcmp(data_wires, "on-demand") == 0;
 
     /* OSOE_TURNOVER_WAKE (P2): which writers a connection's reopened buffer
-     * wakes - every one waiting for its room, or one, the wake then handed on.
-     * A node's own: no other node sees how its writers wake. */
+     * wakes - every one waiting for its room; one, the wake then handed on; or
+     * as many as the room holds messages of a chunk. A node's own: no other
+     * node sees how its writers wake. */
     const char *turnover_wake = getenv("OSOE_TURNOVER_WAKE");
-    if (turnover_wake && strcmp(turnover_wake, "all") != 0 && strcmp(turnover_wake, "hand-on") != 0)
-        osoe_fatal("OSOE_TURNOVER_WAKE='%s' is not all or hand-on", turnover_wake);
-    b->turnover_hand_on = turnover_wake && strcmp(turnover_wake, "hand-on") == 0;
+    if (!turnover_wake || strcmp(turnover_wake, "all") == 0)
+        b->turnover_wake = OSOE_TURNOVER_WAKE_ALL;
+    else if (strcmp(turnover_wake, "hand-on") == 0)
+        b->turnover_wake = OSOE_TURNOVER_WAKE_HAND_ON;
+    else if (strcmp(turnover_wake, "room") == 0)
+        b->turnover_wake = OSOE_TURNOVER_WAKE_ROOM;
+    else
+        osoe_fatal("OSOE_TURNOVER_WAKE='%s' is not all, hand-on or room", turnover_wake);
 
     /*
      * The step's hosts (§6.1), which SLURM_NODEID indexes and so the node map

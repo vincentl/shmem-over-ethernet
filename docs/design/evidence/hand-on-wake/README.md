@@ -1,4 +1,4 @@
-# The hand-on wake for a reopened connection buffer (P2): modelled, built, timed
+# The turnover's wake for a reopened connection buffer (P2): the hand-on and the room count, modelled, built, timed
 
 P2 of `docs/prompts/v0.2-open-items.md` (round four's scale S1; design §3.11,
 "Wake count tracks divisibility"): a buffer reopened wakes one writer waiting
@@ -38,6 +38,17 @@ What it cannot say: every design here is live, a bare wake of one too, since
 the agent opens again after every reservation and wakes again. The hand-on is a
 performance change, and the model has no clock; nor can it see starvation.
 
+**The room count** (`room`, the author's of 2026-10-29, from the experiment
+below): the open wakes as many writers as the room holds messages of a chunk,
+`ceil(CAP / chunk)`, and a writer that waited and needed less than a chunk hands
+on as `hand_on`'s do; one that reserved without waiting never does. Its five
+cases, chunk 2 in buffers of two to four and writers needing more than the room
+in all, are live, the largest 749,336 states; and its breakage,
+`room_count_before_open`, the open's count taken from the room before its store
+- the full buffer it reopens, a count of none - leaves a writer asleep with
+nothing left to wake it: LOST WAKE, as it must. Every case of the night before
+keeps its state count; the whole run took 3 minutes 11 seconds.
+
 ## As built (branch `hand-on-wake`)
 
 `OSOE_TURNOVER_WAKE=hand-on`; `all`, waking every writer, stays the default.
@@ -51,6 +62,15 @@ whole message waits for a later turnover's wake. A put's least is that part, so
 puts never pass - the passes are for whole messages larger than a part. Each
 writer's own setting decides its hand-on and the node's lead's its agent's wake;
 `osoe-stat` counts them as `am.turnover_hand_ons` and `am.turnover_passes`.
+
+`OSOE_TURNOVER_WAKE=room` is the room count: the open wakes up to
+`ceil(room / chunk)` writers at once (`osoe_wait_word_wake_up_to`), the room the
+one this open made - after the pre-open drain's replies - and never less than
+one; a writer that waited and whose reservation was smaller than a chunk hands
+on, by the hand-on's floor; the pass is the hand-on's. At the defaults the count
+is four, three whole messages and a part, so a herd of large puts runs almost
+no chain - a 64 KiB put's 40-byte tail hands on when it waited - and a room of
+small messages runs four.
 
 ## The timing
 
@@ -138,11 +158,71 @@ cover is a room of small messages, which holds more writers than it counts -
 a node's PEs' atomics toward one node, say - where the hand-on's chain wakes as
 many as fit; that is untested here.
 
+## The room count, timed
+
+`OSOE_TURNOVER_WAKE=room` as built, against all and the hand-on, rotated each
+series, three series of 5 s, at 4 to 64 writers and four block sizes - 1 MiB, 64
+KiB, 4 KiB and 64 B, the last two small messages, a room of which holds more
+writers than the count (`bench.sh` with its WAKES, `herd-room-2026-10-29.txt`).
+Each one's rate over all's, the medians:
+
+| | 4 | 8 | 16 | 32 | 64 |
+|---|---|---|---|---|---|
+| 1 MiB, room | 1.00 | 1.08 | 1.00 | 1.18 | 1.94 |
+| 1 MiB, hand-on | 0.80 | 0.83 | 0.79 | 0.97 | 1.56 |
+| 64 KiB, room | 0.97 | 0.98 | 0.95 | 1.18 | 1.90 |
+| 64 KiB, hand-on | 0.78 | 0.75 | 0.67 | 0.82 | 1.36 |
+| 4 KiB, room | 0.99 | 1.09 | 0.96 | 0.91 | 1.44 |
+| 4 KiB, hand-on | 0.69 | 0.92 | 0.74 | 0.61 | 0.71 |
+| 64 B, room | 1.00 | 1.15 | 1.15 | 1.09 | 1.13 |
+| 64 B, hand-on | 1.30 | 0.73 | 0.67 | 0.60 | 0.61 |
+
+and beside them, at 1 MiB and at 4 KiB:
+
+| | 4 | 8 | 16 | 32 | 64 |
+|---|---|---|---|---|---|
+| sleeps a 64 KiB, 1 MiB: all | 0.87 | 1.60 | 3.21 | 6.12 | 14.28 |
+| room | 0.87 | 1.25 | 1.39 | 1.46 | 1.47 |
+| sleeps a 64 KiB, 4 KiB: all | 1.42 | 3.05 | 4.53 | 7.00 | 14.75 |
+| room | 1.40 | 2.05 | 2.57 | 2.59 | 2.63 |
+| hand-on | 1.28 | 2.10 | 3.60 | 6.90 | 13.41 |
+| slowest writer's share, 1 MiB: all | 0.85 | 0.82 | 0.82 | 0.85 | 0.64 |
+| room | 0.84 | 0.98 | 0.98 | 0.97 | 0.95 |
+| slowest writer's share, 4 KiB: all | 0.94 | 0.89 | 0.82 | 0.78 | 0.29 |
+| room | 0.98 | 0.98 | 0.98 | 0.98 | 0.95 |
+| longest put, ms, 1 MiB: all | 3.6 | 8.4 | 34.7 | 67.8 | 705 |
+| room | 4.4 | 4.6 | 7.6 | 15.3 | 27.5 |
+| longest put, ms, 4 KiB: all | 1.7 | 2.1 | 10.1 | 18.6 | 881 |
+| room | 1.4 | 7.0 | 3.5 | 3.6 | 7.2 |
+| KiB a segment, 1 MiB: all | 205 | 194 | 217 | 250 | 256 |
+| room | 205 | 199 | 188 | 180 | 178 |
+| hand-on | 166 | 161 | 158 | 156 | 153 |
+
+The room count keeps all's rate where the writers are few - 0.91 at its least,
+4 KiB puts at 32 writers, where all's herd fills a segment fuller - and passes
+it where they are many: 1.13 to 1.94 at 64 writers, every block size, the
+agent's CPU a GiB a third less at 1 MiB and 64 KiB. Its sleeps stay flat from 16
+writers at every size but 64 B, its slowest writer within 5% of the mean from 16
+writers, its longest put's median under 28 ms - a series' 46 and 58 at most -
+where all's reach 0.6 to 1.7 s at 64: the herd's whole cost, in rate, sleeps,
+fairness and latency, without the chain's.
+Large puts hand on 0.03 times a 64 KiB at 1 MiB blocks: the count runs no chain.
+Small ones do, as designed: about once a wait at 4 KiB and 64 B, where the
+hand-on hands on once a put - 16 and 1,008 times a 64 KiB - a `futex_wake` on
+nearly every small put while anyone waits, which is the hand-on's loss there.
+At 64 B the agent's CPU a GiB at 32 and 64 writers is 0.39 to 0.41 s under the
+room count against all's 0.25: its segments are the smaller, 42 to 92 KiB
+against 50 to 184. At 64 B and four writers the hand-on alone gained, 1.30, its
+segments 22 KiB where the others sent 4 to 5.
+
 ## What is not explained
 
-About one hand-on run in eighteen had every writer's longest put at 45 to 98
-ms at once - seen at 4, 8, 16 and 32 writers - where all's and `wake-4`'s
-shared waits went to about 20 ms. They are not lost wakes of the turnover. The
+About one hand-on run in eighteen of the first grids had every writer's
+longest put at 45 to 98 ms at once - seen at 4, 8, 16 and 32 writers - where
+all's and `wake-4`'s shared waits went to about 20 ms; in the room count's grid
+none of the hand-on's 60 runs did, and one of the room count's, 54 to 58 ms at
+16 writers - so the wake shapes how often it shows, not whether. They are not
+lost wakes of the turnover. The
 diagnostic copy prints the connection's buffers whenever a writer's sleep
 reaches its 100 ms sweep and whenever an agent's wait lasts 20 ms: in two such
 stalls nothing printed, and the one whose lines were kept

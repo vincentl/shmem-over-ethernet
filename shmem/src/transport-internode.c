@@ -638,17 +638,26 @@ static uint32_t room_worth_a_wake(struct osoe_connection *connection, uint32_t p
 }
 
 /*
- * The hand-on's first half (P2, under OSOE_TURNOVER_WAKE=hand-on): after a
- * reservation that left room worth another writer's, wake one writer waiting
- * for room, if any is - the reservation's CAS, then this load of the count,
- * the other side of a waiter's registration and then its look at the room
- * (base/wait-word.h). So a reopened buffer, which wakes one, wakes as many as
- * it has room for, one after another.
+ * The hand-on's first half (P2): after a reservation that left room worth
+ * another writer's, wake one writer waiting for room, if any is - the
+ * reservation's CAS, then this load of the count, the other side of a waiter's
+ * registration and then its look at the room (base/wait-word.h).
+ *
+ * Under OSOE_TURNOVER_WAKE=hand-on, every such reservation: a reopened buffer,
+ * which wakes one, wakes as many as it has room for, one after another. Under
+ * room, only a writer that `waited` and took less than a chunk: the open woke
+ * as many as the room holds messages of a chunk, so a woken writer that took
+ * less leaves room the count did not see - a room of small messages wakes as
+ * many as fit - while a writer that reserved without waiting took room the
+ * count gave others, and a woken one that took a chunk took its own.
  */
 static void hand_on(struct osoe_connection *connection, uint32_t peer,
-                    const struct osoe_reservation *r)
+                    const struct osoe_reservation *r, bool waited)
 {
-    if (connection->hand_on && r->room >= room_worth_a_wake(connection, peer) &&
+    bool wanted = connection->wake == OSOE_TURNOVER_WAKE_HAND_ON ||
+                  (connection->wake == OSOE_TURNOVER_WAKE_ROOM && waited &&
+                   r->len < connection->chunk);
+    if (wanted && r->room >= room_worth_a_wake(connection, peer) &&
         osoe_wait_word_wake_one(osoe_connection_turnover_wait(connection)))
         osoe_count(OSOE_C_AM_TURNOVER_HAND_ONS, 1);
 }
@@ -678,7 +687,11 @@ static void hand_on(struct osoe_connection *connection, uint32_t peer,
  * (docs/design/evidence/hand-on-wake/): live, a pass a writer a turnover.
  * The herd the open woke, every writer asleep at every turnover, which H12
  * measured at a quarter of a node's PEs a 64 KiB, becomes a chain of wakes as
- * long as the room.
+ * long as the room. Or, under room, the open wakes as many as the room holds
+ * messages of a chunk at once - four at the defaults - and only a woken writer
+ * that took less than a chunk hands on, so that the chain runs only where the
+ * room holds more writers than it counted; the pass is the hand-on's (the
+ * model's room cases).
  *
  * Step 2 slept 20 us and looked again instead, which on the ring held a stream
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer
@@ -693,7 +706,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
                             struct osoe_reservation *r)
 {
     if (osoe_connection_reserve_up_to(connection, len, least, r) == OSOE_RESERVATION_OK) {
-        hand_on(connection, peer, r);
+        hand_on(connection, peer, r, false);
         return;
     }
     osoe_count(OSOE_C_AM_RESERVE_STALLS, 1);
@@ -732,7 +745,8 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
         /* The hand-on's second half: woken - by a wake, or by a word that
          * moved before it slept - to room worth another's but not its own, a
          * writer passes the wake on, once a turnover, and looks again. */
-        if (connection->hand_on && woken && r->room >= room_worth_a_wake(connection, peer)) {
+        if (connection->wake != OSOE_TURNOVER_WAKE_ALL && woken &&
+            r->room >= room_worth_a_wake(connection, peer)) {
             uint64_t now = turnover(connection);
             if (now != passed_in && osoe_wait_word_pass_on(word)) {
                 passed_in = now;
@@ -753,7 +767,7 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
         am_wait_check(&w, now);
     }
     osoe_wait_word_leave(word);
-    hand_on(connection, peer, r);
+    hand_on(connection, peer, r, true);
     am_wait_end();
 }
 
