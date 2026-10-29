@@ -652,7 +652,9 @@ a hang the library cannot prove, such as a PE computing for ever, is what
   of TCP timeouts climbs (`nstat -az TcpExtTCPTimeouts`), are what the Pi
   cluster met as F1. Turning the segmentation offload off on the node that
   stalled - `ethtool -K <interface> tso off gso off` - ended the stalls it
-  measured, though its cause is not settled ("How osoe is tested").
+  measured, and with every node's offload off they stayed away a day after
+  boot, where with it on shorter stalls came back at the same sizes; why is
+  not settled ("How osoe is tested").
 
 ## The repository
 
@@ -1823,10 +1825,14 @@ that one could be added without touching the OpenSHMEM layer.
 - **A Raspberry Pi 5 cluster** over gigabit Ethernet, its four nodes running
   with TCP and generic segmentation offload off. Before, one node's spurious
   retransmissions stalled collectives of some sizes for up to 52 s at a time
-  (F1); turning its offload off ended the stalls in the runs that followed,
-  though every node had just rebooted, and F1 is not explained - three hours of
-  `mix` with the offload off still counted 87 retransmission timeouts
-  (`docs/pi-cluster-results.md`, "F1, investigated"). There an 8-byte put with
+  (F1); turning its offload off ended the stalls in the runs that followed.
+  Those runs came just after every node rebooted, so a control in October
+  told the two apart: with the offload off, F1's sizes stalled nowhere 1.4
+  and 23.7 hours after boot; with it on, 13 hours after, calls stalled 45 ms
+  at them - not F1's seconds, and with no retransmission timeout. F1 is not
+  explained - three hours of `mix` with the offload off still counted 87
+  retransmission timeouts (`docs/pi-cluster-results.md`, "F1, investigated"
+  and "H29 and H22"). There an 8-byte put with
   quiet, a get or a fetch-add between two nodes took 172 to 176 µs a round trip
   against a bare io_uring TCP echo's 158 to 159, by the medians of seven pairs
   in each of three runs: within 9 to 11% of the echo. The ratio does not

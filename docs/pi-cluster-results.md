@@ -1090,14 +1090,17 @@ model lacks, not the link's.
 the world, 200 calls after 20, a call over 20 ms slow) at 4 × 1, 4 × 2 and
 4 × 4 over F1's block sizes, twice, and with rank 0 on `pi-002`:
 
-| | offload off, 1.4 h after boot | offload on, 13 h after boot |
-|---|---|---|
-| slow calls | none at any size; the slowest 3.9 ms | 1 to 10 in 200 at 12 of the 38 points run - 32 to 49 KiB at 4 × 1, 16 and 20 KiB at 4 × 2, 28 and 32 KiB with rank 0 on `pi-002`, none at 4 × 4 - each 44 to 45 ms |
-| TCP retransmission timeouts | none | none |
+| | offload off, 1.4 h after boot | offload on, 13 h after boot | offload off again, 23.7 h after boot |
+|---|---|---|---|
+| slow calls | none at any size; the slowest 3.9 ms | 1 to 10 in 200 at 12 of the 38 points run - 32 to 49 KiB at 4 × 1, 16 and 20 KiB at 4 × 2, 28 and 32 KiB with rank 0 on `pi-002`, none at 4 × 4 - each 44 to 45 ms | none at any size; the slowest 4.3 ms |
+| TCP retransmission timeouts | none | none | none |
 
 Offload on brings stalls back where F1 found them, but not F1's: 45 ms
 waits with no retransmission timeout, where F1's were 0.5 to 36 s, the timeout
-doubling. And the nodes were thirteen hours up where the baseline's were not
-two, so offload off again at the same uptime is what separates the offload from
-the uptime; H22 stays open for it.
+doubling. The nodes were thirteen hours up where the baseline's were not two,
+so the offload went off again, the nodes then nearly a day up: nothing
+stalled. **The stalls follow the offload, not the uptime**, and H22 is closed.
+That settles the confound "F1, investigated" left - its clean runs came
+minutes after every node rebooted - but not F1: why the offload stalls calls at
+these sizes, and why for seconds in September and 45 ms now, is not known.
 
