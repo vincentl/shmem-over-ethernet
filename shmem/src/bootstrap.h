@@ -19,10 +19,10 @@
  * reserve_waiting).
  */
 enum osoe_turnover_wake {
-    OSOE_TURNOVER_WAKE_ALL,         /* every one, the default */
+    OSOE_TURNOVER_WAKE_ALL,         /* every one, as osoe did until 2026-10-29 */
     OSOE_TURNOVER_WAKE_HAND_ON,     /* one, each writer waking the next as the room allows */
-    OSOE_TURNOVER_WAKE_ROOM,        /* as many as the room holds messages of a chunk; a
-                                     * writer that waited and took less wakes another */
+    OSOE_TURNOVER_WAKE_ROOM,        /* the default: as many as the room holds messages of a
+                                     * chunk; a writer that waited and took less wakes another */
 };
 
 struct osoe_bootstrap {

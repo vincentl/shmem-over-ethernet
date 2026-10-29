@@ -670,28 +670,28 @@ static void hand_on(struct osoe_connection *connection, uint32_t peer,
  * it marks the connection and wakes the lead, which visits only connections
  * with work (§3.10) - and waits on the connection's turnover word, which the
  * agent bumps when it opens a buffer and anyone is registered
- * (base/wait-word.h, §3.11). Every waiter is woken: room is divisible, and each
- * has its own reservation to retry. A put's part takes the room it finds, so
- * writers of large puts each get some of a reopened buffer, where before v0.2
- * step 4 one 64 KiB message filled it and the rest slept again (the release
- * fixes' review, S1); a whole message larger than the room left still sleeps
- * again. It asks again before every sleep, since the buffer that just opened
- * may have filled before this writer got to it.
+ * (base/wait-word.h, §3.11). It asks again before every sleep, since the buffer
+ * that just opened may have filled before this writer got to it; a put's part
+ * takes the room it finds, and a whole message larger than the room left
+ * sleeps again.
  *
- * Or one is woken, under OSOE_TURNOVER_WAKE=hand-on (P2): a reopened buffer
- * wakes one writer, each reservation that leaves room worth another wakes the
- * next (hand_on), and a woken writer that finds the room too little for its
- * message but worth another's passes the wake on - once a turnover, or two
- * such writers pass it back and forth, and then from a word loaded after its
- * own bump - which is turnover_wake_model.py's hand_on
- * (docs/design/evidence/hand-on-wake/): live, a pass a writer a turnover.
- * The herd the open woke, every writer asleep at every turnover, which H12
- * measured at a quarter of a node's PEs a 64 KiB, becomes a chain of wakes as
- * long as the room. Or, under room, the open wakes as many as the room holds
- * messages of a chunk at once - four at the defaults - and only a woken writer
- * that took less than a chunk hands on, so that the chain runs only where the
- * room holds more writers than it counted; the pass is the hand-on's (the
- * model's room cases).
+ * Which writers an open wakes is OSOE_TURNOVER_WAKE's (P2). **By default,
+ * room**: as many as the reopened room holds messages of a chunk, at once -
+ * four at the defaults, three whole messages and a part - and a woken writer
+ * that took less than a chunk hands on (hand_on), so that a room of small
+ * messages wakes as many as fit; the pass is the hand-on's. **all**, as osoe
+ * did until 2026-10-29, wakes every one, each to retry its own reservation:
+ * at every turnover every writer woke and most slept again, which H12
+ * measured at a quarter of a node's PEs a 64 KiB moved, each wake the node's
+ * agent's. **hand-on** wakes one, each reservation that leaves room worth
+ * another waking the next, and a woken writer that finds the room too little
+ * for its message but worth another's passing the wake on - once a turnover,
+ * or two such writers pass it back and forth, and then from a word loaded
+ * after its own bump. turnover_wake_model.py (docs/design/evidence/
+ * hand-on-wake/) holds all three: live, a pass a writer a turnover; and the
+ * evidence's timing why room is the default - waking every writer's rate kept
+ * below 64 writers and passed at 64, where the hand-on's chain sent buffers
+ * emptier.
  *
  * Step 2 slept 20 us and looked again instead, which on the ring held a stream
  * to 3% of the floor (§8.4). am.reserve_stalls counts every wait, so a buffer

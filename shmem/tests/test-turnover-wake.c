@@ -4,10 +4,10 @@
  * but none of node 1 puts to the one PE of node 1 at once, so that the
  * connection's buffer is full and every turnover has writers asleep for its
  * room - the release fixes' review's S1, which H12 measured on the cluster.
- * OSOE_TURNOVER_WAKE=all, the default, wakes every writer at an open and hands
- * nothing on; hand-on wakes one, and the writers wake one another as the room
- * allows; room wakes as many as the room holds messages of a chunk, and a
- * woken writer that took less hands on (transport-internode.c,
+ * OSOE_TURNOVER_WAKE=room, the default, wakes as many as the room holds
+ * messages of a chunk, and a woken writer that took less hands on; all wakes
+ * every writer at an open and hands nothing on; hand-on wakes one, and the
+ * writers wake one another as the room allows (transport-internode.c,
  * reserve_waiting).
  *
  * Each writer puts its 1 MiB slice whole, 16 times - messages of a chunk - or,
@@ -118,9 +118,10 @@ int main(int argc, char **argv)
         CHECK(wrong == 0);
     }
     if (me == 0) {
+        /* Unset is room, the default since 2026-10-29. */
         const char *setting = getenv("OSOE_TURNOVER_WAKE");
-        const char *wake = setting && (strcmp(setting, "hand-on") == 0 ||
-                                       strcmp(setting, "room") == 0) ? setting : "all";
+        const char *wake = !setting ? "room" : strcmp(setting, "all") == 0 ? "all" :
+                           strcmp(setting, "hand-on") == 0 ? "hand-on" : "room";
         uint64_t stalls = 0, hand_ons = 0, passes = 0;
         CHECK(thread_total("am.reserve_stalls", &stalls));
         CHECK(thread_total("am.turnover_hand_ons", &hand_ons));

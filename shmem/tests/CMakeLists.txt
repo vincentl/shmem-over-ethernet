@@ -1709,10 +1709,10 @@ if(OSOE_INTERNODE)
 
   # The turnover's wake (P2): eight PEs of node 0 put 16 MiB each to node 1's
   # one PE at once, so that every reopening of their connection's buffer has
-  # writers asleep for its room; under OSOE_TURNOVER_WAKE unset, all, hand-on
-  # and room, every byte arrives and node 0's hand-on counters say which wake
-  # ran - and with eight-byte puts, a room of which holds more writers than the
-  # room count counts, under all, hand-on and room.
+  # writers asleep for its room; under OSOE_TURNOVER_WAKE unset (room, the
+  # default), all, hand-on and room, every byte arrives and node 0's hand-on
+  # counters say which wake ran - and with eight-byte puts, a room of which
+  # holds more writers than the room count counts, under all, hand-on and room.
   add_executable(shmem_test_turnover_wake test-turnover-wake.c
     ${PROJECT_SOURCE_DIR}/tools/stat/segment.c)
   target_include_directories(shmem_test_turnover_wake PRIVATE

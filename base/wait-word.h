@@ -21,18 +21,17 @@
  * breakages - the count read before the value's store, the registration after
  * the check, the value published by a release store - each lose a wake.
  *
- * **Every waiter is woken** (§3.11: the wake count tracks divisibility). The
- * values this carries are divisible, or nearly: each quiet waits for its own
- * sequence, and each writer has its own reservation to retry - a put's part
- * takes the room it finds (v0.2 step 4), and a whole message larger than the
- * room left sleeps again (the release fixes' review, S1, where a buffer of
- * twice the chunk had room for one message of OSOE_AM_CHUNK). A credit, which
- * only one waiter can take, is not one of them. **Or some**: under
- * OSOE_TURNOVER_WAKE=hand-on (P2) a connection's turnover wakes one writer,
- * and the writers wake one another as the room allows, and under room as many
- * as the room holds messages of a chunk (transport-internode.c,
- * reserve_waiting; docs/design/evidence/hand-on-wake/turnover_wake_model.py) -
- * the same two sides, waking fewer.
+ * **Every waiter is woken** (§3.11: the wake count tracks divisibility) where
+ * each can use the move: each quiet waits for its own sequence. A credit, which
+ * only one waiter can take, is not one of them. **Or some**, where the move is
+ * room that holds only so many: a connection's turnover wakes as many writers
+ * as the reopened room holds messages of a chunk (OSOE_TURNOVER_WAKE=room, the
+ * default since 2026-10-29, P2), or one, the writers waking one another as the
+ * room allows (hand-on) - since waking every writer, `all`, had every writer
+ * asleep at every turnover, each woken by the node's agent (the release fixes'
+ * review, S1; H12) (transport-internode.c, reserve_waiting;
+ * docs/design/evidence/hand-on-wake/turnover_wake_model.py). The same two
+ * sides, waking fewer.
  *
  * The value is the caller's, and so are its stores and loads: this holds only
  * the word and the count, and says nothing about what the value is.

@@ -45,7 +45,7 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
                   abort abort_exit lock pipeline allgather scan scan_pipeline deadlock
                   team_block split_numbers pool_dry posted_bitmap lane lane_scan visit
                   control_ack carrier helper_request deadlock_owners abort_owners exchange
-                  mesh active_set data_wire)
+                  mesh active_set data_wire turnover_wake)
   if(OSOE_MULTIPLE_MODELS)
     list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim
                             pe_quiet)

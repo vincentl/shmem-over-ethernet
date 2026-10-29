@@ -1336,7 +1336,8 @@ third class, reply credits, is indivisible, and has the handoff below.
   64 writers, puts of 64 B to 1 MiB): 0.91 to 1.18 times waking every writer's
   rate below 64 writers and 1.13 to 1.94 at 64, the sleeps flat and the
   writers fair, where the hand-on lost up to 40% with small messages, handing
-  on at nearly every put while anyone waited. The default the author's.
+  on at nearly every put while anyone waited. **The default since 2026-10-29**
+  (the author's): `all` and `hand-on` stay settings.
 - Single descriptor frees (indivisible) → **wake one.** Waking more is a
   thundering herd; at 256 local PEs, 255 threads wake and immediately re-sleep.
 
