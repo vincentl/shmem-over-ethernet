@@ -1,0 +1,41 @@
+slurm-node-02     59.66%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-02      5.06%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+slurm-node-02      4.84%  swapper          [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+slurm-node-02      3.83%  osoe-agent       [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-02      3.62%  multistream      [kernel.kallsyms]     [k] __pv_queued_spin_lock_slowpath             -      -            
+slurm-node-02      3.55%  multistream      [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+slurm-node-02      1.81%  multistream      [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-02      1.39%  multistream      libc.so.6             [.] syscall                                    -      -            
+slurm-node-02      1.23%  multistream      [kernel.kallsyms]     [k] gup_fast_fallback                          -      -            
+slurm-node-02      1.20%  multistream      libosoe.so.0.1.0      [.] reserve_waiting.part.0                     -      -            
+slurm-node-02      1.02%  swapper          [kernel.kallsyms]     [k] poll_idle                                  -      -            
+slurm-node-02      0.72%  multistream      libosoe.so.0.1.0      [.] osoe_futex_wait_bitset                     -      -            
+slurm-node-02      0.66%  multistream      [kernel.kallsyms]     [k] __get_user_8                               -      -            
+slurm-node-02      0.53%  multistream      [kernel.kallsyms]     [k] __raw_callee_save___pv_queued_spin_unlock  -      -            
+slurm-node-02      0.51%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-02 the progress threads' symbols, with their callers:
+slurm-node-01     57.85%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-01      5.37%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+slurm-node-01      4.98%  swapper          [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+slurm-node-01      4.03%  multistream      [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+slurm-node-01      3.70%  osoe-agent       [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-01      3.28%  multistream      [kernel.kallsyms]     [k] __pv_queued_spin_lock_slowpath             -      -            
+slurm-node-01      1.98%  multistream      [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+slurm-node-01      1.55%  multistream      libc.so.6             [.] syscall                                    -      -            
+slurm-node-01      1.40%  multistream      [kernel.kallsyms]     [k] gup_fast_fallback                          -      -            
+slurm-node-01      1.26%  multistream      libosoe.so.0.1.0      [.] reserve_waiting.part.0                     -      -            
+slurm-node-01      1.21%  swapper          [kernel.kallsyms]     [k] poll_idle                                  -      -            
+slurm-node-01      0.80%  multistream      libosoe.so.0.1.0      [.] osoe_futex_wait_bitset                     -      -            
+slurm-node-01      0.64%  multistream      [kernel.kallsyms]     [k] __get_user_8                               -      -            
+slurm-node-01      0.56%  multistream      [kernel.kallsyms]     [k] __raw_callee_save___pv_queued_spin_unlock  -      -            
+slurm-node-01 the progress threads' symbols, with their callers:
+slurm-node-01      5.75%  [k] _raw_spin_unlock_irqrestore            -      -            
+slurm-node-01             |          
+slurm-node-01              --3.67%--try_to_wake_up
+slurm-node-01                        |          
+slurm-node-01                         --3.66%--wake_up_q
+slurm-node-01                                   futex_wake
+slurm-node-01                                   __x64_sys_futex_wake
+slurm-node-01                                   do_syscall_64
+slurm-node-01                                   entry_SYSCALL_64_after_hwframe
+slurm-node-01                                   syscall

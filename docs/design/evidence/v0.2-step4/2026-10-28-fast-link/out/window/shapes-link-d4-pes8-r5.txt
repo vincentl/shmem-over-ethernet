@@ -1,0 +1,102 @@
+# 22:46:10 nodes=8 pes_per_node=8 OSOE_COLLECTIVE_SHAPE=link OSOE_COLLECTIVE_PIPELINE=4
+# ~/osoe/build/release/kit/shapes 100
+salloc: Granted job allocation 75
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 7 connected its mesh in 845 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 4 connected its mesh in 938 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 1127 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 connected its mesh in 909 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 1365 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 6 connected its mesh in 1380 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 1508 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 1847 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 58 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26215 us of this start)
+osoe: PE 34 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25337 us of this start)
+osoe: PE 42 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22865 us of this start)
+osoe: PE 12 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16399 us of this start)
+osoe: PE 17 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15761 us of this start)
+osoe: PE 1 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16436 us of this start)
+osoe: PE 25 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21117 us of this start)
+osoe: PE 59 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26199 us of this start)
+osoe: PE 39 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25373 us of this start)
+osoe: PE 44 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22921 us of this start)
+osoe: PE 13 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16389 us of this start)
+osoe: PE 18 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15776 us of this start)
+osoe: PE 50 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17607 us of this start)
+osoe: PE 2 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16473 us of this start)
+osoe: PE 26 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21128 us of this start)
+osoe: PE 57 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26218 us of this start)
+osoe: PE 32 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (27679 us of this start)
+osoe: PE 45 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22937 us of this start)
+osoe: PE 8 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (27535 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 19 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15763 us of this start)
+osoe: PE 51 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17532 us of this start)
+osoe: PE 4 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16484 us of this start)
+osoe: PE 27 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21156 us of this start)
+osoe: PE 60 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26199 us of this start)
+osoe: PE 33 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25335 us of this start)
+osoe: PE 46 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22858 us of this start)
+osoe: PE 9 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16390 us of this start)
+osoe: PE 20 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15760 us of this start)
+osoe: PE 53 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17647 us of this start)
+osoe: PE 5 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16431 us of this start)
+osoe: PE 29 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21168 us of this start)
+osoe: PE 61 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26115 us of this start)
+osoe: PE 35 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25364 us of this start)
+osoe: PE 47 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22863 us of this start)
+osoe: PE 10 of 64 (local 2 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16393 us of this start)
+osoe: PE 21 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15777 us of this start)
+osoe: PE 54 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17621 us of this start)
+osoe: PE 6 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16479 us of this start)
+osoe: PE 30 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21169 us of this start)
+osoe: PE 62 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26222 us of this start)
+osoe: PE 36 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25335 us of this start)
+osoe: PE 40 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26976 us of this start)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 11 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16398 us of this start)
+osoe: PE 23 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15722 us of this start)
+osoe: PE 55 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17553 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 0 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26763 us of this start)
+osoe: PE 31 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21140 us of this start)
+osoe: PE 63 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (26171 us of this start)
+osoe: PE 37 of 64 (local 5 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25354 us of this start)
+osoe: PE 41 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22931 us of this start)
+osoe: PE 14 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16393 us of this start)
+osoe: PE 16 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (27317 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 48 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (27290 us of this start)
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 3 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16486 us of this start)
+osoe: PE 24 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (27125 us of this start)
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 56 of 64 (local 0 of 8): segment /dev/shm/osoe.75.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 7 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (27739 us of this start)
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 38 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 4 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (25374 us of this start)
+osoe: PE 43 of 64 (local 3 of 8): segment /dev/shm/osoe.75.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 5 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (22817 us of this start)
+osoe: PE 15 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16429 us of this start)
+osoe: PE 22 of 64 (local 6 of 8): segment /dev/shm/osoe.75.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 2 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (15745 us of this start)
+osoe: PE 49 of 64 (local 1 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17616 us of this start)
+osoe: PE 7 of 64 (local 7 of 8): segment /dev/shm/osoe.75.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (16427 us of this start)
+osoe: PE 28 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 3 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (21188 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 229448
+osoe: PE 52 of 64 (local 4 of 8): segment /dev/shm/osoe.75.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 6 of 8; link measured: a hop of 101725 ns, a message cost of 36420 ns, 1792565622 bytes a second (17630 us of this start)
+reduce pes=64 bytes=65536 median_us=449.5 fastest_us=357.2
+broadcast pes=64 bytes=65536 median_us=368.9 fastest_us=194.2
+reduce pes=64 bytes=262144 median_us=1649.2 fastest_us=1429.3
+broadcast pes=64 bytes=262144 median_us=1168.4 fastest_us=1071.7
+reduce pes=64 bytes=1048576 median_us=6295.8 fastest_us=5873.3
+broadcast pes=64 bytes=1048576 median_us=4434.2 fastest_us=4005.8
+reduce pes=64 bytes=4194304 median_us=26981.7 fastest_us=26005.2
+broadcast pes=64 bytes=4194304 median_us=17341.3 fastest_us=14386.9
+salloc: Relinquishing job allocation 75
+# exit 0

@@ -1,0 +1,49 @@
+== ~/out/window
+jobs: 20, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  shapes-fixed-k4-d8 pes=8 h=-
+    reduce bytes=65536       556 (540-597, n=5)
+    broadcast bytes=65536    416 (398-420, n=5)
+    reduce bytes=262144      1302 (1293-1330, n=5)
+    broadcast bytes=262144   940 (933-976, n=5)
+    reduce bytes=1048576     4651 (4584-4780, n=5)
+    broadcast bytes=1048576  3310 (3246-3334, n=5)
+    reduce bytes=4194304     20202 (18474-23074, n=5)
+    broadcast bytes=4194304  12690 (12176-13534, n=5)
+    unsent limit 16384 B
+  shapes-link-d4 pes=8 h=-
+    reduce bytes=65536       474 (450-499, n=5)
+    broadcast bytes=65536    350 (332-374, n=5)
+    reduce bytes=262144      1620 (1483-1672, n=5)
+    broadcast bytes=262144   1148 (1041-1244, n=5)
+    reduce bytes=1048576     5962 (5821-6296, n=5)
+    broadcast bytes=1048576  4377 (4110-4434, n=5)
+    reduce bytes=4194304     25525 (25063-26982, n=5)
+    broadcast bytes=4194304  16917 (16140-17341, n=5)
+    link 2665 (1710-2854) MiB/s, hop 101 (45.8-112) us, message 32.9 (22.9-36.4) us; unsent limit 357743 (229448-383059) B
+  shapes-link-d8 pes=8 h=-
+    reduce bytes=65536       474 (452-538, n=5)
+    broadcast bytes=65536    358 (332-504, n=5)
+    reduce bytes=262144      1390 (1019-1409, n=5)
+    broadcast bytes=262144   949 (911-979, n=5)
+    reduce bytes=1048576     5932 (2479-6299, n=5)
+    broadcast bytes=1048576  3358 (3189-3695, n=5)
+    reduce bytes=4194304     26909 (10459-27115, n=5)
+    broadcast bytes=4194304  12374 (12192-14724, n=5)
+    link 2055 (523-2881) MiB/s, hop 97.8 (38.4-112) us, message 44.3 (21.3-44.6) us; unsent limit 275761 (70197-386669) B
+  shapes-tree-d8 pes=8 h=-
+    reduce bytes=65536       471 (432-544, n=5)
+    broadcast bytes=65536    359 (351-507, n=5)
+    reduce bytes=262144      1302 (1210-1401, n=5)
+    broadcast bytes=262144   945 (925-995, n=5)
+    reduce bytes=1048576     5778 (4859-6281, n=5)
+    broadcast bytes=1048576  3256 (3185-3409, n=5)
+    reduce bytes=4194304     25399 (20676-27121, n=5)
+    broadcast bytes=4194304  12699 (12250-15241, n=5)
+    link 1878 (906-2823) MiB/s, hop 112 (42.3-120) us, message 24.9 (17.3-35.9) us; unsent limit 252019 (121638-378872) B

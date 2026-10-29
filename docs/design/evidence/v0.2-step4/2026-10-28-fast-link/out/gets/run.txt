@@ -1,0 +1,19 @@
+# 2026-10-28T22:53:55Z gets.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+22:53:58 exit 0 get-pieces-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/osoe/build/release/kit/get-pieces 21 67108864
+22:54:08 exit 0 get-1m-pes1-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/osoe/build/release/kit/multistream get 1048576 10
+22:54:19 exit 0 get-1m-pes4-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/osoe/build/release/kit/multistream get 1048576 10
+22:54:29 exit 0 get-1m-pes8-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/osoe/build/release/kit/multistream get 1048576 10
+22:54:39 exit 0 get-1m-pes16-zone262144-r1.txt: OSOE_GET_LANDING_BYTES=262144 ~/osoe/build/release/kit/multistream get 1048576 10
+22:54:42 exit 0 get-pieces-r1.txt:  ~/osoe/build/release/kit/get-pieces 21 67108864
+22:54:52 exit 0 get-1m-pes1-r1.txt:  ~/osoe/build/release/kit/multistream get 1048576 10
+22:55:02 exit 0 get-1m-pes4-r1.txt:  ~/osoe/build/release/kit/multistream get 1048576 10
+22:55:13 exit 0 get-1m-pes8-r1.txt:  ~/osoe/build/release/kit/multistream get 1048576 10
+22:55:23 exit 0 get-1m-pes16-r1.txt:  ~/osoe/build/release/kit/multistream get 1048576 10
+22:55:25 exit 0 get-pieces-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/osoe/build/release/kit/get-pieces 21 67108864
+22:55:36 exit 0 get-1m-pes1-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/osoe/build/release/kit/multistream get 1048576 10
+22:55:46 exit 0 get-1m-pes4-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/osoe/build/release/kit/multistream get 1048576 10
+22:55:57 exit 0 get-1m-pes8-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/osoe/build/release/kit/multistream get 1048576 10
+22:56:07 exit 0 get-1m-pes16-zone1048576-r1.txt: OSOE_GET_LANDING_BYTES=1048576 ~/osoe/build/release/kit/multistream get 1048576 10
+# done 22:56:07

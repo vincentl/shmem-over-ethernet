@@ -1,0 +1,17 @@
+# 23:03:40 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/2dcf8d6/build/release/kit/multistream put 65536 10
+salloc: Granted job allocation 149
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.149.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 104186 ns, a message cost of 0 ns, 811714470 bytes a second (5836 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 103899
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.149.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 104186 ns, a message cost of 0 ns, 811714470 bytes a second (8238 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.149.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 104186 ns, a message cost of 0 ns, 811714470 bytes a second (8646 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 103899
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.149.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 104186 ns, a message cost of 0 ns, 811714470 bytes a second (807 us of this start)
+multistream node=0 pes=2 mib_per_s=2685.8 progress_cpu_s=9.028 program_cpu_s=3.098 progress_cpu_s_per_gib=0.3442 program_sleeps=229216 sleeps_per_64kib=0.533 peers_in_calls=0.971 peers_in_calls_with_quiets=1.000 quiet_share=0.110 peers_window_s=10.000
+multistream node=0 peer_mib=26859.6
+multistream node=1 pes=2 mib_per_s=1757.8 progress_cpu_s=9.973 program_cpu_s=1.898 progress_cpu_s_per_gib=0.5809 program_sleeps=153809 sleeps_per_64kib=0.547 peers_in_calls=0.986 peers_in_calls_with_quiets=1.000 quiet_share=0.075 peers_window_s=10.000
+multistream node=1 peer_mib=17579.4
+multistream job mode=put bytes=65536 seconds=10.00 nodes=2 pes=4 pes_per_node=2 helpers=unset mib_per_s=4443.7 progress_cpu_s_per_gib=0.4378
+salloc: Relinquishing job allocation 149
+# exit 0

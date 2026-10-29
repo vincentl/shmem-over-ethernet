@@ -1,0 +1,18 @@
+# 23:03:50 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/2dcf8d6/build/release/kit/multistream put 1048576 10
+salloc: Granted job allocation 150
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.150.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 119005 ns, a message cost of 0 ns, 1053768973 bytes a second (271 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 134882
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.150.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 119005 ns, a message cost of 0 ns, 1053768973 bytes a second (9164 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.150.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 119005 ns, a message cost of 0 ns, 1053768973 bytes a second (9117 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 134882
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.150.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 119005 ns, a message cost of 0 ns, 1053768973 bytes a second (3528 us of this start)
+multistream node=0 pes=2 mib_per_s=1983.6 progress_cpu_s=9.808 program_cpu_s=2.078 progress_cpu_s_per_gib=0.5062 program_sleeps=167254 sleeps_per_64kib=0.527 peers_in_calls=0.983 peers_in_calls_with_quiets=1.000 quiet_share=0.079 peers_window_s=10.000
+multistream node=0 peer_mib=19838.0
+multistream node=1 pes=2 mib_per_s=2182.9 progress_cpu_s=9.728 program_cpu_s=2.455 progress_cpu_s_per_gib=0.4563 program_sleeps=185440 sleeps_per_64kib=0.531 peers_in_calls=0.968 peers_in_calls_with_quiets=1.000 quiet_share=0.088 peers_window_s=10.001
+multistream node=1 peer_mib=21831.0
+multistream job mode=put bytes=1048576 seconds=10.00 nodes=2 pes=4 pes_per_node=2 helpers=unset mib_per_s=4166.5 progress_cpu_s_per_gib=0.4801
+salloc: Relinquishing job allocation 150
+salloc: Job allocation 150 has been revoked.
+# exit 0

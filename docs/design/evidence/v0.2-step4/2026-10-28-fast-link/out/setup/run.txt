@@ -1,0 +1,5 @@
+# 2026-10-28T22:40:46Z session-3.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 900 s
+22:40:47 exit 0 probe.txt:  ~/osoe/build/release/tools/probe/probe
+22:40:47 exit 0 startup-32.txt:  ~/osoe/build/release/kit/startup

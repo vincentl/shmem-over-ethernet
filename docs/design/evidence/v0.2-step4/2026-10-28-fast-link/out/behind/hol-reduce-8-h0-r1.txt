@@ -1,0 +1,51 @@
+# 22:58:45 nodes=8 pes_per_node=2 OSOE_PROGRESS_HELPERS=0
+# ~/osoe/build/release/kit/hol 10 reduce 8
+salloc: Pending job allocation 128
+salloc: job 128 queued and waiting for resources
+salloc: job 128 has been allocated resources
+salloc: Granted job allocation 128
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 1 connected its mesh in 1036 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 connected its mesh in 952 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 4 connected its mesh in 1260 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 connected its mesh in 1247 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 1489 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 7 connected its mesh in 1658 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 1748 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 2464 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 2 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25856 us of this start)
+osoe: PE 4 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25431 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 11 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (18970 us of this start)
+osoe: PE 8 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25590 us of this start)
+osoe: PE 14 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25202 us of this start)
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 1 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (14215 us of this start)
+osoe: PE 6 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (24876 us of this start)
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 3 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25569 us of this start)
+osoe: PE 5 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (21594 us of this start)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 10 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (24355 us of this start)
+osoe: PE 12 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25776 us of this start)
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 9 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (14824 us of this start)
+osoe: PE 15 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (17191 us of this start)
+osoe: PE 0 of 16 (local 0 of 2): segment /dev/shm/osoe.128.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (25326 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 13 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (17960 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 294907
+osoe: PE 7 of 16 (local 1 of 2): segment /dev/shm/osoe.128.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 102641 ns, a message cost of 46068 ns, 2303961750 bytes a second (24772 us of this start)
+hol phase=alone op=reduce bytes=8 operations=3900 median_us=123 p90_us=140 p99_us=409 max_us=675 stream_mib_per_s=0
+hol phase=stream op=reduce bytes=8 operations=12370 median_us=763 p90_us=941 p99_us=1186 max_us=1738 stream_mib_per_s=2698
+salloc: Relinquishing job allocation 128
+# exit 0

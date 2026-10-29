@@ -1,0 +1,24 @@
+# 2026-10-28T22:56:07Z behind.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 180 s
+22:56:19 exit 0 hol-fetch-add-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/hol 10 fetch-add
+22:56:34 exit 0 hol-barrier-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/hol 10 barrier
+22:56:53 exit 0 hol-reduce-8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/hol 10 reduce 8
+22:57:12 exit 0 hol-reduce-65536-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/hol 10 reduce 65536
+22:57:32 exit 0 hol-broadcast-8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/hol 10 broadcast 8
+22:57:51 exit 0 hol-broadcast-65536-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/hol 10 broadcast 65536
+22:57:51 exit 0 nstat-before-h2-r1.txt:  nstat -n
+22:58:03 exit 0 put-1m-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream put 1048576 10
+22:58:03 exit 0 nstat-h2-r1.txt:  bash -c nstat | sed "s/^/$(hostname) /"
+22:58:13 exit 0 put-1m-profiled-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream put 1048576 10 (beside: bash '~/osoe/docs/fast-link/profile.sh' 5)
+22:58:26 exit 0 hol-fetch-add-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/hol 10 fetch-add
+22:58:45 exit 0 hol-barrier-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/hol 10 barrier
+22:59:05 exit 0 hol-reduce-8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/hol 10 reduce 8
+22:59:23 exit 0 hol-reduce-65536-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/hol 10 reduce 65536
+22:59:44 exit 0 hol-broadcast-8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/hol 10 broadcast 8
+23:00:03 exit 0 hol-broadcast-65536-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/hol 10 broadcast 65536
+23:00:03 exit 0 nstat-before-h0-r1.txt:  nstat -n
+23:00:13 exit 0 put-1m-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 1048576 10
+23:00:13 exit 0 nstat-h0-r1.txt:  bash -c nstat | sed "s/^/$(hostname) /"
+23:00:24 exit 0 put-1m-profiled-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 1048576 10 (beside: bash '~/osoe/docs/fast-link/profile.sh' 5)
+# done 23:00:24

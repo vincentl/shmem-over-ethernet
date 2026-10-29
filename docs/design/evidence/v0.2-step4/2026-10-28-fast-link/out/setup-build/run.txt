@@ -1,0 +1,11 @@
+# 2026-10-28T22:40:10Z build.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 1800 s
+slurm-node-01: built, 0 warnings
+slurm-node-06: built, 0 warnings
+slurm-node-04: built, 0 warnings
+slurm-node-02: built, 0 warnings
+slurm-node-05: built, 0 warnings
+slurm-node-08: built, 0 warnings
+slurm-node-07: built, 0 warnings
+slurm-node-03: built, 0 warnings

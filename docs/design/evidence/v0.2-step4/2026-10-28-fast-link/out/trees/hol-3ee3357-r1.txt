@@ -1,0 +1,13 @@
+# 23:02:17 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/3ee3357/build/release/kit/hol 10
+salloc: Granted job allocation 143
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.143.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 151925 ns, a message cost of 0 ns, 1508302614 bytes a second (9693 us of this start)
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.143.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 151925 ns, a message cost of 0 ns, 1508302614 bytes a second (6932 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.143.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 151925 ns, a message cost of 0 ns, 1508302614 bytes a second (9510 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.143.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 151925 ns, a message cost of 0 ns, 1508302614 bytes a second (9533 us of this start)
+hol phase=alone op=fetch-add bytes=8 operations=6287 median_us=77 p90_us=86 p99_us=215 max_us=287 stream_mib_per_s=0
+hol phase=stream op=fetch-add bytes=8 operations=7649 median_us=1323 p90_us=2324 p99_us=3060 max_us=3259 stream_mib_per_s=2707
+salloc: Relinquishing job allocation 143
+salloc: Job allocation 143 has been revoked.
+# exit 0

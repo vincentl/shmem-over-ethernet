@@ -1,0 +1,315 @@
+== ~/out/many-pes
+jobs: 23, of which 0 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+multistream: the job's MiB/s, a node's (each node's of each round), the
+progress threads' CPU seconds a GiB, the node's PEs' sleeps a 64 KiB moved -
+their voluntary context switches, which every turnover's wake of all its
+writers raises (S1) - and the peer nodes a node's PEs were
+inside a call toward at once, time-averaged over the window every PE of the
+node was in its loop - a lower bound of the model's quantity - then the same
+with each quiet counted toward the block before it, which comes nearer it, the
+model's numbers going beside the pair (fast-link.md, section 5); the share of
+the PEs' time in quiets, and the seconds the count was taken over (median,
+range, count)
+  get-1m     pes=16 h=0                job 3936 (n=1)
+                                       node 1968 (1442-2494, n=2)
+                                       cpu/GiB 0.470 (n=1)
+                                       sleeps a 64 KiB 1.76 (1.44-2.08, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0280 (0.0280-0.0280, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1543 MiB/s, hop 117 us, message 0 us; unsent limit 207095 B
+  put-1m     pes=16 h=0                job 4116 (n=1)
+                                       node 2058 (1408-2708, n=2)
+                                       cpu/GiB 0.482 (n=1)
+                                       sleeps a 64 KiB 4.01 (4.01-4.01, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0140 (0.0100-0.0180, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 2142 MiB/s, hop 92.8 us, message 0 us; unsent limit 287513 B
+  put-64k    pes=16 h=0                job 4335 (n=1)
+                                       node 2168 (1618-2717, n=2)
+                                       cpu/GiB 0.450 (n=1)
+                                       sleeps a 64 KiB 4.01 (4.01-4.01, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0145 (0.0110-0.0180, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1426 MiB/s, hop 121 us, message 0 us; unsent limit 191458 B
+  get-1m     pes=32 h=0                job 3626 (n=1)
+                                       node 1813 (1080-2546, n=2)
+                                       cpu/GiB 0.496 (n=1)
+                                       sleeps a 64 KiB 2.17 (1.74-2.61, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.0140 (0.0140-0.0140, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 768 MiB/s, hop 106 us, message 0 us; unsent limit 103096 B
+  put-1m     pes=32 h=0                job 3567 (n=1)
+                                       node 1783 (1185-2382, n=2)
+                                       cpu/GiB 0.575 (n=1)
+                                       sleeps a 64 KiB 7.99 (7.98-8.01, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00450 (0.00300-0.00600, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 2709 MiB/s, hop 42.7 us, message 0 us; unsent limit 363602 B
+  put-64k    pes=32 h=0                job 3985 (n=1)
+                                       node 1992 (1299-2686, n=2)
+                                       cpu/GiB 0.513 (n=1)
+                                       sleeps a 64 KiB 8.00 (7.98-8.01, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00600 (0.00400-0.00800, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1493 MiB/s, hop 102 us, message 0 us; unsent limit 200441 B
+  get-1m     pes=64 h=0                job 3648 (n=1)
+                                       node 1824 (1143-2505, n=2)
+                                       cpu/GiB 0.504 (n=1)
+                                       sleeps a 64 KiB 3.19 (2.73-3.65, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00700 (0.00700-0.00700, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 2578 MiB/s, hop 110 us, message 0 us; unsent limit 345976 B
+  put-1m     pes=64 h=0                job 3159 (n=1)
+                                       node 1580 (1522-1637, n=2)
+                                       cpu/GiB 0.651 (n=1)
+                                       sleeps a 64 KiB 16.0 (16.0-16.0, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00200 (0.00200-0.00200, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1188 MiB/s, hop 101 us, message 0 us; unsent limit 159475 B
+  put-64k    pes=64 h=0                job 3139 (n=1)
+                                       node 1569 (1525-1614, n=2)
+                                       cpu/GiB 0.655 (n=1)
+                                       sleeps a 64 KiB 16.0 (16.0-16.0, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0.00200 (0.00200-0.00200, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 1559 MiB/s, hop 114 us, message 0 us; unsent limit 209265 B
+  put-1m-wake pes=256 h=0              job 1698 (n=1)
+                                       node 849 (816-882, n=2)
+                                       cpu/GiB 1.22 (n=1)
+                                       sleeps a 64 KiB 63.5 (63.4-63.5, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0 (0-0, n=2), over 10.00 (10.00-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 816 MiB/s, hop 113 us, message 0 us; unsent limit 109560 B
+  put-1m-wake-profiled pes=256 h=0     job 1682 (n=1)
+                                       node 841 (803-879, n=2)
+                                       cpu/GiB 1.23 (n=1)
+                                       sleeps a 64 KiB 63.4 (63.4-63.5, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0 (0-0, n=2), over 10.0 (10.0-10.0, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 2173 MiB/s, hop 102 us, message 0 us; unsent limit 291634 B
+  put-64k-wake pes=256 h=0             job 1817 (n=1)
+                                       node 908 (874-943, n=2)
+                                       cpu/GiB 1.15 (n=1)
+                                       sleeps a 64 KiB 64.0 (64.0-64.0, n=2)
+                                       peers in calls 1.00 (1.00-1.00, n=2)
+                                       with quiets 1.00 (1.00-1.00, n=2), in quiets 0 (0-0, n=2), over 10.00 (10.00-10.00, n=2) s
+                                       each node's least peer over its most, the least of all: 1.00
+                                       link 2500 MiB/s, hop 43.6 us, message 0 us; unsent limit 335493 B
+
+mailbox: messages a second (median, range)
+  mailbox pes=16 h=0  697103 (n=1)
+    link 2338 MiB/s, hop 101 us, message 0 us; unsent limit 313786 B
+  mailbox pes=32 h=0  696718 (n=1)
+    link 871 MiB/s, hop 107 us, message 0 us; unsent limit 116886 B
+  mailbox pes=64 h=0  371576 (n=1)
+    link 1206 MiB/s, hop 101 us, message 0 us; unsent limit 161932 B
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  collectives-check-off pes=16 h=0
+    barrier                  125 (n=1)
+    reduce bytes=8           148 (n=1)
+    broadcast bytes=8        155 (n=1)
+    reduce bytes=65536       296 (n=1)
+    broadcast bytes=65536    200 (n=1)
+    fcollect block=8         144 (n=1)
+    alltoall block=8         306 (n=1)
+    fcollect block=4096      229 (n=1)
+    alltoall block=4096      814 (n=1)
+    link 807 MiB/s, hop 102 us, message 0 us; unsent limit 108379 B
+  collectives-check-on pes=16 h=0
+    barrier                  125 (n=1)
+    reduce bytes=8           143 (n=1)
+    broadcast bytes=8        143 (n=1)
+    reduce bytes=65536       294 (n=1)
+    broadcast bytes=65536    196 (n=1)
+    fcollect block=8         152 (n=1)
+    alltoall block=8         310 (n=1)
+    fcollect block=4096      228 (n=1)
+    alltoall block=4096      801 (n=1)
+    link 711 MiB/s, hop 99.6 us, message 0 us; unsent limit 95411 B
+  collectives-check-off pes=32 h=0
+    barrier                  157 (n=1)
+    reduce bytes=8           138 (n=1)
+    broadcast bytes=8        130 (n=1)
+    reduce bytes=65536       359 (n=1)
+    broadcast bytes=65536    206 (n=1)
+    fcollect block=8         147 (n=1)
+    alltoall block=8         504 (n=1)
+    fcollect block=4096      315 (n=1)
+    alltoall block=4096      2741 (n=1)
+    link 1629 MiB/s, hop 114 us, message 0 us; unsent limit 218660 B
+  collectives-check-on pes=32 h=0
+    barrier                  159 (n=1)
+    reduce bytes=8           137 (n=1)
+    broadcast bytes=8        139 (n=1)
+    reduce bytes=65536       377 (n=1)
+    broadcast bytes=65536    207 (n=1)
+    fcollect block=8         155 (n=1)
+    alltoall block=8         504 (n=1)
+    fcollect block=4096      333 (n=1)
+    alltoall block=4096      2773 (n=1)
+    link 4194 MiB/s, hop 99.9 us, message 0 us; unsent limit 562861 B
+  collectives-check-off pes=64 h=0
+    barrier                  221 (n=1)
+    reduce bytes=8           135 (n=1)
+    broadcast bytes=8        132 (n=1)
+    reduce bytes=65536       466 (n=1)
+    broadcast bytes=65536    227 (n=1)
+    fcollect block=8         142 (n=1)
+    alltoall block=8         1203 (n=1)
+    fcollect block=4096      595 (n=1)
+    alltoall block=4096      11129 (n=1)
+    link 656 MiB/s, hop 97.8 us, message 0 us; unsent limit 88059 B
+  collectives-check-on pes=64 h=0
+    barrier                  212 (n=1)
+    reduce bytes=8           133 (n=1)
+    broadcast bytes=8        125 (n=1)
+    reduce bytes=65536       476 (n=1)
+    broadcast bytes=65536    190 (n=1)
+    fcollect block=8         144 (n=1)
+    alltoall block=8         1193 (n=1)
+    fcollect block=4096      579 (n=1)
+    alltoall block=4096      10945 (n=1)
+    link 1359 MiB/s, hop 81.9 us, message 0 us; unsent limit 182371 B
+  collectives-wake-check-off pes=256 h=0
+    barrier                  672 (n=1)
+    reduce bytes=8           258 (n=1)
+    broadcast bytes=8        251 (n=1)
+    reduce bytes=65536       1287 (n=1)
+    broadcast bytes=65536    368 (n=1)
+    fcollect block=8         258 (n=1)
+    alltoall block=8         13916 (n=1)
+    fcollect block=4096      8180 (n=1)
+    alltoall block=4096      262727 (n=1)
+    link 1749 MiB/s, hop 111 us, message 0 us; unsent limit 234691 B
+  collectives-wake-check-on pes=256 h=0
+    barrier                  975 (n=1)
+    reduce bytes=8           256 (n=1)
+    broadcast bytes=8        255 (n=1)
+    reduce bytes=65536       1252 (n=1)
+    broadcast bytes=65536    378 (n=1)
+    fcollect block=8         266 (n=1)
+    alltoall block=8         14119 (n=1)
+    fcollect block=4096      8180 (n=1)
+    alltoall block=4096      271567 (n=1)
+    link 922 MiB/s, hop 115 us, message 0 us; unsent limit 123725 B
+
+OSOE_CHECK_COLLECTIVES's cost: each line's median with the check, its median
+without, and the first over the second (P24)
+  collectives pes=16 h=0
+    barrier                        125       125  1.002
+    reduce bytes=8                 143       148  0.970
+    broadcast bytes=8              143       155  0.920
+    reduce bytes=65536             294       296  0.996
+    broadcast bytes=65536          196       200  0.978
+    fcollect block=8               152       144  1.058
+    alltoall block=8               310       306  1.013
+    fcollect block=4096            228       229  0.993
+    alltoall block=4096            801       814  0.984
+  collectives pes=32 h=0
+    barrier                        159       157  1.015
+    reduce bytes=8                 137       138  0.991
+    broadcast bytes=8              139       130  1.071
+    reduce bytes=65536             377       359  1.048
+    broadcast bytes=65536          207       206  1.004
+    fcollect block=8               155       147  1.051
+    alltoall block=8               504       504  1.000
+    fcollect block=4096            333       315  1.055
+    alltoall block=4096           2773      2741  1.012
+  collectives pes=64 h=0
+    barrier                        212       221  0.957
+    reduce bytes=8                 133       135  0.989
+    broadcast bytes=8              125       132  0.945
+    reduce bytes=65536             476       466  1.021
+    broadcast bytes=65536          190       227  0.841
+    fcollect block=8               144       142  1.013
+    alltoall block=8              1193      1203  0.992
+    fcollect block=4096            579       595  0.974
+    alltoall block=4096          10945     11129  0.983
+  collectives-wake pes=256 h=0
+    barrier                        975       672  1.450
+    reduce bytes=8                 256       258  0.994
+    broadcast bytes=8              255       251  1.019
+    reduce bytes=65536            1252      1287  0.973
+    broadcast bytes=65536          378       368  1.029
+    fcollect block=8               266       258  1.033
+    alltoall block=8             14119     13916  1.015
+    fcollect block=4096           8180      8180  1.000
+    alltoall block=4096         271567    262727  1.034
+
+counters that moved over the window (PE 0's node; median, range)
+  get-1m pes=16 h=0 buffers=None: reserve_stalls 144977 (n=1), sends 205657 (n=1)
+  put-1m pes=16 h=0 buffers=None: receive_enobufs 15.0 (n=1), receive_rearms 15.0 (n=1), reserve_stalls 295657 (n=1), sends 161848 (n=1)
+  put-64k pes=16 h=0 buffers=None: reserve_stalls 268511 (n=1), sends 186665 (n=1)
+  get-1m pes=32 h=0 buffers=None: receive_enobufs 4.00 (n=1), receive_rearms 4.00 (n=1), reserve_stalls 134075 (n=1), sends 237821 (n=1)
+  put-1m pes=32 h=0 buffers=None: receive_enobufs 36.0 (n=1), receive_rearms 36.0 (n=1), reserve_stalls 202788 (n=1), sends 95882 (n=1)
+  put-64k pes=32 h=0 buffers=None: reserve_stalls 202396 (n=1), sends 118140 (n=1)
+  get-1m pes=64 h=0 buffers=None: receive_enobufs 26.0 (n=1), receive_rearms 26.0 (n=1), reserve_stalls 239715 (n=1), sends 64473 (n=1)
+  put-1m pes=64 h=0 buffers=None: reserve_stalls 244467 (n=1), sends 65681 (n=1)
+  put-64k pes=64 h=0 buffers=None: reserve_stalls 290571 (n=1), sends 61065 (n=1)
+  put-1m-wake pes=256 h=0 buffers=None: reserve_stalls 149687 (n=1), sends 35865 (n=1)
+  put-64k-wake pes=256 h=0 buffers=None: reserve_stalls 216180 (n=1), sends 37796 (n=1)
+
+outcomes
+  mailbox-pes16-h0-r1.txt: osoe-pacer failures=0 seconds=20.0
+  mailbox-pes32-h0-r1.txt: osoe-pacer failures=0 seconds=19.9
+  mailbox-pes64-h0-r1.txt: osoe-pacer failures=0 seconds=19.7
+
+profile-wake-pes256-h0-r1.txt
+  slurm-node-02     59.66%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+  slurm-node-02      5.06%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+  slurm-node-02      4.84%  swapper          [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+  slurm-node-02      3.83%  osoe-agent       [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+  slurm-node-02      3.62%  multistream      [kernel.kallsyms]     [k] __pv_queued_spin_lock_slowpath             -      -            
+  slurm-node-02      3.55%  multistream      [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+  slurm-node-02      1.81%  multistream      [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+  slurm-node-02      1.39%  multistream      libc.so.6             [.] syscall                                    -      -            
+  slurm-node-02      1.23%  multistream      [kernel.kallsyms]     [k] gup_fast_fallback                          -      -            
+  slurm-node-02      1.20%  multistream      libosoe.so.0.1.0      [.] reserve_waiting.part.0                     -      -            
+  slurm-node-02      1.02%  swapper          [kernel.kallsyms]     [k] poll_idle                                  -      -            
+  slurm-node-02      0.72%  multistream      libosoe.so.0.1.0      [.] osoe_futex_wait_bitset                     -      -            
+  slurm-node-02      0.66%  multistream      [kernel.kallsyms]     [k] __get_user_8                               -      -            
+  slurm-node-02      0.53%  multistream      [kernel.kallsyms]     [k] __raw_callee_save___pv_queued_spin_unlock  -      -            
+  slurm-node-02      0.51%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+  slurm-node-02 the progress threads' symbols, with their callers:
+  slurm-node-01     57.85%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+  slurm-node-01      5.37%  swapper          [kernel.kallsyms]     [k] flush_smp_call_function_queue              -      -            
+  slurm-node-01      4.98%  swapper          [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+  slurm-node-01      4.03%  multistream      [kernel.kallsyms]     [k] finish_task_switch.isra.0                  -      -            
+  slurm-node-01      3.70%  osoe-agent       [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+  slurm-node-01      3.28%  multistream      [kernel.kallsyms]     [k] __pv_queued_spin_lock_slowpath             -      -            
+  slurm-node-01      1.98%  multistream      [kernel.kallsyms]     [k] _raw_spin_unlock_irqrestore                -      -            
+  slurm-node-01      1.55%  multistream      libc.so.6             [.] syscall                                    -      -            
+  slurm-node-01      1.40%  multistream      [kernel.kallsyms]     [k] gup_fast_fallback                          -      -            
+  slurm-node-01      1.26%  multistream      libosoe.so.0.1.0      [.] reserve_waiting.part.0                     -      -            
+  slurm-node-01      1.21%  swapper          [kernel.kallsyms]     [k] poll_idle                                  -      -            
+  slurm-node-01      0.80%  multistream      libosoe.so.0.1.0      [.] osoe_futex_wait_bitset                     -      -            
+  slurm-node-01      0.64%  multistream      [kernel.kallsyms]     [k] __get_user_8                               -      -            
+  slurm-node-01      0.56%  multistream      [kernel.kallsyms]     [k] __raw_callee_save___pv_queued_spin_unlock  -      -            
+  slurm-node-01 the progress threads' symbols, with their callers:
+  slurm-node-01      5.75%  [k] _raw_spin_unlock_irqrestore            -      -            
+  slurm-node-01             |          
+  slurm-node-01              --3.67%--try_to_wake_up
+  slurm-node-01                        |          
+  slurm-node-01                         --3.66%--wake_up_q
+  slurm-node-01                                   futex_wake
+  slurm-node-01                                   __x64_sys_futex_wake
+  slurm-node-01                                   do_syscall_64
+  slurm-node-01                                   entry_SYSCALL_64_after_hwframe

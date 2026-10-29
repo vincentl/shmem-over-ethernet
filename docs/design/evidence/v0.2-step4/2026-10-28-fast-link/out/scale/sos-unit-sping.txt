@@ -1,0 +1,81 @@
+# 23:14:54 nodes=8 pes_per_node=2 
+# ~/osoe/build/sos/unit/sping
+salloc: Pending job allocation 317
+salloc: job 317 queued and waiting for resources
+salloc: job 317 has been allocated resources
+salloc: Granted job allocation 317
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 1 connected its mesh in 908 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 connected its mesh in 1062 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 connected its mesh in 1022 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 connected its mesh in 1358 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 connected its mesh in 1128 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 1117 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 connected its mesh in 1561 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 1958 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 2 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18489 us of this start)
+osoe: PE 1 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (10326 us of this start)
+osoe: PE 13 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18133 us of this start)
+osoe: PE 4 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18225 us of this start)
+osoe: PE 8 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18442 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 284873
+osoe: PE 3 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (13903 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 284873
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 284873
+osoe: PE 5 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (17758 us of this start)
+osoe: PE 14 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18368 us of this start)
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 284873
+osoe: PE 9 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (16410 us of this start)
+osoe: PE 10 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18075 us of this start)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 284873
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 284873
+osoe: PE 6 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (17636 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 284873
+osoe: PE 0 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (17958 us of this start)
+osoe: PE 12 of 16 (local 0 of 2): segment /dev/shm/osoe.317.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (18144 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 284873
+osoe: PE 15 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (13194 us of this start)
+osoe: PE 11 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (11465 us of this start)
+osoe: PE 7 of 16 (local 1 of 2): segment /dev/shm/osoe.317.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 40662 ns, a message cost of 39717 ns, 2225570378 bytes a second (17632 us of this start)
+3(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  3 pinged   2:      128 words      2.31 uSec   443.58 MB/s
+1(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  1 pinged   0:      128 words      2.45 uSec   418.47 MB/s
+9(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  9 pinged   8:      128 words      2.49 uSec   411.82 MB/s
+11(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+ 11 pinged  10:      128 words     57.44 uSec    17.83 MB/s
+13(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+ 13 pinged  12:      128 words      2.40 uSec   427.29 MB/s
+15(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+ 15 pinged  14:      128 words      2.46 uSec   416.60 MB/s
+7(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  7 pinged   6:      128 words      2.46 uSec   416.01 MB/s
+5(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  5 pinged   4:      128 words      2.47 uSec   414.66 MB/s
+2(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  2 pinged   3:      128 words      2.31 uSec   443.58 MB/s
+12(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+ 12 pinged  13:      128 words      2.40 uSec   427.20 MB/s
+8(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  8 pinged   9:      128 words      2.49 uSec   411.74 MB/s
+14(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+ 14 pinged  15:      128 words      2.46 uSec   415.67 MB/s
+4(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  4 pinged   5:      128 words      2.47 uSec   414.66 MB/s
+6(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  6 pinged   7:      128 words      2.46 uSec   416.68 MB/s
+10(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+ 10 pinged  11:      128 words     57.44 uSec    17.83 MB/s
+0(16): Shmem PING reps 1000 minWords 128 maxWords 128 incWords 0
+  0 pinged   1:      128 words      2.45 uSec   418.22 MB/s
+salloc: Relinquishing job allocation 317
+# exit 0

@@ -1,0 +1,56 @@
+# 2026-10-28T23:00:24Z trees.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 1800 s
+slurm-node-01: 3ee3357: built, 0 warnings
+slurm-node-02: 3ee3357: built, 0 warnings
+slurm-node-06: 3ee3357: built, 0 warnings
+slurm-node-04: 3ee3357: built, 0 warnings
+slurm-node-05: 3ee3357: built, 0 warnings
+slurm-node-08: 3ee3357: built, 0 warnings
+slurm-node-07: 3ee3357: built, 0 warnings
+slurm-node-03: 3ee3357: built, 0 warnings
+slurm-node-01: de3dc42: built, 0 warnings
+slurm-node-02: de3dc42: built, 0 warnings
+slurm-node-06: de3dc42: built, 0 warnings
+slurm-node-04: de3dc42: built, 0 warnings
+slurm-node-05: de3dc42: built, 0 warnings
+slurm-node-08: de3dc42: built, 0 warnings
+slurm-node-07: de3dc42: built, 0 warnings
+slurm-node-03: de3dc42: built, 0 warnings
+slurm-node-01: 49c62d3: built, 0 warnings
+slurm-node-02: 49c62d3: built, 0 warnings
+slurm-node-04: 49c62d3: built, 0 warnings
+slurm-node-06: 49c62d3: built, 0 warnings
+slurm-node-05: 49c62d3: built, 0 warnings
+slurm-node-08: 49c62d3: built, 0 warnings
+slurm-node-07: 49c62d3: built, 0 warnings
+slurm-node-03: 49c62d3: built, 0 warnings
+slurm-node-01: 2dcf8d6: built, 0 warnings
+slurm-node-02: 2dcf8d6: built, 0 warnings
+slurm-node-06: 2dcf8d6: built, 0 warnings
+slurm-node-04: 2dcf8d6: built, 0 warnings
+slurm-node-05: 2dcf8d6: built, 0 warnings
+slurm-node-08: 2dcf8d6: built, 0 warnings
+slurm-node-07: 2dcf8d6: built, 0 warnings
+slurm-node-03: 2dcf8d6: built, 0 warnings
+23:01:14 exit 0 put-64k-de3dc42-r1.txt:  ~/osoe/build/trees/de3dc42/build/release/kit/multistream put 65536 10
+23:01:25 exit 0 put-1m-de3dc42-r1.txt:  ~/osoe/build/trees/de3dc42/build/release/kit/multistream put 1048576 10
+23:01:36 exit 0 hol-de3dc42-r1.txt:  ~/osoe/build/trees/de3dc42/build/release/kit/hol 10
+23:01:56 exit 0 mailbox-de3dc42-r1.txt:  ~/osoe/build/trees/de3dc42/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:02:06 exit 0 put-64k-3ee3357-r1.txt:  ~/osoe/build/trees/3ee3357/build/release/kit/multistream put 65536 10
+23:02:17 exit 0 put-1m-3ee3357-r1.txt:  ~/osoe/build/trees/3ee3357/build/release/kit/multistream put 1048576 10
+23:02:27 exit 0 hol-3ee3357-r1.txt:  ~/osoe/build/trees/3ee3357/build/release/kit/hol 10
+23:02:48 exit 0 mailbox-3ee3357-r1.txt:  ~/osoe/build/trees/3ee3357/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:02:58 exit 0 put-64k-main-r1.txt:  ~/osoe/build/release/kit/multistream put 65536 10
+23:03:08 exit 0 put-1m-main-r1.txt:  ~/osoe/build/release/kit/multistream put 1048576 10
+23:03:20 exit 0 hol-main-r1.txt:  ~/osoe/build/release/kit/hol 10
+23:03:40 exit 0 mailbox-main-r1.txt:  ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:03:50 exit 0 put-64k-2dcf8d6-r1.txt:  ~/osoe/build/trees/2dcf8d6/build/release/kit/multistream put 65536 10
+23:04:01 exit 0 put-1m-2dcf8d6-r1.txt:  ~/osoe/build/trees/2dcf8d6/build/release/kit/multistream put 1048576 10
+23:04:12 exit 0 hol-2dcf8d6-r1.txt:  ~/osoe/build/trees/2dcf8d6/build/release/kit/hol 10
+23:04:32 exit 0 mailbox-2dcf8d6-r1.txt:  ~/osoe/build/trees/2dcf8d6/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:04:42 exit 0 put-64k-49c62d3-r1.txt:  ~/osoe/build/trees/49c62d3/build/release/kit/multistream put 65536 10
+23:04:53 exit 0 put-1m-49c62d3-r1.txt:  ~/osoe/build/trees/49c62d3/build/release/kit/multistream put 1048576 10
+23:05:04 exit 0 hol-49c62d3-r1.txt:  ~/osoe/build/trees/49c62d3/build/release/kit/hol 10
+23:05:24 exit 0 mailbox-49c62d3-r1.txt:  ~/osoe/build/trees/49c62d3/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+# done 23:05:24

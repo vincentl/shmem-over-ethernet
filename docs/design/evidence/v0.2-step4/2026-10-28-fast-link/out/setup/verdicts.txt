@@ -1,0 +1,4 @@
+probe: PROBE PASSED on 8 of 8 nodes
+a job of 32 PEs a node: startup pes=256 init_ms_pe0=101.8 init_ms_slowest=122.0 init_ms_fastest=75.6
+tier 2 on slurm-node-01, exit 0: 100% tests passed, 0 tests failed out of 1071
+the litmus: 493/1071 Test #391: shmem.quiet.litmus.L2 Passed 7.11 sec

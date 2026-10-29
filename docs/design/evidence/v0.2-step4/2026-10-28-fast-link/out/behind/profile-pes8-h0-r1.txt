@@ -1,0 +1,99 @@
+slurm-node-01     88.66%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-01      2.02%  osoe-agent       [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-01      1.27%  osoe-agent       [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-01      0.78%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-01      0.67%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-01 the progress threads' symbols, with their callers:
+slurm-node-04     89.95%  swapper          [kernel.kallsyms]           [k] cpuidle_enter_state                        -      -            
+slurm-node-04      1.62%  osoe-agent       [kernel.kallsyms]           [k] _copy_from_iter                            -      -            
+slurm-node-04      1.23%  osoe-agent       [kernel.kallsyms]           [k] _copy_to_iter                              -      -            
+slurm-node-04      0.72%  multistream      libc.so.6                   [.] 0x000000000017bb72                         -      -            
+slurm-node-04      0.72%  swapper          [kernel.kallsyms]           [k] handle_softirqs                            -      -            
+slurm-node-04      0.51%  osoe-agent       libc.so.6                   [.] 0x000000000017bb72                         -      -            
+slurm-node-04 the progress threads' symbols, with their callers:
+slurm-node-05     87.65%  swapper          [kernel.kallsyms]  [k] cpuidle_enter_state                        -      -            
+slurm-node-05      2.22%  osoe-agent       [kernel.kallsyms]  [k] _copy_from_iter                            -      -            
+slurm-node-05      1.00%  osoe-agent       [kernel.kallsyms]  [k] _copy_to_iter                              -      -            
+slurm-node-05      0.89%  multistream      libc.so.6          [.] 0x000000000017bb72                         -      -            
+slurm-node-05      0.84%  swapper          [kernel.kallsyms]  [k] handle_softirqs                            -      -            
+slurm-node-05      0.75%  swapper          [kernel.kallsyms]  [k] poll_idle                                  -      -            
+slurm-node-06     89.04%  swapper          [kernel.kallsyms]           [k] cpuidle_enter_state                        -      -            
+slurm-node-06      1.96%  osoe-agent       [kernel.kallsyms]           [k] _copy_from_iter                            -      -            
+slurm-node-06      1.30%  osoe-agent       [kernel.kallsyms]           [k] _copy_to_iter                              -      -            
+slurm-node-06      0.75%  swapper          [kernel.kallsyms]           [k] handle_softirqs                            -      -            
+slurm-node-06      0.66%  multistream      libc.so.6                   [.] 0x000000000017bb72                         -      -            
+slurm-node-05 the progress threads' symbols, with their callers:
+slurm-node-06 the progress threads' symbols, with their callers:
+slurm-node-08     88.71%  swapper          [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-08      2.19%  osoe-agent       [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-08      1.16%  osoe-agent       [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-08      0.96%  swapper          [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-08      0.76%  multistream      libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-08 the progress threads' symbols, with their callers:
+slurm-node-02     89.64%  swapper          [kernel.kallsyms]      [k] cpuidle_enter_state                        -      -            
+slurm-node-02      1.43%  osoe-agent       [kernel.kallsyms]      [k] _copy_from_iter                            -      -            
+slurm-node-02      1.37%  osoe-agent       [kernel.kallsyms]      [k] _copy_to_iter                              -      -            
+slurm-node-02      0.74%  swapper          [kernel.kallsyms]      [k] handle_softirqs                            -      -            
+slurm-node-02      0.56%  multistream      libc.so.6              [.] 0x000000000017bb72                         -      -            
+slurm-node-02 the progress threads' symbols, with their callers:
+slurm-node-07     88.77%  swapper      [kernel.kallsyms]     [k] cpuidle_enter_state                        -      -            
+slurm-node-07      2.19%  osoe-agent   [kernel.kallsyms]     [k] _copy_from_iter                            -      -            
+slurm-node-07      1.17%  osoe-agent   [kernel.kallsyms]     [k] _copy_to_iter                              -      -            
+slurm-node-07      0.87%  swapper      [kernel.kallsyms]     [k] handle_softirqs                            -      -            
+slurm-node-07      0.69%  multistream  libc.so.6             [.] 0x000000000017bb72                         -      -            
+slurm-node-07 the progress threads' symbols, with their callers:
+slurm-node-03     88.92%  swapper          [kernel.kallsyms]      [k] cpuidle_enter_state                        -      -            
+slurm-node-03      1.47%  osoe-agent       [kernel.kallsyms]      [k] _copy_from_iter                            -      -            
+slurm-node-03      1.26%  osoe-agent       [kernel.kallsyms]      [k] _copy_to_iter                              -      -            
+slurm-node-03      0.70%  swapper          [kernel.kallsyms]      [k] handle_softirqs                            -      -            
+slurm-node-03      0.65%  multistream      libc.so.6              [.] 0x000000000017bb72                         -      -            
+slurm-node-03      0.56%  osoe-agent       [kernel.kallsyms]      [k] __check_object_size                        -      -            
+slurm-node-03 the progress threads' symbols, with their callers:
+slurm-node-01      2.02%  [k] _copy_from_iter                     -      -            
+slurm-node-01             |
+slurm-node-01             ---tcp_sendmsg_locked
+slurm-node-01                tcp_sendmsg
+slurm-node-01                sock_sendmsg
+slurm-node-01                io_send
+slurm-node-01                io_issue_sqe
+slurm-node-01                io_submit_sqes
+slurm-node-01                __do_sys_io_uring_enter
+slurm-node-01                do_syscall_64
+slurm-node-01                entry_SYSCALL_64_after_hwframe
+slurm-node-01                0x7f27fe1133ca
+slurm-node-05      2.22%  [k] _copy_from_iter                            -      -            
+slurm-node-05             |
+slurm-node-05             ---tcp_sendmsg_locked
+slurm-node-05                tcp_sendmsg
+slurm-node-05                sock_sendmsg
+slurm-node-05                io_send
+slurm-node-05                io_issue_sqe
+slurm-node-05                io_submit_sqes
+slurm-node-05                __do_sys_io_uring_enter
+slurm-node-05                do_syscall_64
+slurm-node-05                entry_SYSCALL_64_after_hwframe
+slurm-node-05                0x7fdfc66653ca
+slurm-node-08      2.19%  [k] _copy_from_iter                            -      -            
+slurm-node-08             |
+slurm-node-08             ---tcp_sendmsg_locked
+slurm-node-08                tcp_sendmsg
+slurm-node-08                sock_sendmsg
+slurm-node-08                io_send
+slurm-node-08                io_issue_sqe
+slurm-node-08                io_submit_sqes
+slurm-node-08                __do_sys_io_uring_enter
+slurm-node-08                do_syscall_64
+slurm-node-08                entry_SYSCALL_64_after_hwframe
+slurm-node-08                0x7fe6f6e603ca
+slurm-node-07      2.19%  [k] _copy_from_iter                        -      -            
+slurm-node-07             |
+slurm-node-07             ---tcp_sendmsg_locked
+slurm-node-07                tcp_sendmsg
+slurm-node-07                sock_sendmsg
+slurm-node-07                io_send
+slurm-node-07                io_issue_sqe
+slurm-node-07                io_submit_sqes
+slurm-node-07                __do_sys_io_uring_enter
+slurm-node-07                do_syscall_64
+slurm-node-07                entry_SYSCALL_64_after_hwframe
+slurm-node-07                0x7fc7077983ca

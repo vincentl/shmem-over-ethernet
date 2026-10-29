@@ -1,0 +1,29 @@
+# 22:44:18 nodes=2 pes_per_node=8 OSOE_LINK_HOP_NS=44961 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=2120261150
+# ~/osoe/build/release/kit/startup
+salloc: Granted job allocation 45
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 connected its mesh in 494 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 476 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 0 of 16 (local 0 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 8 of 16 (local 0 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 271393
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 271393
+osoe: PE 3 of 16 (local 3 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 4 of 16 (local 4 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 7 of 16 (local 7 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 1 of 16 (local 1 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 2 of 16 (local 2 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 6 of 16 (local 6 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 5 of 16 (local 5 of 8): segment /dev/shm/osoe.45.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 0 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 11 of 16 (local 3 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 9 of 16 (local 1 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 10 of 16 (local 2 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 12 of 16 (local 4 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 13 of 16 (local 5 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 14 of 16 (local 6 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+osoe: PE 15 of 16 (local 7 of 8): segment /dev/shm/osoe.45.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 524288 bytes, node 1 of 2; link set: a hop of 44961 ns, a message cost of 0 ns, 2120261150 bytes a second
+startup pes=16 init_ms_pe0=50.3 init_ms_slowest=53.0 init_ms_fastest=44.4
+salloc: Relinquishing job allocation 45
+# exit 0

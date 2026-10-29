@@ -1,0 +1,27 @@
+# 2026-10-28T22:46:29Z many-pes.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 300 s
+22:46:40 exit 0 put-1m-pes16-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 1048576 10
+22:46:50 exit 0 put-64k-pes16-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 65536 10
+22:47:00 exit 0 get-1m-pes16-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream get 1048576 10
+22:47:21 exit 0 mailbox-pes16-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+22:47:22 exit 0 collectives-check-off-pes16-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=0 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:47:24 exit 0 collectives-check-on-pes16-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=1 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:47:34 exit 0 put-1m-pes32-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 1048576 10
+22:47:44 exit 0 put-64k-pes32-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 65536 10
+22:47:55 exit 0 get-1m-pes32-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream get 1048576 10
+22:48:15 exit 0 mailbox-pes32-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+22:48:17 exit 0 collectives-check-off-pes32-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=0 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:48:20 exit 0 collectives-check-on-pes32-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=1 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:48:30 exit 0 put-1m-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 1048576 10
+22:48:41 exit 0 put-64k-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 65536 10
+22:48:51 exit 0 get-1m-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream get 1048576 10
+22:49:11 exit 0 mailbox-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+22:49:17 exit 0 collectives-check-off-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=0 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:49:24 exit 0 collectives-check-on-pes64-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=1 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:49:34 exit 0 put-1m-wake-pes256-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 1048576 10
+22:49:45 exit 0 put-64k-wake-pes256-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 MULTISTREAM_STAT=~/osoe/build/release/tools/stat/osoe-stat ~/osoe/build/release/kit/multistream put 65536 10
+22:49:57 exit 0 put-1m-wake-profiled-pes256-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 1048576 10 (beside: bash '~/osoe/docs/fast-link/profile.sh' 5)
+22:51:54 exit 0 collectives-wake-check-off-pes256-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=0 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+22:53:54 exit 0 collectives-wake-check-on-pes256-h0-r1.txt: SHMEM_SYMMETRIC_SIZE=16m OSOE_PROGRESS_HELPERS=0 OSOE_CHECK_COLLECTIVES=1 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+# done 22:53:54

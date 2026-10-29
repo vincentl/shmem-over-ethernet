@@ -343,3 +343,246 @@ vCPUs, which H26 is to check under a site's binding; the zero-copy send's
 (A3), which pays only where helpers do not run; the chooser's costs, refitted
 to a fast link; the link's measurement, steadier on a fast link; and
 io_uring's own device polling, which a site's latency tuning cannot reach.
+
+## The third session (2026-10-28)
+
+**The machines.** The second session's again, made anew by the author's
+Terraform: eight `c4-standard-16` and the head node in `us-central1-a`, and §2's
+facts the same on every node - the Xeon Platinum 8581C, Linux 6.12.113 (6.12.111
+in the second), `gve` at 23,000 Mbit/s, the MTU 8896, the TCP settings,
+interrupt coalescing at 20 µs receiving and 50 sending, liburing 2.9,
+`RemoveIPC=no`, locked memory unlimited, `kernel.perf_event_paranoid` 3. The tree
+was `2dd3a623`, layout 42 and H23's data wires on demand merged into it, cloned
+on the head node from a bundle of `main`. The session was one chain,
+`docs/fast-link/session-3.sh` (§21), the author's plan
+(`docs/prompts/cluster-session-3-plan.md`) section by section, one round each
+where the plan named no other, from 22:38:56 to 23:23:05 UTC: **44.1 minutes**
+against the plan's 52, every section done, 357 jobs, two of them failed (H11,
+below). The machines' start-up scripts were done before it began, so its wait
+took 0.1 of its four minutes.
+
+**Setup (§1 to §3).** 4.2 minutes: the packages on every machine at once,
+`slurm-setup.sh` (eight nodes of 16 CPUs and 59,760 MB), `build.sh` (all eight
+without a warning), the facts, the probe passed on every node, and a job of 256
+PEs, 32 a node, whose slowest PE started in 122 ms; tier 2 passed 1,071 of 1,071
+on one node in 148 s, T35's litmus, `shmem.quiet.litmus.L2`, among them -
+natively on x86-64 for the first time, in 7.1 s (T36). SOS was fetched and built
+on the head node meanwhile: 161 of its 163 programs, the C11
+`test_all_any_some` and `wait_until_all_any_some` not building, as in the VM's
+dry run.
+
+**The floor (§4, `iperf3` alone).** As both sessions': both ways at once 5,423
+to 5,431 MiB/s from one stream each way to sixteen, 2,712 to 2,715 a node each
+way. Under a minute.
+
+**P38: the link's measurement on two and three nodes (§19).** The start-up
+probe with the link measured and set to what a first job measured, five rounds -
+the fastest PE's `shmem_init`, milliseconds, the median, and what PE 0
+measured, the rounds' range:
+
+| Nodes | PEs a node | Measured | Set | Its hop, µs | Its bandwidth, GB/s | Its message cost, µs |
+|---|---|---|---|---|---|---|
+| 2 | 1 | 55.3 | 46.2 | 37 to 112 | 1.38 to 2.30 | 0 |
+| 2 | 8 | 58.8 | 48.6 | 40 to 98 | 0.95 to 2.78 | 0 |
+| 3 | 1 | 70.0 | 51.3 | 92 to 111 | 1.79 to 2.89 | 1.1 to 151 |
+| 3 | 8 | 68.8 | 48.6 | 98 to 120 | 0.88 to 5.68 | 0 to 36 |
+
+P38's longer streams and untimed first fan (`docs/decisions/2026-10-20.md`,
+"Batch 1") cost a start 9 to 20 ms here, where the second session's
+measurement cost 3 to 5, and steady nothing: the bandwidth 0.88 to 5.68 GB/s
+from job to job on a link that gives 2.85, as H14's 1.9 to 5.1; the hop 37 to
+120 µs, where H14's was 43 to 53; the message cost still 0 on two nodes and 0
+to 151 µs on three.
+
+**P37: the pipeline's window and the chooser (§14).** P37's four cases, five
+rounds, 8 PEs a node - a reduction's and a broadcast's microseconds by the
+chooser at a window of 4 and of 8, by its trees alone at 8, and by the fixed
+fan-out of 4 at 8, the median of the rounds:
+
+| Bytes | Reduce: chooser at 4, at 8, trees at 8, fixed (4, 8) | Broadcast: the same four |
+|---|---|---|
+| 64 KiB | 474, 474, 471, 556 | 350, 358, 359, 416 |
+| 256 KiB | 1,620, 1,390, 1,302, 1,302 | 1,148, 949, 945, 940 |
+| 1 MiB | 5,962, 5,932, 5,778, 4,651 | 4,377, 3,358, 3,256, 3,310 |
+| 4 MiB | 25,525, 26,909, 25,399, 20,202 | 16,917, 12,374, 12,699, 12,690 |
+
+A window of 8 against 4: the broadcasts 17 to 27% faster from 256 KiB, the
+chooser's then within 3% of the fixed shape's, which at 4 it trailed by the
+second session's 17 to 26%; the 256 KiB reduction 14% faster; the 1 and 4 MiB
+reductions within 6% either way, and still 24 to 33% behind the fixed fan-out
+of 4; 64 KiB alike.
+
+The chooser's jobs were two kinds again, as in the second session
+(`docs/decisions/2026-10-20.md`, "P37, for the author"). By the model -
+`shape_timing.py`'s `choose_shape` given each job's measured link - nine of the
+ten took the tree of 7 children for every reduction from 256 KiB, and one, the
+window of 8's third round, took Träff's: its link read 0.55 GB/s and a message
+cost of 21 µs, where the others read 1.78 to 3.02 GB/s and 23 to 45 µs. Its 256
+KiB, 1 MiB and 4 MiB reductions took 1,019, 2,479 and 10,459 µs - 1.4, 2.4 and
+2.6 times faster than the median of that window's five, the tree's, and 1.3 to
+1.9 times than the fixed fan-out of 4 - its broadcasts no faster. At the link's
+2.85 GB/s the closed form takes Träff's on eight nodes only while the message
+cost reads under 5.5 to 10.5 µs, by the size and the hop (at 256 KiB and a hop
+of 100 µs, never); at the 44 µs most rounds read it prices Träff's at 2.5 to
+3.9 times the tree.
+
+**H12: many PEs a node (§20).** On two nodes, one round, no helpers: §5's
+streams and the mailbox at 16, 32 and 64 PEs a node; the wake's point, 256 PEs a
+node on a 16 MiB heap, profiled once; and `OSOE_CHECK_COLLECTIVES` off and on at
+each count. The job's MiB/s over the two nodes, whose both ways at once give
+5,429; the progress threads' CPU seconds a GiB; the PEs' sleeps a 64 KiB moved
+by the puts; the mailbox's messages a second:
+
+| PEs a node | Get 1 MiB | Put 1 MiB | Put 64 KiB | CPU a GiB | Sleeps a 64 KiB | Mailbox |
+|---|---|---|---|---|---|---|
+| 16 | 3,936 | 4,116 | 4,335 | 0.45 to 0.48 | 4.0 | 697,000 |
+| 32 | 3,626 | 3,567 | 3,985 | 0.50 to 0.58 | 8.0 | 697,000 |
+| 64 | 3,648 | 3,159 | 3,139 | 0.50 to 0.66 | 16.0 | 372,000 |
+| 256 | - | 1,698 | 1,817 | 1.15 to 1.22 | 63.5 to 64.0 | - |
+
+Every writer sleeps once a turnover: the puts' sleeps a 64 KiB are a quarter of
+the PEs a node at every count - S1's herd, each turnover's wake of all its
+writers - and at 256 the progress threads' CPU a GiB doubles and the job moves
+31 to 33% of the link; the profile's progress thread has the kernel's
+`_raw_spin_unlock_irqrestore` for its top symbol, 5.8% of the node's samples, 3.7
+of them waking PEs from `futex_wake`, the node 58 to 60% idle. The collectives,
+microseconds, the check off:
+
+| PEs a node | Barrier | Reduce 64 KiB | Broadcast 64 KiB | Alltoall 8 B | Alltoall 4 KiB |
+|---|---|---|---|---|---|
+| 16 | 125 | 296 | 200 | 306 | 814 |
+| 32 | 157 | 359 | 206 | 504 | 2,741 |
+| 64 | 221 | 466 | 227 | 1,203 | 11,129 |
+| 256 | 672 | 1,287 | 368 | 13,916 | 262,727 |
+
+`OSOE_CHECK_COLLECTIVES` costs nothing one round can see from 16 to 64 PEs a
+node - each collective's time with the check over its time without, 0.84 to
+1.07 - and at 256 the same within 3% but for the barrier, 672 µs to 975, one
+round at 16 PEs a vCPU.
+
+**H28: gets and the per-node landing budget (§8).** One round on eight nodes:
+`multistream`'s gets of 1 MiB at 1, 4, 8 and 16 PEs a node with the zone unset -
+the budget's, which gave 1 MiB at 1 and 4 PEs a node, 512 KiB at 8 and 256 KiB at
+16 - beside 256 KiB and 1 MiB fixed, the job's MiB/s:
+
+| PEs a node | The budget's zone | 256 KiB | 1 MiB |
+|---|---|---|---|
+| 1 | 13,115 | 8,232 | 12,975 |
+| 4 | 16,119 | 13,278 | 16,207 |
+| 8 | 15,654 | 14,527 | 13,129 |
+| 16 | 14,609 | 14,531 | 11,022 |
+
+The budget's zone is the best or within 1% of it at every count: a fixed 256
+KiB costs one PE a node 37% and four 18%; a fixed 1 MiB costs eight PEs a node
+16% and sixteen 25%, the nodes then unequal (1,553 to 2,257 MiB/s at eight
+against the budget's 1,774 to 2,085) and their PEs inside calls toward 2 to 2.6
+peers at once, against the budget's 5.5 to 6.4. Where the budget's zone and the
+fixed one are the same, 256 KiB at 16 PEs a node, the two jobs ran within 0.5%.
+Between two nodes, one PE each, a get's time over a put's: with the budget's
+zone 0.95 to 1.00 from 1 MiB to 64 MiB; with 256 KiB, 1.49 to 1.80 past the zone.
+
+**H15 to H19: behind a stream (§13).** One round on eight nodes, 8 PEs a node,
+at 0 and 2 helpers. The stream, `multistream`'s puts of 1 MiB: 17,760 MiB/s at
+none, 21,256 at two, the progress threads' CPU a GiB 0.46 and 0.58. An
+operation's microseconds alone and behind a stream at the link's rate, 2,678 to
+2,702 MiB/s (2,306 to 2,374 beside the 64 KiB collectives), median (p99):
+
+| Operation | Alone, no helpers | Behind | Alone, two helpers | Behind |
+|---|---|---|---|---|
+| Barrier | 99 (422) | 499 (902) | 94 (266) | 121 (263) |
+| Fetch-add | 77 (98) | 663 (893) | 72 (93) | 598 (927) |
+| Broadcast 8 B | 112 (349) | 710 (1,104) | 113 (286) | 649 (2,006) |
+| Reduce 8 B | 123 (409) | 763 (1,186) | 122 (328) | 643 (2,333) |
+| Broadcast 64 KiB | 293 (523) | 1,034 (1,708) | 271 (531) | 1,028 (1,495) |
+| Reduce 64 KiB | 389 (601) | 1,243 (1,703) | 331 (587) | 1,242 (2,388) |
+
+Behind the stream a fetch-add takes 8.6 times its time alone at no helpers and
+8.3 at two, the 8-byte collectives 5.3 to 6.3 times, the 64 KiB ones 3.2 to 3.8;
+the barrier alone escapes it with two helpers, 121 µs against 499 at none.
+TCP's retransmissions over the stream's window (`nstat`, H18): at no helpers 9
+to 46 segments on four nodes, none on the rest; at two helpers, the stream at
+Google's egress, 286 to 518 on seven nodes and one on the eighth - fast
+retransmits and a few SACK recoveries, one tail-loss probe a node, none timed
+out. The progress threads profiled on x86-64 (H19, node 1): at no helpers the
+node 89% idle and its progress thread's most the kernel's copies to and from the
+sockets (`_copy_from_iter` 2.0%, `_copy_to_iter` 1.3% of the node's samples);
+at two the node 81% idle, the copies split about evenly between the helpers.
+
+**H6: the ladder's code rungs on the earlier trees (§16).** One round between
+the first two nodes, two PEs each, every tree built there by its own `oshcc` -
+`multistream`'s puts, the job's MiB/s and the PEs' sleeps a 64 KiB at 1 MiB and
+64 KiB blocks; the mailbox's messages a second; `hol`'s fetch-add alone and
+behind a stream, median µs:
+
+| Tree | Put 1 MiB | Put 64 KiB | Sleeps a 64 KiB | Mailbox | Fetch-add alone, behind |
+|---|---|---|---|---|---|
+| `3ee3357`, before rung 1 | 3,482 | 3,793 | 1.72, 1.91 | 93,652 | 77, 1,323 |
+| `de3dc42`, rung 1 | 3,860 | 4,186 | 0.94, 0.98 | 100,200 | 74, 1,724 |
+| `49c62d3`, rungs 2 and 3 | 4,070 | 4,237 | 0.52, 0.54 | 97,709 | 74, 507 |
+| `2dcf8d6`, rung 4 | 4,166 | 4,444 | 0.53, 0.54 | 93,926 | 73, 525 |
+| `main` | 4,002 | 4,569 | 0.52, 0.53 | 99,091 | 87, 523 |
+
+Rung 1, a put filling the room its open buffer has, raised the puts 10 to 11%,
+halved the PEs' sleeps and took 12 to 14% off the CPU a GiB, a fetch-add behind
+the stream no faster in this one round; rungs 2 and 3, the
+kernel's unsent queue limited by the link and buffers of 256 KiB, settings, cut
+a fetch-add behind the stream from 1,724 µs to 507 and the sleeps by half again;
+rung 4, the pass parsing each provided buffer where the kernel put it, 2 to 5%
+more with up to 5% less CPU. The mailbox within 7% across them all.
+
+**H11: the cluster at size (§10), and B8's SOS.** 173 jobs in 9.6 minutes.
+`osoe-bench` at 8 and 16 PEs a node, 64 and 128 PEs, no helpers -
+microseconds, the median of 200 trips:
+
+| PEs | Barrier | Reduce 8 B | Reduce 64 KiB | Broadcast 64 KiB | Fcollect 4 KiB | Alltoall 8 B | Alltoall 4 KiB |
+|---|---|---|---|---|---|---|---|
+| 64 | 117 | 161 | 434 | 337 | 480 | 469 | 1,283 |
+| 128 | 139 | 170 | 466 | 345 | 685 | 756 | 4,527 |
+
+A remote put-and-quiet and get of 8 bytes 73.8 and 71.2 µs at 64 PEs (41.3 and
+41.2 the fastest), 84.9 and 76.0 at 128, and a fetch-add 77.5 there; a stream of puts
+2,709 MiB/s from 64 KiB blocks, the link's. Start-up, the slowest PE's
+`shmem_init` and the fastest's, milliseconds, the median of three: 102 and 70.1
+at one PE a node, 122 and 69.4 at 8, 117 and 69.5 at 32 (256 PEs). `mix`,
+`osoe-pacer` for 300 s at 32 PEs, 4 a node: no failure. SOS at 2 PEs a node, 16
+PEs: 159 of its 161 programs passed, and the two that did not are refused by
+osoe's argument checks, as on the Pi (`docs/pi-cluster.md`):
+`shmem_team_b2b_collectives` gives `shmem_long_collect` a destination of 80
+bytes for a result of 1,280, and `shmemalign` asks `shmem_align` for an
+alignment of 2. The VM's dry run failed both so, and `bigget` and `bigput` only
+for its 32 MiB heap.
+
+**H26: the helpers under a site's binding (§5, `binding.sh site`).** Slurm's
+`task/affinity`, 8 PEs a node, 0 and 2 helpers, two rounds each way: every PE
+bound to one CPU (`-K1 --cpu-bind=threads`), which Slurm gave as CPUs 0 to 3 and
+8 to 11, four cores' two hyperthreads, the other four cores idle; and every PE
+given two (`--cpus-per-task=2`), one core a PE. The job's MiB/s over eight
+nodes, the mailbox's messages a second and two collectives' microseconds, the
+median of the rounds, beside the second session's unbound (H4):
+
+| | One CPU a PE, 0 → 2 helpers | One core a PE, 0 → 2 | Unbound, 0 → 2 |
+|---|---|---|---|
+| Get 1 MiB | 14,386 → 15,153 | 14,423 → 17,539 | 15,100 → 19,770 |
+| Put 1 MiB | 16,701 → 17,115 | 17,247 → 20,821 | 17,407 → 21,502 |
+| Put 64 KiB | 16,639 → 16,754 | 16,849 → 20,535 | - |
+| Mailbox | 98,000 → 123,000 | 925,000 → 456,000 | 920,000 → 1,255,000 |
+| Reduce 64 KiB | 389 → 391 | 462 → 356 | 453 → 401 |
+| Alltoall 4 KiB | 1,297 → 1,489 | 1,375 → 1,196 | 1,321 → 1,014 |
+
+Bound to one CPU, a PE's helpers share it: two buy the streams 1 to 5%, where
+unbound they bought 23 to 31%, and the mailbox a quarter, and cost the
+collectives up to 15% (the 4 KiB alltoall; the 8-byte ones 5 to 6%); the
+mailbox itself runs at a tenth of its unbound rate, helpers or none. With a core
+a PE, two helpers buy the streams 21 to 22% and the 64 KiB reduction and the
+alltoalls 13 to 23%, nearly as unbound, the small collectives within 5% either
+way, but halve the mailbox, as H4 found unbound past one PE a vCPU.
+
+**What the numbers point at**, for the decisions to come, not taken here
+(`docs/decisions/2026-10-28.md`, "For the author"): the window of 8, decided,
+pays for every broadcast and tree; the reductions' choice of Träff's turns on a
+message cost P38 has not steadied, read at 23 to 45 µs where the closed form
+takes Träff's only under 5.5 to 10.5; the helpers' default (P36) - under a
+site's binding they pay with a core a PE but halve the mailbox, and with one CPU
+a PE buy little; the herd's
+wakes (P2), a quarter of the PEs a node at every count; and the collectives'
+check, which costs nothing seen up to 64 PEs a node.

@@ -1,0 +1,13 @@
+# 2026-10-28T22:38:56Z session-3.sh on slurm-controller: kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4, 8 nodes,
+# launcher srun, sections: wait setup floor link-cost window many-pes gets behind trees scale binding pack
+ 0 wait      done   22:39:04 UTC, exit 0, 0.1 min (planned 4), 0 jobs, 0 failed
+ 1 setup     done   22:43:16 UTC, exit 0, 4.2 min (planned 5), 3 jobs, 0 failed
+ 2 floor     done   22:44:12 UTC, exit 0, 0.9 min (planned 1), 0 jobs, 0 failed
+ 3 link-cost done   22:44:21 UTC, exit 0, 0.1 min (planned 0.2), 41 jobs, 0 failed
+ 4 window    done   22:46:29 UTC, exit 0, 2.1 min (planned 2), 20 jobs, 0 failed
+ 5 many-pes  done   22:53:54 UTC, exit 0, 7.4 min (planned 7), 23 jobs, 0 failed
+ 6 gets      done   22:56:07 UTC, exit 0, 2.2 min (planned 2.3), 15 jobs, 0 failed
+ 7 behind    done   23:00:24 UTC, exit 0, 4.3 min (planned 5), 20 jobs, 0 failed
+ 8 trees     done   23:05:24 UTC, exit 0, 5.0 min (planned 6), 20 jobs, 0 failed
+ 9 scale     done   23:14:59 UTC, exit 0, 9.6 min (planned 9.5), 173 jobs, 2 failed
+10 binding   done   23:23:04 UTC, exit 0, 8.1 min (planned 8), 42 jobs, 0 failed

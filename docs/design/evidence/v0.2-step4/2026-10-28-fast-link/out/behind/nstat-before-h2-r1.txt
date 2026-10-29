@@ -1,0 +1,6 @@
+# 22:57:51 nodes=8 pes_per_node=1 
+# nstat -n
+salloc: Granted job allocation 122
+salloc: Nodes slurm-node-[01-08] are ready for job
+salloc: Relinquishing job allocation 122
+# exit 0

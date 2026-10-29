@@ -1,0 +1,206 @@
+# 23:13:37 nodes=8 pes_per_node=2 
+# ~/osoe/build/sos/unit/set_fetch
+salloc: Granted job allocation 292
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 4 connected its mesh in 956 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 7 connected its mesh in 905 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 6 connected its mesh in 1191 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 connected its mesh in 909 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 connected its mesh in 1258 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 1658 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 2115 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 2089 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 4 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (25098 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 348872
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 348872
+osoe: PE 14 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (25678 us of this start)
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 348872
+osoe: PE 12 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (25367 us of this start)
+osoe: PE 2 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (25631 us of this start)
+osoe: PE 5 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (14090 us of this start)
+osoe: PE 1 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (22156 us of this start)
+osoe: PE 15 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (19349 us of this start)
+osoe: PE 6 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (24455 us of this start)
+osoe: PE 13 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (16636 us of this start)
+osoe: PE 3 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (22955 us of this start)
+osoe: PE 0 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (24377 us of this start)
+osoe: PE 7 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (16248 us of this start)
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 348872
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 348872
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 348872
+osoe: PE 8 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (25580 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 348872
+osoe: PE 9 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (15252 us of this start)
+osoe: PE 10 of 16 (local 0 of 2): segment /dev/shm/osoe.292.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (24859 us of this start)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 348872
+osoe: PE 11 of 16 (local 1 of 2): segment /dev/shm/osoe.292.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 93800 ns, a message cost of 30971 ns, 2725565694 bytes a second (17288 us of this start)
+1: Entering int test
+1: Finished int test
+1: Entering long test
+1: Finished long test
+1: Entering longlong test
+1: Finished longlong test
+1: Entering float test
+1: Finished float test
+1: Entering double test
+1: Finished double test
+13: Entering int test
+13: Finished int test
+13: Entering long test
+13: Finished long test
+13: Entering longlong test
+13: Finished longlong test
+13: Entering float test
+13: Finished float test
+13: Entering double test
+13: Finished double test
+3: Entering int test
+3: Finished int test
+3: Entering long test
+3: Finished long test
+3: Entering longlong test
+3: Finished longlong test
+3: Entering float test
+3: Finished float test
+3: Entering double test
+3: Finished double test
+5: Entering int test
+5: Finished int test
+5: Entering long test
+5: Finished long test
+5: Entering longlong test
+5: Finished longlong test
+5: Entering float test
+5: Finished float test
+5: Entering double test
+5: Finished double test
+15: Entering int test
+15: Finished int test
+15: Entering long test
+15: Finished long test
+15: Entering longlong test
+15: Finished longlong test
+15: Entering float test
+15: Finished float test
+15: Entering double test
+15: Finished double test
+9: Entering int test
+9: Finished int test
+9: Entering long test
+9: Finished long test
+9: Entering longlong test
+9: Finished longlong test
+9: Entering float test
+9: Finished float test
+9: Entering double test
+9: Finished double test
+7: Entering int test
+7: Finished int test
+7: Entering long test
+7: Finished long test
+7: Entering longlong test
+7: Finished longlong test
+7: Entering float test
+7: Finished float test
+7: Entering double test
+7: Finished double test
+11: Entering int test
+11: Finished int test
+11: Entering long test
+11: Finished long test
+11: Entering longlong test
+11: Finished longlong test
+11: Entering float test
+11: Finished float test
+11: Entering double test
+11: Finished double test
+12: Entering int test
+12: Finished int test
+12: Entering long test
+12: Finished long test
+12: Entering longlong test
+12: Finished longlong test
+12: Entering float test
+12: Finished float test
+12: Entering double test
+12: Finished double test
+4: Entering int test
+4: Finished int test
+4: Entering long test
+4: Finished long test
+4: Entering longlong test
+4: Finished longlong test
+4: Entering float test
+4: Finished float test
+4: Entering double test
+4: Finished double test
+2: Entering int test
+2: Finished int test
+2: Entering long test
+2: Finished long test
+2: Entering longlong test
+2: Finished longlong test
+2: Entering float test
+2: Finished float test
+2: Entering double test
+2: Finished double test
+8: Entering int test
+8: Finished int test
+8: Entering long test
+8: Finished long test
+8: Entering longlong test
+8: Finished longlong test
+8: Entering float test
+8: Finished float test
+8: Entering double test
+8: Finished double test
+10: Entering int test
+10: Finished int test
+10: Entering long test
+10: Finished long test
+10: Entering longlong test
+10: Finished longlong test
+10: Entering float test
+10: Finished float test
+10: Entering double test
+10: Finished double test
+14: Entering int test
+14: Finished int test
+14: Entering long test
+14: Finished long test
+14: Entering longlong test
+14: Finished longlong test
+14: Entering float test
+14: Finished float test
+14: Entering double test
+14: Finished double test
+6: Entering int test
+6: Finished int test
+6: Entering long test
+6: Finished long test
+6: Entering longlong test
+6: Finished longlong test
+6: Entering float test
+6: Finished float test
+6: Entering double test
+6: Finished double test
+0: Entering int test
+0: Finished int test
+0: Entering long test
+0: Finished long test
+0: Entering longlong test
+0: Finished longlong test
+0: Entering float test
+0: Finished float test
+0: Entering double test
+0: Finished double test
+salloc: Relinquishing job allocation 292
+# exit 0

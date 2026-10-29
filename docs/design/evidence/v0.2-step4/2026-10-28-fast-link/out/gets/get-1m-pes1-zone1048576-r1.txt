@@ -1,0 +1,55 @@
+# 22:55:25 nodes=8 pes_per_node=1 OSOE_GET_LANDING_BYTES=1048576
+# ~/osoe/build/release/kit/multistream get 1048576 10
+salloc: Granted job allocation 112
+salloc: Nodes slurm-node-[01-08] are ready for job
+osoe: node 1 connected its mesh in 1420 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 2 connected its mesh in 1489 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 2 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 4 connected its mesh in 1795 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 4 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 7 connected its mesh in 1768 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 7 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 connected its mesh in 2494 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 3 connected its mesh in 1970 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 3 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 6 connected its mesh in 2290 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 6 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 5 connected its mesh in 2793 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+osoe: node 5 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: PE 1 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (33491 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 7 connections to 158229
+osoe: PE 0 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (32416 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 7 connections to 158229
+osoe: PE 4 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.4.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 4 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (32965 us of this start)
+osoe: node 4 limits the unsent bytes of each of its 7 connections to 158229
+osoe: PE 5 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.5.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 5 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (31721 us of this start)
+osoe: node 5 limits the unsent bytes of each of its 7 connections to 158229
+osoe: node 6 limits the unsent bytes of each of its 7 connections to 158229
+osoe: PE 6 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.6.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 6 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (32581 us of this start)
+osoe: PE 7 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.7.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 7 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (32990 us of this start)
+osoe: node 3 limits the unsent bytes of each of its 7 connections to 158229
+osoe: PE 3 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.3.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 3 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (32399 us of this start)
+osoe: PE 2 of 8 (local 0 of 1): segment /dev/shm/osoe.112.0.2.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 2 of 8; link measured: a hop of 98881 ns, a message cost of 59529 ns, 1236168076 bytes a second (33335 us of this start)
+osoe: node 2 limits the unsent bytes of each of its 7 connections to 158229
+osoe: node 7 limits the unsent bytes of each of its 7 connections to 158229
+multistream node=0 pes=1 mib_per_s=1668.2 progress_cpu_s=8.037 program_cpu_s=2.775 progress_cpu_s_per_gib=0.4933 program_sleeps=127872 sleeps_per_64kib=0.479 peers_in_calls=0.878 peers_in_calls_with_quiets=1.000 quiet_share=0.121 peers_window_s=10.000
+multistream node=0 peer_mib=2384.0,2384.0,2384.0,2383.0,2383.0,2383.0,2383.0
+multistream node=1 pes=1 mib_per_s=1617.3 progress_cpu_s=8.342 program_cpu_s=2.543 progress_cpu_s_per_gib=0.5281 program_sleeps=118239 sleeps_per_64kib=0.457 peers_in_calls=0.881 peers_in_calls_with_quiets=1.000 quiet_share=0.119 peers_window_s=10.001
+multistream node=1 peer_mib=2310.0,2311.0,2311.0,2311.0,2311.0,2311.0,2310.0
+multistream node=2 pes=1 mib_per_s=1581.1 progress_cpu_s=8.497 program_cpu_s=2.501 progress_cpu_s_per_gib=0.5503 program_sleeps=114292 sleeps_per_64kib=0.452 peers_in_calls=0.884 peers_in_calls_with_quiets=1.000 quiet_share=0.115 peers_window_s=10.000
+multistream node=2 peer_mib=2259.0,2259.0,2259.0,2259.0,2259.0,2259.0,2259.0
+multistream node=3 pes=1 mib_per_s=1653.2 progress_cpu_s=7.901 program_cpu_s=2.724 progress_cpu_s_per_gib=0.4894 program_sleeps=131480 sleeps_per_64kib=0.497 peers_in_calls=0.876 peers_in_calls_with_quiets=1.000 quiet_share=0.124 peers_window_s=10.000
+multistream node=3 peer_mib=2362.0,2362.0,2362.0,2362.0,2362.0,2362.0,2362.0
+multistream node=4 pes=1 mib_per_s=1635.0 progress_cpu_s=8.068 program_cpu_s=2.618 progress_cpu_s_per_gib=0.5052 program_sleeps=124180 sleeps_per_64kib=0.475 peers_in_calls=0.880 peers_in_calls_with_quiets=1.000 quiet_share=0.120 peers_window_s=10.000
+multistream node=4 peer_mib=2336.0,2336.0,2336.0,2336.0,2336.0,2336.0,2336.0
+multistream node=5 pes=1 mib_per_s=1615.8 progress_cpu_s=8.225 program_cpu_s=2.514 progress_cpu_s_per_gib=0.5212 program_sleeps=125385 sleeps_per_64kib=0.485 peers_in_calls=0.882 peers_in_calls_with_quiets=1.000 quiet_share=0.118 peers_window_s=10.000
+multistream node=5 peer_mib=2309.0,2309.0,2308.0,2308.0,2308.0,2309.0,2309.0
+multistream node=6 pes=1 mib_per_s=1595.3 progress_cpu_s=8.136 program_cpu_s=2.591 progress_cpu_s_per_gib=0.5221 program_sleeps=118111 sleeps_per_64kib=0.463 peers_in_calls=0.882 peers_in_calls_with_quiets=1.000 quiet_share=0.118 peers_window_s=10.000
+multistream node=6 peer_mib=2280.0,2279.0,2279.0,2279.0,2279.0,2279.0,2280.0
+multistream node=7 pes=1 mib_per_s=1608.5 progress_cpu_s=8.057 program_cpu_s=2.645 progress_cpu_s_per_gib=0.5129 program_sleeps=122316 sleeps_per_64kib=0.475 peers_in_calls=0.880 peers_in_calls_with_quiets=1.000 quiet_share=0.120 peers_window_s=10.000
+multistream node=7 peer_mib=2299.0,2298.0,2298.0,2298.0,2298.0,2298.0,2298.0
+multistream job mode=get bytes=1048576 seconds=10.00 nodes=8 pes=8 pes_per_node=1 helpers=unset mib_per_s=12974.6 progress_cpu_s_per_gib=0.5150
+salloc: Relinquishing job allocation 112
+# exit 0

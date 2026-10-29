@@ -1,0 +1,28 @@
+# 2026-10-28T23:19:02Z session-3.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 900 s
+23:19:02 exit 0 cpus-allowed.txt:  bash -c echo "$(hostname) task ${SLURM_PROCID:-?}: $(grep Cpus_allowed_list /proc/self/status)"
+# 2026-10-28T23:19:02Z helpers.sh on slurm-controller
+# kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4
+# launcher srun, build ~/osoe/build/release, nodes 8, OSOE_NO_PROGRESS_TIMEOUT=60, SHMEM_DEBUG=1, timeout 120 s
+23:19:13 exit 0 put-1m-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream put 1048576 10
+23:19:23 exit 0 put-64k-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream put 65536 10
+23:19:34 exit 0 get-1m-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream get 1048576 10
+23:19:54 exit 0 mailbox-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:19:56 exit 0 collectives-pes8-h2-r1.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+23:20:06 exit 0 put-1m-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 1048576 10
+23:20:17 exit 0 put-64k-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 65536 10
+23:20:27 exit 0 get-1m-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream get 1048576 10
+23:20:48 exit 0 mailbox-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:20:50 exit 0 collectives-pes8-h0-r1.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+23:21:00 exit 0 put-1m-pes8-h0-r2.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 1048576 10
+23:21:10 exit 0 put-64k-pes8-h0-r2.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream put 65536 10
+23:21:21 exit 0 get-1m-pes8-h0-r2.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/kit/multistream get 1048576 10
+23:21:41 exit 0 mailbox-pes8-h0-r2.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:21:43 exit 0 collectives-pes8-h0-r2.txt: OSOE_PROGRESS_HELPERS=0 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+23:21:54 exit 0 put-1m-pes8-h2-r2.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream put 1048576 10
+23:22:04 exit 0 put-64k-pes8-h2-r2.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream put 65536 10
+23:22:15 exit 0 get-1m-pes8-h2-r2.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/kit/multistream get 1048576 10
+23:22:35 exit 0 mailbox-pes8-h2-r2.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+23:22:37 exit 0 collectives-pes8-h2-r2.txt: OSOE_PROGRESS_HELPERS=2 ~/osoe/build/release/tools/bench/osoe-bench quick barrier collectives
+# done 23:22:37

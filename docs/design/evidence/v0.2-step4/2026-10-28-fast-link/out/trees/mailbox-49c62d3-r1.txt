@@ -1,0 +1,52 @@
+# 23:05:04 nodes=2 pes_per_node=2 
+# ~/osoe/build/trees/49c62d3/build/release/tools/pacer/osoe-pacer --seconds 20 mailbox
+salloc: Granted job allocation 156
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.156.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 154539 ns, a message cost of 0 ns, 766446150 bytes a second (6372 us of this start)
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.156.0.0.0, heap 268435456 bytes at 0x100000000000, node 0 of 2; link measured: a hop of 154539 ns, a message cost of 0 ns, 766446150 bytes a second (12189 us of this start)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 98105
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.156.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 154539 ns, a message cost of 0 ns, 766446150 bytes a second (12101 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 98105
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.156.0.1.0, heap 268435456 bytes at 0x100000000000, node 1 of 2; link measured: a hop of 154539 ns, a message cost of 0 ns, 766446150 bytes a second (367 us of this start)
+osoe-pacer 0.1.0 library=osoe openshmem=1.6 thread=serialized pes=4 nodes=2 layout=2,2 hosts=slurm-node-[01-02] heap=256m memory=128m seed=1 report=5 exercises=mailbox
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 seconds=20 memory=1.3k
+mailbox node_mate_us median=211.5 p99=211.5
+mailbox round_trip_us median=125.2 p99=512.0 pairs=2
+mailbox t=0.0 round=1 messages=16 messages_per_s=76544 mib_per_s=10.3 send_s=0.000 wait_s=0.000 check_s=0.000 step_s=0.000 failures=0
+library nodes=2 bytes_sent=82664 gets_nonblocking=0 landing_full=0 reserve_stalls=5 wakes_sent=482 barrier_ns=15790903
+mailbox node_mate_us median=152.1 p99=297.5
+mailbox round_trip_us median=117.2 p99=187.1 pairs=2
+mailbox t=0.0 round=9 messages=144 messages_per_s=76707 mib_per_s=10.6 send_s=0.002 wait_s=0.000 check_s=0.000 step_s=0.002 failures=0
+library nodes=2 bytes_sent=101304 gets_nonblocking=0 landing_full=0 reserve_stalls=5 wakes_sent=542 barrier_ns=435302
+mailbox node_mate_us median=130.9 p99=361.8
+mailbox round_trip_us median=104.7 p99=159.8 pairs=2
+mailbox t=0.1 round=73 messages=1168 messages_per_s=85765 mib_per_s=11.2 send_s=0.011 wait_s=0.000 check_s=0.000 step_s=0.012 failures=0
+library nodes=2 bytes_sent=253760 gets_nonblocking=0 landing_full=0 reserve_stalls=45 wakes_sent=880 barrier_ns=322456
+mailbox node_mate_us median=129.9 p99=286.9
+mailbox round_trip_us median=101.8 p99=167.7 pairs=2
+mailbox t=0.2 round=585 messages=9360 messages_per_s=86532 mib_per_s=11.3 send_s=0.091 wait_s=0.002 check_s=0.003 step_s=0.095 failures=0
+library nodes=2 bytes_sent=1436040 gets_nonblocking=0 landing_full=0 reserve_stalls=377 wakes_sent=3366 barrier_ns=444065
+mailbox node_mate_us median=123.4 p99=264.6
+mailbox round_trip_us median=102.9 p99=151.5 pairs=2
+mailbox t=0.9 round=4681 messages=74896 messages_per_s=91421 mib_per_s=11.8 send_s=0.684 wait_s=0.021 check_s=0.017 step_s=0.717 failures=0
+library nodes=2 bytes_sent=10761776 gets_nonblocking=0 landing_full=0 reserve_stalls=2623 wakes_sent=21393 barrier_ns=328298
+mailbox node_mate_us median=108.5 p99=239.1
+mailbox round_trip_us median=106.4 p99=169.2 pairs=2
+mailbox t=5.7 round=33250 messages=532000 messages_per_s=96143 mib_per_s=12.5 send_s=4.494 wait_s=0.152 check_s=0.112 step_s=4.754 failures=0
+library nodes=2 bytes_sent=73550600 gets_nonblocking=0 landing_full=0 reserve_stalls=18594 wakes_sent=131154 barrier_ns=263830
+mailbox node_mate_us median=106.9 p99=242.7
+mailbox round_trip_us median=103.9 p99=163.5 pairs=2
+mailbox t=10.6 round=63294 messages=1012704 messages_per_s=97298 mib_per_s=12.6 send_s=4.667 wait_s=0.165 check_s=0.117 step_s=4.941 failures=0
+library nodes=2 bytes_sent=77241376 gets_nonblocking=0 landing_full=0 reserve_stalls=19087 wakes_sent=135910 barrier_ns=199438
+mailbox node_mate_us median=104.8 p99=233.4
+mailbox round_trip_us median=107.0 p99=266.3 pairs=2
+mailbox t=15.5 round=93699 messages=1499184 messages_per_s=99648 mib_per_s=12.9 send_s=4.608 wait_s=0.162 check_s=0.110 step_s=4.882 failures=0
+library nodes=2 bytes_sent=77832312 gets_nonblocking=0 landing_full=0 reserve_stalls=18240 wakes_sent=133097 barrier_ns=381346
+mailbox node_mate_us median=106.2 p99=237.0
+mailbox round_trip_us median=114.3 p99=167.6 pairs=2
+mailbox t=20.0 round=121567 messages=1945072 messages_per_s=98987 mib_per_s=12.9 send_s=4.253 wait_s=0.152 check_s=0.100 step_s=4.505 failures=0
+library nodes=2 bytes_sent=71262504 gets_nonblocking=0 landing_full=0 reserve_stalls=16341 wakes_sent=120888 barrier_ns=199020
+summary mailbox rounds=121567 messages=1945072 seconds=19.9 messages_per_s=97709 mib_per_s=12.7 failures=0
+osoe-pacer failures=0 seconds=20.1
+salloc: Relinquishing job allocation 156
+# exit 0

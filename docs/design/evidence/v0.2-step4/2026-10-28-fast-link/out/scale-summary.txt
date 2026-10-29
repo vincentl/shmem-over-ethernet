@@ -1,0 +1,166 @@
+== ~/out/scale
+jobs: 173, of which 2 failed (run.txt)
+
+beside each case: the link its jobs measured at start-up, as PE 0 took it, and the
+unsent limit node 0 set from it (SHMEM_DEBUG), median (range) over its rounds
+
+osoe-bench: each line's median microseconds over its trips, the median of the
+rounds' (range, count); a job's own lines are its median of 200 trips under
+`quick`, of 2,000 without
+  bench pes=8 h=0
+    barrier                  117 (n=1)
+    reduce bytes=8           161 (n=1)
+    broadcast bytes=8        158 (n=1)
+    reduce bytes=65536       434 (n=1)
+    broadcast bytes=65536    337 (n=1)
+    fcollect block=8         258 (n=1)
+    alltoall block=8         469 (n=1)
+    fcollect block=4096      480 (n=1)
+    alltoall block=4096      1283 (n=1)
+    link 1096 MiB/s, hop 92.7 us, message 26.9 us; unsent limit 147114 B
+  bench pes=16 h=0
+    barrier                  139 (n=1)
+    reduce bytes=8           170 (n=1)
+    broadcast bytes=8        170 (n=1)
+    reduce bytes=65536       466 (n=1)
+    broadcast bytes=65536    345 (n=1)
+    fcollect block=8         264 (n=1)
+    alltoall block=8         756 (n=1)
+    fcollect block=4096      685 (n=1)
+    alltoall block=4096      4527 (n=1)
+    link 2858 MiB/s, hop 48.2 us, message 24.1 us; unsent limit 383648 B
+
+start-up: shmem_init, milliseconds - the slowest PE's, the launcher's spread
+with it, and the fastest's, nearer init's own cost
+  startup pes=1  slowest 102 (100-110, n=3)  fastest 70.1 (68.2-75.9, n=3)
+  startup pes=8  slowest 122 (112-148, n=3)  fastest 69.4 (67.6-72.6, n=3)
+  startup pes=32  slowest 117 (117-136, n=3)  fastest 69.5 (68.7-71.8, n=3)
+
+outcomes
+  mix-h0.txt: osoe-pacer failures=0 seconds=313.3
+  sos-unit-shmem_team_b2b_collectives.txt: failed
+  sos-unit-shmemalign.txt: failed
+
+bench-pes16-h0.txt
+  salloc: Pending job allocation 158
+  salloc: job 158 queued and waiting for resources
+  salloc: job 158 has been allocated resources
+  salloc: Granted job allocation 158
+  salloc: Nodes slurm-node-[01-08] are ready for job
+  osoe: node 6 connected its mesh in 708 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 0 connected its mesh in 1093 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 1134 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 7 connected its mesh in 1109 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 4 connected its mesh in 964 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 2 connected its mesh in 1041 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 3 connected its mesh in 1270 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 5 connected its mesh in 1516 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=128 remote_target=16 local_target=1
+  latency put+quiet target=16 where=remote bytes=8 median_us=84.9 fastest_us=42.8
+  latency get target=16 where=remote bytes=8 median_us=76.0 fastest_us=44.1
+  latency put+quiet target=16 where=remote bytes=64 median_us=78.7 fastest_us=48.6
+  latency get target=16 where=remote bytes=64 median_us=78.6 fastest_us=43.6
+  latency put+quiet target=16 where=remote bytes=512 median_us=79.9 fastest_us=45.8
+  latency get target=16 where=remote bytes=512 median_us=77.8 fastest_us=49.3
+  latency put+quiet target=16 where=remote bytes=4096 median_us=80.2 fastest_us=46.7
+  latency get target=16 where=remote bytes=4096 median_us=79.4 fastest_us=43.0
+  latency put+quiet target=16 where=remote bytes=32768 median_us=119.7 fastest_us=67.4
+  latency get target=16 where=remote bytes=32768 median_us=105.3 fastest_us=70.0
+  latency put+quiet target=16 where=remote bytes=262144 median_us=184.6 fastest_us=140.5
+  latency get target=16 where=remote bytes=262144 median_us=210.1 fastest_us=133.6
+  latency put+quiet target=16 where=remote bytes=1048576 median_us=478.0 fastest_us=429.5
+  latency get target=16 where=remote bytes=1048576 median_us=662.7 fastest_us=453.9
+  latency put+quiet target=1 where=local bytes=8 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=8 median_us=0.0 fastest_us=0.0
+  latency put+quiet target=1 where=local bytes=64 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=64 median_us=0.0 fastest_us=0.0
+  latency put+quiet target=1 where=local bytes=512 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=512 median_us=0.0 fastest_us=0.0
+  latency put+quiet target=1 where=local bytes=4096 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=4096 median_us=0.1 fastest_us=0.1
+  latency put+quiet target=1 where=local bytes=32768 median_us=0.6 fastest_us=0.6
+  latency get target=1 where=local bytes=32768 median_us=0.7 fastest_us=0.7
+  latency put+quiet target=1 where=local bytes=262144 median_us=5.6 fastest_us=4.7
+  latency get target=1 where=local bytes=262144 median_us=6.0 fastest_us=5.8
+  latency put+quiet target=1 where=local bytes=1048576 median_us=30.9 fastest_us=27.2
+  latency get target=1 where=local bytes=1048576 median_us=31.8 fastest_us=31.2
+  bandwidth put target=16 where=remote bytes=4096 mib_per_s=2651.5
+  bandwidth put target=16 where=remote bytes=65536 mib_per_s=2712.2
+  bandwidth put target=16 where=remote bytes=262144 mib_per_s=2699.9
+  bandwidth put target=16 where=remote bytes=1048576 mib_per_s=2705.2
+  bandwidth put target=16 where=remote bytes=4194304 mib_per_s=2709.1
+  bandwidth put target=1 where=local bytes=4096 mib_per_s=92673.2
+  bandwidth put target=1 where=local bytes=65536 mib_per_s=52259.2
+  bandwidth put target=1 where=local bytes=262144 mib_per_s=53838.7
+  bandwidth put target=1 where=local bytes=1048576 mib_per_s=32016.5
+  bandwidth put target=1 where=local bytes=4194304 mib_per_s=14234.9
+  atomic fetch-add target=16 where=remote median_us=77.5 fastest_us=40.9
+  atomic fetch-add target=1 where=local median_us=0.0 fastest_us=0.0
+  pairs pe=0 target=64 bytes=1048576 mib_per_s=444.6
+  pairs pe=1 target=65 bytes=1048576 mib_per_s=152.1
+  pairs pe=2 target=66 bytes=1048576 mib_per_s=481.4
+  pairs pe=3 target=67 bytes=1048576 mib_per_s=140.1
+  pairs pe=4 target=68 bytes=1048576 mib_per_s=180.4
+  pairs pe=5 target=69 bytes=1048576 mib_per_s=137.7
+
+bench-pes8-h0.txt
+  salloc: Granted job allocation 157
+  salloc: Nodes slurm-node-[01-08] are ready for job
+  osoe: node 2 connected its mesh in 1440 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 1 connected its mesh in 1919 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 0 connected its mesh in 2374 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 4 connected its mesh in 2335 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 5 connected its mesh in 2675 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 7 connected its mesh in 2521 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 6 connected its mesh in 2359 us: 8 wires answered and 6 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe: node 3 connected its mesh in 2243 us: 6 wires answered and 8 called, in 4 slots of 100 us, 8 calls in flight at most
+  osoe-bench pes=64 remote_target=8 local_target=1
+  latency put+quiet target=8 where=remote bytes=8 median_us=73.8 fastest_us=41.3
+  latency get target=8 where=remote bytes=8 median_us=71.2 fastest_us=41.2
+  latency put+quiet target=8 where=remote bytes=64 median_us=77.2 fastest_us=40.2
+  latency get target=8 where=remote bytes=64 median_us=77.4 fastest_us=40.0
+  latency put+quiet target=8 where=remote bytes=512 median_us=78.3 fastest_us=35.5
+  latency get target=8 where=remote bytes=512 median_us=78.5 fastest_us=36.6
+  latency put+quiet target=8 where=remote bytes=4096 median_us=82.6 fastest_us=45.2
+  latency get target=8 where=remote bytes=4096 median_us=81.7 fastest_us=50.5
+  latency put+quiet target=8 where=remote bytes=32768 median_us=117.7 fastest_us=66.0
+  latency get target=8 where=remote bytes=32768 median_us=104.6 fastest_us=70.9
+  latency put+quiet target=8 where=remote bytes=262144 median_us=184.1 fastest_us=131.7
+  latency get target=8 where=remote bytes=262144 median_us=158.1 fastest_us=125.8
+  latency put+quiet target=8 where=remote bytes=1048576 median_us=485.5 fastest_us=439.5
+  latency get target=8 where=remote bytes=1048576 median_us=482.4 fastest_us=414.4
+  latency put+quiet target=1 where=local bytes=8 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=8 median_us=0.0 fastest_us=0.0
+  latency put+quiet target=1 where=local bytes=64 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=64 median_us=0.0 fastest_us=0.0
+  latency put+quiet target=1 where=local bytes=512 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=512 median_us=0.0 fastest_us=0.0
+  latency put+quiet target=1 where=local bytes=4096 median_us=0.1 fastest_us=0.1
+  latency get target=1 where=local bytes=4096 median_us=0.1 fastest_us=0.1
+  latency put+quiet target=1 where=local bytes=32768 median_us=0.7 fastest_us=0.6
+  latency get target=1 where=local bytes=32768 median_us=0.7 fastest_us=0.7
+  latency put+quiet target=1 where=local bytes=262144 median_us=4.8 fastest_us=4.7
+  latency get target=1 where=local bytes=262144 median_us=6.0 fastest_us=5.8
+  latency put+quiet target=1 where=local bytes=1048576 median_us=33.5 fastest_us=33.1
+  latency get target=1 where=local bytes=1048576 median_us=34.8 fastest_us=34.2
+  bandwidth put target=8 where=remote bytes=4096 mib_per_s=2137.6
+  bandwidth put target=8 where=remote bytes=65536 mib_per_s=2709.1
+  bandwidth put target=8 where=remote bytes=262144 mib_per_s=2707.1
+  bandwidth put target=8 where=remote bytes=1048576 mib_per_s=2707.8
+  bandwidth put target=8 where=remote bytes=4194304 mib_per_s=2708.7
+  bandwidth put target=1 where=local bytes=4096 mib_per_s=90845.3
+  bandwidth put target=1 where=local bytes=65536 mib_per_s=51576.8
+  bandwidth put target=1 where=local bytes=262144 mib_per_s=53178.9
+  bandwidth put target=1 where=local bytes=1048576 mib_per_s=32978.4
+  bandwidth put target=1 where=local bytes=4194304 mib_per_s=14193.8
+  atomic fetch-add target=8 where=remote median_us=74.0 fastest_us=41.6
+  atomic fetch-add target=1 where=local median_us=0.0 fastest_us=0.0
+  pairs pe=0 target=32 bytes=1048576 mib_per_s=268.2
+  pairs pe=1 target=33 bytes=1048576 mib_per_s=342.0
+  pairs pe=2 target=34 bytes=1048576 mib_per_s=292.4
+  pairs pe=3 target=35 bytes=1048576 mib_per_s=269.4
+  pairs pe=4 target=36 bytes=1048576 mib_per_s=271.8
+  pairs pe=5 target=37 bytes=1048576 mib_per_s=846.2
+  pairs pe=6 target=38 bytes=1048576 mib_per_s=253.6
+  pairs pe=7 target=39 bytes=1048576 mib_per_s=253.3
+  pairs pe=8 target=40 bytes=1048576 mib_per_s=215.4

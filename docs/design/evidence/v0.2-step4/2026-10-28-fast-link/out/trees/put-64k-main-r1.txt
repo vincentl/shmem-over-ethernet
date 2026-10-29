@@ -1,0 +1,21 @@
+# 23:02:48 nodes=2 pes_per_node=2 
+# ~/osoe/build/release/kit/multistream put 65536 10
+salloc: Granted job allocation 145
+salloc: Nodes slurm-node-[01-02] are ready for job
+osoe: node 0 connected its mesh in 451 us: 0 wires answered and 2 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 0 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 1 connected its mesh in 552 us: 2 wires answered and 0 called, in 1 slots of 100 us, 8 calls in flight at most
+osoe: node 1 probes its connections with TCP keepalive at 60,10,6, and ends the job on a peer that acknowledges nothing for 120 s (OSOE_KEEPALIVE)
+osoe: node 0 limits the unsent bytes of each of its 1 connections to 245516
+osoe: PE 0 of 4 (local 0 of 2): segment /dev/shm/osoe.145.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 138065 ns, a message cost of 0 ns, 1918094081 bytes a second (11818 us of this start)
+osoe: PE 1 of 4 (local 1 of 2): segment /dev/shm/osoe.145.0.0.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 0 of 2; link measured: a hop of 138065 ns, a message cost of 0 ns, 1918094081 bytes a second (1089 us of this start)
+osoe: PE 2 of 4 (local 0 of 2): segment /dev/shm/osoe.145.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 138065 ns, a message cost of 0 ns, 1918094081 bytes a second (11653 us of this start)
+osoe: node 1 limits the unsent bytes of each of its 1 connections to 245516
+osoe: PE 3 of 4 (local 1 of 2): segment /dev/shm/osoe.145.0.1.0, heap 268435456 bytes at 0x100000000000, landing zone 1048576 bytes, node 1 of 2; link measured: a hop of 138065 ns, a message cost of 0 ns, 1918094081 bytes a second (244 us of this start)
+multistream node=0 pes=2 mib_per_s=2587.4 progress_cpu_s=9.355 program_cpu_s=2.999 progress_cpu_s_per_gib=0.3702 program_sleeps=220672 sleeps_per_64kib=0.533 peers_in_calls=0.959 peers_in_calls_with_quiets=1.000 quiet_share=0.102 peers_window_s=10.000
+multistream node=0 peer_mib=25875.4
+multistream node=1 pes=2 mib_per_s=1981.3 progress_cpu_s=9.960 program_cpu_s=2.194 progress_cpu_s_per_gib=0.5147 program_sleeps=168570 sleeps_per_64kib=0.532 peers_in_calls=0.980 peers_in_calls_with_quiets=1.000 quiet_share=0.077 peers_window_s=10.000
+multistream node=1 peer_mib=19814.2
+multistream job mode=put bytes=65536 seconds=10.00 nodes=2 pes=4 pes_per_node=2 helpers=unset mib_per_s=4568.7 progress_cpu_s_per_gib=0.4329
+salloc: Relinquishing job allocation 145
+# exit 0

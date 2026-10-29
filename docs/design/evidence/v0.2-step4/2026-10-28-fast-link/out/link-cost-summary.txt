@@ -1,0 +1,14 @@
+== ~/out/link-cost
+jobs: 41, of which 0 failed (run.txt)
+
+start-up: shmem_init, milliseconds - the slowest PE's, the launcher's spread
+with it, and the fastest's, nearer init's own cost
+  link-first pes=None  slowest 79.1 (n=1)  fastest 61.2 (n=1)
+  startup-measured-nodes2 pes=1  slowest 63.0 (55.5-83.2, n=5)  fastest 55.3 (53.8-57.5, n=5)
+  startup-measured-nodes2 pes=8  slowest 79.0 (55.3-106, n=5)  fastest 58.8 (52.7-66.8, n=5)
+  startup-measured-nodes3 pes=1  slowest 78.7 (74.4-106, n=5)  fastest 70.0 (65.5-75.5, n=5)
+  startup-measured-nodes3 pes=8  slowest 100 (85.9-132, n=5)  fastest 68.8 (64.7-71.3, n=5)
+  startup-set-nodes2 pes=1  slowest 70.1 (48.8-72.4, n=5)  fastest 46.2 (44.4-50.3, n=5)
+  startup-set-nodes2 pes=8  slowest 65.8 (53.0-66.7, n=5)  fastest 48.6 (44.4-50.4, n=5)
+  startup-set-nodes3 pes=1  slowest 64.5 (56.5-91.6, n=5)  fastest 51.3 (44.4-55.2, n=5)
+  startup-set-nodes3 pes=8  slowest 65.9 (65.9-78.6, n=5)  fastest 48.6 (45.2-51.1, n=5)

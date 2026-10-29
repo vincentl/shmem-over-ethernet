@@ -1,0 +1,27 @@
+# 2026-10-28T22:38:56Z session-3.sh on slurm-controller: kit 2dd3a623de7a4e67783b4d90d24964e6761a9bb4, 8 nodes,
+# launcher srun, sections: wait setup floor link-cost window many-pes gets behind trees scale binding pack
+22:38:56 0 wait: started, 4 min planned
+ 0 wait      done   22:39:04 UTC, exit 0, 0.1 min (planned 4), 0 jobs, 0 failed
+22:39:04 1 setup: started, 5 min planned
+ 1 setup     done   22:43:16 UTC, exit 0, 4.2 min (planned 5), 3 jobs, 0 failed
+22:43:16 2 floor: started, 1 min planned
+ 2 floor     done   22:44:12 UTC, exit 0, 0.9 min (planned 1), 0 jobs, 0 failed
+22:44:12 3 link-cost: started, 0.2 min planned
+ 3 link-cost done   22:44:21 UTC, exit 0, 0.1 min (planned 0.2), 41 jobs, 0 failed
+22:44:22 4 window: started, 2 min planned
+ 4 window    done   22:46:29 UTC, exit 0, 2.1 min (planned 2), 20 jobs, 0 failed
+22:46:29 5 many-pes: started, 7 min planned
+ 5 many-pes  done   22:53:54 UTC, exit 0, 7.4 min (planned 7), 23 jobs, 0 failed
+22:53:55 6 gets: started, 2.3 min planned
+ 6 gets      done   22:56:07 UTC, exit 0, 2.2 min (planned 2.3), 15 jobs, 0 failed
+22:56:07 7 behind: started, 5 min planned
+ 7 behind    done   23:00:24 UTC, exit 0, 4.3 min (planned 5), 20 jobs, 0 failed
+23:00:24 8 trees: started, 6 min planned
+ 8 trees     done   23:05:24 UTC, exit 0, 5.0 min (planned 6), 20 jobs, 0 failed
+23:05:24 9 scale: started, 9.5 min planned
+ 9 scale     done   23:14:59 UTC, exit 0, 9.6 min (planned 9.5), 173 jobs, 2 failed
+23:14:59 10 binding: started, 8 min planned
+10 binding   done   23:23:04 UTC, exit 0, 8.1 min (planned 8), 42 jobs, 0 failed
+23:23:04 11 pack: started, 2 min planned
+11 pack      done   23:23:05 UTC, exit 0, 0.0 min (planned 2), 0 jobs, 0 failed
+the chain ended at 23:23:05, 44.1 min: ~/out/summary.txt
