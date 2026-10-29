@@ -702,11 +702,11 @@ endforeach()
 if(OSOE_INTERNODE)
   # OSOE_COLLECTIVE_PIPELINE too (§5.8): the pieces each lead keeps in flight
   # place them in the internal region, so a node with another number puts a piece
-  # where its parent keeps another. Two nodes, the second's lead given 4 to the
-  # first's default 2; and outside 1 to 8, or not a number, refused at init.
+  # where its parent keeps another. Two nodes, the second's lead given 2 against
+  # the first's default 8; and outside 1 to 8, or not a number, refused at init.
   osoe_refusal_test(shmem.job.disagree.pipeline 2 0
     LAUNCH -n 2 -m 0,1 -e 1:OSOE_COLLECTIVE_PIPELINE=2
-    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=2; node 0 has 4"
+    PATTERNS "node 1 [(]or a node below it[)] has OSOE_COLLECTIVE_PIPELINE=2; node 0 has 8"
              "node 1: the rendezvous lost node 0, its parent in the rendezvous tree"
     PROGRAM $<TARGET_FILE:shmem_test_job>)
   osoe_internode_label(shmem.job.disagree.pipeline)
@@ -730,7 +730,7 @@ osoe_refusal_test(shmem.collective-fanout.local-disagree 2 0
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 osoe_refusal_test(shmem.collective-pipeline.local-disagree 2 0
   LAUNCH -n 2 -e 1:OSOE_COLLECTIVE_PIPELINE=2
-  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 4, this PE has 2"
+  PATTERNS "osoe: PE 1: OSOE_COLLECTIVE_PIPELINE differs between PEs: the local lead has 8, this PE has 2"
            "osoe: PE 0: another local PE failed during rendezvous"
   PROGRAM $<TARGET_FILE:shmem_test_rma>)
 
@@ -1112,7 +1112,8 @@ if(OSOE_INTERNODE)
   # handed by the lead to the helper that owns it; a data wire held back at its
   # caller and at its callee, each told by the other node's notice and then
   # made; one held past the deadlock detector's quiet, which must not take it
-  # for a deadlock; one held past OSOE_NO_PROGRESS_TIMEOUT, which ends the job
+  # for a deadlock; one held while osoe-stat reads a PE's wait for it, its
+  # blocked kind the wire to a node, connecting; one held past OSOE_NO_PROGRESS_TIMEOUT, which ends the job
   # naming it; a global exit while every other PE's first allocation waits for
   # a wire held back, which ends the job with the caller's status
   # (data_wire_model.py's STATUS); and the count of data wires a node may make
@@ -1124,7 +1125,7 @@ if(OSOE_INTERNODE)
   target_link_libraries(shmem_test_data_wires PRIVATE osoe)
   osoe_warnings(shmem_test_data_wires)
   foreach(case "ring|0,1,2,3,4|0" "skip|0,1,2,3,4|0" "ring|0,0,1,1,2,2,3,3|2"
-               "stall-caller|0,1|0" "stall-callee|0,1|0" "stall-long|0,1|0"
+               "stall-caller|0,1|0" "stall-callee|0,1|0" "stall-long|0,1|0" "stall-stat|0,1|0"
                "stall-timeout|0,1|0" "exit|0,1,2|0" "budget-fits|0,1,2,3|0"
                "budget-refused|0,1,2,3|0" "budget-eager|0,1,2,3|0")
     string(REPLACE "|" ";" parts "${case}")
@@ -1140,7 +1141,8 @@ if(OSOE_INTERNODE)
       endif()
     endif()
     add_test(NAME ${name}
-      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/data-wires.sh $<TARGET_FILE:osoe-launch>
+      COMMAND ${CMAKE_COMMAND} -E env OSOE_TEST_STAT=$<TARGET_FILE:osoe-stat>
+              sh ${CMAKE_CURRENT_SOURCE_DIR}/data-wires.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_data_wires> ${mode} ${map} ${helpers})
     set_tests_properties(${name} PROPERTIES LABELS "tier2" TIMEOUT 90
       PASS_REGULAR_EXPRESSION "DATA WIRES OK")
@@ -2215,15 +2217,18 @@ if(OSOE_INTERNODE)
   osoe_internode_label(shmem.keepalive.loopback-off.0-1)
   osoe_internode_label(shmem.keepalive.set-on.0-1)
 endif()
-# OSOE_PROGRESS_HELPERS=auto, the author's rule (P36; helpers-auto.sh), as each
-# node's lead says it under SHMEM_DEBUG: two on three nodes, none on two, and
-# none on a node whose PEs outnumber its CPUs (OSOE_TEST_ONLINE_CPUS) beside two
-# on its peers, data moving between every pair of PEs - left out under
-# ThreadSanitizer, as shmem.internode's maps are, since those puts land in a
-# heap a local thread holds through an ordering in another process (§8.2). And
-# the hook refused where it is no count of CPUs.
+# OSOE_PROGRESS_HELPERS=auto, the author's rule (P36; helpers-auto.sh) and the
+# default since 2026-10-28, as each node's lead says it under SHMEM_DEBUG: two on
+# three nodes, by name and with the setting unset; none on two; none on a node
+# whose PEs outnumber its CPUs (OSOE_TEST_ONLINE_CPUS) beside two on its peers,
+# each logical node told it is a machine of its own; and none on any where the
+# machine's PEs, all its logical nodes' (OSOE_MACHINE_PES), outnumber its CPUs -
+# data moving between every pair of PEs - left out under ThreadSanitizer, as
+# shmem.internode's maps are, since those puts land in a heap a local thread
+# holds through an ordering in another process (§8.2). And the hooks refused
+# where they are no count of CPUs, or of the job's PEs.
 if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
-  foreach(mode three two crowded)
+  foreach(mode three default two crowded machine)
     add_test(NAME shmem.helpers.auto.${mode}
       COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/helpers-auto.sh $<TARGET_FILE:osoe-launch>
               $<TARGET_FILE:shmem_test_internode> ${mode})
@@ -2237,6 +2242,12 @@ osoe_refusal_test(shmem.start-up.test-online-cpus.invalid 2 0
   LAUNCH -n 2
   PATTERNS "osoe: PE 0: OSOE_TEST_ONLINE_CPUS='0' is not a count of CPUs from 1 to 65536"
            "osoe: PE 1: OSOE_TEST_ONLINE_CPUS='0' is not a count of CPUs from 1 to 65536"
+  PROGRAM $<TARGET_FILE:shmem_test_init>)
+osoe_refusal_test(shmem.start-up.machine-pes.invalid 2 0
+  ENV OSOE_PROGRESS_HELPERS=auto
+  LAUNCH -n 2 -e 0:OSOE_MACHINE_PES=3 -e 1:OSOE_MACHINE_PES=3
+  PATTERNS "osoe: PE 0: OSOE_MACHINE_PES='3' is not a count of the job's PEs from 1 to 2"
+           "osoe: PE 1: OSOE_MACHINE_PES='3' is not a count of the job's PEs from 1 to 2"
   PROGRAM $<TARGET_FILE:shmem_test_init>)
 # A helper that never answers its stop - OSOE_TEST_DEAF_HELPER, the defect
 # helper_request_model.py's `deaf` case stands for - ends the job at
@@ -3184,7 +3195,7 @@ if(OSOE_INTERNODE AND NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
   add_executable(shmem_test_fixed-shape test-fixed-shape.c)
   target_link_libraries(shmem_test_fixed-shape PRIVATE osoe)
   osoe_warnings(shmem_test_fixed-shape)
-  foreach(case "fanout-4-pipeline-2;4;2" "defaults;8;4")
+  foreach(case "fanout-4-pipeline-2;4;2" "defaults;8;8")
     list(GET case 0 name)
     list(GET case 1 fanout)
     list(GET case 2 pipeline)
@@ -4069,10 +4080,10 @@ endforeach()
 # whichever PE arrives last compares) - each named by the node-mate that meets
 # every member's call, before any result is given out, on one node and on two,
 # where PE 1 is a non-lead of node 0 whose difference no lead's check sees. An
-# alltoall is named after its puts. Without the setting, the
-# default, the first returns as before (off); a node-mate without it is named
-# by the PE that compares (unsaid). And the collectives' own programs, run with
-# the check on, find nothing to name.
+# alltoall is named after its puts. At 0 the first returns as before the check
+# (off); unset, the default since 2026-10-28 (P39), it is named as at 1
+# (default); a node-mate at 0 is named by the PE that compares (unsaid). And
+# the collectives' own programs, run with the check on, find nothing to name.
 add_executable(shmem_test_collective-divergence test-collective-divergence.c)
 target_link_libraries(shmem_test_collective-divergence PRIVATE osoe)
 osoe_warnings(shmem_test_collective-divergence)
@@ -4100,11 +4111,19 @@ foreach(kind kind gather root count sync alltoall)
   endforeach()
 endforeach()
 add_test(NAME shmem.collective-check.off.0-0-0-0
-  COMMAND $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+  COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_COLLECTIVES=0
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
           $<TARGET_FILE:shmem_test_collective-divergence>)
 set_tests_properties(shmem.collective-check.off.0-0-0-0 PROPERTIES LABELS "tier2" TIMEOUT 60
   PASS_REGULAR_EXPRESSION "returned from its collective, which it must not"
   FAIL_REGULAR_EXPRESSION "OSOE_CHECK_COLLECTIVES")
+add_test(NAME shmem.collective-check.default.0-0-0-0
+  COMMAND ${CMAKE_COMMAND} -E env --unset=OSOE_CHECK_COLLECTIVES
+          $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_TEST_DIVERGE=1 --
+          $<TARGET_FILE:shmem_test_collective-divergence>)
+set_tests_properties(shmem.collective-check.default.0-0-0-0 PROPERTIES LABELS "tier2"
+  TIMEOUT 60 PASS_REGULAR_EXPRESSION "${osoe_call_check_named}"
+  FAIL_REGULAR_EXPRESSION "returned from its collective")
 add_test(NAME shmem.collective-check.unsaid.0-0-0-0
   COMMAND ${CMAKE_COMMAND} -E env OSOE_CHECK_COLLECTIVES=1
           $<TARGET_FILE:osoe-launch> -n 4 -m 0,0,0,0 -t 30 -e 1:OSOE_CHECK_COLLECTIVES=0 --

@@ -111,8 +111,8 @@ uint64_t osoe_shape_circulant_cost(uint32_t nodes, uint32_t window, uint64_t byt
  * + 1, or the job's rounds where they are more, so that the fan-out ceiling no
  * longer decides how many nodes Träff's runs on. Its window is the slots a
  * round can have: each round takes `lane_rows` / ceil(log2 nodes) of the lane's
- * rows of `capacity` slots - at the defaults' lane of nine rows 16 pieces on
- * three or four nodes, 12 on five to eight, 8 on nine to sixteen, and the
+ * rows of `capacity` slots - at the defaults' lane of nine rows 32 pieces on
+ * three or four nodes, 24 on five to eight, 16 on nine to sixteen, and the
  * capacity from 17 on, as on the node counts to 512 where a lane has no more.
  * tools/modelcheck/shape_timing.py's choose_shape(), line for line.
  */

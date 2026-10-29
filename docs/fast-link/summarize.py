@@ -67,7 +67,7 @@ CLAIMS_FIELDS = ("last_us", "last_p90_us", "split_us", "split_p90_us", "split_p9
 def places_way(nodes, link):
     """The way the default takes on NODES nodes of one run each, in order, on
     LINK (hop, message, bytes a second) at the default settings - the ceiling
-    8, the capacity 4, the small class 1 KiB: shape_timing.py's choose_places,
+    8, the capacity 8, the small class 1 KiB: shape_timing.py's choose_places,
     which shmem.shape.places-grid holds to the C's; None where the model cannot
     be found beside the kit."""
     here = os.path.dirname(os.path.abspath(__file__))
@@ -76,7 +76,7 @@ def places_way(nodes, link):
         from shape_timing import choose_places
     except ImportError:
         return None
-    return choose_places(nodes, nodes, True, True, min(nodes, 64), link, 8, 4, 1024)
+    return choose_places(nodes, nodes, True, True, min(nodes, 64), link, 8, 8, 1024)
 
 
 def figures(x, n=3):

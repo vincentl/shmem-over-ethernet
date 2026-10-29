@@ -132,9 +132,9 @@ for (nodes, lengths), by_way in sorted(rows.items()):
 if links:
     print()
     print("the link each default's job measured, and the way the default takes on it "
-          '(the ceiling 8, the capacity 4, the small class 1 KiB; shape_timing.py)')
+          '(the ceiling 8, the capacity 8, the small class 1 KiB; shape_timing.py)')
 for nodes, round_, hop, message, rate in sorted(links):
-    way = choose_places(nodes, nodes, True, True, min(nodes, 64), (hop, message, rate), 8, 4,
+    way = choose_places(nodes, nodes, True, True, min(nodes, 64), (hop, message, rate), 8, 8,
                         1024)
     print(f'{nodes:>5} round {round_}: a hop of {hop} ns, a message cost of {message} ns, '
           f'{rate} bytes a second: {way}')

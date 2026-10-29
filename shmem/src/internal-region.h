@@ -523,7 +523,7 @@ static inline uint64_t osoe_internal_exchange_offset(uint32_t fanout, uint32_t m
  * sized by two numbers every node agrees on - the fan-out and the node count,
  * no setting of its own and no word at the rendezvous - and is larger than the
  * fan-out's only where the rounds outnumber it: past 512 nodes at the default
- * fan-out of 8, by a row of 64 KiB at the defaults for each doubling, on every
+ * fan-out of 8, by a row of 128 KiB at the defaults for each doubling, on every
  * lane of every PE. The tree's rows are the first `fanout` + 1 of them, its
  * release row the last of those, wherever the lane ends. The chooser is given
  * this number as the lane it may fit rounds to (collective-shape.h).

@@ -89,7 +89,8 @@ enum osoe_blocked_detail {
     /* Layout 42: a wait for the data wire to the peer node in the detail while
      * it is still being made - H23's data wires made on demand, a stalled one
      * told as any wait is (docs/decisions/2026-10-24.md, the author's answers,
-     * item 4). Kept in this layout for that build: nothing writes it yet. */
+     * item 4): a writer waiting for room in a connection never opened
+     * (transport-internode.c, reserve_waiting). */
     OSOE_BLOCKED_DETAIL_CONNECTING,
 };
 

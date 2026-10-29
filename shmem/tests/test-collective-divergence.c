@@ -14,7 +14,7 @@
  * writes to it first, and that lead finds it differs from its own before it
  * puts a byte (internode-generic.c).
  *
- * And within a node, under OSOE_CHECK_COLLECTIVES=1 (P24), the same two and
+ * And within a node, under OSOE_CHECK_COLLECTIVES (P24, on by default), the same two and
  * three more, OSOE_TEST_DIVERGE_KIND's: `root`, the one PE broadcasting from
  * team rank 1 where the others broadcast from 0; `count`, it reducing half the
  * elements; `sync`, it calling shmem_barrier_all where the others reduce; and

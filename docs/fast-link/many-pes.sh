@@ -5,7 +5,8 @@
 # one other node at once: the case in which each reopening of a connection's
 # buffer wakes every writer asleep for its room (the release fixes' review,
 # S1), which P2's wake of one would replace, and in which a node's lead
-# compares the most calls when OSOE_CHECK_COLLECTIVES is on (P24). At each
+# compares the most calls when OSOE_CHECK_COLLECTIVES is on (P24; the default
+# since 2026-10-28, P39, on what this timed). At each
 # count of PES_PER_NODE, helpers.sh's workloads - multistream's put stream in
 # 1 MiB and 64 KiB blocks and its get stream in 1 MiB blocks, STREAM_SECONDS
 # each, PE 0 printing its node's counters around each window (osoe-stat, the
@@ -22,11 +23,13 @@
 # and 16 to 23 at 32 under the rule then, and 1.0 with a wake of one. Every job
 # has the heap HEAP (SHMEM_SYMMETRIC_SIZE), the same at every count: what a PE
 # holds in /dev/shm is its heap and the library's region beside it, about
-# 15.6 MiB at the defaults, so that 256 PEs ask about 7.9 GiB of a node at
-# 16 MiB, which a c4-standard-16's 29 GiB holds and the development VM's 3.9
-# GiB does not (its dry run takes WAKE_PES=64). Everything at HELPERS, none by
-# default: a pair has one peer, which one helper holds whatever the count, and
-# OSOE_PROGRESS_HELPERS=auto gives a pair none. One round, the author's
+# 25.2 MiB at the defaults (15.6 at the capacity of 4 it had to 2026-10-28), so
+# that 256 PEs ask about 10.3 GiB of a node at 16 MiB (7.9 then), which a
+# c4-standard-16's 29 GiB holds and the development VM's 3.9 GiB does not (its
+# dry run takes WAKE_PES=64). Everything at HELPERS, none by default - set
+# outright, as 0: a pair has one peer, which one helper holds whatever the
+# count, and OSOE_PROGRESS_HELPERS=auto, the library's default since
+# 2026-10-28, gives a pair none. One round, the author's
 # (docs/decisions/2026-10-27.md); with ROUNDS more, the check's two runs change
 # order each round.
 #   PES_PER_NODE ("16 32 64"), WAKE_PES (256; empty, none), HELPERS ("0"),

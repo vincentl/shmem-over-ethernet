@@ -56,8 +56,8 @@ static uint32_t consumed_count;
  * fan-out is chosen from the link under it (collective-shape.h), so the
  * ceiling is the most a call may take - on hundreds of nodes a star of 8 is
  * three levels where 4 is five - and the barrier's and the small class's trees
- * take it whole. It sizes the layout: 2.56 times the tag's internal region at
- * a capacity of 4 (internal-region.h). An RDMA backend would choose 8-16.
+ * take it whole. It sizes the layout: about 4.2 times the tag's internal region
+ * at the capacity of 8 (internal-region.h). An RDMA backend would choose 8-16.
  */
 uint32_t osoe_internode_fanout_default(void)
 {

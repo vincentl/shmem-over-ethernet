@@ -272,7 +272,7 @@ int main(void)
     if (shmem_team_n_pes(SHMEM_TEAM_SHARED) < npes &&
         scan_leaf((uint32_t)npes, scan_fanout_setting(), (uint32_t)me)) {
         uint64_t pieces = (MANY + SLOT_LONGS - 1) / SLOT_LONGS;
-        uint64_t window = scan_shape_setting("OSOE_COLLECTIVE_PIPELINE", 4, 2);
+        uint64_t window = scan_shape_setting("OSOE_COLLECTIVE_PIPELINE", 8, 2);
         uint64_t want = pieces < window ? pieces : window, most = most_in_flight();
         if (most != want)
             fprintf(stderr, "PE %d: a leaf of the scan's tree had %llu pieces in flight at "

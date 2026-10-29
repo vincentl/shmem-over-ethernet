@@ -88,8 +88,9 @@
 
 /*
  * A large piece carries 16 KiB, its 16-byte header in the lane's slot beside
- * it: 2,048 longs. So ONE_PIECE is one large piece, SEVERAL four - more than
- * the default window of two - and SMALL fits the default small slot of 1 KiB.
+ * it: 2,048 longs. So ONE_PIECE is one large piece, SEVERAL four - a window
+ * of 4 full, half the default 8 - and SMALL fits the default small slot of
+ * 1 KiB.
  */
 enum {
     PIECE_BYTES = 16 << 10,
@@ -503,7 +504,7 @@ static void boundary(void)
 {
     CHECK_FATAL(npes >= 2);
     uint32_t small = setting("OSOE_SMALL_COLLECTIVE_BYTES", 1024);
-    uint32_t window = setting("OSOE_COLLECTIVE_PIPELINE", 4);
+    uint32_t window = setting("OSOE_COLLECTIVE_PIPELINE", 8);
     unsigned char *bytes_dst = (unsigned char *)dest, *bytes_src = (unsigned char *)source;
     size_t sizes[] = { small, (size_t)small + 1, 3 * (size_t)PIECE_BYTES + 1 };
     for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {

@@ -193,7 +193,7 @@
  *   - **rows**: round k of either half moves its pieces into the k-th block
  *     of the receiver's lane, a block being the call's window of slots - a
  *     round takes as many of the lane's rows as the rounds leave it, so that
- *     at the defaults' lane of nine rows the window is 16 pieces on four nodes
+ *     at the defaults' lane of nine rows the window is 32 pieces on four nodes
  *     and the capacity from 17 - piece j into the block's slot j mod the
  *     window, each a put of its header
  *     and bytes and then a fenced add on the receiver's arrival counter for the
@@ -2584,7 +2584,7 @@ static uint64_t scan_grant_words(uint32_t number)
  * step 2, Part 2's record), a scan over 16 PEs on four nodes at the defaults'
  * fan-out of 8 took 1.5 to 2.0 times as long from 8 KiB up - its root's node
  * sending six copies over its link where 4 sends three - and at 4 with the
- * capacity's four pieces in flight it was 1.30 times faster at 1 MiB but 6.6%
+ * four pieces in flight, the capacity then, it was 1.30 times faster at 1 MiB but 6.6%
  * slower at 64 KiB: 0.1.0's shape is the one no size of it is slower in.
  */
 enum { SCAN_FANOUT_UNDER_LINK = 4, SCAN_WINDOW_UNDER_LINK = 2 };

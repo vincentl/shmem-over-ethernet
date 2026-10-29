@@ -1406,7 +1406,7 @@ int main(int argc, char **argv)
     link = (struct osoe_link){ setting("OSOE_LINK_HOP_NS", 0), setting("OSOE_LINK_MESSAGE_NS", 0),
                                setting("OSOE_LINK_BYTES_PER_SECOND", 0) };
     ceiling = setting("OSOE_COLLECTIVE_FANOUT", 8);
-    capacity = setting("OSOE_COLLECTIVE_PIPELINE", 4);
+    capacity = setting("OSOE_COLLECTIVE_PIPELINE", 8);
     small = setting("OSOE_SMALL_COLLECTIVE_BYTES", 1024);
     CHECK_FATAL(link.bytes_per_second != 0);    /* the link is set, so the choice is known */
     uint64_t smallest = smallest_circulant();

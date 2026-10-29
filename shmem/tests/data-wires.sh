@@ -29,6 +29,12 @@
 #       node making a data wire is neither idle nor quiet, so the job is not
 #       declared deadlocked - a stalled wire is told as any wait is - and ends
 #       right once the wire is made.
+#   data-wires.sh LAUNCHER PROGRAM stall-stat
+#       Node 0 held 5 s: osoe-stat, given the job's id - its launcher's pid -
+#       shows a PE blocked on a data wire being made, "data wire to node N,
+#       connecting" (OSOE_BLOCKED_DETAIL_CONNECTING, H23's blocked kind), while
+#       it is held; then the wire is made and the job ends right. OSOE_TEST_STAT
+#       names osoe-stat.
 #   data-wires.sh LAUNCHER PROGRAM stall-timeout
 #       Node 1 held 30 s with OSOE_NO_PROGRESS_TIMEOUT=2: the job ends with a
 #       failure, naming the data wire that is not made, well before the hold.
@@ -71,6 +77,8 @@ case $MODE in
     stall-caller) export OSOE_TEST_HOLD_DATA_WIRES=0:4000 OSOE_TEST_NOTICE_SECONDS=1 ;;
     stall-callee) export OSOE_TEST_HOLD_DATA_WIRES=1:4000 OSOE_TEST_NOTICE_SECONDS=1 ;;
     stall-long) export OSOE_TEST_HOLD_DATA_WIRES=0:6000 OSOE_DEADLOCK_SECONDS=1 ;;
+    stall-stat) export OSOE_TEST_HOLD_DATA_WIRES=0:5000
+                [ -n "${OSOE_TEST_STAT:-}" ] || { echo "stall-stat needs OSOE_TEST_STAT"; exit 2; } ;;
     stall-timeout) export OSOE_TEST_HOLD_DATA_WIRES=1:30000 OSOE_NO_PROGRESS_TIMEOUT=2 ;;
     budget-*) MAP=0,1,2,3
               export OSOE_COLLECTIVE_FANOUT=2 OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER_BUDGET=8192
@@ -85,9 +93,29 @@ case $MODE in
     budget-fits|budget-eager) program_mode=none ;;
 esac
 began=$(date +%s)
-out=$(SHMEM_DEBUG=1 OSOE_PROGRESS_HELPERS=$HELPERS "$LAUNCHER" -n "$ranks" -m "$MAP" -t 40 -k -- \
-      "$PROGRAM" "$program_mode" 2>&1)
-status=$?
+probe=
+if [ "$MODE" = stall-stat ]; then
+    # osoe-stat reads every node's records by the job's id while node 0 holds
+    # its wires, until one says it waits for a wire being made, or for 4 s.
+    log=$(mktemp)
+    SHMEM_DEBUG=1 OSOE_PROGRESS_HELPERS=$HELPERS "$LAUNCHER" -n "$ranks" -m "$MAP" -t 40 -k -- \
+        "$PROGRAM" "$program_mode" > "$log" 2>&1 &
+    job=$!
+    tries=0
+    while [ "$tries" -lt 16 ] && [ -z "$probe" ]; do
+        sleep 0.25
+        probe=$("$OSOE_TEST_STAT" "$job" 2>&1 | grep -E 'data wire to node [0-9]+, connecting')
+        tries=$((tries + 1))
+    done
+    wait "$job"
+    status=$?
+    out=$(cat "$log")
+    rm -f "$log"
+else
+    out=$(SHMEM_DEBUG=1 OSOE_PROGRESS_HELPERS=$HELPERS "$LAUNCHER" -n "$ranks" -m "$MAP" -t 40 -k -- \
+          "$PROGRAM" "$program_mode" 2>&1)
+    status=$?
+fi
 took=$(( $(date +%s) - began ))
 printf '%s\n' "$out"
 echo "launcher exited $status after ${took} s"
@@ -147,6 +175,11 @@ case $MODE in
         printf '%s\n' "$out" | grep -q '^DATA WIRES TEST OK$' || exit 1
         printf '%s\n' "$out" | grep -qi 'deadlock' && { echo "declared deadlocked"; exit 1; }
         [ "$took" -ge 5 ] || { echo "the hold did not hold"; exit 1; } ;;
+    stall-stat)
+        [ "$status" -eq 0 ] || exit 1
+        printf '%s\n' "$out" | grep -q '^DATA WIRES TEST OK$' || exit 1
+        [ -n "$probe" ] || { echo "osoe-stat never showed a PE waiting for a data wire being made"; exit 1; }
+        printf 'osoe-stat: %s\n' "$probe" ;;
     stall-caller|stall-callee)
         [ "$status" -eq 0 ] || exit 1
         printf '%s\n' "$out" | grep -q '^DATA WIRES TEST OK$' || exit 1

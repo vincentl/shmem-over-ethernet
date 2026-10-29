@@ -647,13 +647,17 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
     struct osoe_wait_word *word = osoe_connection_turnover_wait(connection);
     struct am_wait w;
     /* A connection never opened, on demand, is one whose data wire is not yet
-     * made (H23): its no-progress fatal says so, its lead's notice what the
-     * wire waits for (data-wires.h). */
+     * made (H23): its blocked record says so - the data wire to the peer,
+     * connecting, as osoe-stat and the deadlock detector tell it - and its
+     * no-progress fatal, its lead's notice what the wire waits for
+     * (data-wires.h). Once the wire is made and the buffer opened, a writer
+     * still short of room waits on the turnover as any writer does. */
     uint64_t opened = turnover(connection);
-    am_wait_begin(&w, routine, OSOE_BLOCKED_DETAIL_TURNOVER,
-                  osoe.bootstrap.data_wires_on_demand && opened == 0
-                      ? "the turnover of a connection whose data wire is not yet made"
-                      : "the connection's buffer turnover",
+    bool connecting = osoe.bootstrap.data_wires_on_demand && opened == 0;
+    am_wait_begin(&w, routine,
+                  connecting ? OSOE_BLOCKED_DETAIL_CONNECTING : OSOE_BLOCKED_DETAIL_TURNOVER,
+                  connecting ? "the turnover of a connection whose data wire is not yet made"
+                             : "the connection's buffer turnover",
                   peer, pe, opened);
     osoe_wait_word_enter(word);
     uint32_t slept_on = 0;
@@ -673,7 +677,14 @@ static void reserve_waiting(struct osoe_connection *connection, uint32_t peer, i
         osoe_progress_host_wake(peer);
         slept_on = seen;
         swept = sleep_on(word, seen);
-        am_wait_check(&w, turnover(connection));
+        uint64_t now = turnover(connection);
+        if (connecting && now != 0) {
+            osoe_blocked_leave();
+            osoe_blocked_enter(routine, OSOE_BLOCKED_DETAIL_TURNOVER, peer);
+            w.watching = "the connection's buffer turnover";
+            connecting = false;
+        }
+        am_wait_check(&w, now);
     }
     osoe_wait_word_leave(word);
     am_wait_end();

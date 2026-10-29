@@ -48,6 +48,8 @@ struct osoe_bootstrap {
                                  * (OSOE_PROGRESS_HELPERS_AUTO; P36) */
     uint32_t online_cpus;       /* the CPUs online the rule counted on this node, or
                                  * OSOE_TEST_ONLINE_CPUS's; 0 where nothing asked */
+    uint32_t machine_pes;       /* OSOE_MACHINE_PES: the job's PEs on this machine, which
+                                 * osoe-launch's logical nodes share; 0 unset (P36) */
     uint32_t collective_pipeline;  /* OSOE_COLLECTIVE_PIPELINE: D, a data collective's
                                      * pieces in flight per level of the tree (§5.8) */
     uint32_t small_collective_bytes;    /* OSOE_SMALL_COLLECTIVE_BYTES: the largest data
@@ -94,8 +96,8 @@ struct osoe_bootstrap {
     /* OSOE_TEST_PRINT_LINK=1, a testing hook (T19): rank 0 prints the link it
      * measured at the end of shmem_init, as the OSOE_LINK_* that pin it. */
     bool print_link;
-    /* OSOE_CHECK_COLLECTIVES=1 (P24): every collective's call compared among
-     * a node's PEs (collectives.h's struct osoe_call). */
+    /* OSOE_CHECK_COLLECTIVES, 1 unless set to 0 (P24, P39): every collective's
+     * call compared among a node's PEs (collectives.h's struct osoe_call). */
     bool check_collectives;
     /* OSOE_TEST_MESH_HOLD=NODE:MS, a testing hook (H23): node NODE's lead
      * reaches its mesh MS milliseconds late; 0 milliseconds for none. */
@@ -175,16 +177,19 @@ struct osoe_bootstrap {
  * slots of a header and 16 KiB - or, past 512 nodes at the default fan-out,
  * ceil(log2 nodes) x D, a row of 64 KiB more at the defaults for each doubling
  * (osoe_internal_lane_rows; P3) - and a PE has one per thread record,
- * OSOE_MAX_THREADS + 1 of them: 9.6 MiB at the defaults (fan-out 8, D = 4, 16
- * threads) - and at the extremes the ranges allow (1,024 teams, fan-out 32,
+ * OSOE_MAX_THREADS + 1 of them: 19.1 MiB at the defaults (fan-out 8, D = 8,
+ * 16 threads) - and at the extremes the ranges allow (1,024 teams, fan-out 32,
  * D = 8, 1,023 threads, small collectives of 16 KiB) a PE's region is about
  * 5.2 GiB, which the shared-memory capacity check refuses at init on a machine
  * without it (node.c). Since v0.2 step 2 it is the window's capacity: each
  * large collective's window is chosen up to it (collective-shape.h). Its
- * default 4 is the author's (docs/decisions/2026-10-06.md item 5): the Pi's
- * 1 MiB reduction at k = 2 took 33.5 ms at D = 2 and 23.0 at D = 4.
+ * default 8 is the author's (P37, 2026-10-25), timed on eight nodes of Google
+ * Cloud's link at the third cluster session (2026-10-28): from 256 KiB every
+ * broadcast 17 to 27% faster than at D = 4, the default the author first chose
+ * on the Pi (docs/decisions/2026-10-06.md item 5), whose 1 MiB reduction at
+ * k = 2 took 33.5 ms at D = 2 and 23.0 at D = 4.
  */
-#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 4u
+#define OSOE_COLLECTIVE_PIPELINE_DEFAULT 8u
 #define OSOE_COLLECTIVE_PIPELINE_LOWEST  1u
 #define OSOE_COLLECTIVE_PIPELINE_HIGHEST 8u
 
@@ -292,11 +297,12 @@ static inline const char *osoe_collective_places_name(uint32_t places)
 /*
  * OSOE_PROGRESS_HELPERS (docs/design/progress-helpers-proposal.md §3.8): how
  * many threads of the node lead's process own the data wires beside its agent,
- * which then keeps the control wires alone (owner-map.h). 0, the default, is
- * one thread a node, as before helpers existed. At most 64: an owner is a bit
- * of a PE's mask of owners to wake (progress-host.c). It shapes the connection
- * area and the node segment's owner records, so a node's PEs must agree, and
- * the node's own rendezvous checks that they do (node.c); nodes need not.
+ * which then keeps the control wires alone (owner-map.h). 0 is one thread a
+ * node, as before helpers existed; unset, `auto` (below). At most 64: an
+ * owner is a bit of a PE's mask of owners to wake (progress-host.c). It
+ * shapes the connection area and the node segment's owner records, so a
+ * node's PEs must agree, and the node's own rendezvous checks that they do
+ * (node.c); nodes need not.
  */
 #define OSOE_PROGRESS_HELPERS_HIGHEST 64u
 
@@ -307,8 +313,10 @@ static inline const char *osoe_collective_places_name(uint32_t places)
  * helper already holds alone; and where a node's PEs outnumbered its CPUs, two
  * helpers halved the mailbox on Google Cloud's nodes (docs/fast-link-results.md,
  * H4). Every PE of a node counts the same nodes, PEs and CPUs, so its PEs
- * agree. Not yet the default: that waits for the helpers measured under a
- * site's binding (H26).
+ * agree. The default since the author's word of 2026-10-28 (P36), once H26
+ * measured the helpers under a site's binding: with a core a PE two took the
+ * streams a fifth faster and halved the mailbox, with one CPU a PE they bought
+ * little either way. Logical nodes on one machine each count its CPUs.
  */
 #define OSOE_PROGRESS_HELPERS_AUTO 2u
 #define OSOE_PROGRESS_HELPERS_AUTO_NODES 3u

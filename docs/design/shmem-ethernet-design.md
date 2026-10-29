@@ -1401,10 +1401,11 @@ words can collide on the same bucket spinlock.
 ### 3.12 Progress threads and where they run
 
 > **Every PE starts one agent thread in `shmem_init`. The local lead's agent is
-> the node's control plane and, by default, its whole progress engine; with
-> `OSOE_PROGRESS_HELPERS`, helper threads of the lead's process own the data
-> wires beside it. Every other agent is a service thread that does only work
-> which must happen inside its own process.**
+> the node's control plane and, with no helpers, its whole progress engine;
+> with `OSOE_PROGRESS_HELPERS` - two by default on a job of three nodes or more
+> where a node's PEs fit its CPUs - helper threads of the lead's process own
+> the data wires beside it. Every other agent is a service thread that does
+> only work which must happen inside its own process.**
 
 An earlier draft said "a small fixed pool per node" without saying which process
 the pool lives in. PEs are processes, so that choice decides how every
@@ -1425,9 +1426,9 @@ at every helper count, a control wire and a data wire (§3.1,
 - **Owner 0 is the lead's agent.** It holds every control wire - the internode
   tree's ARRIVE and RELEASE and the deadlock detector's messages, and nothing
   else but the goodbyes every wire carries, its own and the abortive one - and
-  the control plane's state, the tree's and the detector's. With no
-  helpers, the default, it holds every data wire too, and is the node's one
-  progress thread.
+  the control plane's state, the tree's and the detector's. With no helpers
+  (`OSOE_PROGRESS_HELPERS=0`, or where `auto` gives none) it holds every data
+  wire too, and is the node's one progress thread.
 - **Owners 1 to H are helper threads**, `OSOE_PROGRESS_HELPERS` of them, at
   most 64 (`progress-host.c`, `docs/decisions/2026-10-08-helpers.md`). The data
   wire to the peer in slot p is owner 1 + (p mod H)'s (`owner-map.h`), so a
@@ -1437,10 +1438,17 @@ at every helper count, a control wire and a data wire (§3.1,
   author's rule of 2026-10-20 (A2, P36; `bootstrap.h`): 2 on a job of three
   nodes or more where the node runs no more PEs than its machine has CPUs
   online, 0 otherwise - each PE of a node counting the same nodes, PEs and CPUs
-  in its bootstrap, before anything is laid out by H, so its PEs agree. The
-  default stays 0 until the author's word on the helpers measured under a site's
-  binding (H26, 2026-10-28: a core a PE, two helpers took the streams a fifth
-  faster and halved the mailbox; one CPU a PE, little either way).
+  in its bootstrap, before anything is laid out by H, so its PEs agree. Where
+  `osoe-launch`'s logical nodes share one machine the PEs counted are the
+  machine's, all its logical nodes' (`OSOE_MACHINE_PES`, which the launcher
+  gives every rank and the bootstrap checks: a number from 1 to the job's PEs,
+  unset where a node is a machine; the larger of it and the node's PEs is
+  counted), so that a few logical nodes take two helpers each and a job of many
+  on few CPUs takes none. `auto` is the default since the author's word of
+  2026-10-28 (P36), on the helpers measured under a site's binding (H26: a core
+  a PE, two helpers took the streams a fifth faster and halved the mailbox; one
+  CPU a PE, little either way); `0` keeps the one thread, for a job that lives
+  by its message rate.
 - **Writers wake the owner of their wire**, not the lead: the connection area
   holds a sleeping flag and a dirty bitmap an owner, and a helper's wake word,
   while the lead's agent sleeps on its PE slot's in the node segment, which stop
@@ -5254,10 +5262,11 @@ puts beside the READY counter of the lead that writes to it first, and which
 that lead compares with its own before it puts a byte
 (`shmem.collective-divergence.gather-size`; §5.8). It names a divergence where
 the leads meet, and only there: collectives whose phases share no edge or word
-wait in different places, a hang whose blocked records name each PE's routine
-- a gather against a reduction among them; broadcasts from two roots on one
-node carry the same root position; and a node's members are not compared with
-each other at all.
+wait in different places, a hang whose blocked records name each PE's routine -
+a gather against a reduction among them; broadcasts from two roots on one node
+carry the same root position; and a node's members are not compared with each
+other by this protocol, only by the check below (`OSOE_CHECK_COLLECTIVES`, on by
+default since 2026-10-28).
 
 **Why a single writer.** An earlier draft had local members combine into the
 lead's `dest` as they arrived. That fails three ways:
@@ -5574,10 +5583,12 @@ one does. The puts start at the PE's right neighbour, so no PE is everyone's
 first target; a strided block is a put an element, element-strided within each
 block as the spec's Example 33 and SOS read §9.10.6.
 
-*As built since 2026-10-20 (P24):* the node's PEs are compared too, under
-`OSOE_CHECK_COLLECTIVES=1`, off by default; timed at many PEs a node (H12,
-2026-10-28), nothing one round could see from 16 to 64 PEs a node, and at 256
-nothing but the barrier's 672 µs to 975.
+*As built since 2026-10-20 (P24), on by default since 2026-10-28 (P39):* the
+node's PEs are compared too, unless `OSOE_CHECK_COLLECTIVES=0`; it was off until
+timed at many PEs a node (H12, 2026-10-28), nothing one round could see from 16
+to 64 PEs a node, and at 256 nothing but the barrier's 672 µs to 975, and the
+author turned it on. A PE at 0 beside PEs at the default is named by the one
+that compares.
 Each member says its call - kind, operation, element and width, bytes where all
 must agree, a broadcast's root, an alltoall's strides, a scan's inclusiveness -
 in three spare words of its own internal region's release-counter line for the
@@ -5973,7 +5984,8 @@ the first loop, 10.7 and 6.3 ms with this one.
 
 *As built at v0.2 (step 2; the fan-out's note in §5.3):* D is the call's
 window, the shape's, at most `OSOE_COLLECTIVE_PIPELINE`, which is now the
-**capacity** - default 4, the slots of a lane's row - and the chooser gives every
+**capacity** - default 4 at step 2 and 8 since 2026-10-28 (P37, the author's),
+the slots of a lane's row - and the chooser gives every
 large call the capacity, since more pieces in flight never cost a large
 collective time in either of `shape_timing.py`'s simulations of the loop. With
 the call's fan-out its tree differs from the last call's, which the counters
@@ -5989,7 +6001,8 @@ and two pieces in flight (or the ceiling and the capacity where those are
 less), not the ceiling's: on the Pi a scan over 16 PEs on four nodes at the
 defaults' fan-out of 8 took 1.5 to 2.0 times as long from 8 KiB up, its root's
 node sending six copies over its link where 4 sends three, and at 4 with four
-pieces in flight it was 1.30 times faster at 1 MiB and 6.6% slower at 64 KiB. Each lead publishes the shape of its last
+pieces in flight, the capacity then, it was 1.30 times faster at 1 MiB and 6.6%
+slower at 64 KiB. Each lead publishes the shape of its last
 reduction or broadcast in the team's tree state (`team.tree.shape_fanout`,
 `shape_window`), which `shmem.shape.chosen.*` holds to the chooser call by
 call.
@@ -6382,7 +6395,8 @@ tree's interior lead sends k + 1 and the fold the step's brief first described
 put up to 3.5 on a fold lead's. Rule 1 holds through the lanes' rows, round k
 of either half into the k-th block of the receiver's lane - a block being as
 many of the lane's rows as the rounds leave a round, all of whose slots it
-keeps in flight, 16 pieces on four nodes. *(As built at v0.2, P3:)* a lane has
+keeps in flight, 32 pieces on four nodes at the capacity of 8 (16 at the 4 it
+was until 2026-10-28). *(As built at v0.2, P3:)* a lane has
 those rows, ⌈log₂ N⌉ of them for the job's N nodes, or the fan-out ceiling's + 1
 for the tree's child positions and its release, whichever is more
 (`osoe_internal_lane_rows`; the chooser is told the number, and takes Träff's
@@ -6395,8 +6409,10 @@ at every size, where the cost model finds Träff's faster for 1 MiB by 3.2 times
 at 513 nodes and 4.3 at 4,096 (its event simulation, which runs the trees
 faster than the closed form does at that size, 2.7 to 2.9 times at 513 and
 1,024). A lane is longer than the ceiling's only past 512 nodes at the default:
-a row of 64 KiB at the defaults on each of a PE's lanes for each doubling of
-the nodes, 1.1 MiB a PE at 1,024 nodes, 3.2 at 4,096 and 7.4 at 65,536. Before
+a row of 128 KiB at the defaults on each of a PE's lanes for each doubling of
+the nodes, 2.1 MiB a PE at 1,024 nodes, 6.4 at 4,096 and 14.9 at 65,536 (a row
+of 64 KiB, and 1.1, 3.2 and 7.4, at the capacity of 4 it was until
+2026-10-28). Before
 its first put a Träff's reduction checks that the blocks it addresses end within
 the lane, by the functions that place the slots. Rule 2 on the lead's thread,
 which combines or copies every piece; rule 3 since each block is combined once,
@@ -7116,8 +7132,11 @@ eager by default until a large cluster measures it:
   writer's own wait, whose fatal says that its connection's data wire is not yet
   made. A node making a wire is neither idle nor quiet, so the deadlock detector
   never takes a stalled wire for a deadlock. `osoe-stat`'s blocked kind for the
-  wait, `OSOE_BLOCKED_DETAIL_CONNECTING`, is the layout-42 slice's: named, but
-  set by no writer yet - H23's one open part.
+  wait, `OSOE_BLOCKED_DETAIL_CONNECTING`, the layout-42 slice's, is set by a
+  writer waiting for room in a connection never opened (`reserve_waiting`), and
+  told by `osoe-stat` and the deadlock detector as the data wire to the node,
+  connecting - the turnover's once the wire is made and the writer still waits
+  for room (`shmem.data-wires.stall-stat`, 2026-10-28).
 - **The budget counts the data wires a node makes** (the author, 2026-10-27;
   `docs/decisions/2026-10-27-data-wires-on-demand.md`): on demand the buffers
   are chosen as eagerly, halving to the floor, so that on demand refuses nothing
@@ -7214,7 +7233,9 @@ step 4 `OSOE_KEEPALIVE` (§3.15); `OSOE_LIVENESS`, from the same step, is
 retired with the development watchdog (§3.15).
 `OSOE_NODE_MAP` (§8.1) is osoe's own too but is read by `osoe-launch`, which
 turns it into the `OSOE_NODEID`, `OSOE_LOCALID` and `OSOE_GTIDS` above; the
-library never sees it.
+library never sees it. `osoe-launch` also gives every rank `OSOE_MACHINE_PES`,
+the job's PEs on this machine, optional for the library and checked when set,
+which the progress helpers' rule counts against the machine's CPUs (§3.12).
 
 The test launcher, `tools/launch/osoe-launch`, starts L processes of a one-node
 job with these variables set. Its job id is its own pid, so concurrent launches
@@ -8529,7 +8550,8 @@ Each is independently breakable, and each failure appears far from its cause.
 19. **Only an owner of the node's wires submits - the local lead's agent, or one
     of its progress helpers - and each alone owns its ring and its wires'
     sockets.** (§3.12) Application threads and other agents request; they never
-    submit. With no helpers, the default, the agent is the one owner.
+    submit. With no helpers (`OSOE_PROGRESS_HELPERS=0`, or where `auto` gives
+    none), the agent is the one owner.
 20. **One symmetric heap per PE, addressed as `(PE, region, offset)` everywhere
     outside the owning process.** (§4.1, §4.9) Sharing a heap between PEs makes
     one PE's puts overwrite another's data; keying by address loses cross-process
@@ -8721,7 +8743,8 @@ after-release list.
   `docs/decisions/2026-10-07-shape-data-path.md`):* the link's hop, message cost
   and bandwidth are measured at the end of `shmem_init`, and each large
   reduction and broadcast takes the fan-out a closed-form cost model gives its
-  size on them, under a ceiling of 8 and a capacity of 4. On the Pi's four
+  size on them, under a ceiling of 8 and a capacity of 4 (the capacity is 8
+  since 2026-10-28, P37; these timings were taken at 4). On the Pi's four
   nodes, against 0.1.0's fixed tree, alternating three times: a 1 MiB
   broadcast 1.43 to 1.47 times faster, a 1 MiB reduction 1.20 to 1.26, every
   size from 64 KiB up faster, and none slower beyond the noise; the sweep of 1

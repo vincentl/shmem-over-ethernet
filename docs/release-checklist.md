@@ -124,14 +124,16 @@ until the tree to be tagged has them; the author tags.
   runs before the tag, once every open item is cleared
   (`docs/prompts/task-v0.2-to-the-tag.md`).
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
-  to be tagged, at no helpers and at two and three where the merge point ran
-  them - ThreadSanitizer's as `ctest` judges every test there since the ninth
-  review's C9-1, its reports judged by `tsan.reports` at each count, none
-  included, and no gate run apart; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
+  to be tagged, at `OSOE_PROGRESS_HELPERS=0` set outright and at two and three
+  where the merge point ran them, and with the setting unset, the default
+  `auto` since 2026-10-28 - ThreadSanitizer's as `ctest` judges every test there
+  since the ninth review's C9-1, its reports judged by `tsan.reports` at each
+  count, none included, and no gate run apart; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
   last run at 0.1.0's tag; the single-node build in its presets and on Rocky
   Linux 9.
 - [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
-  two PEs at no helpers and at two, and its team programs at 70 PEs, as at step
+  two PEs at `OSOE_PROGRESS_HELPERS=0` set outright and at two, and its team
+  programs at 70 PEs, as at step
   4's merge point (`docs/decisions/2026-10-10-step4-merge-point.md`), which ran
   them before its review's fixes and every change since; and the README's
   sentence on Sandia OpenSHMEM's suite "on the tree tagged 0.1.0" made the
@@ -213,8 +215,9 @@ rated them (round six's readiness Q5-5).
 - **A hand-on wake for a reopened connection buffer** - a writer that reserves
   and leaves room wakes the next, a woken writer that finds none passes the
   wake on - `wait_word_model.py` first (scale S1).
-- **The pipeline's window on links faster than gigabit**: measure, then the
-  default (scale S2).
+- ~~**The pipeline's window on links faster than gigabit**: measure, then the
+  default (scale S2)~~ - done 2026-10-28 (P37: timed at the third cluster
+  session, the default 8).
 - **The x86-64 network path**, on any x86-64 Debian 13 host (portability Q3).
 - **`osoe-stat --gc` reading a segment into private memory**, its status
   counting only what it failed to do (Q4); a Clang user's first command (Q5);
