@@ -73,6 +73,19 @@ INTERNAL = [
     ('lane-word', 'osoe_am_parse', 'take_child_lanes',
      'a child\'s lane word against this lead\'s taking and clearing of the '
      'collective before\'s: the same order'),
+    ('small-slot', 'osoe_am_parse', 'osoe_am_parse',
+     'a child\'s piece in this lead\'s small slot, put once each small '
+     'collective, against the last collective\'s - another child\'s, landed by '
+     'another helper since helpers run by default (P36): a reader clears what it '
+     'read, and the next is put only after the reader\'s next arrival, which the '
+     'clear precedes (internode-generic.c, cleared)'),
+    ('small-slot', 'osoe_am_parse', 'cleared',
+     'a child\'s piece in this lead\'s small slot against this lead\'s clearing '
+     'of the last collective\'s once combined: the same order'),
+    ('past-the-team-words', 'osoe_am_parse', 'written',
+     'a landing in a lead\'s grant fields against test-circulant-grants.c\'s own '
+     'look at them, between two barriers: the next reduction\'s pieces are put '
+     'only once every member has left the barrier after the look'),
 ]
 
 REPORT_START = re.compile(r'^WARNING: ThreadSanitizer: (.+?) \(pid=\d+\)', re.M)

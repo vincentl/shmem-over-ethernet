@@ -1,0 +1,2 @@
+tcp mode=bothways rank=1 host=pi-002 sent_mib_per_s=112.1 received_mib_per_s=112.1
+tcp mode=bothways rank=0 host=pi-001 sent_mib_per_s=112.1 received_mib_per_s=112.1
