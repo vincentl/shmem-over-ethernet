@@ -46,7 +46,7 @@ What Part 4 decides, and from what:
 
 | Question | Where it was left | What decides it here |
 |---|---|---|
-| Whether a node should run progress helpers by default, and how many | the progress helpers proposal's §8 item 3: no helpers by default, a count from `OSOE_PROGRESS_HELPERS` alone, until a fast link has been measured (`docs/decisions/2026-10-07.md`, items 4 to 6) | §5: the put and get streams and the mailbox at 0, 1, 2 and 4 helpers and 8 to 32 PEs a node, against the bare stream (§4) |
+| Whether a node should run progress helpers by default, and how many | the progress helpers proposal's §8 item 3: no helpers by default, a count from `OSOE_PROGRESS_HELPERS` alone, until a fast link has been measured (`docs/decisions/2026-10-07.md`, items 4 to 6) | §5: the put and get streams and the mailbox at 0, 1, 2 and 4 helpers and 8 to 32 PEs a node, against the bare stream (§4); decided on 2026-10-28 (P36, after H26): `auto`, two helpers on three nodes or more where a node's PEs fit its CPUs, the default |
 | The zero-copy send's default, and whether a connection needs a third buffer with it on | `OSOE_WIRE_ZERO_COPY`'s row: "Not timed on a fast link" | §7 |
 | The ladder's rungs on a fast link: the unsent limit and its rule, the connection buffer, the receive buffers | Part 0's ladder, measured on the Pi and the VM (`docs/decisions/2026-10-07.md`, item 12) | §6 |
 | The landing zone's size, which holds a large get | `docs/design/blocking-get-proposal.md`, (d) | §8 |
@@ -54,7 +54,7 @@ What Part 4 decides, and from what:
 | The landing zone's per-node budget (P32's default) | the author's A5, 2026-10-12; H28 | §8 |
 | `collect`'s places: where each way wins, and P35's 16 nodes | P31 and P35, provisional; H25 | §12 |
 | What waits behind a stream at each helper count | §11's list, once left out; H15 to H19 | §13 |
-| The pipeline's window and the chooser's shapes | round four's scale S2; H13 | §14 |
+| The pipeline's window and the chooser's shapes | round four's scale S2; H13 | §14; the window's default of 8 (P37) since 2026-10-28 |
 | What a site's latency tuning buys | the cluster's first session; H27 | §15 |
 | The ladder's code rungs, 1 and 4 | Part 0's ladder; H6 | §16 |
 
@@ -430,7 +430,9 @@ the streams; the barrier's and the 8-byte reduce's read pooled or by mode,
 since unbound they land in one of two modes a job on the Pi, about 25 µs apart,
 which three rounds can draw unevenly (`docs/decisions/README.md`). A rule the
 author may then give: for example a count that follows the link's measured
-bandwidth and the node's peers, or the setting alone as today.
+bandwidth and the node's peers, or the setting alone, as it was. He gave the
+rule `auto` (P36) on 2026-10-28: two helpers on three nodes or more where a
+node's PEs fit its CPUs online, now the default.
 
 **H26, the helpers under a site's binding** (B11). Most sites run Slurm with
 `task/affinity` and `task/cgroup`, each task bound to the cores it was allotted,
@@ -550,8 +552,9 @@ into a node at once (scale S3). 36 short jobs: about five minutes.
 docs/fast-link/scale.sh NODES out/scale
 ```
 
-`osoe-bench` at every node with 8 and 16 PEs a node, at the counts of `HELPERS`
-- no helpers unless given, so `HELPERS="0 N"` with §5's best; `osoe-pacer`
+`osoe-bench` at every node with 8 and 16 PEs a node, at the counts of
+`HELPERS` - `0` unless given, and passed outright, the library's own default
+being `auto` since 2026-10-28, so `HELPERS="0 N"` with §5's best; `osoe-pacer`
 `mix` for ten minutes at each; start-up time at 1, 8 and 32 PEs a node - the
 slowest PE's, which is the launcher's spread and init, and the fastest's,
 nearer init's own; and the SOS test suite at two PEs a node if `SOS_BUILD`
@@ -603,9 +606,11 @@ The README's sentences the numbers replace or confirm:
 - **Behind a stream and tuned:** the "What does not scale" entry on helpers and
   the README's latency sentences, with what §13 and §15 find.
 - **Many PEs a node:** the Limits entry "By default one thread a node moves
-  every message between nodes", whose turnover's wakes "under the present one,
-  and at 256, it has not been measured", and the `OSOE_CHECK_COLLECTIVES` row's
-  "Off by default until timed at many PEs a node" (§20).
+  every message between nodes" (now "Without progress helpers one thread a node
+  moves every message between nodes"), whose turnover's wakes "under the
+  present one, and at 256, it has not been measured", and the
+  `OSOE_CHECK_COLLECTIVES` row's "Off by default until timed at many PEs a
+  node" (§20; on by default since 2026-10-28, P39).
 
 What the kit once left out is in it now: a barrier, a fetch-add and the
 collectives behind a stream at each helper count, TCP's retransmissions around
@@ -699,8 +704,9 @@ beats the one it takes at a size, they are off on this link, and the
 minutes. `CASES` runs others: `link-dD` and `tree-dD` are the chooser and its
 trees at a window of D (`OSOE_COLLECTIVE_PIPELINE`); the third session's are
 P37's four, `link-d4 link-d8 tree-d8 fixed-k4-d8`, five rounds - the default
-of 8, decided on 2026-10-25, against today's 4 and the best fixed tree of the
-second session.
+of 8, decided on 2026-10-25 and built on 2026-10-28, against the 4 it replaced
+and the best fixed tree of the second session. `link` and `tree` with no
+suffix run at the default: 4 in the first two sessions, 8 from 2026-10-28.
 
 ## 15. Latency tuning
 
@@ -791,9 +797,11 @@ docs/fast-link/link-cost.sh NODES out/link-cost
 ```
 
 H14: the link's measurement at start-up - fifteen round trips of a small put,
-fifteen tries of a put to each of the root's first children and three streams
-of 128 KiB and 512 KiB, about 27 ms of a start on the Pi's gigabit
-(`link-measure.c`) - was found running on two and three nodes, where every
+fifteen tries of a put to each of the root's first children against one alone,
+whose least times give the message cost (since 2026-10-28; before, a trimmed
+mean of each try's difference), and three streams of 128 KiB and 512 KiB,
+about 27 ms of a start on the Pi's gigabit (`link-measure.c`) - was found
+running on two and three nodes, where every
 fan-out builds one tree and so no choice read it (the step 2 adversarial read,
 finding 12). Since then the chooser's Träff's on three nodes and every data
 wire's unsent limit at any count read it; what is left to know is its cost on
@@ -809,7 +817,12 @@ bytes beyond the short one's take less than a millisecond gets streams that
 much longer, and each child comes to a timed message from the same idle; run
 again, the section shows whether the bandwidth and the message cost now hold
 from job to job - the second session's read 1.9 to 5.1 GB/s, and 0 to 159 µs
-on three nodes.
+on three nodes, by the trimmed mean. The third session's read the bandwidth
+0.88 to 5.68 GB/s and the message cost, by the same, 0 to 151 µs on three
+nodes, and on eight 23 to 45 µs where the closed form takes Träff's only under
+5.5 to 10.5: a wake late or a page touched first only lengthens a try, so the
+author chose (P37, P38, 2026-10-28) the message cost from the least of the
+tries, which no cluster has timed - this section run again would.
 
 ## 20. Many PEs a node (H12)
 
@@ -825,7 +838,8 @@ connection's buffer wakes every writer then asleep for its room
 (`osoe_connection_open`'s wake of all, the release fixes' review, S1), a herd
 on the node's one progress thread that grows with the PEs sending toward one
 other node at once. **P24**, `OSOE_CHECK_COLLECTIVES`'s cost before it may
-become a default (`docs/decisions/2026-10-20.md`): the PE that meets every
+become a default (`docs/decisions/2026-10-20.md`; it became one on 2026-10-28,
+P39, on what this section timed): the PE that meets every
 arrival of its node compares each one's call, so its loads grow with its
 node's PEs, where at 4 PEs in the VM nothing was measurable.
 
@@ -835,14 +849,15 @@ two and four a vCPU of a `c4-standard-16` - §5's workloads, `multistream`'s
 put stream in 1 MiB and 64 KiB blocks and its get stream in 1 MiB, ten seconds
 each, PE 0 printing its node's counters around each window, the mailbox for
 twenty, and `osoe-bench quick barrier collectives` twice, with
-`OSOE_CHECK_COLLECTIVES` off and on. Then at 256 PEs a node, sixteen a vCPU,
+`OSOE_CHECK_COLLECTIVES` at 0 and at 1. Then at 256 PEs a node, sixteen a vCPU,
 the wake's cost alone: the two put streams, the 1 MiB one again with both
 nodes' CPUs profiled for five seconds, five in (§13's `profile.sh`; the chain
 of §21 gives it `PERF="sudo -n perf"`, the image's `perf_event_paranoid` being
 3), and the collectives with the check off and on, its files named `-wake`. No
-helpers (`HELPERS`): a
+helpers (`HELPERS`, passed outright as 0): a
 pair has one peer, which one helper holds whatever their count, and
-`OSOE_PROGRESS_HELPERS=auto` gives a pair none. One round, the author's
+`OSOE_PROGRESS_HELPERS=auto`, the library's default since 2026-10-28, gives a
+pair none. One round, the author's
 (`docs/decisions/2026-10-27.md`).
 
 What answers P2 is, beside each case's rate and the progress threads' CPU a
@@ -868,8 +883,9 @@ was 11.8% of every sample.
 
 Every job's heap is 16 MiB (`HEAP`, `SHMEM_SYMMETRIC_SIZE`), the same at every
 count: a PE's `/dev/shm` object is its heap and the library's region beside
-it, about 15.6 MiB at the defaults (`shmem/src/node.c`), so 256 PEs ask about
-7.9 GiB of a node, which a `c4-standard-16`'s 29 GiB holds; the development
+it, about 25.2 MiB at the defaults (`shmem/src/node.c`; 15.6 when the capacity
+was 4, as in the third session's runs), so 256 PEs ask about 10.3 GiB of a node
+(7.9 then), which a `c4-standard-16`'s 29 GiB holds; the development
 VM's 3.9 GiB holds two logical nodes of 64, and its dry run takes
 `WAKE_PES=64`. 23 jobs: 18 at 16 to 64 PEs a node of ten to twenty seconds
 and the collectives' few, and 5 at 256 whose collectives no session has timed -

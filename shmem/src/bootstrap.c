@@ -106,6 +106,27 @@ static uint32_t online_cpus(void)
     return online > 0 && online <= UINT32_MAX ? (uint32_t)online : 0;
 }
 
+/* The job's PEs on this machine that OSOE_PROGRESS_HELPERS=auto counts against
+ * its CPUs online in place of the node's (bootstrap.h): OSOE_MACHINE_PES,
+ * which osoe-launch gives every rank, its logical nodes sharing one machine's
+ * CPUs (the author, 2026-10-28, P36). 0 unset: a node is a machine. */
+static uint32_t machine_pes(uint32_t world_size)
+{
+    uint32_t pes = 0;
+    switch (osoe_environment_u32("OSOE_MACHINE_PES", &pes)) {
+    case OSOE_ENVIRONMENT_OK:
+        if (pes >= 1 && pes <= world_size)
+            return pes;
+        /* fall through */
+    case OSOE_ENVIRONMENT_INVALID:
+        osoe_fatal("OSOE_MACHINE_PES='%s' is not a count of the job's PEs from 1 to %u",
+                   getenv("OSOE_MACHINE_PES"), world_size);
+    case OSOE_ENVIRONMENT_UNSET:
+        break;
+    }
+    return 0;
+}
+
 void osoe_bootstrap_read(struct osoe_bootstrap *b)
 {
     *b = (struct osoe_bootstrap){ 0 };
@@ -364,17 +385,20 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
 
     /* OSOE_PROGRESS_HELPERS (bootstrap.h): by every PE, refused past 64 before
      * anything is laid out by it - an owner past the 64th has no bit in a PE's
-     * mask (the adversarial read of Part 1, N5). Or `auto`, the author's rule
-     * (OSOE_PROGRESS_HELPERS_AUTO), from what every PE of the node counts
-     * alike before anything is laid out: the job's nodes, the node's PEs and
+     * mask (the adversarial read of Part 1, N5). Unset or `auto`, the author's
+     * rule (OSOE_PROGRESS_HELPERS_AUTO; the default since P36), from what every
+     * PE of the node counts alike before anything is laid out: the job's
+     * nodes, the node's PEs - or the machine's, its logical nodes' all - and
      * its CPUs online. */
     b->progress_helpers = 0;
     const char *helpers = getenv("OSOE_PROGRESS_HELPERS");
-    if (helpers && strcmp(helpers, "auto") == 0) {
+    if (!helpers || strcmp(helpers, "auto") == 0) {
         b->progress_helpers_auto = true;
         b->online_cpus = online_cpus();
+        b->machine_pes = machine_pes(b->world_size);
+        uint32_t pes = b->machine_pes > b->local_count ? b->machine_pes : b->local_count;
         b->progress_helpers = b->node_count >= OSOE_PROGRESS_HELPERS_AUTO_NODES &&
-                                      b->local_count <= b->online_cpus
+                                      pes <= b->online_cpus
                                   ? OSOE_PROGRESS_HELPERS_AUTO
                                   : 0;
     } else if (osoe_environment_u32("OSOE_PROGRESS_HELPERS", &b->progress_helpers) ==
@@ -661,11 +685,13 @@ void osoe_bootstrap_read(struct osoe_bootstrap *b)
         osoe_fatal("OSOE_TEST_PRINT_LINK='%s' is not 0 or 1", getenv("OSOE_TEST_PRINT_LINK"));
     b->print_link = print_link == 1;
 
-    /* OSOE_CHECK_COLLECTIVES (P24; the author, 2026-10-20: under a setting, off
-     * until timed at many PEs a node, H12): each PE says each collective's call
-     * and the node-mate that meets them compares them (collectives.h). A PE's
-     * own: a node-mate without it says nothing, which the one comparing names. */
-    uint32_t check_collectives = 0;
+    /* OSOE_CHECK_COLLECTIVES (P24): each PE says each collective's call and the
+     * node-mate that meets them compares them (collectives.h). A PE's own: a
+     * node-mate without it says nothing, which the one comparing names. On
+     * unless 0 (P39; the author, 2026-10-28), once H12 timed it at many PEs a
+     * node: nothing one round could see from 16 to 64, and at 256 a barrier's
+     * 672 us to 975. */
+    uint32_t check_collectives = 1;
     if (osoe_environment_u32("OSOE_CHECK_COLLECTIVES", &check_collectives) ==
             OSOE_ENVIRONMENT_INVALID || check_collectives > 1)
         osoe_fatal("OSOE_CHECK_COLLECTIVES='%s' is not 0 or 1", getenv("OSOE_CHECK_COLLECTIVES"));

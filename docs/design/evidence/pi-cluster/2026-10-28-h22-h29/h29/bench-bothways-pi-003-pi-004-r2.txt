@@ -1,0 +1,4 @@
+osoe-bench pes=2 remote_target=1 local_target=-1
+pairs pe=0 target=1 bytes=1048576 mib_per_s=111.1
+pairs pe=1 target=0 bytes=1048576 mib_per_s=100.2
+pairs pes=2 total_mib_per_s=200.5

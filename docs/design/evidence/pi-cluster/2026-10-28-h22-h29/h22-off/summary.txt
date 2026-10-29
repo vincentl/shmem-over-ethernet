@@ -1,0 +1,25 @@
+21:20:02 tree d24c54e9; label off
+21:20:02 uptime: pi-001=4893s pi-002=4893s pi-003=4892s pi-004=4891s 
+21:20:02 offload: pi-001=00 pi-002=00 pi-003=00 pi-004=00  (tso,gso; 1 on)
+21:20:06 A-4x1-a exit 0: 16384:slow=0,max_ms=1.1 20480:slow=0,max_ms=1.0 24576:slow=0,max_ms=1.2 28672:slow=0,max_ms=1.3 32768:slow=0,max_ms=1.8 36864:slow=0,max_ms=2.0 40960:slow=0,max_ms=1.7 49152:slow=0,max_ms=2.1 
+21:20:06     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:06     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:14 A-4x2-a exit 0: 8192:slow=0,max_ms=0.9 12288:slow=0,max_ms=1.5 16384:slow=0,max_ms=1.5 20480:slow=0,max_ms=1.8 24576:slow=0,max_ms=2.1 
+21:20:14     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:14     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:16 A-4x4-a exit 0: 4096:slow=0,max_ms=1.2 8192:slow=0,max_ms=1.9 12288:slow=0,max_ms=2.7 16384:slow=0,max_ms=3.9 
+21:20:16     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:16     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:20 A-4x1-b exit 0: 16384:slow=0,max_ms=0.9 20480:slow=0,max_ms=1.0 24576:slow=0,max_ms=1.1 28672:slow=0,max_ms=1.3 32768:slow=0,max_ms=1.4 36864:slow=0,max_ms=1.8 40960:slow=0,max_ms=1.7 49152:slow=0,max_ms=2.1 
+21:20:20     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:20     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:22 A-4x2-b exit 0: 8192:slow=0,max_ms=0.9 12288:slow=0,max_ms=1.5 16384:slow=0,max_ms=1.9 20480:slow=0,max_ms=1.8 24576:slow=0,max_ms=2.1 
+21:20:22     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:22     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:25 A-4x4-b exit 0: 4096:slow=0,max_ms=1.2 8192:slow=0,max_ms=1.9 12288:slow=0,max_ms=2.7 16384:slow=0,max_ms=3.4 
+21:20:25     timeouts before: pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:25     timeouts after:  pi-001=0 pi-002=0 pi-003=0 pi-004=0 
+21:20:27 P-rank0-on-pi-002 exit 0: 28672:slow=0,max_ms=1.2 32768:slow=0,max_ms=1.3 28672:slow=0,max_ms=1.2 32768:slow=0,max_ms=1.3 
+21:20:27     timeouts before: 
+21:20:27     timeouts after:  
+21:20:27 DONE

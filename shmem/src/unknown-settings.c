@@ -85,6 +85,7 @@ static const char *const known_settings[] = {
     "OSOE_JOB_ID",
     "OSOE_LAUNCH",
     "OSOE_LOCALID",
+    "OSOE_MACHINE_PES",
     "OSOE_NODEID",
     "OSOE_PROCID",
     "OSOE_STEP_ID",

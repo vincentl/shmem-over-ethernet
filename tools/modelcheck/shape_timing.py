@@ -723,7 +723,7 @@ def choose_places(nodes, members, runs, ordered, room, link, ceiling, capacity, 
     return best
 
 
-def places_crossovers(link, members_a_node=1, ceiling=8, capacity=4, small=1024, room=64,
+def places_crossovers(link, members_a_node=1, ceiling=8, capacity=8, small=1024, room=64,
                       most=1024):
     """The default way at each node count from 2 to `most`, as runs of node
     counts taking one way: [(first, last, way)]."""
@@ -1063,7 +1063,7 @@ def grid_lines():
         for link in links:
             for nodes in (1, 2, 3, 4, 5, 7, 8, 9, 13, 16, 17, 31, 33, 64, 255, 257, 512, 513,
                           1000, 1024, 4096, 65536):
-                for ceiling, capacity in ((2, 4), (4, 2), (8, 4), (32, 8)):
+                for ceiling, capacity in ((2, 4), (4, 2), (8, 4), (8, 8), (32, 8)):
                     for n in (8, 1024, 1025, 4096, 16384, 16385, 65536, 1 << 20, 1 << 30):
                         for allowed in ((0, 1) if op == 'reduce' else (0,)):
                             shape = choose_shape(op, nodes, n, link, ceiling, capacity, 1024,
@@ -1088,7 +1088,8 @@ def places_grid_lines():
                       200, 254, 512, 513, 1000, 1024, 4096):
             for per_node in (1, 4, 16):
                 for runs, ordered in ((False, False), (True, False), (True, True)):
-                    for ceiling, capacity, small in ((8, 4, 1024), (4, 2, 128), (32, 8, 16384)):
+                    for ceiling, capacity, small in ((8, 4, 1024), (8, 8, 1024), (4, 2, 128),
+                                                     (32, 8, 16384)):
                         for circulant in (0, 1):
                             members = nodes * per_node
                             way = choose_places(nodes, members, runs, ordered, 64, link, ceiling,

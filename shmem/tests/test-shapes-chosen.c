@@ -118,7 +118,7 @@ int main(int argc, char **argv)
     uint64_t hop = setting("OSOE_LINK_HOP_NS", 0), message = setting("OSOE_LINK_MESSAGE_NS", 0);
     uint64_t bandwidth = setting("OSOE_LINK_BYTES_PER_SECOND", 0);
     uint64_t ceiling = setting("OSOE_COLLECTIVE_FANOUT", 8);
-    uint64_t capacity = setting("OSOE_COLLECTIVE_PIPELINE", 4);
+    uint64_t capacity = setting("OSOE_COLLECTIVE_PIPELINE", 8);
     uint64_t small = setting("OSOE_SMALL_COLLECTIVE_BYTES", 1024);
     CHECK_FATAL(bandwidth != 0);            /* the link is set, so the choice is known */
 

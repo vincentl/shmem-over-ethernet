@@ -21,7 +21,7 @@
 /*
  * How much the root measures. The hop and each stream's time are medians of
  * their tries, which a delayed try - a wake late, a page touched first -
- * cannot move as it moves a mean; the message cost a trimmed mean (below). On
+ * cannot move as it moves a mean; the message cost from least tries (below). On
  * the Pi's gigabit about 27 ms in all, most of it the streams' 1.9 MiB
  * (measured, 2026-10-06: 27.1 to 27.6 ms a start), so about 170 ms on a link
  * of 100 Mbit/s. A link fast enough that those streams take less than
@@ -57,24 +57,6 @@ static uint64_t median(uint64_t *values, size_t count)
 {
     qsort(values, count, sizeof *values, compare_u64);
     return values[count / 2];
-}
-
-static int compare_i64(const void *a, const void *b)
-{
-    int64_t x = *(const int64_t *)a, y = *(const int64_t *)b;
-    return (x > y) - (x < y);
-}
-
-/* The mean of the middle three fifths: an average, which the model's o is,
- * that a try delayed as a whole - or one hurried - does not move. */
-static int64_t trimmed_mean(int64_t *values, size_t count)
-{
-    qsort(values, count, sizeof *values, compare_i64);
-    size_t cut = count / 5;
-    int64_t sum = 0;
-    for (size_t i = cut; i < count - cut; i++)
-        sum += values[i];
-    return sum / (int64_t)(count - 2 * cut);
 }
 
 /*
@@ -193,27 +175,30 @@ static struct osoe_link measure(const int *children, uint32_t fan)
         trips[i] = timed_puts(context, child, &scratch, piece, 1, word);
     uint64_t trip = median(trips, HOP_TRIPS);
 
-    /* Paired: each try's fan against the single put just after it, so that
-     * a slow stretch of the run moves both. The extra a fan costs comes as a
-     * few tries some 20 us late among many that cost nothing more (the Pi,
-     * 2026-10-06), which a median reads as 0 or 20 by turns; the model's o is
-     * the average a level pays, so the trimmed mean. And a fan not timed
-     * first, so that every child comes to the timed one from one round trip
-     * idle, as the first child comes to its put alone: a child that sat out
-     * the put alone came from two, and where its thread sleeps deeper for the
-     * longer idle - a virtual machine's idle CPU - its wake was counted as
-     * the message's (P38: on Google Cloud, three nodes of one PE each read o
-     * as 2 to 4 us in three jobs and 112 and 159 us in the other two, H14). */
-    int64_t extra = 0;
+    /* The fan's least time against the single put's least: a wake late, a
+     * page touched first, only ever lengthens a try, so each kind's least is
+     * the try nearest the link's own cost, and their difference the fan's.
+     * The trimmed mean of each try's difference read 23 to 45 us on eight
+     * nodes of Google Cloud's link, where the closed form takes Träff's only
+     * under 5.5 to 10.5 us, and Träff's ran the large reductions it lost 1.4
+     * to 2.6 times faster (the third cluster session; the author, 2026-10-28);
+     * on the Pi's four nodes no choice turns on o. Each try times its fan just
+     * before its put alone, as before, and a fan not timed first, so that
+     * every child comes to the timed one from one round trip idle, as the
+     * first child comes to its put alone (P38). */
+    uint64_t extra = 0;
     if (fan > 1) {
-        int64_t differences[FAN_TRIES];
+        uint64_t served_least = UINT64_MAX, alone_least = UINT64_MAX;
         for (unsigned i = 0; i < FAN_TRIES; i++) {
             timed_fan(context, children, fan, &scratch, piece);
             uint64_t served = timed_fan(context, children, fan, &scratch, piece);
             uint64_t alone = timed_fan(context, children, 1, &scratch, piece);
-            differences[i] = (int64_t)served - (int64_t)alone;
+            if (served < served_least)
+                served_least = served;
+            if (alone < alone_least)
+                alone_least = alone;
         }
-        extra = trimmed_mean(differences, FAN_TRIES);
+        extra = served_least > alone_least ? served_least - alone_least : 0;
     }
 
     /* The first try at the lengths a slow link needs, which says how much
@@ -236,7 +221,7 @@ static struct osoe_link measure(const int *children, uint32_t fan)
 
     struct osoe_link link;
     link.hop_ns = trip / 2 ? trip / 2 : 1;
-    link.message_ns = extra > 0 ? (uint64_t)extra / (fan - 1) : 0;
+    link.message_ns = extra > 0 ? extra / (fan - 1) : 0;
     if (link.message_ns > OSOE_LINK_MESSAGE_NS_HIGHEST)
         link.message_ns = OSOE_LINK_MESSAGE_NS_HIGHEST;
     /*

@@ -489,6 +489,12 @@ int main(int argc, char **argv)
     free(ranks);
     osoe_node_map_free(&map);
     node_count_for_children = node_count;
+    /* The job's PEs on this machine, which every logical node shares, for
+     * OSOE_PROGRESS_HELPERS's rule to count against its CPUs in place of a
+     * node's (bootstrap.h; the author, 2026-10-28, P36). */
+    char machine_pes[24];
+    snprintf(machine_pes, sizeof machine_pes, "%ld", n);
+    setenv_or_die("OSOE_MACHINE_PES", machine_pes);
     /* One loopback address per logical node (exec_rank): 127.0.0.1 to .254. */
     if (node_count > 254 && !host_list) {
         fprintf(stderr, "osoe-launch: %u logical nodes; at most 254 get a loopback address "

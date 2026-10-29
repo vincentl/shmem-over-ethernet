@@ -1,0 +1,26 @@
+21:02:35 tree d24c54e9; offload: pi-001=00 pi-002=00 pi-003=00 pi-004=00  (tso,gso; 1 on)
+21:02:38 osoe one way pi-001-pi-002-r1: bytes=4096 mib_per_s=111.1 bytes=65536 mib_per_s=112.1 bytes=262144 mib_per_s=112.1 bytes=1048576 mib_per_s=112.1 bytes=4194304 mib_per_s=112.1 
+21:02:39 osoe both ways pi-001-pi-002-r1: pairs pe=0 target=1 bytes=1048576 mib_per_s=111.2 pairs pe=1 target=0 bytes=1048576 mib_per_s=110.8 pairs pes=2 total_mib_per_s=221.7 
+21:02:50 tcp oneway pi-001-pi-002-r1: rank=0 sent_mib_per_s=112.3 received_mib_per_s=0.0 rank=1 sent_mib_per_s=0.0 received_mib_per_s=112.2 
+21:03:01 tcp bothways pi-001-pi-002-r1: rank=1 sent_mib_per_s=112.1 received_mib_per_s=112.1 rank=0 sent_mib_per_s=112.1 received_mib_per_s=112.1 
+21:03:04 osoe one way pi-001-pi-002-r2: bytes=4096 mib_per_s=111.2 bytes=65536 mib_per_s=112.1 bytes=262144 mib_per_s=112.1 bytes=1048576 mib_per_s=112.1 bytes=4194304 mib_per_s=112.1 
+21:03:05 osoe both ways pi-001-pi-002-r2: pairs pe=0 target=1 bytes=1048576 mib_per_s=111.3 pairs pe=1 target=0 bytes=1048576 mib_per_s=99.8 pairs pes=2 total_mib_per_s=199.7 
+21:03:16 tcp oneway pi-001-pi-002-r2: rank=0 sent_mib_per_s=112.2 received_mib_per_s=0.0 rank=1 sent_mib_per_s=0.0 received_mib_per_s=112.2 
+21:03:28 tcp bothways pi-001-pi-002-r2: rank=1 sent_mib_per_s=112.0 received_mib_per_s=112.1 rank=0 sent_mib_per_s=112.0 received_mib_per_s=112.1 
+21:03:31 osoe one way pi-001-pi-002-r3: bytes=4096 mib_per_s=111.0 bytes=65536 mib_per_s=112.1 bytes=262144 mib_per_s=112.1 bytes=1048576 mib_per_s=112.1 bytes=4194304 mib_per_s=112.1 
+21:03:31 osoe both ways pi-001-pi-002-r3: pairs pe=0 target=1 bytes=1048576 mib_per_s=111.3 pairs pe=1 target=0 bytes=1048576 mib_per_s=109.9 pairs pes=2 total_mib_per_s=219.7 
+21:03:43 tcp oneway pi-001-pi-002-r3: rank=0 sent_mib_per_s=112.2 received_mib_per_s=0.0 rank=1 sent_mib_per_s=0.0 received_mib_per_s=112.2 
+21:03:54 tcp bothways pi-001-pi-002-r3: rank=0 sent_mib_per_s=112.1 received_mib_per_s=112.1 rank=1 sent_mib_per_s=112.1 received_mib_per_s=112.1 
+21:03:57 osoe one way pi-003-pi-004-r1: bytes=4096 mib_per_s=111.3 bytes=65536 mib_per_s=112.1 bytes=262144 mib_per_s=112.1 bytes=1048576 mib_per_s=112.1 bytes=4194304 mib_per_s=112.1 
+21:03:58 osoe both ways pi-003-pi-004-r1: pairs pe=0 target=1 bytes=1048576 mib_per_s=111.3 pairs pe=1 target=0 bytes=1048576 mib_per_s=110.5 pairs pes=2 total_mib_per_s=221.1 
+21:04:09 tcp oneway pi-003-pi-004-r1: rank=0 sent_mib_per_s=112.2 received_mib_per_s=0.0 rank=1 sent_mib_per_s=0.0 received_mib_per_s=112.2 
+21:04:20 tcp bothways pi-003-pi-004-r1: rank=1 sent_mib_per_s=112.1 received_mib_per_s=112.1 rank=0 sent_mib_per_s=112.1 received_mib_per_s=112.1 
+21:04:23 osoe one way pi-003-pi-004-r2: bytes=4096 mib_per_s=111.4 bytes=65536 mib_per_s=112.1 bytes=262144 mib_per_s=112.1 bytes=1048576 mib_per_s=112.1 bytes=4194304 mib_per_s=112.1 
+21:04:24 osoe both ways pi-003-pi-004-r2: pairs pe=0 target=1 bytes=1048576 mib_per_s=111.1 pairs pe=1 target=0 bytes=1048576 mib_per_s=100.2 pairs pes=2 total_mib_per_s=200.5 
+21:04:35 tcp oneway pi-003-pi-004-r2: rank=0 sent_mib_per_s=112.2 received_mib_per_s=0.0 rank=1 sent_mib_per_s=0.0 received_mib_per_s=112.2 
+21:04:47 tcp bothways pi-003-pi-004-r2: rank=0 sent_mib_per_s=112.1 received_mib_per_s=112.1 rank=1 sent_mib_per_s=112.1 received_mib_per_s=112.1 
+21:04:50 osoe one way pi-003-pi-004-r3: bytes=4096 mib_per_s=111.4 bytes=65536 mib_per_s=112.1 bytes=262144 mib_per_s=112.1 bytes=1048576 mib_per_s=112.1 bytes=4194304 mib_per_s=112.1 
+21:04:50 osoe both ways pi-003-pi-004-r3: pairs pe=0 target=1 bytes=1048576 mib_per_s=111.2 pairs pe=1 target=0 bytes=1048576 mib_per_s=110.8 pairs pes=2 total_mib_per_s=221.7 
+21:05:01 tcp oneway pi-003-pi-004-r3: rank=0 sent_mib_per_s=112.1 received_mib_per_s=0.0 rank=1 sent_mib_per_s=0.0 received_mib_per_s=112.2 
+21:05:13 tcp bothways pi-003-pi-004-r3: rank=1 sent_mib_per_s=112.1 received_mib_per_s=112.1 rank=0 sent_mib_per_s=112.0 received_mib_per_s=112.1 
+21:05:13 DONE

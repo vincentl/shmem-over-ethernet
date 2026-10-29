@@ -1,0 +1,6 @@
+osoe-bench pes=2 remote_target=1 local_target=-1
+bandwidth put target=1 where=remote bytes=4096 mib_per_s=111.2
+bandwidth put target=1 where=remote bytes=65536 mib_per_s=112.1
+bandwidth put target=1 where=remote bytes=262144 mib_per_s=112.1
+bandwidth put target=1 where=remote bytes=1048576 mib_per_s=112.1
+bandwidth put target=1 where=remote bytes=4194304 mib_per_s=112.1
