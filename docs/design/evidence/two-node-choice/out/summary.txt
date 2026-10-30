@@ -1,0 +1,31 @@
+21:55:44 tree cbfaa7e1
+21:55:45 probe built: 0, warnings: 0
+21:55:45 uptime: pi-001=93436s pi-002=93435s pi-003=93435s pi-004=93434s 
+21:55:45 offload: pi-001=00 pi-002=00 pi-003=00 pi-004=00  (tso,gso; 1 on)
+21:56:01 tree-2x1-1 exit 0: two-node done: every result right
+21:56:17 traff-2x1-1 exit 0: two-node done: every result right
+21:56:32 built-2x1-1 exit 0: two-node done: every result right
+21:56:53 tree-2x4-1 exit 0: two-node done: every result right
+21:57:13 traff-2x4-1 exit 0: two-node done: every result right
+21:57:34 built-2x4-1 exit 0: two-node done: every result right
+21:57:50 tree-2x1-2 exit 0: two-node done: every result right
+21:58:06 traff-2x1-2 exit 0: two-node done: every result right
+21:58:22 built-2x1-2 exit 0: two-node done: every result right
+21:58:42 tree-2x4-2 exit 0: two-node done: every result right
+21:59:03 traff-2x4-2 exit 0: two-node done: every result right
+21:59:23 built-2x4-2 exit 0: two-node done: every result right
+21:59:39 tree-2x1-3 exit 0: two-node done: every result right
+21:59:55 traff-2x1-3 exit 0: two-node done: every result right
+22:00:11 built-2x1-3 exit 0: two-node done: every result right
+22:00:31 tree-2x4-3 exit 0: two-node done: every result right
+22:00:52 traff-2x4-3 exit 0: two-node done: every result right
+22:01:13 built-2x4-3 exit 0: two-node done: every result right
+22:01:29 tree-2x1-4 exit 0: two-node done: every result right
+22:01:45 traff-2x1-4 exit 0: two-node done: every result right
+22:02:01 built-2x1-4 exit 0: two-node done: every result right
+22:02:21 tree-2x4-4 exit 0: two-node done: every result right
+22:02:42 traff-2x4-4 exit 0: two-node done: every result right
+22:03:02 built-2x4-4 exit 0: two-node done: every result right
+22:03:03 uptime: pi-001=93874s pi-002=93873s pi-003=93872s pi-004=93872s 
+22:03:03 offload: pi-001=00 pi-002=00 pi-003=00 pi-004=00  (tso,gso; 1 on)
+22:03:03 DONE

@@ -842,8 +842,11 @@ Where the design admits a limit of its own: a large broadcast, and a reduction
 too small for Träff's rounds to pay - under 4 to 16 KiB by the node count on
 the Pi cluster's link, by the cost model - go through a tree, whose busiest
 lead sends k + 1 vectors where Träff's sends under two; on two nodes, where the
-two send the same bytes, the cost model takes the tree for a size of whole
-16 KiB pieces and Träff's for most others, not measured either way; Träff's
+two send the same bytes, the cost model takes the tree at every size on the Pi
+cluster's link; measured there (P4, 2026-10-29), the tree was the faster to
+16 KiB, Träff's taking up to 1.7 times as long, and from 32 KiB the two's
+medians came within 12% of each other, Träff's the faster from 48 to 128 KiB
+and, at four PEs a node, to 2 MiB; Träff's
 takes 2⌈log₂ n⌉ rounds where a tree takes 2⌈log_k n⌉ levels, each round a row
 of a lane, and a lane has the ceiling's + 1 rows or the ⌈log₂ n⌉ the rounds
 need, whichever is more, so Träff's runs on a team of up to 65,536 nodes at any

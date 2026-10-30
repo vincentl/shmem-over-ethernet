@@ -1,0 +1,36 @@
+1. A partial last piece: |closed - simulated| increment, as a share of the call
+  link (86000, 7000, 116000000): 810 cases
+    whole   median 0.0596  p90 0.3588  worst 0.8416
+    offset  median 0.0000  p90 0.0478  worst 0.3152
+    link    median 0.0000  p90 0.0440  worst 0.3054
+    period  median 0.0089  p90 0.0955  worst 0.3153
+  link (20000, 2000, 4000000000): 810 cases
+    whole   median 0.0970  p90 0.3945  worst 0.5511
+    offset  median 0.0646  p90 0.3239  worst 0.5513
+    link    median 0.0400  p90 0.3181  worst 0.7278
+    period  median 0.0902  p90 0.3631  worst 0.5511
+  link (1000000, 50000, 12000000): 810 cases
+    whole   median 0.0596  p90 0.3587  worst 0.8198
+    offset  median 0.0000  p90 0.0666  worst 0.3271
+    link    median 0.0000  p90 0.0495  worst 0.3483
+    period  median 0.0090  p90 0.1061  worst 0.3271
+  link (5000, 500, 25000000000): 810 cases
+    whole   median 0.1285  p90 0.4505  worst 0.6532
+    offset  median 0.1051  p90 0.3865  worst 0.6630
+    link    median 0.0493  p90 0.4316  worst 0.8540
+    period  median 0.1249  p90 0.4265  worst 0.6532
+
+2. What charging the last piece its bytes changes on the grids
+  shape grid: 1045 of 11880 lines, at 16385 bytes; 168 change their shape, 34 their algorithm (circulant to tree)
+    hop 1000000 ns: on 2, 3 nodes
+    hop 20000 ns: on 8, 17, 31, 33, 64, 255, 512, 513, 1000, 1024, 4096, 65536 nodes
+    hop 5000 ns: on 8, 31, 33, 512, 65536 nodes
+    hop 86000 ns: on 2 nodes
+  places grid: 633 of 9360 lines; the way in 0; the members, totals, scan and exchange costs in [633, 0, 0, 0]
+  the 113 changed shapes on up to 33 nodes, by the simulation: the new one faster in 81, slower in 23, the same in 9; the geometric mean of new over old 0.919
+    0.564  reduce on 31 nodes, hop 20000 ns: ('circulant', 4, 2) to ('tree', 3, 2)
+    0.564  reduce on 8 nodes, hop 20000 ns: ('circulant', 4, 2) to ('tree', 3, 2)
+    0.653  reduce on 31 nodes, hop 5000 ns: ('circulant', 2, 4) to ('tree', 2, 4)
+    1.127  broadcast on 13 nodes, hop 20000 ns: ('tree', 3, 8) to ('tree', 8, 8)
+    1.136  broadcast on 17 nodes, hop 5000 ns: ('tree', 4, 8) to ('tree', 11, 8)
+    1.154  reduce on 17 nodes, hop 1000000 ns: ('tree', 3, 4) to ('tree', 4, 4)

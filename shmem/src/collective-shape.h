@@ -73,7 +73,10 @@ struct osoe_collective_shape {
  * lead entering at once: the first piece's way through the tree - up, then
  * down, for a reduction; credits up, then the data down, for a broadcast -
  * then every later piece at the pace of the busiest link or of the window's
- * loop, whichever is slower. Nanoseconds, UINT64_MAX where the sum overflows;
+ * loop, whichever is slower, and a partial last piece its own bytes on the
+ * busiest link or, where the window holds it back, the window's pace less
+ * what its shorter loop gives back, whichever is more (P4). Nanoseconds,
+ * UINT64_MAX where the sum overflows;
  * 0 for one node or no bytes. A few dozen integer operations: the tree's
  * critical paths come from its shape in closed form, not from walking it.
  */

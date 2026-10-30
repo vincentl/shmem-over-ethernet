@@ -1,0 +1,60 @@
+== built: two nodes, the Pi's link (86000 7000 116000000), every size to 16 MiB
+    2 nodes: Träff's at 11486022 of 16776192 sizes (68.5%), the first 16385, every size from 0, 2046 changes
+== built: the Pi's link, every size to 4 MiB
+    3 nodes: Träff's at 4178121 of 4193280 sizes (99.6%), the first 16184, every size from 16184, 1 changes
+    4 nodes: Träff's at 4184895 of 4193280 sizes (99.8%), the first 9410, every size from 9410, 1 changes
+    5 nodes: Träff's at 4184315 of 4193280 sizes (99.8%), the first 9990, every size from 9990, 1 changes
+    6 nodes: Träff's at 4186061 of 4193280 sizes (99.8%), the first 8244, every size from 8244, 1 changes
+    7 nodes: Träff's at 4187439 of 4193280 sizes (99.9%), the first 6866, every size from 6866, 1 changes
+    8 nodes: Träff's at 4189074 of 4193280 sizes (99.9%), the first 5231, every size from 5231, 1 changes
+    9 nodes: Träff's at 4186333 of 4193280 sizes (99.8%), the first 7972, every size from 7972, 1 changes
+   12 nodes: Träff's at 4187243 of 4193280 sizes (99.9%), the first 7062, every size from 7062, 1 changes
+   16 nodes: Träff's at 4189033 of 4193280 sizes (99.9%), the first 5272, every size from 5272, 1 changes
+   17 nodes: Träff's at 4187787 of 4193280 sizes (99.9%), the first 6518, every size from 6518, 1 changes
+   33 nodes: Träff's at 4188574 of 4193280 sizes (99.9%), the first 5731, every size from 5731, 1 changes
+   64 nodes: Träff's at 4190077 of 4193280 sizes (99.9%), the first 4228, every size from 4228, 1 changes
+   70 nodes: Träff's at 4189251 of 4193280 sizes (99.9%), the first 5054, every size from 5054, 1 changes
+  128 nodes: Träff's at 4190282 of 4193280 sizes (99.9%), the first 4023, every size from 4023, 1 changes
+  255 nodes: Träff's at 4190539 of 4193280 sizes (99.9%), the first 3766, every size from 3766, 1 changes
+  256 nodes: Träff's at 4190539 of 4193280 sizes (99.9%), the first 3766, every size from 3766, 1 changes
+  511 nodes: Träff's at 4190722 of 4193280 sizes (99.9%), the first 3583, every size from 3583, 1 changes
+  512 nodes: Träff's at 4190722 of 4193280 sizes (99.9%), the first 3583, every size from 3583, 1 changes
+== built: a loopback's link (20000 2000 4000000000), every size to 1 MiB
+    2 nodes: Träff's at 770048 of 1047552 sizes (73.5%), the first 278529, every size from 278529, 1 changes
+    3 nodes: Träff's at 557056 of 1047552 sizes (53.2%), the first 475137, every size from 507905, 3 changes
+    4 nodes: Träff's at 851968 of 1047552 sizes (81.3%), the first 180225, every size from 212993, 3 changes
+    8 nodes: Träff's at 933888 of 1047552 sizes (89.1%), the first 114689, every size from 114689, 1 changes
+   16 nodes: Träff's at 933888 of 1047552 sizes (89.1%), the first 114689, every size from 114689, 1 changes
+   31 nodes: Träff's at 950272 of 1047552 sizes (90.7%), the first 98305, every size from 98305, 1 changes
+   64 nodes: Träff's at 933888 of 1047552 sizes (89.1%), the first 114689, every size from 114689, 1 changes
+  255 nodes: Träff's at 950272 of 1047552 sizes (90.7%), the first 98305, every size from 98305, 1 changes
+== now: two nodes, the Pi's link (86000 7000 116000000), every size to 16 MiB
+    2 nodes: Träff's at 0 of 16776192 sizes (0.0%), the first 0, every size from 0, 0 changes
+== now: the Pi's link, every size to 4 MiB
+    3 nodes: Träff's at 4178121 of 4193280 sizes (99.6%), the first 16184, every size from 16184, 1 changes
+    4 nodes: Träff's at 4184895 of 4193280 sizes (99.8%), the first 9410, every size from 9410, 1 changes
+    5 nodes: Träff's at 4184315 of 4193280 sizes (99.8%), the first 9990, every size from 9990, 1 changes
+    6 nodes: Träff's at 4186061 of 4193280 sizes (99.8%), the first 8244, every size from 8244, 1 changes
+    7 nodes: Träff's at 4187439 of 4193280 sizes (99.9%), the first 6866, every size from 6866, 1 changes
+    8 nodes: Träff's at 4189074 of 4193280 sizes (99.9%), the first 5231, every size from 5231, 1 changes
+    9 nodes: Träff's at 4186333 of 4193280 sizes (99.8%), the first 7972, every size from 7972, 1 changes
+   12 nodes: Träff's at 4187243 of 4193280 sizes (99.9%), the first 7062, every size from 7062, 1 changes
+   16 nodes: Träff's at 4189033 of 4193280 sizes (99.9%), the first 5272, every size from 5272, 1 changes
+   17 nodes: Träff's at 4187787 of 4193280 sizes (99.9%), the first 6518, every size from 6518, 1 changes
+   33 nodes: Träff's at 4188574 of 4193280 sizes (99.9%), the first 5731, every size from 5731, 1 changes
+   64 nodes: Träff's at 4190077 of 4193280 sizes (99.9%), the first 4228, every size from 4228, 1 changes
+   70 nodes: Träff's at 4189251 of 4193280 sizes (99.9%), the first 5054, every size from 5054, 1 changes
+  128 nodes: Träff's at 4190282 of 4193280 sizes (99.9%), the first 4023, every size from 4023, 1 changes
+  255 nodes: Träff's at 4190539 of 4193280 sizes (99.9%), the first 3766, every size from 3766, 1 changes
+  256 nodes: Träff's at 4190539 of 4193280 sizes (99.9%), the first 3766, every size from 3766, 1 changes
+  511 nodes: Träff's at 4190722 of 4193280 sizes (99.9%), the first 3583, every size from 3583, 1 changes
+  512 nodes: Träff's at 4190722 of 4193280 sizes (99.9%), the first 3583, every size from 3583, 1 changes
+== now: a loopback's link (20000 2000 4000000000), every size to 1 MiB
+    2 nodes: Träff's at 745452 of 1047552 sizes (71.2%), the first 289429, every size from 327857, 5 changes
+    3 nodes: Träff's at 543616 of 1047552 sizes (51.9%), the first 480385, every size from 544385, 5 changes
+    4 nodes: Träff's at 832488 of 1047552 sizes (79.5%), the first 196569, every size from 216129, 3 changes
+    8 nodes: Träff's at 916388 of 1047552 sizes (87.5%), the first 119261, every size from 144001, 3 changes
+   16 nodes: Träff's at 914720 of 1047552 sizes (87.3%), the first 122397, every size from 142533, 3 changes
+   31 nodes: Träff's at 933920 of 1047552 sizes (89.2%), the first 114657, every size from 114657, 1 changes
+   64 nodes: Träff's at 923364 of 1047552 sizes (88.1%), the first 118905, every size from 137381, 3 changes
+  255 nodes: Träff's at 935632 of 1047552 sizes (89.3%), the first 112945, every size from 112945, 1 changes

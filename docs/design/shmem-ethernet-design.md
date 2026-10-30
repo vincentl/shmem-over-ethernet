@@ -6460,7 +6460,15 @@ which `shmem.shape.chosen.*` and `shmem.circulant.*` hold call by call. Its
 crossover is the cost model's on the measured link: on the Pi's four nodes
 between 8 and 16 KiB, and it was faster than the trees at every size it took - 1.32 to 1.41
 times at 1 MiB - and the trees below it unchanged (`docs/pi-cluster-results.md`,
-v0.2 step 3).
+v0.2 step 3). *(As built at v0.2, P4:)* a tree's partial last piece costs its own
+bytes on the busiest link - or, where the window holds it back, the window's pace
+less what its shorter loop gives back - not a whole piece's period, nearer what
+the simulation step 2 fitted finds, so that on two nodes - where a tree's one
+child and Träff's two leads send the same bytes - the choice no longer follows
+how a size divides into 16 KiB pieces: two nodes of the Pi's link take the tree
+at every size, measured the faster to 16 KiB and within 12% of Träff's beyond,
+and from three nodes the crossover is where it was
+(`docs/decisions/2026-10-29-two-node-choice.md`).
 
 #### Prefix scans
 

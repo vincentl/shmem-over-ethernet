@@ -1,0 +1,26 @@
+osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=83035 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=117876369
+two-node pes=8 bytes=4096 slowest_median_us=255.2 fastest_median_us=235.4 p10_us=251.8 p90_us=262.1 algorithm=0 window=8 children=1
+two-node pes=8 bytes=8192 slowest_median_us=325.6 fastest_median_us=256.4 p10_us=308.3 p90_us=336.1 algorithm=0 window=8 children=1
+two-node pes=8 bytes=16384 slowest_median_us=497.9 fastest_median_us=363.5 p10_us=490.6 p90_us=506.8 algorithm=0 window=8 children=1
+two-node pes=8 bytes=16385 slowest_median_us=497.9 fastest_median_us=364.2 p10_us=491.1 p90_us=507.5 algorithm=0 window=8 children=1
+two-node pes=8 bytes=32768 slowest_median_us=825.3 fastest_median_us=572.4 p10_us=818.0 p90_us=834.9 algorithm=0 window=8 children=1
+two-node pes=8 bytes=32769 slowest_median_us=825.4 fastest_median_us=576.9 p10_us=819.5 p90_us=836.0 algorithm=0 window=8 children=1
+two-node pes=8 bytes=49152 slowest_median_us=1179.0 fastest_median_us=789.1 p10_us=1170.0 p90_us=1198.2 algorithm=0 window=8 children=1
+two-node pes=8 bytes=49153 slowest_median_us=1186.7 fastest_median_us=797.3 p10_us=1162.9 p90_us=1208.8 algorithm=0 window=8 children=1
+two-node pes=8 bytes=65536 slowest_median_us=1442.0 fastest_median_us=1005.8 p10_us=1373.3 p90_us=1472.1 algorithm=0 window=8 children=1
+two-node pes=8 bytes=65537 slowest_median_us=1456.7 fastest_median_us=1075.7 p10_us=1432.7 p90_us=1476.2 algorithm=0 window=8 children=1
+two-node pes=8 bytes=98304 slowest_median_us=1873.3 fastest_median_us=1454.3 p10_us=1848.9 p90_us=1892.7 algorithm=0 window=8 children=1
+two-node pes=8 bytes=98305 slowest_median_us=1867.7 fastest_median_us=1452.6 p10_us=1848.7 p90_us=1881.9 algorithm=0 window=8 children=1
+two-node pes=8 bytes=131072 slowest_median_us=2526.8 fastest_median_us=1886.3 p10_us=2411.0 p90_us=2571.4 algorithm=0 window=8 children=1
+two-node pes=8 bytes=131073 slowest_median_us=2523.4 fastest_median_us=1876.2 p10_us=2394.1 p90_us=2556.5 algorithm=0 window=8 children=1
+two-node pes=8 bytes=262144 slowest_median_us=4154.7 fastest_median_us=3753.9 p10_us=4015.1 p90_us=4329.2 algorithm=0 window=8 children=1
+two-node pes=8 bytes=262145 slowest_median_us=4150.1 fastest_median_us=3736.9 p10_us=3998.2 p90_us=4320.8 algorithm=0 window=8 children=1
+two-node pes=8 bytes=524288 slowest_median_us=7429.1 fastest_median_us=6838.3 p10_us=7295.0 p90_us=7454.6 algorithm=0 window=8 children=1
+two-node pes=8 bytes=524289 slowest_median_us=7422.8 fastest_median_us=6833.6 p10_us=7300.2 p90_us=7462.7 algorithm=0 window=8 children=1
+two-node pes=8 bytes=1048576 slowest_median_us=14069.5 fastest_median_us=13333.7 p10_us=13956.0 p90_us=14135.4 algorithm=0 window=8 children=1
+two-node pes=8 bytes=1048577 slowest_median_us=14086.5 fastest_median_us=13393.5 p10_us=13943.4 p90_us=14157.1 algorithm=0 window=8 children=1
+two-node pes=8 bytes=2097152 slowest_median_us=25859.9 fastest_median_us=25243.8 p10_us=25765.3 p90_us=26548.4 algorithm=0 window=8 children=1
+two-node pes=8 bytes=2097153 slowest_median_us=25799.7 fastest_median_us=25118.6 p10_us=25735.4 p90_us=25890.7 algorithm=0 window=8 children=1
+two-node pes=8 bytes=4194304 slowest_median_us=50942.5 fastest_median_us=50515.2 p10_us=50688.9 p90_us=53707.8 algorithm=0 window=8 children=1
+two-node pes=8 bytes=4194305 slowest_median_us=50846.4 fastest_median_us=50371.4 p10_us=50700.7 p90_us=53509.9 algorithm=0 window=8 children=1
+two-node done: every result right

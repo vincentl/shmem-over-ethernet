@@ -21,10 +21,14 @@
  * ceiling's + 1, or the job's rounds where they are more - a lane that fits the
  * rounds of every team Träff's runs on, so that the chooser takes it past 512
  * nodes at the default ceiling and past 8 at a ceiling of 2, and leaves it to the
- * trees only where the lane it is told is too short. grid reads the answers
- * tools/modelcheck/shape_timing.py writes - op, nodes, bytes, the link, the
- * ceiling, the capacity, the small class's bytes and whether Träff's is
- * allowed, then the algorithm, fan-out, window and cost it chose - and
+ * trees only where the lane it is told is too short. And a tree's partial last
+ * piece, charged its bytes (P4): two nodes of the Pi take the tree either side
+ * of every multiple of 16 KiB, and from three nodes to 512 Träff's is taken
+ * from under 4 to 16 KiB and at every size above, as the README says. grid
+ * reads the answers tools/modelcheck/shape_timing.py writes - op, nodes,
+ * bytes, the link, the ceiling, the capacity, the small class's bytes and
+ * whether Träff's is allowed, then the algorithm, fan-out, window and cost it
+ * chose - and
  * requires the same of osoe_shape_choose, osoe_shape_cost and
  * osoe_shape_circulant_cost, whose arithmetic is the model's in integers; a
  * line's team is the whole job, so its lane has osoe_internal_lane_rows of its
@@ -160,6 +164,63 @@ static void check_lane_rows(void)
     CHECK(s.algorithm == OSOE_SHAPE_CIRCULANT && s.window == 12);
 }
 
+/*
+ * A tree's partial last piece charged its bytes (P4): on two nodes, where a
+ * tree's one child and Träff's two leads each send the vector once each way,
+ * a byte past whole pieces costs the tree that byte on the link - 9 ns on the
+ * Pi's - and half a piece half a piece's time, where it had cost a whole
+ * period; so a reduction as the data path asks for it on two nodes of the
+ * Pi's link takes the tree either side of every multiple of 16 KiB to 4 MiB,
+ * where it had taken the tree at 16 KiB k and Träff's at 16 KiB k + 1.
+ */
+static void check_last_piece(void)
+{
+    const uint64_t piece = OSOE_INTERNAL_PIECE_BYTES;
+    for (uint64_t k = 1; k <= 256; k++) {
+        uint64_t whole = osoe_shape_cost(OSOE_SHAPE_REDUCE, 2, 2, 8, k * piece, piece, &pi_link);
+        CHECK(osoe_shape_cost(OSOE_SHAPE_REDUCE, 2, 2, 8, k * piece + 1, piece, &pi_link) ==
+              whole + 9);
+        CHECK(osoe_shape_cost(OSOE_SHAPE_REDUCE, 2, 2, 8, k * piece + piece / 2, piece,
+                              &pi_link) == whole + (piece / 2 * 1000000000u + 115999999) /
+                                                       116000000);
+        for (uint64_t n = k * piece - 1; n <= k * piece + 1; n++)
+            CHECK(whole_job_shape(OSOE_SHAPE_REDUCE, 2, n, &pi_link, 8, 8, 1024, true)
+                      .algorithm == OSOE_SHAPE_TREE);
+    }
+}
+
+/*
+ * The crossover the README states, which charging the last piece its bytes
+ * left where it was (P4): on the Pi's link at the defaults, from three nodes to
+ * 512, Träff's from a size under 4 to 16 KiB by the node count - 16,184 bytes on
+ * three, 3,583 on 511 and 512 - and at every size above it, on a ladder of
+ * every 64 bytes to 64 KiB and either side of every multiple of 16 KiB to 1 MiB.
+ */
+static void check_crossovers(void)
+{
+    static const uint32_t nodes[] = { 3, 4, 5, 8, 16, 64, 511, 512 };
+    for (unsigned i = 0; i < sizeof nodes / sizeof nodes[0]; i++) {
+        uint64_t first = 0;
+        bool tree_after = false;
+        for (uint64_t n = 1088; n <= ((uint64_t)1 << 20) + 1;
+             n += n < 65536 ? 64 : (n % 16384 == 1 ? 16382 : 1)) {
+            struct osoe_collective_shape s =
+                whole_job_shape(OSOE_SHAPE_REDUCE, nodes[i], n, &pi_link, 8, 8, 1024, true);
+            if (s.algorithm == OSOE_SHAPE_CIRCULANT && first == 0)
+                first = n;
+            else if (s.algorithm == OSOE_SHAPE_TREE && first != 0)
+                tree_after = true;
+        }
+        printf("reduce: Träff's on %u nodes of the Pi from %llu bytes%s\n", nodes[i],
+               (unsigned long long)first, tree_after ? ", and the tree above it" : "");
+        CHECK(first >= 3500 && first < 16384 && !tree_after);
+    }
+    CHECK(whole_job_shape(OSOE_SHAPE_REDUCE, 3, 16184, &pi_link, 8, 8, 1024, true).algorithm ==
+          OSOE_SHAPE_CIRCULANT);
+    CHECK(whole_job_shape(OSOE_SHAPE_REDUCE, 3, 16183, &pi_link, 8, 8, 1024, true).algorithm ==
+          OSOE_SHAPE_TREE);
+}
+
 static int choice(void)
 {
     const enum osoe_shape_operation ops[] = { OSOE_SHAPE_REDUCE, OSOE_SHAPE_BROADCAST };
@@ -216,6 +277,8 @@ static int choice(void)
     CHECK(osoe_shape_circulant_cost(4096, 1, UINT64_MAX / 2, OSOE_INTERNAL_PIECE_BYTES,
                                     &pi_link) == UINT64_MAX);
     check_lane_rows();
+    check_last_piece();
+    check_crossovers();
     return CHECK_DONE();
 }
 

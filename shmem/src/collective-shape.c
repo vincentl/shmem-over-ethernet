@@ -151,9 +151,33 @@ uint64_t osoe_shape_cost(enum osoe_shape_operation operation, uint32_t nodes, ui
     uint64_t paced = (loop + window - 1) / window;
     if (paced > period)
         period = paced;
-    if (pieces > 1 && period != 0 && pieces - 1 > (UINT64_MAX - fill) / period)
+    /* A partial last piece (P4) adds its own bytes on the busiest link, or,
+     * where the window holds it back, the window's pace less what its loop,
+     * shorter by its missing bytes, gives back - whichever is more, a period
+     * at a whole piece's bytes - as shape_timing.py's simulation, step 2's
+     * fit, finds it closer than a period on every link of the grid. Charged a
+     * period, 16,385 bytes cost a tree on two nodes of the Pi 141 us more than
+     * 16,384, where the Pi measured 12 at most, and the chooser took Träff's or
+     * the tree by how a size divides into pieces. */
+    uint64_t later = pieces - 1, tail = 0;
+    uint64_t last = bytes - (pieces - 1) * piece_bytes;
+    if (pieces > 1 && last < piece_bytes) {
+        uint64_t last_ns =
+            (last * 1000000000u + link->bytes_per_second - 1) / link->bytes_per_second;
+        uint64_t last_loop = 0;
+        for (unsigned i = 0; i < t.ways; i++) {
+            uint64_t l = path_time(&t.loop[i], link->hop_ns, last_ns, link->message_ns);
+            if (l > last_loop)
+                last_loop = l;
+        }
+        later = pieces - 2;
+        tail = t.beta * last_ns;
+        if (paced > loop - last_loop && paced - (loop - last_loop) > tail)
+            tail = paced - (loop - last_loop);
+    }
+    if (later > 0 && period != 0 && later > (UINT64_MAX - fill - tail) / period)
         return UINT64_MAX;
-    return fill + (pieces - 1) * period;
+    return fill + later * period + tail;
 }
 
 /* a + b, or UINT64_MAX where it overflows */
