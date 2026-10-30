@@ -1,7 +1,8 @@
 # Prompts
 
 **Where the files are.** The open briefs sit here - v0.2's arc, its last
-stretch and the list of items that stretch clears; every finished one is in
+stretch and the list of items that stretch clears, and the off-network
+cluster's brief for after the tag; every finished one is in
 `done/`, under its own name, which this index still gives, and so are the
 cloud sessions' manifests and responses, beside their briefs.
 
@@ -9,8 +10,10 @@ cloud sessions' manifests and responses, beside their briefs.
 every open item cleared before the tag, as the author asked that day -
 `v0.2-open-items.md` lists them by number, 61 when it was compiled, with how
 many are left at its head - Part 4 on eight Google Cloud nodes, run in three
-sessions (2026-10-12, 10-20 and 10-28), round ten, the tag's checks. Before it,
-v0.2's arc was `task-v0.2.md` - four steps in order, each
+sessions (2026-10-12, 10-20 and 10-28), round ten, the tag's checks. For after
+the tag, `off-network-cluster-brief.md` (2026-10-30, X17) is the brief of a
+session on a bare-metal cluster of hundreds of nodes, off the network. Before
+the last stretch, v0.2's arc was `task-v0.2.md` - four steps in order, each
 with a brief of its own for a session that starts cold, and a list of items
 gated on hardware - written on 2026-10-05 from the author's decisions of that
 evening (`docs/decisions/2026-10-05-v0.2.md`): `v0.2-step1-single-node-prompt.md`
@@ -133,3 +136,4 @@ and `docs/reviews/` do track the current names.
 | `task-v0.2.md` | The arc of v0.2: four steps in order - the single-node build, the tree's shape from the link, Rabenseifner's reduction, progress helpers - and the items gated on x86-64 hardware; how to spend each session | open, its last stretch `task-v0.2-to-the-tag.md`'s: steps 1 to 3 done - step 3, Träff's circulant reduce-scatter in place of the fold, merged 2026-10-07 at `512e913` (`docs/decisions/2026-10-07-circulant-data-path.md`); step 4's Parts 0 to 3 merged and their merge point passed on 2026-10-10 at `f9efd10` (`docs/decisions/2026-10-10-step4-merge-point.md`); Part 4, a fast link, in 0.2's scope (`docs/decisions/2026-10-10.md`, item 3, where `2026-10-09.md` item 3 let 0.2 ship without it), run on eight of Google Cloud's `c4-standard-16` in three sessions, 2026-10-12, 10-20 and 10-28 (`docs/fast-link-results.md`); the items it gated on hardware taken into `v0.2-open-items.md` |
 | `task-v0.2-to-the-tag.md` | v0.2's last stretch, from round nine's merge to the tag, the author having asked on 2026-10-11 that it clear every open item: the order of the work, the machines (eight `c4-standard-16` on Google Cloud, Debian 13), how each slice is done, the author's decisions first | open |
 | `v0.2-open-items.md` | The 61 open items before the 0.2 tag, compiled on 2026-10-11 from every list the project keeps, each with its source, kind, place and size | open |
+| `off-network-cluster-brief.md` | The off-network cluster's brief (2026-10-30), the 0.2 tag's last item (X17), for a cold agent on a bare-metal cluster of hundreds of nodes off the network, testing osoe and perhaps developing it: what to read first; the off-network facts, the build fetching nothing and the corpus carried in; the questions only that cluster answers - start-up at hundreds of nodes, the kernel's neighbour table on a flat network, Träff's past 256 nodes, P35's cap within the exchange's room of 64, the receive pool (A6), A2 under the site's binding, and the ceilings' widest gaps - each with how to measure it; the kit on a site's own Slurm without `sudo`; and the return contract, one Markdown file standing alone | open: for the session after the tag (N4, `docs/decisions/2026-10-20.md`) |

@@ -161,10 +161,12 @@ until the tree to be tagged has them; the author tags.
   replaced by the tag's, anything merged after `5748c97` added, and its line on
   0.1.0's `osoe-pacer mix` hang kept (`docs/decisions/2026-10-09.md` item 4,
   the author: "fine").
-- [ ] **The version**: `CMakeLists.txt`'s `0.1.0` to `0.2.0` in the commit the tag
+- [x] **The version**: `CMakeLists.txt`'s `0.1.0` to `0.2.0` in the commit the tag
   names, with the README's places that give the current version - its Status,
   the version strings and the library's file name, the repository table's row,
-  `SHMEM_VERSION`'s row - and the README's Status linking the new note.
+  `SHMEM_VERSION`'s row - and the README's Status linking the new note. Done
+  2026-10-30 (X2), before the tag's last runs, so that they run on the version
+  the tag names; every test of a version takes it from the project's.
 - [x] **The soname**: `libosoe.so.0`, as 0.1.0's (the author,
   `docs/decisions/2026-10-10.md` item 4) - the installed headers and the
   exported names are 0.1.0's, so a program built against 0.1.0 links and runs

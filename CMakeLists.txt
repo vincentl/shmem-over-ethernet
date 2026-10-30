@@ -5,9 +5,9 @@ cmake_minimum_required(VERSION 3.25)
 # first line of SHMEM_INFO's text, every tool's --version (oshcc's is
 # --showme:version, which leaves --version the compiler's), and the shared
 # library's file name and soname all come from this value (cmake/OsoeVersion.cmake
-# says how). 0.1.0 is the first release's.
+# says how). 0.1.0 was the first release's, and 0.2.0 is the second's.
 project(osoe
-  VERSION 0.1.0
+  VERSION 0.2.0
   DESCRIPTION "OpenSHMEM 1.6 over Ethernet with io_uring"
   LANGUAGES C)
 

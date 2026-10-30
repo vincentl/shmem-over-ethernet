@@ -80,7 +80,7 @@ static _Atomic int thread_level = OSOE_INIT_LEVEL;
 /*
  * What the library calls itself: the vendor string (shmem.h) and the project's
  * version, which CMake gives libosoe as OSOE_VERSION_STRING from the one value
- * that names it (cmake/OsoeVersion.cmake) - "osoe 0.1.0". SHMEM_VERSION's line
+ * that names it (cmake/OsoeVersion.cmake) - "osoe 0.2.0". SHMEM_VERSION's line
  * and the first line of SHMEM_INFO's text begin with it.
  */
 #ifndef OSOE_VERSION_STRING

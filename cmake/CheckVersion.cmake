@@ -5,7 +5,7 @@
 # the project's version when the test is registered, so the tool is compared
 # with what CMake knows, and a version written into one place by hand fails here.
 #
-#   cmake -DPROGRAM=<path> -DARGUMENTS=--version "-DEXPECTED=osoe-stat (osoe) 0.1.0"
+#   cmake -DPROGRAM=<path> -DARGUMENTS=--version "-DEXPECTED=osoe-stat (osoe) 0.2.0"
 #         -P CheckVersion.cmake
 cmake_minimum_required(VERSION 3.25)
 
