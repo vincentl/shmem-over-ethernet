@@ -11,6 +11,7 @@ you want; each names the `README.md` of the directories that go with it.
 | Where | What |
 |---|---|
 | `README.md` | what osoe is; building, installing and running a program, under `srun` or on one machine; every limit and every environment variable |
+| `docs/ceilings.md` | every ceiling a job can meet - its value, what happens past it, and the largest value any run has reached, and where - with where in the source each is set, and the widest gaps between a ceiling and what has run |
 | `docs/pi-cluster.md` | the runbook for the four Raspberry Pi 5 nodes osoe was measured on, under Slurm: checking the nodes, building, the smoke tests, the library against its floor, `osoe-bench`, how jobs end, and programs from the reading corpus |
 | `docs/pi-cluster-results.md` | what the sessions on that cluster measured and found, newest last |
 | `docs/fast-link.md`, `docs/fast-link/` | the runbook for v0.2 step 4's Part 4, written before its machines existed and first run on 2026-10-12: five to eight x86-64 nodes on a link above a gigabit, set up under Slurm, and the measurements that decide the progress helpers' default, the zero-copy send's, the ladder's settings and the landing zone's size, and (B14) `collect`'s places, what waits behind a stream, the shapes' chooser, latency tuning and the ladder's code rungs; beside it the kit's scripts and probes, which run on one machine's logical nodes too (`dry-run.sh`) |

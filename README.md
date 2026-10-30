@@ -692,6 +692,7 @@ where to find what among the documents.
 | `docs/fast-link.md`, `docs/fast-link-results.md`, `docs/fast-link/` | the runbook for the measurements on a link above a gigabit - v0.2 step 4's last part - and what its sessions measured, with its scripts and probes; the first session, on eight x86-64 nodes, was on 2026-10-12, the second on 2026-10-20 and the third on 2026-10-28 |
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
 | `docs/release-notes/` | a note for each release: what it is and what changed, what was checked before its tag, and what it leaves for later |
+| `docs/ceilings.md` | every ceiling a job can meet, where in the source each is set, and the largest run of each ([Ceilings, and how far each is tested](#ceilings-and-how-far-each-is-tested)) |
 | `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
@@ -1023,7 +1024,65 @@ times these:
   instead, and 12,288 nodes at no progress helpers or 16,384 with them, the
   ceiling of a lead's io_uring; 65,535 PEs a node; `OSOE_MAX_TEAMS` 1,024,
   `OSOE_TEAM_BLOCKS` 65,536, `OSOE_MAX_THREADS` 1,023, a fan-out of 32 and 8
-  pieces in flight, at most.
+  pieces in flight, at most. The next heading gives every one, with how far
+  each has run.
+
+### Ceilings, and how far each is tested
+
+Each bound a job can meet, its value, what happens past it, and the largest
+value any run has reached, and where. What has run is the measure of every row:
+in the registered suite, jobs of up to 70 logical nodes, and 70 PEs on one node;
+on one machine's logical nodes, by the records, 254 nodes under `osoe-launch`
+and 128 under tier 3; and across separate machines, eight Google Cloud nodes -
+256 PEs at 32 a node, and 512 at 256 on each of two, streams of puts and five
+collectives alone - and the Pi cluster's four nodes of four PEs. So most of the
+ceilings below are far past any job that has run: where osoe sets one, its
+arithmetic is tested, and a job at it is not. [`docs/ceilings.md`](docs/ceilings.md)
+has every ceiling, with where in the source each is set, the record of each
+run, the layout's field widths that no run approaches and the widest gaps; each
+setting's own range is its row under [Environment variables](#environment-variables).
+
+| Ceiling | Value | Past it | Largest run, and where |
+|---|---|---|---|
+| Nodes a job | 4,097 at the default `OSOE_AM_BUFFER_BUDGET`, 1 GiB; from 2,050 the buffers to each peer are halved to their floor, twice `OSOE_AM_CHUNK` | from 2,050 each node's lead says the buffers were reduced; from 4,098 the start ends, naming the budget | 254 logical nodes on one machine; eight Google Cloud nodes; the arithmetic at 2,049 to 4,098 |
+| Data wires a node, under `OSOE_MESH_DATA_WIRES=on-demand` | 4,096 at the default budget, whatever the job's nodes | a data wire past them ends the job, naming the node and both settings | four logical nodes at two data wires a node |
+| Nodes, a lead's io_uring | 8,192 at no progress helpers, which only a larger budget reaches; 12,288 with the data wires on demand; 16,384 with helpers | refused at start by name | the arithmetic at each; 254 logical nodes |
+| Nodes, under `OSOE_WIRE_ZERO_COPY=on` | 3,274 at no helpers and the default receive buffers, by io_uring's completion queue | refused at start by name | 64 logical nodes; eight Google Cloud nodes |
+| Nodes on one subnet | about 1,025: the kernel's neighbour table, an entry a peer, holds 1,024 by default (`net.ipv4.neigh.default.gc_thresh3`); logical nodes of one machine share one, n(n - 1) entries, more than 1,024 past 32 nodes | the kernel drops what it cannot address, calls time out, and nodes count each other vanished: osoe does not check it; `tier3.sh` does | 128 tier-3 nodes with the table raised, 32 at the default; eight Google Cloud nodes |
+| Callers waiting at a lead | a listen backlog of the job's nodes, up to 4,096, cut to `net.core.somaxconn`; 16 at a time through the hello | a caller waits in TCP's retries, and osoe dials again after a second; on one kernel at 128 tier-3 nodes, its per-CPU queue of arriving packets (`net.core.netdev_max_backlog`, 1,000) dropped handshakes, a lead a second late in 12 runs of 30 | 254 logical nodes |
+| Rendezvous ports | 32 candidates of `OSOE_PORT_RANGE` a node, drawn from the job's ids | the start ends, naming the range | 254 logical nodes on one host; the refusal untested |
+| PEs a node | 65,535 | the start ends, naming the rank list | 256 on each of two Google Cloud nodes, streams of puts and five collectives; 64 with gets and the mailbox; 70 on one node in the suite |
+| PEs a node, by the launcher's one string | a node's ranks come as one environment string, `SLURM_GTIDS`, and Linux holds one to 32 pages, 131,072 bytes on 4 KiB pages: about 21,000 PEs of five-digit ranks | the launcher cannot start the process ("Argument list too long") | not run |
+| PEs a node, by the kernel's map count | each PE maps each node-mate's heap and statics, two maps a node-mate, against `vm.max_map_count`, 65,530 by the kernel's default: about 32,000 node-mates; osoe does not check it beforehand | the start ends, naming the node-mate's heap it could not map | not run |
+| PEs a job | none of its own beside the nodes' and a node's; designed for 500 nodes of 256, 128,000 PEs | - | 512 |
+| Open files | a lead's two sockets for each other node and a descriptor for each node-mate, beside the program's: a hard limit of 1,024 runs out at about 385 nodes of 256 PEs | the start ends, naming the limit | 254 logical nodes; the refusal at a limit of 32 |
+| Locked memory | io_uring's rings on Linux 6.14 and later, at most 2.6 MiB a lead at 4,097 nodes on a Pi's pages; the zero-copy send's loans | a ring refused ends the start, naming the limit; a send refused goes by copy | 254 logical nodes on a Pi; 64 at 8 MiB with the zero-copy send |
+| `/dev/shm` | P × (the heap, the statics and about 26 MiB) and the control segment: 70.7 GiB a node of 256 PEs on 500 nodes at the default heap | refused at `shmem_init` by name, or a warning with `OSOE_SHM_CAPACITY_CHECK=0` | 256 PEs a node on a heap of 16 MiB |
+| A PE's heap, `SHMEM_SYMMETRIC_SIZE` | 4 TiB | refused by name | 1,500 MiB on the Pi |
+| `shmem_align`'s alignment | 4 GiB, which every heap base the library tries is a multiple of | returns NULL on every PE | 4,096 |
+| Teams a PE is in, `OSOE_MAX_TEAMS` | 1,024; 256 by default | a split returns nonzero, naming it | 1,021 at once on four PEs; 12 on the Pi |
+| Team blocks a node holds, `OSOE_TEAM_BLOCKS` | 65,536; 1,024 by default, which three whole-job `shmem_team_split_2d` grids fill at 256 PEs a node | a split returns nonzero, naming it and the node | 8,192 at 256 PEs on each of two logical nodes |
+| Contexts, `OSOE_MAX_CONTEXTS` | 4,096; 64 by default | `shmem_ctx_create` returns nonzero, naming it | 4,096 on two logical nodes |
+| Live threads that have called the library, `OSOE_MAX_THREADS` | 1,023; 16 by default | the job ends, naming it | 21 |
+| CPUs `OSOE_AGENT_CPUS=node` can place an agent on | those numbered below 1,024, as glibc's `cpu_set_t` holds them | a CPU from 1,024 on is not recorded, and nothing says so | not run |
+| Progress helpers, `OSOE_PROGRESS_HELPERS` | 64 | refused by name | 64 on two and four logical nodes; 4 on eight Google Cloud nodes |
+| A lead's reply pool | written whole at start, 48 bytes a descriptor: one for each credit (`OSOE_AM_CREDITS`) of each peer's data wire and one more a peer, and (`OSOE_COLLECTIVE_FANOUT` + 1) × `OSOE_TEAM_BLOCKS` - 432 KiB of those at the defaults; at 65,536 credits and 4,096 peers, about 12 GiB | a pool that runs dry ends the job, naming both nodes: only nodes whose `OSOE_AM_CREDITS` differ, or a defect, can empty it | 64 credits; 1 and 2 in the suite |
+| A wire owner's receive pool | `OSOE_WIRE_BYTES` × `OSOE_WIRE_BUFFERS`, 1 MiB at the defaults, however many peers send to it | not an error: the kernel ends a receive with `ENOBUFS` and the owner arms it again, counted in `transport.am.receive_enobufs` with no notice, so the counters alone show it | 256 buffers of 16 KiB, and 64 of 64 KiB, on eight Google Cloud nodes; a fan-in of seven nodes into one |
+| A tree's fan-out, `OSOE_COLLECTIVE_FANOUT` | 32 | refused by name | 32 on three logical nodes; 8 on eight Google Cloud nodes |
+| Träff's reduction | teams of up to 65,536 nodes | the tree | 70 logical nodes; eight Google Cloud nodes; past 512 nodes only the cost model |
+| `collect`'s exchange of the nodes' totals | room for 64 nodes; 16 by default (`OSOE_COLLECTIVE_PLACES`) | the tree or the scan; a forced exchange falls back | 17 logical nodes; eight Google Cloud nodes |
+| `OSOE_KEEPALIVE` | IDLE and INTERVAL 1 to 32,767 s, COUNT 1 to 127 | refused by name | the default |
+| A host list | one bracketed range a name: `node[1-8]`, not `rack[1-4]n[1-8]` | `shmem_init` ends, naming the list | the parser's tests |
+| `osoe-launch` | 1,024 processes; 254 logical nodes without a host list | refused by name | 254 logical nodes; 512 processes |
+
+The widest gaps between a ceiling and its largest run are a PE's heap, about
+2,800 times what has run; a connection's credits, 1,024 times the default that
+every run used; Träff's teams, 936 times the 70 logical nodes it has run on;
+PEs a node, 256 times - though the launcher's string stops them at about
+21,000; and, against separate machines alone, the 4,097 nodes, 512 times the
+eight that have run. The off-network cluster's brief
+([`docs/prompts/off-network-cluster-brief.md`](docs/prompts/off-network-cluster-brief.md))
+asks what only a cluster of hundreds of nodes can measure.
 
 ## Limits, and where osoe departs from the specification
 
@@ -1942,11 +2001,11 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `OSOE_NO_PROGRESS_TIMEOUT` | `0` | Seconds a wait on the library's own progress - acknowledgements, buffer space, a reply, the rendezvous - may see none before it ends the job, naming what it waited for; `0`, never. A start-up wait on another node has two seconds more, and a PE's wait on its lead in the rendezvous four, so that a node whose own PE never calls `shmem_init` ends first, naming the PE's rank. A program's own waits and collectives are not timed. |
-| `OSOE_KEEPALIVE` | `60,10,6`, or `0` where every node has a loopback address | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - `osoe-launch`'s logical nodes - has neither: with no link between its nodes to cut, and a kernel that closes a dead node's connections itself and answers for a stopped one, a probe can find nothing there, and an overloaded machine's receive backlog drops them. Nodes with addresses of their own keep both, tier 3's namespaces on one machine among them. `SHMEM_DEBUG` says which a node chose. |
+| `OSOE_KEEPALIVE` | `60,10,6`, or `0` where every node has a loopback address | `IDLE,INTERVAL,COUNT`: TCP keepalive between nodes, in seconds, seconds and probes, `1` to `32767`, `1` to `32767` and `1` to `127`. IDLE + INTERVAL × COUNT, 120 s by default, is also how long a node's kernel may leave data sent to it unacknowledged before the node counts as vanished. `0` for neither. Not set, a job whose every node has a loopback address - `osoe-launch`'s logical nodes - has neither: with no link between its nodes to cut, and a kernel that closes a dead node's connections itself and answers for a stopped one, a probe can find nothing there, and an overloaded machine's receive backlog drops them. Nodes with addresses of their own keep both, tier 3's namespaces on one machine among them. `SHMEM_DEBUG` says which a node chose. |
 | `OSOE_DEADLOCK_SECONDS` | `10` | How long a job whose every PE waits in the library, with nothing moving on any node and nothing in flight, is watched before it ends as deadlocked, each node naming where its PEs wait: `1` to `86400`, or `0` for never. |
 | `OSOE_MESH_SLOT` | `100` | Microseconds between the slots of the mesh's start-up schedule, `0` to `100000`: each lead calls one place further round the circle a slot, its calls of a slot begun no earlier than the slot's time, counted from the rendezvous's release, so that each lead is called by about one other at a time; `0`, no slots, each call as soon as fewer than eight are in flight. The schedule's ⌈(n - 1)/2⌉ slots are 3.2 ms at 64 nodes and 0.2 s at 4,097 at the default, the least it takes; calls slower than a slot's share of the eight in flight set the pace instead. Nodes may differ. |
 | `OSOE_MESH_DATA_WIRES` | `eager` | `eager` or `on-demand`: when a node pair's data wire, which carries every put, get and atomic between the two nodes, is made. `eager` makes every one at start-up, as osoe always has. `on-demand` makes the control wires alone at start-up - eagerly to every node, so that start-up still proves every node reachable, and the barrier, the deadlock detector, the abort and keepalive keep theirs - and a pair's data wire at the first traffic between the two nodes, which waits for it meanwhile: the node the mesh's schedule has call the other dials, the other asking it to over their control wire, and each lead's listener stays open for the job's life. What it saves is the data wires' sockets and their part of start-up, for a program whose nodes each talk to few others - which still makes the collective tree's data wires, one a node, at its first collective that carries data: `shmem_malloc`'s check of its arguments, and the end of `shmem_init`, which measures the link between nodes 0 and 1 and hands it out unless the `OSOE_LINK_*` settings give it. A data wire that cannot be made is met at the first traffic of its pair rather than in the start-up's mesh: its wait says what it waits for after 30 s and every minute after - the node, its address and the last call's error, as start-up's calls do - and ends the job only under `OSOE_NO_PROGRESS_TIMEOUT`. Measured on no large cluster yet, which is why it is not the default. *Checked* between nodes, by every lead before any wire is made: a job whose nodes differ is refused, naming the first node that differs from node 0 and how each makes them. |
-| `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. |
+| `OSOE_PORT_RANGE` | `17000-26999` | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the rendezvous. Each node tries 32 of them, drawn from the job's ids, and a node that finds none of its 32 free ends the start, naming the range. |
 | `OSOE_MESH_PORT_RANGE` | not set | `LOW-HIGH`, within `1024-65535`: the ports a node's lead may listen on for the connections between nodes, which it tells the others in the rendezvous, so nodes need not agree on it - for a site whose firewall opens the nodes' ports by range. Not set, the kernel chooses the port, as it chooses a connection's own. A lead takes the first free port of the range from one its job and node pick, and refuses to start naming the range where none is free; best apart from `OSOE_PORT_RANGE`, whose candidates it may otherwise take. `SHMEM_DEBUG` has each lead say the port it took. |
 | `OSOE_JOB_SECRET` | unset | 32 hexadecimal digits: a secret every node proves it knows when it joins the job, never sent. A value that is not 32 hexadecimal digits is refused by name, but an empty one is taken as unset, without a word: a wrapper whose secret came out empty starts the job unsecured. *Checked* between nodes: where one node has a secret and another has none, or a different one, the node that sees it ends naming the variable and both nodes; a node's PEs are not compared, and only its lead's is used. |
 | `OSOE_HEAP_BASE` | chosen | The address every PE maps its heap at, a multiple of the page size, in place of the library's own candidates - digits, in decimal or after `0x` in hexadecimal, with no sign: a node whose lead cannot map its heap there refuses to start, naming the address and the kernel's reason - or, under ThreadSanitizer, the tool's: it refuses an address outside its application memory, as it does the library's first candidates, which the lead passes over. The node's first PE's value is the node's. |
