@@ -7,10 +7,10 @@ cloud sessions' manifests and responses, beside their briefs.
 
 **Open now:** v0.2's last stretch, `task-v0.2-to-the-tag.md` (2026-10-11):
 every open item cleared before the tag, as the author asked that day -
-`v0.2-open-items.md` lists them by number, 61 when it was compiled and 18 left
-on 2026-10-30 - Part 4 on eight Google Cloud nodes, run in three sessions
-(2026-10-12, 10-20 and 10-28), round ten, the tag's checks. Before it, v0.2's
-arc was `task-v0.2.md` - four steps in order, each
+`v0.2-open-items.md` lists them by number, 61 when it was compiled, with how
+many are left at its head - Part 4 on eight Google Cloud nodes, run in three
+sessions (2026-10-12, 10-20 and 10-28), round ten, the tag's checks. Before it,
+v0.2's arc was `task-v0.2.md` - four steps in order, each
 with a brief of its own for a session that starts cold, and a list of items
 gated on hardware - written on 2026-10-05 from the author's decisions of that
 evening (`docs/decisions/2026-10-05-v0.2.md`): `v0.2-step1-single-node-prompt.md`
