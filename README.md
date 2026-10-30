@@ -1886,7 +1886,7 @@ that one could be added without touching the OpenSHMEM layer.
   tore nothing it could see on these machines.
 - **Sandia OpenSHMEM's test suite**: 161 of its 165 programs passed on 0.2.0's
   tree at four logical nodes of two PEs in the development VM, with no progress
-  helpers and with two, and the same day at 4 × 2 on the Pi cluster, 8 PEs, on
+  helpers, two and three, and the same day at 4 × 2 on the Pi cluster, 8 PEs, on
   its code before the version was changed (2026-10-30), as on the tree tagged
   0.1.0 - on the Pi with `bigget` at a smaller loop count, since its default is
   16 GiB of gets a PE over gigabit Ethernet; natively on x86-64, on eight
