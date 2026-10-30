@@ -254,10 +254,12 @@ rated them (round six's readiness Q5-5).
   measured on two and three nodes, where no fan-out differs.
 - **What v0.2 step 3 left to after its merge** (its adversarial read, findings
   2 and 7, `docs/reviews/archive/v0.2-step3-adversarial-read.md`, and its
-  record, `docs/decisions/2026-10-07-circulant-data-path.md`): on two nodes the
+  record, `docs/decisions/2026-10-07-circulant-data-path.md`): ~~on two nodes the
   cost model's choice between the tree and Träff's follows how a size divides
   into 16 KiB pieces, a tree's cost charging a partial last piece whole - take
-  the tree on two nodes, or charge its last piece by its bytes (step 2's fit);
+  the tree on two nodes, or charge its last piece by its bytes (step 2's fit)~~ -
+  done 2026-10-29 (P4: the last piece charged its bytes, two nodes of the Pi's
+  link taking the tree at every size, `docs/decisions/2026-10-29-two-node-choice.md`);
   Träff's at the default ceiling's last row (257 to 512 nodes) only through a
   lower ceiling's tests; the cost model's Träff's optimistic against the Pi from
   256 KiB, and `osoe-bench`'s back-to-back 64 KiB reduction no faster for it -

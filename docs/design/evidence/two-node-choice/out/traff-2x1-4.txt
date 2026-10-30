@@ -1,0 +1,25 @@
+two-node pes=2 bytes=4096 slowest_median_us=376.5 fastest_median_us=361.4 p10_us=346.1 p90_us=384.0 algorithm=1 window=72 children=0
+two-node pes=2 bytes=8192 slowest_median_us=414.4 fastest_median_us=387.3 p10_us=393.4 p90_us=418.1 algorithm=1 window=72 children=0
+two-node pes=2 bytes=16384 slowest_median_us=521.8 fastest_median_us=483.9 p10_us=491.3 p90_us=570.2 algorithm=1 window=72 children=0
+two-node pes=2 bytes=16385 slowest_median_us=520.1 fastest_median_us=485.3 p10_us=491.1 p90_us=562.2 algorithm=1 window=72 children=0
+two-node pes=2 bytes=32768 slowest_median_us=764.5 fastest_median_us=753.4 p10_us=630.1 p90_us=892.5 algorithm=1 window=72 children=0
+two-node pes=2 bytes=32769 slowest_median_us=772.4 fastest_median_us=722.7 p10_us=650.9 p90_us=913.5 algorithm=1 window=72 children=0
+two-node pes=2 bytes=49152 slowest_median_us=1019.6 fastest_median_us=948.0 p10_us=780.2 p90_us=1060.9 algorithm=1 window=72 children=0
+two-node pes=2 bytes=49153 slowest_median_us=1008.8 fastest_median_us=946.4 p10_us=785.4 p90_us=1059.4 algorithm=1 window=72 children=0
+two-node pes=2 bytes=65536 slowest_median_us=1209.0 fastest_median_us=1139.2 p10_us=1156.6 p90_us=1222.9 algorithm=1 window=72 children=0
+two-node pes=2 bytes=65537 slowest_median_us=1211.6 fastest_median_us=1173.2 p10_us=1158.0 p90_us=1231.3 algorithm=1 window=72 children=0
+two-node pes=2 bytes=98304 slowest_median_us=1454.6 fastest_median_us=1411.7 p10_us=1220.7 p90_us=1494.3 algorithm=1 window=72 children=0
+two-node pes=2 bytes=98305 slowest_median_us=1462.2 fastest_median_us=1418.3 p10_us=1323.8 p90_us=1507.3 algorithm=1 window=72 children=0
+two-node pes=2 bytes=131072 slowest_median_us=1857.7 fastest_median_us=1810.4 p10_us=1522.8 p90_us=1901.7 algorithm=1 window=72 children=0
+two-node pes=2 bytes=131073 slowest_median_us=1867.6 fastest_median_us=1813.7 p10_us=1522.9 p90_us=1919.7 algorithm=1 window=72 children=0
+two-node pes=2 bytes=262144 slowest_median_us=3360.7 fastest_median_us=3318.8 p10_us=2758.0 p90_us=3464.1 algorithm=1 window=72 children=0
+two-node pes=2 bytes=262145 slowest_median_us=3364.7 fastest_median_us=3326.1 p10_us=2748.1 p90_us=3473.7 algorithm=1 window=72 children=0
+two-node pes=2 bytes=524288 slowest_median_us=5790.2 fastest_median_us=5740.9 p10_us=5124.0 p90_us=5889.7 algorithm=1 window=72 children=0
+two-node pes=2 bytes=524289 slowest_median_us=5824.4 fastest_median_us=5740.4 p10_us=5118.1 p90_us=5895.4 algorithm=1 window=72 children=0
+two-node pes=2 bytes=1048576 slowest_median_us=10236.4 fastest_median_us=10045.0 p10_us=9907.1 p90_us=10787.3 algorithm=1 window=72 children=0
+two-node pes=2 bytes=1048577 slowest_median_us=10715.9 fastest_median_us=10554.0 p10_us=9910.1 p90_us=10795.9 algorithm=1 window=72 children=0
+two-node pes=2 bytes=2097152 slowest_median_us=19802.0 fastest_median_us=19157.9 p10_us=19211.0 p90_us=20291.2 algorithm=1 window=72 children=0
+two-node pes=2 bytes=2097153 slowest_median_us=19786.8 fastest_median_us=19147.3 p10_us=19581.8 p90_us=20303.9 algorithm=1 window=72 children=0
+two-node pes=2 bytes=4194304 slowest_median_us=39664.0 fastest_median_us=38729.0 p10_us=38109.2 p90_us=39833.2 algorithm=1 window=72 children=0
+two-node pes=2 bytes=4194305 slowest_median_us=39706.8 fastest_median_us=38710.1 p10_us=38153.1 p90_us=39813.1 algorithm=1 window=72 children=0
+two-node done: every result right

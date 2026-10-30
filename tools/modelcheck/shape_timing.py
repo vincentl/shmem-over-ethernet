@@ -32,9 +32,12 @@ One rule, in three forms, in the form of grant_timing.py:
               integer nanoseconds and bytes, the same arithmetic in both
               languages: the first piece's way through the tree, then every
               later piece at the pace of the busiest link or of the window's
-              loop, whichever is slower. Its choices sit between the two link
-              models': choosing by it costs less, against either, than choosing
-              by one and running under the other.
+              loop, whichever is slower, and a partial last piece its own
+              bytes on the busiest link or the window's pace less what its
+              shorter loop gives back, whichever is more (P4). Its choices
+              sit between the two link models': choosing by it costs less,
+              against either, than choosing by one and running under the
+              other.
   tree_terms()  what cost() needs of a tree, in closed form, as the C computes
               it, from the tree being full to its last level; checked against
               tree_terms_walk(), which walks every node.
@@ -74,6 +77,9 @@ PI_HOP, PI_MESSAGE, PI_BANDWIDTH = 86.0, 7.0, 116.0
 PI_PIECE = 16368
 PI_WITHIN = 326
 PIECE = 16384
+# True for check_last_piece's broken variant alone: a partial last piece
+# charged a whole period, as cost() did before P4.
+LAST_PIECE_WHOLE = False
 
 
 def tree(nodes, k):
@@ -394,7 +400,17 @@ def cost(op, nodes, k, W, n, s, h_ns, o_ns, bytes_per_second, interior=1):
     fill = max(a * h_ns + b * t + m * o_ns for a, b, m in first)
     loop = max(a * h_ns + b * t + m * o_ns for a, b, m in loops)
     period = max(beta * t, (loop + W - 1) // W)
-    return min(SATURATED, fill + (pieces - 1) * period)
+    # a partial last piece (P4): its own bytes on the busiest link, or the
+    # window's pace less what its shorter loop gives back, whichever is more -
+    # nearer what simulate() finds it adds than a period, a whole one's
+    later, tail = pieces - 1, 0
+    last = n - (pieces - 1) * s
+    if not LAST_PIECE_WHOLE and pieces > 1 and last < s:
+        t_last = (last * 1000000000 + bytes_per_second - 1) // bytes_per_second
+        loop_last = max(a * h_ns + b * t_last + m * o_ns for a, b, m in loops)
+        later = pieces - 2
+        tail = max(beta * t_last, (loop + W - 1) // W - (loop - loop_last))
+    return min(SATURATED, fill + later * period + tail)
 
 
 def choose(op, nodes, n, link, ceiling, capacity, small_bytes, s=PIECE):
@@ -997,6 +1013,39 @@ def check_circulant(failures):
                             f'and Träff\'s costs up to {max(regrets):.3f}, beyond {regret_bound}')
 
 
+def check_last_piece(failures):
+    """A partial last piece is charged its bytes (P4): on two nodes of the
+    Pi's link, as the data path asks, where the tree and Träff's send the same
+    bytes, every 16 KiB k + 1 to 4 MiB takes what 16 KiB k takes - charged a
+    whole period, the tree took 16 KiB k and Träff's 16 KiB k + 1, every k;
+    and one byte past whole pieces adds to the closed form what it adds to the
+    simulation, on a grid of trees, within 1% of the call at the median and
+    15% at worst - charged a period, 18% and 82%."""
+    flips = [k for k in range(1, 257)
+             if choose_shape('reduce', 2, k * PIECE, PI_LINK, 8, 8, 1024, circulant=True)[0] !=
+             choose_shape('reduce', 2, k * PIECE + 1, PI_LINK, 8, 8, 1024, circulant=True)[0]]
+    if flips:
+        failures.append(f'LAST: on two nodes of the Pi, 16 KiB k + 1 takes another algorithm '
+                        f'than 16 KiB k for {len(flips)} k of 256, from k = {flips[0]}')
+    errors = []
+    for op in ('reduce', 'broadcast'):
+        for nodes in (2, 3, 4, 7, 16):
+            for k in (2, 4, 8):
+                for j in (1, 4, 16):
+                    n = j * PIECE
+                    closed = (cost(op, nodes, k, 8, n + 1, PIECE, *PI_LINK) -
+                              cost(op, nodes, k, 8, n, PIECE, *PI_LINK)) / 1000
+                    before = simulate(op, nodes, k, 8, n, PIECE, 86, 7, 116, measure='completion')
+                    after = simulate(op, nodes, k, 8, n + 1, PIECE, 86, 7, 116,
+                                     measure='completion')
+                    errors.append(abs(closed - (after - before)) / before)
+    median, worst = statistics.median(errors), max(errors)
+    if median > 0.01 or worst > 0.15:
+        failures.append(f'LAST: a byte past whole pieces costs the closed form what it costs '
+                        f'the simulation within {median:.3f} of the call at the median and '
+                        f'{worst:.3f} at worst, beyond 0.01 and 0.15')
+
+
 def check_circulant_wide(failures):
     """Träff's where the lane's rows now let it run (P3), past the 512 nodes the
     ceiling's lane held at the default: on 513 nodes, the first, a 1 MiB reduction
@@ -1033,6 +1082,7 @@ def checks(rows, h, o, B, interior=1, count_runs=True, choices=True):
         check_lane(failures)
         check_circulant(failures)
         check_circulant_wide(failures)
+        check_last_piece(failures)
     return failures
 
 
@@ -1203,6 +1253,17 @@ def main(argv):
     check_lane(broken, lane_of=lambda ceiling, job_nodes: ceiling + 1)
     mark = unexpected(broken, 'LANE')
     print(f'broken lane (its rows the ceiling\'s, as before P3): '
+          f'{"fails" if broken else "PASSES - the check cannot see it"}{mark}')
+    for f in broken[:2]:
+        print('   ', f)
+    ok = ok and not mark
+    global LAST_PIECE_WHOLE
+    LAST_PIECE_WHOLE = True
+    broken = []
+    check_last_piece(broken)
+    LAST_PIECE_WHOLE = False
+    mark = unexpected(broken, 'LAST')
+    print(f'broken last piece (charged a whole period, as before P4): '
           f'{"fails" if broken else "PASSES - the check cannot see it"}{mark}')
     for f in broken[:2]:
         print('   ', f)

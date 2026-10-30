@@ -4863,8 +4863,16 @@ if(OSOE_INTERNODE)
               $<TARGET_FILE:osoe-launch> -n ${pes} -m ${map} -t ${launch_timeout}
               ${launch_options} --
               $<TARGET_FILE:shmem_test_circulant-reduce> ${arguments})
+    # Two nodes of the Pi's link take the tree at every size (P4), which the
+    # program cannot hold them to - it asks the chooser it compiles in, which
+    # took Träff's for 154 of its calls while a tree's partial last piece was
+    # charged a whole period - so the line is pinned here.
+    set(pass "CIRCULANT REDUCE: .* on ${nodes} nodes")
+    if(case STREQUAL "2")
+      set(pass "CIRCULANT REDUCE: every phase on 2 nodes, 2 PEs, Träff's from 0 bytes, 0 calls checked as Träff's")
+    endif()
     set_tests_properties(shmem.circulant.${case} PROPERTIES LABELS "tier2"
-      TIMEOUT ${timeout} PASS_REGULAR_EXPRESSION "CIRCULANT REDUCE: .* on ${nodes} nodes"
+      TIMEOUT ${timeout} PASS_REGULAR_EXPRESSION "${pass}"
       FAIL_REGULAR_EXPRESSION "CHECK[(]")
     osoe_internode_label(shmem.circulant.${case})
   endforeach()

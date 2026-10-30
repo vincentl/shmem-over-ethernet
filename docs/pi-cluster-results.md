@@ -1104,3 +1104,28 @@ That settles the confound "F1, investigated" left - its clean runs came
 minutes after every node rebooted - but not F1: why the offload stalls calls at
 these sizes, and why for seconds in September and 45 ms now, is not known.
 
+
+## P4: the two-node choice between a tree and Träff's (2026-10-29, night)
+
+Main `cbfaa7e1`, `release`, every node's offload off and 26 hours up. Raw
+outputs, scripts and the probe: `docs/design/evidence/two-node-choice/`; the
+record: `docs/decisions/2026-10-29-two-node-choice.md`. On two nodes, where a
+tree and Träff's send the same bytes, the cost model had taken the tree at the
+multiples of 16 KiB and Träff's at most other sizes, a tree's partial last
+piece charged a whole piece. A byte sum over the world either side of every
+multiple of 16 KiB to 4 MiB, one PE a node and four, each algorithm forced -
+the tree by `OSOE_COLLECTIVE_SHAPE=tree`, Träff's by a link set so that it is
+the cheaper, the tree on the same link - in ten series:
+
+| | one PE a node | four PEs a node |
+|---|---|---|
+| a byte past a multiple of 16 KiB | nothing measurable for either: the tree −29 to +34 µs to 2 MiB, against the 141 µs the cost model charged it | the same |
+| to 16 KiB | the tree: Träff's 1.18 to 1.67 times as long | the tree: Träff's 1.02 to 1.39 times |
+| 32 KiB | even | even |
+| 48 to 128 KiB | Träff's, by 3 to 12% | Träff's, by 2 to 8% |
+| 256 KiB to 4 MiB | even at 256 KiB, then the tree by 1.4 to 3.9% | Träff's by 1 to 4% to 2 MiB, even at 4 MiB |
+
+A tree's partial last piece is now charged its bytes, and two nodes of the
+Pi's link take the tree at every size; the band where Träff's was faster is
+left to the author. The tree on the link measured ran as on the link set,
+0.99 to 1.02 of its time, once the arms' order was turned each series.

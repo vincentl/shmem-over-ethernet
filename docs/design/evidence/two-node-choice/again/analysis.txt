@@ -1,0 +1,68 @@
+
+2 PEs on pi-001,pi-002, 1 a node: the slowest PE's median, us, the median of series 1,2,3,4,5,6
+    bytes      tree     traff traff/tree      series  measured  /tree
+     4096     226.8     378.0      1.667 1.586-1.836     226.2  0.998
+     8192     278.8     412.5      1.480 1.422-1.616     278.6  0.999
+    16384     431.2     521.0      1.208 1.148-1.276     431.2  1.000
+    16385     446.1     524.0      1.175 1.131-1.245     445.6  0.999
+    32768     766.3     764.1      0.997 0.995-1.052     766.6  1.000
+    32769     773.5     775.2      1.002 0.989-1.058     773.6  1.000
+    49152    1045.8    1015.9      0.971 0.953-1.049    1039.6  0.994
+    49153    1049.7    1017.2      0.969 0.945-1.044    1051.0  1.001
+    65536    1302.8    1229.4      0.944 0.890-1.095    1308.2  1.004
+    65537    1302.1    1238.3      0.951 0.891-1.095    1368.0  1.051
+    98304    1605.5    1472.2      0.917 0.901-1.134    1631.6  1.016
+    98305    1612.6    1487.0      0.922 0.901-1.133    1632.0  1.012
+   131072    2091.6    1862.2      0.890 0.876-0.952    2116.5  1.012
+   131073    2104.4    1861.5      0.885 0.869-0.945    2125.4  1.010
+   262144    3364.3    3354.1      0.997 0.964-1.015    3388.9  1.007
+   262145    3363.4    3362.2      1.000 0.989-1.012    3376.1  1.004
+   524288    5673.0    5794.8      1.021 0.920-1.030    5673.7  1.000
+   524289    5702.4    5805.7      1.018 1.005-1.028    5704.9  1.000
+  1048576   10378.1   10664.1      1.028 0.997-1.038   10361.5  0.998
+  1048577   10362.1   10671.7      1.030 1.025-1.032   10370.0  1.001
+  2097152   19653.7   19929.7      1.014 1.004-1.030   19642.7  0.999
+  2097153   19633.1   19938.4      1.016 1.010-1.035   19598.2  0.998
+  4194304   38168.9   39665.1      1.039 1.024-1.047   38185.4  1.000
+  4194305   38286.9   39718.9      1.037 1.035-1.042   38180.8  0.997
+
+8 PEs on pi-001,pi-002, 4 a node: the slowest PE's median, us, the median of series 1,2,3,4,5,6
+    bytes      tree     traff traff/tree      series  measured  /tree
+     4096     257.3     345.4      1.342 1.167-1.486     280.8  1.091
+     8192     322.9     447.9      1.387 1.229-1.480     336.1  1.041
+    16384     502.2     517.2      1.030 0.980-1.041     526.7  1.049
+    16385     510.9     519.1      1.016 0.965-1.025     531.1  1.040
+    32768     842.6     836.2      0.992 0.859-1.067     861.2  1.022
+    32769     843.0     817.0      0.969 0.816-1.077     865.9  1.027
+    49152    1191.3    1104.1      0.927 0.821-1.014    1190.5  0.999
+    49153    1195.2    1138.2      0.952 0.867-1.008    1228.5  1.028
+    65536    1441.0    1368.8      0.950 0.702-1.073    1451.3  1.007
+    65537    1453.2    1367.5      0.941 0.692-1.072    1467.0  1.009
+    98304    1893.4    1814.9      0.959 0.788-1.077    1886.2  0.996
+    98305    1894.8    1857.9      0.980 0.783-1.076    1895.1  1.000
+   131072    2538.7    2344.1      0.923 0.737-0.992    2545.9  1.003
+   131073    2543.8    2340.5      0.920 0.740-0.990    2544.1  1.000
+   262144    4157.4    3991.1      0.960 0.860-0.967    4155.3  0.999
+   262145    4155.8    3976.8      0.957 0.883-0.974    4158.1  1.001
+   524288    7399.6    7265.1      0.982 0.961-0.990    7412.6  1.002
+   524289    7410.4    7277.1      0.982 0.957-0.989    7422.4  1.002
+  1048576   13895.8   13687.1      0.985 0.958-0.997   14070.6  1.013
+  1048577   13907.5   13684.2      0.984 0.954-0.996   14077.3  1.012
+  2097152   27262.7   26851.7      0.985 0.961-1.038   27277.5  1.001
+  2097153   26861.0   26763.5      0.996 0.962-1.040   27272.7  1.015
+  4194304   51227.0   52174.6      1.018 0.971-1.191   52399.4  1.023
+  4194305   53153.5   52015.1      0.979 0.917-1.169   50950.8  0.959
+
+The links measured (OSOE_TEST_PRINT_LINK):
+  tree-measured-2x1-1.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=83639 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=116695606
+  tree-measured-2x1-2.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=86426 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=117531438
+  tree-measured-2x1-3.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=83857 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=116176094
+  tree-measured-2x1-4.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=83691 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=117006876
+  tree-measured-2x1-5.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=89006 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=116046459
+  tree-measured-2x1-6.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=83322 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=116575799
+  tree-measured-2x4-1.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=85185 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=118482378
+  tree-measured-2x4-2.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=82704 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=118006338
+  tree-measured-2x4-3.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=89950 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=118259633
+  tree-measured-2x4-4.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=87904 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=118151005
+  tree-measured-2x4-5.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=83035 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=117876369
+  tree-measured-2x4-6.txt: osoe: the link measured at start-up, to run again on it: OSOE_LINK_HOP_NS=89100 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=117468062
