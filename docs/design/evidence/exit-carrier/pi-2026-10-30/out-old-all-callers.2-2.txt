@@ -1,0 +1,14 @@
+ending the job at 1793363498.591927201
+ending the job at 1793363498.591913887
+ending the job at 1793363498.588717402
+ending the job at 1793363498.588884933
+PE 2: computing
+PE 3: handler began
+PE 0: handler began
+PE 3: computing
+PE 3: handler ran after a second
+srun: error: pi-002: task 3: Exited with exit code 10
+srun: Terminating StepId=2091.0
+slurmstepd-pi-001: error: *** STEP 2091.0 ON pi-001 CANCELLED AT 2026-10-30T08:31:39 ***
+srun: error: pi-001: tasks 0-1: Terminated
+srun: Force Terminated StepId=2091.0

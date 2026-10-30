@@ -1129,3 +1129,21 @@ A tree's partial last piece is now charged its bytes, and two nodes of the
 Pi's link take the tree at every size; the band where Träff's was faster is
 left to the author. The tree on the link measured ran as on the link set,
 0.99 to 1.02 of its time, once the arms' order was turned each series.
+
+## P1: one carrier for a global exit, under srun -K1 (2026-10-30)
+
+`main` at `cbfaa7e1` against P1's build, `abfeba29`, on the head node beside it; evidence
+`docs/design/evidence/exit-carrier/pi-2026-10-30/` (`pi-srun.sh`), the record
+`docs/decisions/2026-10-29-exit-carrier.md`. One test program, `test-global-exit.c`, compiled by
+each build's `oshcc`, run ten times a shape under `srun -K1 --cpu-bind=none`, two PEs a node:
+
+| shape | before P1 | after P1 |
+|---|---|---|
+| every PE calling `shmem_global_exit` at once, each with a second-long handler, two nodes | 143 in 7 runs, a handler cut short in 4 | 7 or 8, the callers' of rank 0's node; nothing killed |
+| the same on four nodes | 143 in 9 runs, a handler cut short in 3 | 7 or 8; nothing killed |
+| two callers on two nodes, the lower's goodbye held so both win their nodes' words | 143 in every run, the outranked caller killed inside its handler | 7, the lower caller's, every run; nothing killed |
+
+Before, the first node's carrier to leave was a bad exit while the other nodes still ended, and
+Slurm killed what was left - round four's conformance F1, which the README stated as a limit until
+P1. After, one PE carries for the job, the lowest-ranked of the nodes' first callers, and leaves
+last of it.

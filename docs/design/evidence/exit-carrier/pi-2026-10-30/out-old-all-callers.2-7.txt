@@ -1,0 +1,19 @@
+ending the job at 1793363508.599724321
+ending the job at 1793363508.599723562
+ending the job at 1793363508.596419941
+PE 0: handler began
+ending the job at 1793363508.596474661
+PE 2: handler began
+PE 0: computing
+PE 0: handler ran after a second
+PE 2: computing
+PE 2: handler ran after a second
+PE 1: handler began
+PE 3: handler began
+PE 1: computing
+PE 1: handler ran after a second
+PE 3: computing
+PE 3: handler ran after a second
+srun: error: pi-002: task 3: Exited with exit code 10
+srun: Terminating StepId=2096.0
+srun: error: pi-001: task 1: Exited with exit code 8
