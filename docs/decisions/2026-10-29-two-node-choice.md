@@ -178,6 +178,33 @@ adds its own bytes on the busiest link.
   checklist's item from step 3; the decisions in force; P4 closed in the open items. No test was
   added to the suite's count: the new checks are in tests it has.
 
+## Verification
+
+In the development VM, on `88e6fe70` (the build, `ad44a6bb`, with its follow-ups: the comment and
+the record naming `shmem.circulant.2`'s count on this tree, the README rewrapped, the Pi results'
+section). **A pre-flight** on `ad44a6bb` first, the release build: the static checks 14 of 14 and
+the shape tests, the shape models and the circulant cases 51 of 51, `shmem.circulant.2` ending
+"every phase on 2 nodes, 2 PEs, Träff's from 0 bytes, 0 calls checked as Träff's, 0 of them on
+teams that are not the world"; and the same tree with `cbfaa7e1`'s `collective-shape.c`, the fix
+reverted, built without a warning, failing all three of `shmem.shape.choice`, `shmem.shape.grid`
+and `shmem.circulant.2` - the last on its pinned line, the program counting "154 calls checked
+as Träff's, 4 of them on teams that are not the world". **The whole verification** on
+`88e6fe70`, P2's `verify-default.sh` less its two wake variants, which hold P2's settings, 62
+minutes from 02:35 UTC:
+
+- every preset, tier 3's and the single-node build without a warning; the static checks 14 of 14;
+- release 1,205 of 1,205 (the models apart), debug 1,205 of 1,205, asan 1,165 of 1,165, tsan 837
+  of 837 through its gate, the single-node suite 584 of 584;
+- the internode suite in debug at no helpers, on demand and on demand at no helpers, 625 of 625
+  each; on demand under asan 602 of 602 and under tsan 282 of 282;
+- tier 3's suite 138 of 138; `model.shape_timing`, `.grid` and `.places-grid` 3 of 3;
+- the counts P2's, no test added: debug 1,205, internode 625; tsan 837, internode 282; the
+  single-node build 631; release without the models 1,205; tier 3 138; the kernel's journal since
+  the run began naming no memory kill.
+
+Every failure: none. And the static checks again on the tree of the commit that records this,
+the release build without a warning: 14 of 14.
+
 ## For the author
 
 - **A two-node rule from the measurement.** On two nodes Träff's beat the tree by 3 to 12% from
