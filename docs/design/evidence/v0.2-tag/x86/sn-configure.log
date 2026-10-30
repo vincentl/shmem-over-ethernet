@@ -1,0 +1,21 @@
+Preset CMake variables:
+
+  CMAKE_BUILD_TYPE="RelWithDebInfo"
+  CMAKE_EXPORT_COMPILE_COMMANDS="ON"
+
+-- The C compiler identification is GNU 14.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/x86_64-linux-gnu-gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- osoe 0.2.0: the single-node build (OSOE_SINGLE_NODE=ON) - jobs of one node only, no liburing, no io_uring, the classic futex
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test OSOE_C_COMPILER_TAKES_C23
+-- Performing Test OSOE_C_COMPILER_TAKES_C23 - Success
+-- Found Python3: /usr/bin/python3 (found version "3.13.5") found components: Interpreter
+-- Configuring done (0.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /var/tmp/x86-tag/sn/build/release

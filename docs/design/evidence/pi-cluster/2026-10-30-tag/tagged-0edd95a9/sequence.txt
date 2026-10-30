@@ -3,3 +3,6 @@ the rehearsal's outputs on the Pi kept
 start 15:16:56
 part a: 0 15:40:10
 readme: 0 15:44:08
+t10: 0 15:54:49
+mix: 0 16:54:52
+DONE 16:54:52

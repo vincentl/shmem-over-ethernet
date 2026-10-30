@@ -12,3 +12,4 @@ single-node under Rosetta: 99% tests passed, 7 tests failed out of 585; real	1m1
 single-node's failures again, one at a time: 0% tests passed, 7 tests failed out of 7
 -- 18:58:07 the full build's first run stalled Rosetta's daemon (342 failed or timed out by test 429 of 581); the VM restarted; again, load 0.07 0.02 0.00
 -- 19:27:56 the second run stalled the daemon too (358 failed or timed out by test 461 of 581); the VM restarted; one at a time, load 0.44 0.10 0.03
+-- 19:57:05 the third run, one at a time, stalled the daemon as well (306 failed or timed out before it was stopped, the load 329.91); stopped there - the full build's one-node tests not run whole under Rosetta on this tree

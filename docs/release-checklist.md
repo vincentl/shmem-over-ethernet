@@ -169,20 +169,28 @@ until the tree to be tagged has them; the author tags.
   (portability P3's third fix, raised again by the ninth review's P9-5). Done
   2026-10-12 (T7): natively at two and three helpers on the cluster's first
   session, and the README's sentence with it (`docs/decisions/2026-10-12.md`).
-- [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
+- [x] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
+  Done 2026-10-30 (T9, T10): the hour on `0edd95a9`, `failures=0` in 3,601 s,
+  with the runbook's first part and the floor's pins there; the runbook end to
+  end on `5cefc7fb`, its code but the version, that morning - the corpus,
+  every pacer run, and an hour each of `mix` and `threads`, `failures=0`; and
+  the 1 MiB lines timed again, Träff's 1.26 to 1.37 times the trees.
 - [x] **The README's commands on the Pi cluster, and its quick start on Raspberry
   Pi OS**, as for 0.1.0. Done 2026-10-30 on the tree to be tagged (T11, T12):
   the quick start on the head node, a Pi 5, in 119 s with no warning, both
   rings and the probe; the installed `oshcc`'s ring under `srun`; the probe on
   every node; `osoe-pacer --quick`; the batch script with its secret; and
   `osoe-stat --summary` on every node of a running job through `srun --overlap`.
-- [ ] **The release note**: `docs/release-notes/0.2.0.md`, drafted 2026-10-10 and
+- [x] **The release note**: `docs/release-notes/0.2.0.md`, drafted 2026-10-10 and
   fact-checked against its sources, made true of the tree tagged - its numbers
   marked "at the tag" filled in from the runs above, its provisional checks
   replaced by the tag's, anything merged after `5748c97` added, and its line on
   0.1.0's `osoe-pacer mix` hang kept (`docs/decisions/2026-10-09.md` item 4,
-  the author: "fine").
+  the author: "fine"). Done
+  2026-10-30 (X1): its checks the tag's, its "at the tag" lines filled from
+  the runs, what merged after `5748c97` added, and two fact-checks' findings
+  made, the second of the whole note (`docs/decisions/2026-10-30.md`).
 - [x] **The version**: `CMakeLists.txt`'s `0.1.0` to `0.2.0` in the commit the tag
   names, with the README's places that give the current version - its Status,
   the version strings and the library's file name, the repository table's row,

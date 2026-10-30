@@ -781,6 +781,63 @@ default binding unless a line says `--cpu-bind=none`; the record is
 - **An hour of `mix`**, `failures=0` in 3,607 s; **an hour of `threads`** in a debug build with
   the test hooks and an overfilled landing zone, `failures=0` in 3,600 s and no `OSOE_CHECK_QUIET:` line.
 
+## The 0.2 tag (2026-10-30)
+
+The runbook on the tree to be tagged (`0edd95a9`) and, the same morning, end to end on its code
+before the version changed (`5cefc7fb`, the tree round ten reviewed), each copied to `~/osoe` and
+built there per §2, Slurm's default binding unless a line says `--cpu-bind=none`; the record is
+`docs/decisions/2026-10-30.md`, the raw outputs `docs/design/evidence/pi-cluster/2026-10-30-tag/`.
+
+- **§1-§2**, on both trees: the release build with no warning; the probe ok on every node; tier 1
+  on the head node 113 of 113, and tier 2 on a node, given all four cores, 1,093 of 1,093.
+- **§4**: the smoke test exits 0 on a block and a cyclic distribution.
+- **§5, the floor**, on the tree to be tagged, its pins checked: a get's, a put and quiet's and a
+  fetch-and-add's fastest round trips 1.100, 1.088 and 1.097 times an io_uring echo's between the
+  same two processes, their medians 1.11, 1.10 and 1.10; the stream 0.999 of the floor's rate -
+  0.1.0's lines, every pin holding with room.
+- **§6, `osoe-bench`** at 4 × 4: a put and quiet of 8 bytes 167.8 µs, a get 167.9; a stream at
+  112.1 MiB/s from 64 KiB; the barrier 180.6 µs, the 8-byte reduce 191.3 and broadcast 189.8,
+  fcollect of 8 bytes a PE 270.3 and alltoall 383.3; the 64 KiB reduce 1,461 µs and broadcast
+  1,888, where 0.1.0's were 2,374 and 1,834. At `OSOE_PROGRESS_HELPERS=0`, beside it, one run
+  each (round ten's S3): the 64 KiB reduce 2,268 µs - `osoe-bench`'s reductions back to back,
+  which take nothing from Träff's under this binding without helpers (H21, below) - the broadcast
+  1,519 and the 4 KiB alltoall 2,553 against the default's 3,488: the default's two helpers paying
+  the reduction and costing the broadcast and the alltoall at this shape, as the README's Limits
+  say. At 4 × 1 the 64 KiB reduce 1,359 µs and broadcast 1,549.
+- **The 1 MiB lines**, on the tree to be tagged, as step 3's merge point timed them (below):
+  `link`, the default, against `tree` and against `OSOE_PROGRESS_HELPERS=0`, alternating three
+  times (`analysis-t10.txt`). A 1 MiB reduction 1.26 times as fast as the trees by OSU at 4 × 4
+  (17.7 against 22.2 ms), 1.37 at 4 × 1 (15.0 against 20.6) and 1.36 by the e-band probe at 4 × 4
+  (15.4 against 20.9), where step 3 measured 1.32, 1.36 and 1.41; from 32 to 256 KiB 1.31 to 1.89.
+  At 4 × 1 under `--cpu-bind=none` the probe's Träff's ran unsteady: 15.1 ms in three of its six
+  runs, at both helper settings, and 18.8 to 22.8 in the rest, against the trees' steady 20.8 to
+  21.0 - which OSU's 4 × 1, under Slurm's binding, was not. Broadcasts of 1 MiB, the same shape
+  either way, within 0.6%. Without helpers, OSU's 1 MiB reduction at 4 × 4 14% slower, and OSU's
+  1 MiB broadcast at 4 × 4 and the probe's at 4 × 1 2.4 and 2.2% faster, the probe's 1 MiB scan at
+  4 × 4 6%; the rest within the noise.
+- **§7, endings**: a global exit returns its status, 7, from every task; a dead PE ends the job,
+  137, naming rank 5 on every PE.
+- **§8, the corpus**, on `5cefc7fb`: NPB IS verifies, classes A and B; PRK's three kernels
+  validate; ISx sorts, weak and strong; of the 72 examples, 64 exit 0 on 4 × 2 and the other eight
+  as the runbook expects; OSU's nineteen programs run whole; ssca1 finds its three alignments,
+  scores 55 to 53, on both maps; the SOS suite at 4 × 2, 160 clean and `bigget` clean alone at
+  `-l 100`, the runbook's 161 of 165.
+- **The README's commands**, on the tree to be tagged, on the head node - Raspberry Pi OS Trixie on
+  a Pi 5 - from a fresh copy: the quick start as printed, built in 119 s with no warning, the
+  ring's four lines on one node and on two logical nodes, the probe; `cmake --install`; the ring
+  built by the installed `oshcc` under `srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4`, its
+  eight lines; the probe on every node; `osoe-pacer --quick`, `failures=0`; the README's batch
+  script, its secret exported, its sixteen; and `osoe-stat --summary` on every node of a running
+  job through `srun --jobid=J --overlap -N4 --ntasks-per-node=1`.
+- **§6, `osoe-pacer`**, on `5cefc7fb`, each run `failures=0`: the default set, its ten exercises
+  each given the run's 300 s, 3,038 s in all; the accumulating sort, the pull and the sort without
+  `shmem_ptr`; mailbox, teams, atomics, rma, locks, memory and collectives, ten minutes each; waits
+  and deprecated, five; `start_pes`; the teams' exhaustion; and the counted runs.
+- **An hour of `mix`** on the tree to be tagged, the checklist's, `failures=0` in 3,601 s, and on
+  `5cefc7fb` that morning, `failures=0` in 3,600 s; **an hour of `threads`** on `5cefc7fb` in a
+  debug build with the test hooks and an overfilled landing zone, `failures=0` in 3,600 s and no
+  `OSOE_CHECK_QUIET:` line.
+
 ## v0.2 step 2: the tree's shape from the link (2026-10-06 and 07)
 
 The trees of v0.2's second step, copied to `~/osoe` and built there as release

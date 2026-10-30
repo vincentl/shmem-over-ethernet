@@ -17,12 +17,11 @@ is 16, four on each node.
 **Status.** Every routine of OpenSHMEM 1.6's C interface is implemented, the
 deprecated ones of its Annex F included. What departs from the
 specification, or takes a choice it leaves open, is listed under
-[Limits](#limits-and-where-osoe-departs-from-the-specification). This tree is
-0.2.0, to be osoe's second release once tagged
-([its note](docs/release-notes/0.2.0.md), a draft until then;
-[the plan](docs/prompts/task-v0.2.md)): the tag waits for the items still open
-before it ([the list](docs/prompts/v0.2-open-items.md)). 0.1.0, tagged
-`v0.1.0`, was the first ([its note](docs/release-notes/0.1.0.md)).
+[Limits](#limits-and-where-osoe-departs-from-the-specification). This is
+0.2.0, osoe's second release ([its note](docs/release-notes/0.2.0.md);
+[the plan](docs/prompts/task-v0.2.md), and [the items](docs/prompts/v0.2-open-items.md)
+it closed before its tag). 0.1.0, tagged `v0.1.0`, was the first
+([its note](docs/release-notes/0.1.0.md)).
 [Installing](#installing) says where the library and the tools show the
 version. It has been tested on
 aarch64 - the Raspberry Pi cluster and an aarch64 virtual machine - and, since
@@ -1309,12 +1308,14 @@ specification or takes a choice the specification leaves open.
   node on eight (2026-10-28); 14 of the 41 models
   (Python, so the same result on any machine) have not run natively at all.
   Before that,
-  on x86-64 the tagged tree built without warnings and passed every test that
-  can run under Rosetta, an x86-64 user space on an aarch64 kernel - 369 of its
-  718, with a shim standing in for the futex2 calls Rosetta refuses; the
+  on x86-64 the tree tagged 0.1.0 built without warnings and passed every test
+  that can run under Rosetta, an x86-64 user space on an aarch64 kernel - 369 of
+  its 718, with a shim standing in for the futex2 calls Rosetta refuses; the
   emulator refused the rest io_uring or seccomp - and v0.2 step 1's full build
   passed its one-node tests but four, each failure the emulator's or the cross
-  build's. Rosetta refuses io_uring, so no x86-64 process had sent a message to
+  build's. 0.2.0's tree cross-builds for x86-64 without a warning, but its full
+  build's one-node tests stalled Rosetta's translation daemon in each of three
+  runs (2026-10-30), and so have not run whole there. Rosetta refuses io_uring, so no x86-64 process had sent a message to
   another node: the network path, and the timing pins that were set on aarch64,
   were untested there, and no x86-64 kernel had run any of it. What x86-64's
   memory order would do to the protocols across nodes was
@@ -1330,7 +1331,8 @@ specification or takes a choice the specification leaves open.
   aarch64 virtual machine, and in the Debian 13 one with liburing hidden from
   it; on the userlands of Debian 12, Ubuntu 22.04 to 26.04 and Fedora 44, in
   containers on Rocky's kernel; and as an x86-64 build under Rosetta with no
-  shim, since Rosetta passes the classic futex through: 343 of its 349 tests,
+  shim, since Rosetta passes the classic futex through: 343 of its 349 tests at
+  v0.2 step 1, and 578 of its 585 on 0.2.0's tree,
   each failure the emulator's or the cross build's. Natively on x86-64 it has
   run on Debian 13's kernel alone.
 - **Every node and every PE of a job must run the same osoe.** The nodes say
