@@ -3,7 +3,7 @@
 # holds, in the top-level CMakeLists.txt.
 #
 # Every target is compiled with that value as the macro OSOE_VERSION_STRING, a
-# string literal such as "0.1.0": the library's start-up line and SHMEM_INFO's
+# string literal such as "0.2.0": the library's start-up line and SHMEM_INFO's
 # text print it, and so does each tool's --version. It is set once, here, for
 # every target, rather than target by target: the library's own sources are
 # also compiled into white-box tests, each of which would have to remember it.
@@ -14,7 +14,7 @@
 # (shmem/CMakeLists.txt).
 #
 # The single-node build says so after the version, wherever the version is
-# printed - "0.1.0 (single-node build)" - so that a user can tell from any
+# printed - "0.2.0 (single-node build)" - so that a user can tell from any
 # tool's --version, SHMEM_INFO or the start-up line which build is installed
 # (OSOE_SINGLE_NODE, the top-level CMakeLists.txt). OSOE_VERSION_TEXT is that
 # text; the library's file name and soname keep the bare version.

@@ -17,11 +17,14 @@ is 16, four on each node.
 **Status.** Every routine of OpenSHMEM 1.6's C interface is implemented, the
 deprecated ones of its Annex F included. What departs from the
 specification, or takes a choice it leaves open, is listed under
-[Limits](#limits-and-where-osoe-departs-from-the-specification). 0.1.0, tagged
-`v0.1.0`, is osoe's first release ([its note](docs/release-notes/0.1.0.md)); this
-tree has v0.2's work on it since ([the plan](docs/prompts/task-v0.2.md)) and calls
-itself 0.1.0 until v0.2 is released. [Installing](#installing) says where the
-library and the tools show the version. It has been tested on
+[Limits](#limits-and-where-osoe-departs-from-the-specification). This tree is
+0.2.0, to be osoe's second release once tagged
+([its note](docs/release-notes/0.2.0.md), a draft until then;
+[the plan](docs/prompts/task-v0.2.md)): the tag waits for the items still open
+before it ([the list](docs/prompts/v0.2-open-items.md)). 0.1.0, tagged
+`v0.1.0`, was the first ([its note](docs/release-notes/0.1.0.md)).
+[Installing](#installing) says where the library and the tools show the
+version. It has been tested on
 aarch64 - the Raspberry Pi cluster and an aarch64 virtual machine - and, since
 2026-10-12, natively on x86-64: eight Google Cloud `c4-standard-16` (Debian 13,
 Linux 6.12) passed the four build presets (`debug`, `release`, and the
@@ -402,11 +405,11 @@ nodes or more, is one.
 
 The version is set once, by `project(osoe VERSION ...)` in `CMakeLists.txt`,
 and everything that names a version says it: `SHMEM_VERSION=1` makes every PE
-print a line ending `osoe 0.1.0, OpenSHMEM 1.6` at start-up, and `SHMEM_INFO=1`
-heads its text with `osoe 0.1.0 environment variables`; `osoe-stat`,
+print a line ending `osoe 0.2.0, OpenSHMEM 1.6` at start-up, and `SHMEM_INFO=1`
+heads its text with `osoe 0.2.0 environment variables`; `osoe-stat`,
 `osoe-pacer`, `osoe-launch` and `osoe-bench` answer `--version` with one line,
-such as `osoe-stat (osoe) 0.1.0`, and the single-node build adds
-`(single-node build)` after the version wherever it is printed; the shared library is `libosoe.so.0.1.0`, with
+such as `osoe-stat (osoe) 0.2.0`, and the single-node build adds
+`(single-node build)` after the version wherever it is printed; the shared library is `libosoe.so.0.2.0`, with
 the soname `libosoe.so.0`. `oshcc` answers `--showme:version` instead: its
 `--version` is still the C compiler's, which build systems run to learn what
 `CC` is. (`shmem_info_get_name` still returns `osoe`, a name, and
@@ -671,7 +674,7 @@ where to find what among the documents.
 |---|---|
 | `README.md` | this file |
 | `COPYING`, `COPYING.LESSER` | the license texts that [License](#license) names: the GNU General Public License and the Lesser General Public License that supplements it, both version 3 |
-| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.1.0, the option `OSOE_SINGLE_NODE` that makes the single-node build ([On a desktop](#on-a-desktop-the-single-node-build)), and the presets `debug`, `release`, `asan`, `tsan` and `tier3`, with the test presets and workflows over them ([Building](#building)) |
+| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.2.0, the option `OSOE_SINGLE_NODE` that makes the single-node build ([On a desktop](#on-a-desktop-the-single-node-build)), and the presets `debug`, `release`, `asan`, `tsan` and `tier3`, with the test presets and workflows over them ([Building](#building)) |
 | `.gitignore` | what git ignores: `build/`, `corpus/` and the specification's PDF, among others |
 | `CLAUDE.md` | the working agreements every Claude Code session on this repository follows - delegating to subagents, naming, renames, the names of review files ([How osoe was made](#how-osoe-was-made)) |
 | `base/` | the pieces the library is made from that need nothing from the OpenSHMEM layer above them, among them futex waits - over futex2 in the full build (`futex-futex2.c`), over the classic futex in the single-node build (`futex-classic.c`) - deadlines, epoch counters, a stall watch, memory fences, and the parsers for settings, Slurm host lists and the node map. An object library folded into `libosoe` and never installed; its tests are in `base/tests/` |
@@ -1906,7 +1909,7 @@ both are set the `SHMEM_` one controls.
 | Variable | Default | What it does |
 |---|---|---|
 | `SHMEM_SYMMETRIC_SIZE` | `256m` | Symmetric heap bytes a PE, with an optional `k`, `m`, `g` or `t` multiplier; at most 4 TiB. `0` is refused. *Checked*. |
-| `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.1.0, OpenSHMEM 1.6`. |
+| `SHMEM_VERSION` | unset | Set: every PE prints osoe's version and the specification's at start-up, as `osoe 0.2.0, OpenSHMEM 1.6`. |
 | `SHMEM_INFO` | unset | Set: each node's first PE prints the variables osoe reads, with their defaults, under a first line naming osoe's version. |
 | `SHMEM_DEBUG` | unset | Set: every PE prints what the library set up for it - its rank and node, its heap's size and address, its control segment's name, and in a job of more than one node the link its large collectives choose their shapes from: measured, with what measuring it cost the PE's start, or set. There each node's lead also prints the limit it set on the unsent bytes of its connections (`OSOE_WIRE_UNSENT_BYTES`), once every owner of its wires has applied it, whether it probes them with TCP keepalive and checks for a silent peer (`OSOE_KEEPALIVE`), and how long its mesh took, from the rendezvous's release to its last connection. |
 
