@@ -5,15 +5,15 @@ ls: cannot access '/home/osoe-b10': No such file or directory
 ls: cannot access '/var/mail/osoe-b10': No such file or directory
 == lingering
 total 0
--rw-r--r-- 1 root root 0 Sep 19 13:13 vincent
+-rw-r--r-- 1 root root 0 Sep 19 13:13 <user>
 == logind
 UID USER    LINGER STATE
-501 vincent yes    active
+501 <user> yes    active
 
 1 users listed.
 SESSION UID USER    SEAT LEADER  CLASS         TTY IDLE SINCE
-     19 501 vincent -    2886061 manager-early -   no   -
-      4 501 vincent -    1193    user          -   no   -
+     19 501 <user> -    2886061 manager-early -   no   -
+      4 501 <user> -    1193    user          -   no   -
 
 2 sessions listed.
 RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no

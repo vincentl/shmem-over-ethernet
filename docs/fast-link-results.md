@@ -355,7 +355,7 @@ interrupt coalescing at 20 µs receiving and 50 sending, liburing 2.9,
 was `2dd3a623`, layout 42 and H23's data wires on demand merged into it, cloned
 on the head node from a bundle of `main`. The session was one chain,
 `docs/fast-link/session-3.sh` (§21), the author's plan
-(`docs/prompts/cluster-session-3-plan.md`) section by section, one round each
+(`docs/prompts/done/cluster-session-3-plan.md`) section by section, one round each
 where the plan named no other, from 22:38:56 to 23:23:05 UTC: **44.1 minutes**
 against the plan's 52, every section done, 357 jobs, two of them failed (H11,
 below). The machines' start-up scripts were done before it began, so its wait
@@ -457,8 +457,13 @@ microseconds, the check off:
 
 `OSOE_CHECK_COLLECTIVES` costs nothing one round can see from 16 to 64 PEs a
 node - each collective's time with the check over its time without, 0.84 to
-1.07 - and at 256 the same within 3% but for the barrier, 672 µs to 975, one
-round at 16 PEs a vCPU.
+1.07 - and at 256 the same within 3.4% but for the barrier, 672 µs to 975, one
+round at 16 PEs a vCPU. The round is `osoe-bench quick`, 200 trips after 200
+of warm-up, and the barrier's is mostly a start-up cost, as the tenth review
+found (scale S2): a sync is checked by whichever PE of the node arrives last,
+and the first time a PE checks one on a team it reads a page of each of its 255
+node-mates' regions, a minor fault each, on the barrier's path; in the
+development VM, in this shape, the check cost a barrier 3% from the 1,000th on.
 
 **H28: gets and the per-node landing budget (§8).** One round on eight nodes:
 `multistream`'s gets of 1 MiB at 1, 4, 8 and 16 PEs a node with the zone unset -

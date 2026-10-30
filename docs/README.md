@@ -41,7 +41,7 @@ was directed, written and reviewed; this part is where each level of it is kept.
 | `CLAUDE.md` | the working agreements a session works under: when to delegate to subagents, how names are spelled, how a rename is audited, how review files are named |
 | `docs/reviews/` | the adversarial reviews: `adversarial-review-prompt.md` is how one is run, `archive/` holds the finished ones, and `evidence/` the raw material of the first two rounds, of two reads of v0.2 step 4's first part and of round eight's scale S4 on the Pi; its `README.md` is the guide |
 
-**The evidence.** About 3,800 files sit under `docs/design/evidence/` and
+**The evidence.** About 5,100 files sit under `docs/design/evidence/` and
 `docs/reviews/evidence/` - `git ls-files | grep -c '/evidence/'` counts them:
 model runs, litmus tests, probe programs, logs, patches, and the raw output of
 each session on the Pi cluster, which
@@ -81,8 +81,10 @@ command ran. On 2026-10-02 those paths were edited - the repository's own
 directory reads `<repo>`, any other path under the home directory reads `~` - so
 a script that names `<repo>` records what ran, and is not one to run as written.
 On 2026-10-12 the cluster's first session's evidence had its user's name, which
-spells an email address, made `<user>` and its home `~`, and the kit's generated
-`facts-one-node.sh` given the licence line, as `facts.sh` now writes it.
+spells an email address, made `<user>` and its home `~` in its text files - its
+ThreadSanitizer reports, a compressed tarball, held the name until 2026-10-30
+(below) - and the kit's generated `facts-one-node.sh` given the licence line,
+as `facts.sh` now writes it.
 The same day the four copies of the specification's examples
 (`spec-example-*.c`, in
 `docs/reviews/evidence/phase1-step2-slice1/conformance/`) were given the notice
@@ -107,3 +109,16 @@ by number (`2026-10-07-profile/classify.py` and
 `2026-10-08-helpers/verification/tsan-gate.py`, under
 `docs/design/evidence/v0.2-step4/`); since then `shmem.license-lines` fails on
 any source file without it. Nothing else in those files was changed.
+
+On 2026-10-30 (`f5cbc2fc`, round ten's PR10-2) the account names the evidence
+still held were written `<user>`: the development VM's account, which evidence
+made after 2026-10-04's edit had written again, in 33 files of B10's
+experiment (`docs/design/evidence/v0.2-step4/2026-10-21-b10/`) and in the
+kit's dry run's `pack.log` (`2026-10-27-session-3-kit/dry/`), and the
+cluster's user in the 2,926 home paths of the first session's ThreadSanitizer
+reports (`2026-10-12-fast-link/verification/tsan/tsan-reports.tar.gz`, the
+tarball rebuilt). Every tracked file was then searched for an account name and
+a path of the author's machine, the 143 compressed ones read through, with the
+old tarball as the search's control: none is left but the 2026-10-04
+decision's own line that keeps the author's address in the commits' author
+lines. The files as they were before this edit are still in git's history.

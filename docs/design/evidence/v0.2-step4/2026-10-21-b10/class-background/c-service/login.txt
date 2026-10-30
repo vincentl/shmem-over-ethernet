@@ -3,9 +3,9 @@ XDG_SESSION_ID=c1
 --- cgroup of this shell
 0::/user.slice/user-1000.slice/session-c1.scope
 --- list-sessions
-19  501 vincent  - 2886061 manager-early - no -
+19  501 <user>  - 2886061 manager-early - no -
 20 1000 osoe-b10 - 2886123 manager       - no -
- 4  501 vincent  - 1193    user          - no -
+ 4  501 <user>  - 1193    user          - no -
 c1 1000 osoe-b10 - 2886109 background    - no -
 --- session-status
 c1 - osoe-b10 (1000)

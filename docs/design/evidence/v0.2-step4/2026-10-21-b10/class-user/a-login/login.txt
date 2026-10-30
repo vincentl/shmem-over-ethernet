@@ -4,7 +4,7 @@ XDG_SESSION_ID=c4
 0::/user.slice/user-1000.slice/session-c4.scope
 --- list-sessions
 24 1000 osoe-b10 - 2913503 manager - no -
- 4  501 vincent  - 1193    user    - no -
+ 4  501 <user>  - 1193    user    - no -
 c4 1000 osoe-b10 - 2913491 user    - no -
 --- session-status
 c4 - osoe-b10 (1000)

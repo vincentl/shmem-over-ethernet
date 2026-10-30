@@ -878,18 +878,25 @@ def check_terms(failures, interior=1, count_runs=True):
                     return
 
 
+# The collectives' window, OSOE_COLLECTIVE_PIPELINE's default since P37 (2026-10-28;
+# bootstrap.h's OSOE_COLLECTIVE_PIPELINE_DEFAULT): the checks of the choice judge it at
+# the default, as a job meets it (round ten's S1: they were pinned at the 4 of before).
+CAPACITY = 8
+
+
 def check_choices(failures):
-    """The closed form's choice of k at W = capacity against each link model's
-    best k at the same W: within the bound the record states, on a grid."""
+    """The closed form's choice of k at W = capacity, the default, against each link
+    model's best k at the same W: within the bound the record states, on a grid."""
     grid = [(op, N, n) for op in ('reduce', 'broadcast') for N in (2, 3, 4, 5, 7, 8, 13, 16, 31)
             for n in (2048, 8192, 32768, 131072, 1 << 20)]
     for links, p90_bound, max_bound in (('sender', 0.08, 0.20), ('connection', 0.05, 0.30)):
         regrets = []
         for op, N, n in grid:
             ks = range(2, 9)
-            sim = {k: simulate(op, N, k, 4, n, PIECE, 86, 7, 116, measure='completion', links=links)
+            sim = {k: simulate(op, N, k, CAPACITY, n, PIECE, 86, 7, 116, measure='completion',
+                               links=links)
                    for k in ks}
-            pick = choose(op, N, n, PI_LINK, 8, 4, 1024)[0]
+            pick = choose(op, N, n, PI_LINK, 8, CAPACITY, 1024)[0]
             regrets.append(sim[pick] / min(sim.values()) - 1)
         regrets.sort()
         p90, worst = regrets[int(len(regrets) * 0.9)], regrets[-1]
@@ -1049,24 +1056,28 @@ def check_last_piece(failures):
 def check_circulant_wide(failures):
     """Träff's where the lane's rows now let it run (P3), past the 512 nodes the
     ceiling's lane held at the default: on 513 nodes, the first, a 1 MiB reduction
-    by the simulation of the Pi's links takes Träff's at least twice less time
-    than every tree to the ceiling. The closed form says 3.2 times: its trees
-    cost about 1.3 times the simulation's at this size, where Träff's costs within
-    15% of it, so the gain is 2.9 times by the simulation (51 ms against 18) and the
-    choice the same. The sender links only: the other model's streams are too slow
+    by the simulation of the Pi's links, at the default window of 8, takes Träff's
+    less time than every tree to the ceiling - 18.7 ms against the best tree's 22.3,
+    1.19 times - and at least 1.1 times less. The closed form says 2.05 times: its
+    best tree, k = 3, costs 41.3 ms, 1.86 times the simulation's best at this size and
+    window, where the window term is its least exact, and Träff's within 15% of its
+    simulation, so the choice is the same. At the window of 4, the default until P37, the simulation
+    gave 2.9 times (51 ms against 18), the gain a pipelined tree of 8 gives back
+    (round ten's S1). The sender links only: the other model's streams are too slow
     to run so many leads."""
     nodes, n = 513, 1 << 20
-    algorithm, k, window = choose_shape('reduce', nodes, n, PI_LINK, 8, 4, 1024, circulant=True)
+    algorithm, k, window = choose_shape('reduce', nodes, n, PI_LINK, 8, CAPACITY, 1024,
+                                        circulant=True)
     if algorithm != 'circulant':
         failures.append('CIRCULANT: 513 nodes do not take Träff\'s at 1 MiB on the Pi\'s link')
         return
     sim_c = simulate_circulant(nodes, n, PIECE, window, 86, 7, 116, links='sender')
-    sim_t = min(simulate('reduce', nodes, t, 4, n, PIECE, 86, 7, 116, measure='completion',
-                         links='sender') for t in range(2, 9))
+    sim_t = min(simulate('reduce', nodes, t, CAPACITY, n, PIECE, 86, 7, 116,
+                         measure='completion', links='sender') for t in range(2, 9))
     closed = circulant_cost(nodes, n, PIECE, window, *PI_LINK) / 1000
-    if sim_t < 2 * sim_c:
+    if sim_t < 1.1 * sim_c:
         failures.append(f'CIRCULANT: on {nodes} nodes the simulation has the best tree at '
-                        f'{sim_t:.0f} us and Träff\'s at {sim_c:.0f}, under twice as fast')
+                        f'{sim_t:.0f} us and Träff\'s at {sim_c:.0f}, under 1.1 times as fast')
     if abs(closed / sim_c - 1) > 0.15:
         failures.append(f'CIRCULANT: on {nodes} nodes Träff\'s closed form is {closed:.0f} us '
                         f'and its simulation {sim_c:.0f}, more than 15% apart')

@@ -15,11 +15,11 @@ a0f5aec31f2d016804a15e53bb603bd0fa68a4b5cb19deaa65a2cf6cb3466bca  /etc/systemd/l
 RemoveIPC=true UserStopDelayUSec=10000000 KillUserProcesses=false linger_file=no
 --- sessions and users now
 SESSION UID USER    SEAT LEADER CLASS TTY IDLE SINCE
-      4 501 vincent -    1193   user  -   no   -
+      4 501 <user> -    1193   user  -   no   -
 
 1 sessions listed.
 UID USER    LINGER STATE
-501 vincent yes    active
+501 <user> yes    active
 
 1 users listed.
 --- /etc/login.defs

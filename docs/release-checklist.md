@@ -113,16 +113,19 @@ Written 2026-10-10, from the items above that every tag needs, the after-release
 list's one that names "the tag", and the author's answers of the v0.2 arc. Open
 until the tree to be tagged has them; the author tags.
 
-- [ ] **Part 4 on a link above a gigabit**: 0.2 waits for the hardware (the
+- [x] **Part 4 on a link above a gigabit**: 0.2 waits for the hardware (the
   author, `docs/decisions/2026-10-10.md` item 3, where `2026-10-09.md` item 3
-  had let it ship without); `docs/fast-link.md` is its runbook.
+  had let it ship without); `docs/fast-link.md` is its runbook. Done: three
+  sessions on eight `c4-standard-16` nodes, 2026-10-12, 10-20 and 10-28
+  (`docs/fast-link-results.md`), H1 to H19 with H25 and H26 closed.
 - [ ] **The review's findings settled on the candidate.** Round eight, at step
   4's merge point, said *release after named changes*, and they were made
   (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
   adversarially before it merges. The ninth, before Part 4, said the same,
   and its changes were made and read (`docs/decisions/2026-10-11.md`); a tenth
   runs before the tag, once every open item is cleared
-  (`docs/prompts/task-v0.2-to-the-tag.md`).
+  (`docs/prompts/task-v0.2-to-the-tag.md`) - begun 2026-10-30 on `5cefc7fb`,
+  P1's merge, the last change of code an open item asked for.
 - [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at `OSOE_PROGRESS_HELPERS=0` set outright and at two and three
   where the merge point ran them, and with the setting unset, the default
@@ -171,11 +174,13 @@ until the tree to be tagged has them; the author tags.
 - [ ] **The upgrade run again on the tree tagged**: a program built against the
   0.1.0 install, run against the tagged library installed over it (readiness
   Q5-3, Q5-4).
-- [ ] **If Part 4 turns the zero-copy send on by default**, its locked-memory
+- [x] **If Part 4 turns the zero-copy send on by default**, its locked-memory
   questions are the tag's, since every user with a low `ulimit -l` then meets
   them: whether a connection that met the limit lends again after a while,
   where today it copies for the rest of the job (readiness Q5-4; `shmem_init`
-  raises the soft limit to the hard one since 2026-10-11).
+  raises the soft limit to the hard one since 2026-10-11). Not so: Part 4's H8
+  left it off, the author's A3 (`docs/decisions/2026-10-20.md`), so the
+  questions stay after the release.
 
 ## After the release
 

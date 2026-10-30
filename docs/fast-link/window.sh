@@ -15,7 +15,7 @@
 # its trees, at a window of D, OSOE_COLLECTIVE_PIPELINE=D) and fixed-kK-dD -
 # the third session's four are "link-d4 link-d8 tree-d8 fixed-k4-d8", P37's
 # default of 8 timed against the 4 it replaced and the best fixed tree of the
-# second session (docs/prompts/cluster-session-3-plan.md). The unsuffixed
+# second session (docs/prompts/done/cluster-session-3-plan.md). The unsuffixed
 # link and tree run at the default window, 8 since 2026-10-28 (the first two
 # sessions' ran at 4). No case sets OSOE_PROGRESS_HELPERS, so each job runs at
 # the library's default of them: none to 2026-10-28, auto since (two on a job

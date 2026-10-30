@@ -12,10 +12,10 @@ Oct 21 01:24:59.612181 lima-osoe systemd[1]: Stopped systemd-logind.service - Us
 Oct 21 01:24:59.642813 lima-osoe systemd[1]: Starting systemd-logind.service - User Login Management...
 Oct 21 01:24:59.669909 lima-osoe systemd-logind[2919099]: Watching system buttons on /dev/input/event0 (Power Button)
 Oct 21 01:24:59.670060 lima-osoe systemd-logind[2919099]: New seat seat0.
-Oct 21 01:24:59.673284 lima-osoe systemd-logind[2919099]: New session 4 of user vincent.
+Oct 21 01:24:59.673284 lima-osoe systemd-logind[2919099]: New session 4 of user <user>.
 Oct 21 01:24:59.673523 lima-osoe systemd[1]: Started systemd-logind.service - User Login Management.
 Oct 21 01:24:59.675234 lima-osoe systemd[1]: Starting user@501.service - User Manager for UID 501...
-Oct 21 01:24:59.698968 lima-osoe systemd-logind[2919099]: New session 26 of user vincent.
+Oct 21 01:24:59.698968 lima-osoe systemd-logind[2919099]: New session 26 of user <user>.
 Oct 21 01:24:59.711467 lima-osoe systemd[1]: Created slice user-1000.slice - User Slice of UID 1000.
 Oct 21 01:24:59.712524 lima-osoe systemd[1]: Starting user-runtime-dir@1000.service - User Runtime Directory /run/user/1000...
 Oct 21 01:24:59.713177 lima-osoe systemd-logind[2919099]: New session c1 of user osoe-b10.

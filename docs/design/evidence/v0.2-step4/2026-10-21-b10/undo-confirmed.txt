@@ -4,7 +4,7 @@ ok       no group entry for osoe-b10
 ok       no home /home/osoe-b10
 ok       no mail spool /var/mail/osoe-b10
 ok       no lingering file for osoe-b10
-ok       lingering files: vincent's alone (as before)
+ok       lingering files: <user>'s alone (as before)
 ok       no processes of uid 1000
 ok       no file of uid 1000 on the root file system, /tmp, /var/tmp, /dev/shm or /run
 ok       no journal file of uid 1000
@@ -21,9 +21,9 @@ ok       no /etc/systemd/logind.conf.d
 ok       logind running with RemoveIPC=yes
 ok       logind's UserStopDelayUSec 10 s
 ok       logind's KillUserProcesses off
-ok       logind lists vincent's one session alone (as before)
-ok       logind lists vincent alone as a user
-ok       vincent's user manager not running (as before: killed on 2026-10-07)
+ok       logind lists <user>'s one session alone (as before)
+ok       logind lists <user> alone as a user
+ok       <user>'s user manager not running (as before: killed on 2026-10-07)
 ok       no unit b10-*
 ok       no /tmp/b10, /tmp/b10-out or /var/tmp/b10-saved
 ok       the VM's lock file still there, untouched
