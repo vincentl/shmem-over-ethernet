@@ -1,0 +1,22 @@
+== 2026-10-30T18:07:14Z, load 0.77 2.55 5.28, CPUs online 4
+-- OSOE_PROGRESS_HELPERS=0, threads of the job's processes at 2.5 s:
+   pid 3007148: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007149: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007150: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007151: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007152: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007153: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007154: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007155: osoe-agent x1; t4-sleep4 x1; 
+   launcher exit 0; 0 lines of output
+-- OSOE_PROGRESS_HELPERS=2, threads of the job's processes at 2.5 s:
+   pid 3007564: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007565: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007566: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007567: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007568: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007569: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007570: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007571: osoe-agent x1; t4-sleep4 x1; 
+   launcher exit 0; 0 lines of output
+DONE

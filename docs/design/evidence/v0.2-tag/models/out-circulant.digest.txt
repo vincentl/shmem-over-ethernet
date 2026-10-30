@@ -1,0 +1,1 @@
+../../shmem/tests/circulant-digest.txt: 612 digests, as the model writes them

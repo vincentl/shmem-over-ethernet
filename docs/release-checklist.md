@@ -118,49 +118,80 @@ until the tree to be tagged has them; the author tags.
   had let it ship without); `docs/fast-link.md` is its runbook. Done: three
   sessions on eight `c4-standard-16` nodes, 2026-10-12, 10-20 and 10-28
   (`docs/fast-link-results.md`), H1 to H19 with H25 and H26 closed.
-- [ ] **The review's findings settled on the candidate.** Round eight, at step
+- [x] **The review's findings settled on the candidate.** Round eight, at step
   4's merge point, said *release after named changes*, and they were made
   (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
   adversarially before it merges. The ninth, before Part 4, said the same,
   and its changes were made and read (`docs/decisions/2026-10-11.md`); a tenth
   runs before the tag, once every open item is cleared
   (`docs/prompts/task-v0.2-to-the-tag.md`) - begun 2026-10-30 on `5cefc7fb`,
-  P1's merge, the last change of code an open item asked for.
-- [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
+  P1's merge, the last change of code an open item asked for. Done 2026-10-30:
+  round ten, *tag after the named changes*, all three made the same day,
+  nothing blocking (`docs/reviews/archive/v0.2-before-tag-review.md`).
+- [x] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at `OSOE_PROGRESS_HELPERS=0` set outright and at two and three
   where the merge point ran them, and with the setting unset, the default
   `auto` since 2026-10-28 - ThreadSanitizer's as `ctest` judges every test there
   since the ninth review's C9-1, its reports judged by `tsan.reports` at each
   count, none included, and no gate run apart; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
   last run at 0.1.0's tag; the single-node build in its presets and on Rocky
-  Linux 9.
-- [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
+  Linux 9. Done 2026-10-30 (T1 to T3, `docs/decisions/2026-10-30.md`), on
+  `0edd95a9` but the six `MULTIPLE` models, on `518f5a46`, its code but the
+  version: nine builds without a warning; `release` and `debug` 1,214 of 1,214,
+  `asan` 1,174 and `tsan` 841 at each of the four helper settings,
+  `tsan.reports` passing at each; the 47 models the build registers, on the
+  Mac; tier 3 138 of 138; the suite beside eight busy loops 1,214 of 1,214; the
+  six `MULTIPLE` models 6 of 6; the single-node build whole in its presets, and
+  on Rocky Linux 9.8 whole but four starts its 3.6 GiB VM's `/dev/shm` refuses
+  by name, which pass with the check reporting instead.
+- [x] **The SOS test suite on the tree to be tagged**, at four logical nodes of
   two PEs at `OSOE_PROGRESS_HELPERS=0` set outright and at two, and its team
   programs at 70 PEs, as at step
   4's merge point (`docs/decisions/2026-10-10-step4-merge-point.md`), which ran
   them before its review's fixes and every change since; and the README's
   sentence on Sandia OpenSHMEM's suite "on the tree tagged 0.1.0" made the
-  tree tagged 0.2's (the ninth review's readiness Q5-4).
-- [ ] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
+  tree tagged 0.2's (the ninth review's readiness Q5-4). Done 2026-10-30 (T4):
+  161 of 165 at both counts, and at three helpers too, the four SOS's own; the
+  team programs at 70 PEs 20 of 20 at each; the README's sentence the tag's
+  checks'.
+- [x] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
   for 0.1.0 (above): the sixteen cases in the development VM's Slurm, and
-  `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on.
-- [ ] **The x86-64 item at two and three helpers too** (portability P3, under
+  `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on. Done
+  2026-10-30 (T5, T6): sixteen of sixteen, on `518f5a46`, the code but the
+  version; the pins held in the VM, three runs and tier 3's three floor tests,
+  and on the Pi on the tree to be tagged, its round trips 1.09 to 1.10 times
+  an io_uring echo's.
+- [x] **The x86-64 item at two and three helpers too** (portability P3, under
   "After the release"), and the README's sentence on what "the tagged tree"
   did on x86-64 made 0.2's (readiness Q5-4). Until an x86-64 kernel runs a
   timing test of the helpers' wakes, what stands for x86's order on them is
   `lead_wake_model.py`, the owners' wake, and `helper_request_model.py`, the
   helpers' requests, which run under x86-TSO with breakages that must fail
-  (portability P3's third fix, raised again by the ninth review's P9-5).
-- [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
+  (portability P3's third fix, raised again by the ninth review's P9-5). Done
+  2026-10-12 (T7): natively at two and three helpers on the cluster's first
+  session, and the README's sentence with it (`docs/decisions/2026-10-12.md`).
+- [x] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
-- [ ] **The README's commands on the Pi cluster, and its quick start on Raspberry
-  Pi OS**, as for 0.1.0.
-- [ ] **The release note**: `docs/release-notes/0.2.0.md`, drafted 2026-10-10 and
+  Done 2026-10-30 (T9, T10): the hour on `0edd95a9`, `failures=0` in 3,601 s,
+  with the runbook's first part and the floor's pins there; the runbook end to
+  end on `5cefc7fb`, its code but the version, that morning - the corpus,
+  every pacer run, and an hour each of `mix` and `threads`, `failures=0`; and
+  the 1 MiB lines timed again, Träff's 1.26 to 1.37 times the trees.
+- [x] **The README's commands on the Pi cluster, and its quick start on Raspberry
+  Pi OS**, as for 0.1.0. Done 2026-10-30 on the tree to be tagged (T11, T12):
+  the quick start on the head node, a Pi 5, in 119 s with no warning, both
+  rings and the probe; the installed `oshcc`'s ring under `srun`; the probe on
+  every node; `osoe-pacer --quick`; the batch script with its secret; and
+  `osoe-stat --summary` on every node of a running job through `srun --overlap`.
+- [x] **The release note**: `docs/release-notes/0.2.0.md`, drafted 2026-10-10 and
   fact-checked against its sources, made true of the tree tagged - its numbers
   marked "at the tag" filled in from the runs above, its provisional checks
   replaced by the tag's, anything merged after `5748c97` added, and its line on
   0.1.0's `osoe-pacer mix` hang kept (`docs/decisions/2026-10-09.md` item 4,
-  the author: "fine").
+  the author: "fine"). Done
+  2026-10-30 (X1): its checks the tag's, its "at the tag" lines filled from
+  the runs, what merged after `5748c97` added, and two fact-checks' findings
+  made, the second of the whole note (`docs/decisions/2026-10-30.md`).
 - [x] **The version**: `CMakeLists.txt`'s `0.1.0` to `0.2.0` in the commit the tag
   names, with the README's places that give the current version - its Status,
   the version strings and the library's file name, the repository table's row,
@@ -173,27 +204,31 @@ until the tree to be tagged has them; the author tags.
   against 0.2: the ninth review's investigators built the README's ring against
   a 0.1.0 install and ran it once 0.2 was installed over it, on one node and
   two, with the right lines. The library's file is `libosoe.so.0.2.0`.
-- [ ] **The upgrade run again on the tree tagged**: a program built against the
+- [x] **The upgrade run again on the tree tagged**: a program built against the
   0.1.0 install, run against the tagged library installed over it (readiness
-  Q5-3, Q5-4).
+  Q5-3, Q5-4). Done 2026-10-30 (T8): the README's ring built against 0.1.0's
+  install printed its four lines on one node and on two against
+  `libosoe.so.0.2.0` installed over it, not rebuilt.
 - [x] **If Part 4 turns the zero-copy send on by default**, its locked-memory
   questions are the tag's, since every user with a low `ulimit -l` then meets
   them: whether a connection that met the limit lends again after a while,
   where today it copies for the rest of the job (readiness Q5-4; `shmem_init`
   raises the soft limit to the hard one since 2026-10-11). Not so: Part 4's H8
-  left it off, the author's A3 (`docs/decisions/2026-10-20.md`), so the
-  questions stay after the release.
+  left it off, the author's A3 (`docs/decisions/2026-10-20.md`), and the
+  questions closed with it (H20), to be asked again should the default change.
 
 ## After the release
 
 What the reviews rated *after release*, kept here so that none is lost; none
 blocks the tag. Round three's own after-release list is
 `docs/reviews/archive/phase1-release-review.md`'s, with its readiness report's
-three diagnosis items (`phase1-release-readiness.md`, Q5's list): of those, what
-round six's readiness review found still as it was - "on behalf of PE N"
-naming the PE that noticed rather than the cause, and `osoe-stat` showing a
-stopped node as a waiting one - and the rest of that list stand as round three
-rated them (round six's readiness Q5-5).
+three diagnosis items (`phase1-release-readiness.md`, Q5's list), which round
+six's readiness review found still open (its Q5-5). v0.2 carried all of them
+into its list of open items on 2026-10-11 (`docs/prompts/v0.2-open-items.md`,
+sources R3 and RD) and closed every one: "on behalf of PE N" naming the PE
+that noticed rather than the cause closed as documented (D9, 2026-10-20), and
+`osoe-stat` showing a stopped node as a waiting one was fixed (D6, 2026-10-16).
+Below, an item struck says when and how it closed; one left plain is open.
 
 - **From round six** (`docs/reviews/archive/phase1-step7-slice4-review.md`):
   - ~~`osoe-stat --summary`'s walk of a data collective: the generic phase
@@ -212,11 +247,17 @@ rated them (round six's readiness Q5-5).
     consistency only~~ - done 2026-10-24 (T29: `lane` and `scan_pipeline` under
     x86-TSO); ~~the PID-namespace message when pids are shifted rather
     than repeated~~ - done 2026-10-27 (D26: the creator's namespace beside its
-    pid); an x86-64 tsan build's heap placement (portability Q5);
-  - a real x86-64 kernel (portability's third step for the x86-64 item).
-- **The 1.6 session routines' semantics, should they ever be more than
+    pid); ~~an x86-64 tsan build's heap placement (portability Q5)~~ - done
+    2026-10-12 (T45: ThreadSanitizer natively on the first cluster session's
+    x86-64 nodes, 612 of 612 at no helpers, two and three, the gate passing);
+  - ~~a real x86-64 kernel (portability's third step for the x86-64 item)~~ -
+    done 2026-10-12 (B8 and T7: the first cluster session ran the library
+    natively on x86-64, Debian 13, Linux 6.12; B8's rest, SOS on x86-64, closed
+    2026-10-28).
+- ~~**The 1.6 session routines' semantics, should they ever be more than
   no-ops** - what design §10's "thorough 1.6 spec read" had left when the author
-  closed it (`docs/decisions/2026-10-04.md` item 11).
+  closed it (`docs/decisions/2026-10-04.md` item 11)~~ - decided 2026-10-11
+  (A9: they stay no-ops, by design, `docs/decisions/2026-10-11.md` item 6).
 - ~~**The global exit's single job-wide carrier**, modelled first, which closes
   what the README's second limit leaves open (round four, conformance F1)~~ -
   done 2026-10-30 (P1: modelled 2026-10-29, built at the author's word, the
@@ -228,16 +269,23 @@ rated them (round six's readiness Q5-5).
 - ~~**The pipeline's window on links faster than gigabit**: measure, then the
   default (scale S2)~~ - done 2026-10-28 (P37: timed at the third cluster
   session, the default 8).
-- **The x86-64 network path**, on any x86-64 Debian 13 host (portability Q3).
-- **`osoe-stat --gc` reading a segment into private memory**, its status
+- ~~**The x86-64 network path**, on any x86-64 Debian 13 host (portability Q3)~~ -
+  done 2026-10-12 (B8, with H2 and H3: native x86-64 on the first cluster
+  session - the probe on every node, tier 2 764 of 764, the stream at 0.999 of
+  the bare one's; B8 closed 2026-10-28, with SOS).
+- ~~**`osoe-stat --gc` reading a segment into private memory**, its status
   counting only what it failed to do (Q4); a Clang user's first command (Q5);
   a sandbox's refusal of futex2 named as one (Q6); the 33rd start within a
-  minute (Q7); the `EPERM` hint naming the sysctl only when it is set (Q1).
-- **`osoe-stat` past 64 segments on one machine** (readiness Q5-5); unknown
+  minute (Q7); the `EPERM` hint naming the sysctl only when it is set (Q1)~~ -
+  done 2026-10-18 (P19 last, `SO_REUSEADDR` on the rendezvous; D5, D27 and D28
+  on 2026-10-16 in cloud session 4, B5 on 2026-10-13 in cloud session 1).
+- ~~**`osoe-stat` past 64 segments on one machine** (readiness Q5-5); unknown
   `OSOE_` names, silent today (Q5-6); the messages that could say more (Q5-6).
   The check above the seam that belonged below it (Q5-7) is done: v0.2 step 1's
-  Part 1 moved it into the transport's settings check.
-- **What v0.2 step 1 left to a later step** (its record's adversarial read,
+  Part 1 moved it into the transport's settings check~~ - done 2026-10-16 (D2,
+  D10, D14, D15 and D16 in cloud session 4, `docs/decisions/2026-10-16.md`; D12
+  on 2026-10-13).
+- ~~**What v0.2 step 1 left to a later step** (its record's adversarial read,
   item 4; T17): one-node variants of `shmem.leftovers.*`,
   `shmem.dead-pe.lead-in-init` and `shmem.job.0*`, and of the pacer's planted
   defects, so that the single-node build runs them and something in it shows
@@ -254,14 +302,19 @@ rated them (round six's readiness Q5-5).
   creation, the author's choice; and `shmem.job.0*`, struck, since
   `shmem_test_job` compiles the internode backend's files
   (`docs/decisions/2026-10-06-single-node-build.md`, item 4 of its adversarial
-  read).
-- **What v0.2 step 2 left to after its merge** (its adversarial read, findings
+  read)~~ - done 2026-10-20 (T17: built but `shmem.dead-pe.lead-in-init`, which
+  the author struck, `docs/decisions/2026-10-20.md` item 7).
+- ~~**What v0.2 step 2 left to after its merge** (its adversarial read, findings
   10 to 12, `docs/reviews/archive/v0.2-step2-adversarial-read.md`): multi-node
   tests on the measured link take shapes that vary from start to start, so pin
   `OSOE_LINK_*` in them or print the link on failure; a divergence across a
   crossover ends by the deadlock detector where one tree let a header name it -
   the call's fan-out could travel in the grant or the lane word; the link is
-  measured on two and three nodes, where no fan-out differs.
+  measured on two and three nodes, where no fan-out differs~~ - done 2026-10-20
+  (H14, the link's measurement timed at the second cluster session; T19 on
+  2026-10-18, the link printed in every multi-node test,
+  `OSOE_TEST_PRINT_LINK`; P15 decided: closed as documented,
+  `docs/decisions/2026-10-20.md` item 7).
 - **What v0.2 step 3 left to after its merge** (its adversarial read, findings
   2 and 7, `docs/reviews/archive/v0.2-step3-adversarial-read.md`, and its
   record, `docs/decisions/2026-10-07-circulant-data-path.md`): ~~on two nodes the
@@ -270,54 +323,80 @@ rated them (round six's readiness Q5-5).
   the tree on two nodes, or charge its last piece by its bytes (step 2's fit)~~ -
   done 2026-10-29 (P4: the last piece charged its bytes, two nodes of the Pi's
   link taking the tree at every size, `docs/decisions/2026-10-29-two-node-choice.md`);
-  Träff's at the default ceiling's last row (257 to 512 nodes) only through a
-  lower ceiling's tests; the cost model's Träff's optimistic against the Pi from
+  ~~Träff's at the default ceiling's last row (257 to 512 nodes) only through a
+  lower ceiling's tests~~ - decided 2026-10-11 (A13: accepted as tested through
+  a lower fan-out ceiling, `docs/decisions/2026-10-11.md` item 9); ~~the cost model's Träff's optimistic against the Pi from
   256 KiB, and `osoe-bench`'s back-to-back 64 KiB reduction no faster for it -
   both worth a look when the progress helpers change what a node carries both
   ways at once (looked at on 2026-10-12, H21 in `docs/pi-cluster-results.md`:
-  the optimism stands at every helper count, and the 64 KiB was the binding).
+  the optimism stands at every helper count, and the 64 KiB was the binding)~~ -
+  done 2026-10-12 (H21, `docs/pi-cluster-results.md`; H29 on the Pi,
+  2026-10-28: the link carries both ways at the full rate, so a cost a byte is
+  what the model lacks).
 - ~~**A lead that dies between making its segment and finishing it** (correctness
-  F2)~~ - done 2026-10-24 (P11, in a start with a launch number); the relayed-goodbye test's sensitivity (F3); `env.probe`'s reopen check
-  racing its child (F4); F5's small items.
-- **Example 48's plain profiling names in C11** (conformance M1); a fractional
+  F2)~~ - done 2026-10-24 (P11, in a start with a launch number); ~~the relayed-goodbye test's sensitivity (F3)~~ -
+  done 2026-10-18 (T33: `OSOE_TEST_HOLD_GOODBYE`,
+  `shmem.global-exit.kills.held-other-node.0-2-2-1`); ~~`env.probe`'s reopen check
+  racing its child (F4)~~ - done 2026-10-18 (T34: `env.probe.slow-reopen`); ~~F5's small items~~ -
+  done 2026-10-18 (P13: the lead's `launch` an atomic; T32 on 2026-10-13, X9 to
+  X11 on 2026-10-12).
+- ~~**Example 48's plain profiling names in C11** (conformance M1); a fractional
   `SHMEM_SYMMETRIC_SIZE` usable whole (M3); where the cache routines are
-  declared (M5).
-- **A test past 16 logical nodes** of the global exit and a proved deadlock
-  (scale, minor 1).
-- **Six of round four's minors** that this list had dropped (the review of step
+  declared (M5)~~ - done 2026-10-13 (B3 and B4 in cloud session 1: the macros
+  pass their arguments through as written, the cache routines said to stay in
+  `shmem.h`; M3 on 2026-10-06, `a4445b07`: a heap's size rounded up to a
+  multiple of 16 bytes).
+- ~~**A test past 16 logical nodes** of the global exit and a proved deadlock
+  (scale, minor 1)~~ - done 2026-10-18 (T18: `shmem.global-exit.32-nodes` and
+  `shmem.deadlock.waits.32-nodes`).
+- ~~**Six of round four's minors** that this list had dropped (the review of step
   D's merge point, readiness): `OSOE_JOB_SECRET` not marked *checked* in the
   README's table; `SHMEM_INFO`'s subset; `oshcc -O2 -show`, the wrapper taking
   `-show` only as its first argument; `--static`; `osoe-launch` never printing
-  the job id; `transport.h:536-539`'s sentence.
-- **From the review of step D's merge point**
+  the job id; `transport.h:536-539`'s sentence~~ - done 2026-10-18 (D23 last:
+  `osoe-launch` gives the job's id and says where it waits on a timeout; X8,
+  X12, B1 and B2 on 2026-10-12, D29 on 2026-10-16).
+- ~~**From the review of step D's merge point**
   (`docs/reviews/archive/phase1-step7-slice3-review.md`), each rated after the
-  release or minor:
+  release or minor~~ - done 2026-10-27 (every item below, the last D26):
   - ~~the release hold of a team's local release (design §3.8) has no test and no
     model: the correctness read's probe - a node stopped while 32 MiB streams
     to it - shows it engaging, and its removal ending the job (G1)~~ - done
     2026-10-25 (T16: `team_block_model.py`'s control queue, and
     `shmem.team-release.held.0-1-2` through `OSOE_TEST_HOLD_RELEASE`);
-  - a PE's descriptor generation for a team number is 32 bits: taking one number
+  - ~~a PE's descriptor generation for a team number is 32 bits: taking one number
     2^32 - 1 times ends the job at the next split - hours on one PE, days on
-    several (conformance F2, scale T2); 64 bits, or a generation that wraps;
-  - `osoe-stat`'s counters view keeps 64 PEs a node (readiness), and a split
+    several (conformance F2, scale T2); 64 bits, or a generation that wraps~~ -
+    done 2026-10-20 (P5: 64 bits, private to the PE,
+    `shmem.team-split.generations.L2`);
+  - ~~`osoe-stat`'s counters view keeps 64 PEs a node (readiness), and a split
     waiting on another thread's pending number shows as `(+0xN)` there, wanting
-    a blocked-record kind of its own;
-  - a split called with other arguments on the PEs of one node is silent, and
+    a blocked-record kind of its own~~ - done 2026-10-18 (D4:
+    `OSOE_BLOCKED_DETAIL_TEAM_NUMBER`, layout 41; D3 on 2026-10-16: every PE of
+    a node in the counter rows);
+  - ~~a split called with other arguments on the PEs of one node is silent, and
     across nodes a proved deadlock: two more words in its reduction, a hash of
-    the arguments and its complement, would fail it alike on every PE;
-  - a busy round runs again at once, spinning a one-node parent's PEs (scale
+    the arguments and its complement, would fail it alike on every PE~~ - done
+    2026-10-20 (P6: the reduction carries a word mixing the arguments and its
+    inverse, `shmem.team-split.divergent.*`);
+  - ~~a busy round runs again at once, spinning a one-node parent's PEs (scale
     minor 4); 257 leads claiming at once start on one bitmap word; the
     engine's team array is zeroed twice (`progress.c:1141`), more than half of
-    a block's 570 bytes on the lead;
-  - nothing asserts that the shared 64-bit atomics are lock-free, and ~~step D's
+    a block's 570 bytes on the lead~~ - done 2026-10-20 (P9: a lost claim moves
+    to the word the local id names, timed at the second cluster session; P8 and
+    P10 on 2026-10-18);
+  - ~~nothing asserts that the shared 64-bit atomics are lock-free~~ - done
+    2026-10-13 (P12: `base/lock-free.h`, refused at compile time where never
+    lock-free, asked at start-up where only sometimes), and ~~step D's
     four models run under sequential consistency only~~ (portability Q4) - done
     2026-10-24 (T29: the four under x86-TSO as well);
-  - `posted_bitmap_model.py`'s ORDER check is reached by no listed breakage,
+  - ~~`posted_bitmap_model.py`'s ORDER check is reached by no listed breakage,
     and `take_arrival`'s comparison with the consumed word is redundant
-    (correctness G3);
-  - round two's C5, `iput` with a stride, dropped from the README and this list
-    (conformance M2);
+    (correctness G3)~~ - done 2026-10-18 (T31, closed on the model; T30 on
+    2026-10-13: `kept_bits`, a breakage only ORDER catches);
+  - ~~round two's C5, `iput` with a stride, dropped from the README and this list
+    (conformance M2)~~ - done 2026-10-18 (P22: `iput`'s and `iget`'s strides
+    below 1 end the job by name);
   - ~~a start-up check that a node's PEs share one PID namespace (portability Q2,
     the refutation's sketch): each PE's `/proc/self/ns/pid` device and inode in
     its slot, compared by the lead at the join and refused by name - a layout
@@ -331,22 +410,26 @@ rated them (round six's readiness Q5-5).
   on a node of 256 PEs four of them empty the default pool (step D's second
   part, its first adversarial read, item 5; documented in the README's
   limits)~~ - done 2026-10-27 (P7, node layout 42).
-- **From the review of v0.2 step 1's merge point**
-  (`docs/reviews/archive/v0.2-step1-review.md`), each rated after the release:
-  - a test that nothing in the library spins (scale Q3-1), best before v0.2
+- ~~**From the review of v0.2 step 1's merge point**
+  (`docs/reviews/archive/v0.2-step1-review.md`), each rated after the release~~ -
+  done 2026-10-28 (every item below, the last T35's x86-64 half):
+  - ~~a test that nothing in the library spins (scale Q3-1), best before v0.2
     step 4, whose helpers rewrite the progress threads' waits: more PEs than
     the machine has cores, PE 0 asleep outside the library for a second or
     two, and the job failing when the others and their agents used more than a
     few percent of the machine - in both builds, not labelled `internode`. A
     wait that spins 200 µs before it sleeps passes both suites today, the floor
     pins among them, and makes a 32-PE barrier on four cores 24 to 35 times
-    slower;
-  - the seam for a backend not of AM's shape (readiness Q5-8): design §4.10's
+    slower~~ - done 2026-10-18 (T14: `test-no-spin.c`, PE 0 asleep outside the
+    library and the waiters' CPU bounded, in both builds; the 200 µs spin fails
+    it);
+  - ~~the seam for a backend not of AM's shape (readiness Q5-8): design §4.10's
     note to say what `internode-backend.h` is - AM's own division, which an
     RDMA backend does not keep - and which of the runtime's functions a backend
     may call: the AM backend calls 38 of the rest of `libosoe` and 21 of
-    `base/`;
-  - a test that fails without the one-node quiet's fence (correctness K2) -
+    `base/`~~ - done 2026-10-12 (X7: `internode-backend.h` says which entries
+    carry an RDMA note and what a backend may call);
+  - ~~a test that fails without the one-node quiet's fence (correctness K2) -
     all of quiet in the single-node build, and on x86-64 the only thing that
     orders a store before a later load there: on aarch64 the counters' `ldar`
     and `stlr` hide its absence, and the investigator's store-buffering litmus
@@ -354,68 +437,89 @@ rated them (round six's readiness Q5-5).
     rounds without it only with the library built `-march=armv8.3-a`, whose
     acquire loads are `ldapr`. The litmus as a tier-2 test of two PEs on one
     node, built so where `ldapr` is emitted and the CPU has it, and on x86-64
-    when a machine exists;
-  - for whoever runs the x86-64 items next: the futex2 shim copied into the
+    when a machine exists~~ - done 2026-10-28 (T35 on 2026-10-20:
+    `shmem.quiet.litmus.L2`, skipped where it cannot show the fence; its x86-64
+    half natively at the third cluster session, T36, 7.1 s);
+  - ~~for whoever runs the x86-64 items next: the futex2 shim copied into the
     VM's own file system - read from the host's mount, Rosetta's translation
     daemon stalled the full x86-64 suite after 244 of its tests (portability
-    Q9).
-- **The mesh's start-up schedule** (`docs/design/mesh-schedule-proposal.md`),
+    Q9)~~ - done 2026-10-12 (X15: `docs/README.md` on the futex2 shim copied
+    into the VM's own file system).
+- ~~**The mesh's start-up schedule** (`docs/design/mesh-schedule-proposal.md`),
   once a system large enough to measure it is at hand: the author postponed it
   on 2026-10-05 (`docs/decisions/2026-10-05-before-the-tag.md` item 2), and the
-  README's limits say the start-up is a chain a larger system may need changed.
+  README's limits say the start-up is a chain a larger system may need changed~~ -
+  done 2026-10-28 (H23, built as the author decided on 2026-10-11 (A8) with a
+  large system's measurement waived: the schedule 2026-10-19, data wires on
+  demand 2026-10-27, the blocked kind 2026-10-28,
+  `docs/decisions/2026-10-28.md`).
 - **From the review of v0.2 step 4's merge point**
   (`docs/reviews/archive/v0.2-step4-review.md`), each rated after the release
   or minor, none to be made before the tag, and two with a half built already
   (2026-10-10):
-  - the ThreadSanitizer gate at a helper count tells the library's own
+  - ~~the ThreadSanitizer gate at a helper count tells the library's own
     collective words in the heap mapping from a program's heap, passes a
     report there only against a short list with a reason each, and requires a
-    helper's frame in every report it passes (correctness Q2-2). *Done
-    2026-10-11*, with the ninth review's C9-1 (`cmake/thread-sanitizer-gate.py`,
+    helper's frame in every report it passes (correctness Q2-2)~~ - done
+    2026-10-11 (the ninth review's C9-1: `cmake/thread-sanitizer-gate.py`,
     `docs/decisions/2026-10-11.md`);
   - ~~a white-box test of the deadlock detector's helper half - an answer naming
     the request posted last, the helpers' applied counts in the activity, the
     pass after the request - each removal failing it (correctness Q2-3)~~ - done
     2026-10-24 (T15: `shmem.deadlock.helper-stale`, `-busy` and `-slow`);
-  - the PEs' waits guarded against spinning, as the helpers' and, since
+  - ~~the PEs' waits guarded against spinning, as the helpers' and, since
     2026-10-10, the agent's idle waits are by `shmem.helper-wake`'s two runs
     (scale S1; the step 1 review's Q3-1, half closed;
-    `docs/decisions/2026-10-10-helper-wake.md`);
+    `docs/decisions/2026-10-10-helper-wake.md`)~~ - done 2026-10-18 (T14,
+    `test-no-spin.c`: the PEs' half of Q3-1);
   - ~~Träff's rounds take a lane's rows, which the fan-out ceiling sizes, so past
     512 nodes at the default the cost model's best reduction is out of reach - by
     its own numbers 3.2 to 4.3 times faster at 1 MiB (scale S2): rows sized
     apart from the ceiling, before hundreds of nodes~~ - done 2026-10-25 (P3: a
     lane's rows the more of the ceiling's + 1 and Träff's rounds, to 65,536 nodes);
-  - the receive pool's re-arms grow with the peers sending into a node at once
+  - ~~the receive pool's re-arms grow with the peers sending into a node at once
     (scale S3): a fan-in at many peers on the fast link, with
-    `transport.am.receive_enobufs` beside the rate - Part 4's;
-  - the mesh's accept loop rebuilding its notice of the missing nodes before
+    `transport.am.receive_enobufs` beside the rate - Part 4's~~ - done
+    2026-10-12 (H10: the fan-in of seven nodes into one PE - 256 receive
+    buffers cut the re-arms about five times and raised no rate; the 64 kept,
+    the author's A6 of 2026-10-20 (item 4), to be measured again on the
+    off-network cluster);
+  - ~~the mesh's accept loop rebuilding its notice of the missing nodes before
     every accept, O(n²) on the highest lead, and the ring's own ceiling of 8,192
-    nodes refused as an io_uring error rather than by name (scale S7);
-  - with the zero-copy send's default, Part 4 decides what its refusal for
+    nodes refused as an io_uring error rather than by name (scale S7)~~ - done
+    2026-10-18 (P16: the notice built only when due; P17: the ring's ceiling
+    refused by name, `shmem.wire.ring-ceiling`);
+  - ~~with the zero-copy send's default, Part 4 decides what its refusal for
     want of locked memory keeps (portability P1, built 2026-10-10:
     `docs/decisions/2026-10-10-zero-copy-locked-memory.md`): whether a
     connection that met the limit lends again after a while, where now it
     copies for the rest of the job (whether `shmem_init` raises the soft
     locked-memory limit to the hard one, as it does for open files, the author
     decided on 2026-10-11, for the rings on Linux 6.14 and later: it does,
-    zero copy on or off);
+    zero copy on or off)~~ - decided 2026-10-20 (A3,
+    `docs/decisions/2026-10-20.md` item 2: the zero-copy send stays off by
+    default, and H20, lending again after a refusal "if it becomes the
+    default", closed with it);
   - ~~the backend's own threads named to the deadlock detector through
     `internode-backend.h`, not AM's owner records (readiness Q5-8)~~ - done
     2026-10-20 (P28: `transport.h`'s `backend_thread`, which AM answers from its
-    owner records), and each owner's last pass shown with its age in
-    `osoe-stat` (Q5-9);
-  - a lead with helpers writing a death twice, its agent's line and a helper's,
+    owner records), and ~~each owner's last pass shown with its age in
+    `osoe-stat` (Q5-9)~~ - done 2026-10-17 (D8: a field in each owner record,
+    layout 40, and a `last pass` column in `osoe-stat`);
+  - ~~a lead with helpers writing a death twice, its agent's line and a helper's,
     and "this PE was not waiting in the library" said of a PE in
     `shmem_finalize` (readiness Q5-3; the README quotes the lines as they are) -
     and a non-lead at no helpers wrote "the job is aborting on behalf of PE 0"
     twice once in about 25 failing runs, the line having two writers, `abort.c`
     and `fatal.c`, and no guard of once a process (the ninth review's readiness
-    Q5-4);
+    Q5-4)~~ - done 2026-10-16 (D18, D19 and D21 in cloud session 4: one first
+    word a process, so a death is one line a node);
   - ~~Träff's on teams that are not the world, typed reductions in place at its
     sizes, the whole-job `_to_all` at them, members' bits after a rounding sum,
-    nodes at different helper counts~~, and SOS at three helpers, each right by
+    nodes at different helper counts~~, and ~~SOS at three helpers~~, each right by
     the review's probes and none in the suite (conformance C3) - done 2026-10-25
-    (T20) but SOS at three helpers, a run of the tag's (T4);
-  - the x86-64 item at the next tag run at two and three helpers too
-    (portability P3);
+    (T20), and SOS at three helpers on 2026-10-30 (T4: 161 of 165 on the tree to
+    be tagged, each program's status as at none and two);
+  - ~~the x86-64 item at the next tag run at two and three helpers too
+    (portability P3)~~ - done 2026-10-12 (T7: natively at two and three helpers
+    on the first cluster session).

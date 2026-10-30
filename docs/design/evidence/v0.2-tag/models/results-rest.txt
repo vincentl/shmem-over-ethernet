@@ -1,0 +1,5 @@
+get_completion.equality exit 0 0 s
+shape_timing.grid exit 0 0 s
+shape_timing.places-grid exit 0 1 s
+circulant.digest exit 0 3 s
+mesh.digest exit 0 0 s

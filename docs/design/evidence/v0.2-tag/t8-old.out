@@ -1,0 +1,23 @@
+T8, part one (t8-old.sh), in the osoe VM, 2026-10-30 - its output as the session printed it,
+the script having written none to a file.
+
+0.1.0 installed: libosoe.so.0 libosoe.so.0.1.0
+== 0.1.0, osoe-launch -n 4 :
+build/scratch/tag-checks/t8-old.sh: line 16: /var/tmp/t8-prefix/bin/osoe-launch: No such file or directory
+== 0.1.0, osoe-launch -n 4 -m 0,0,1,1:
+build/scratch/tag-checks/t8-old.sh: line 16: /var/tmp/t8-prefix/bin/osoe-launch: No such file or directory
+
+0.1.0 installs no osoe-launch - 0.2 is the first to - so the same ring, run by 0.1.0's build
+tree's launcher (/var/tmp/t8-v0.1.0/build/release/tools/launch/osoe-launch), under the VM's lock:
+
+== 0.1.0, osoe-launch -n 4 :
+PE 0 of 4: my box holds 3
+PE 3 of 4: my box holds 2
+PE 1 of 4: my box holds 0
+PE 2 of 4: my box holds 1
+== 0.1.0, osoe-launch -n 4 -m 0,0,1,1:
+PE 1 of 4: my box holds 0
+PE 3 of 4: my box holds 2
+PE 2 of 4: my box holds 1
+PE 0 of 4: my box holds 3
+	libosoe.so.0 => /var/tmp/t8-prefix/lib/libosoe.so.0 (0x0000ffffb54a0000)

@@ -1,0 +1,9 @@
+T5's command, from the Mac, 2026-10-30 - the tree of 518f5a46 built in the osoe VM and t5.sh run
+on it, the VM's lock held for both:
+
+cd <repo> && limactl shell osoe -- bash -c 'exec 9>/tmp/osoe-vm.lock;
+  flock -w 3600 9 || exit 99; T=/var/tmp/t5-tree; rm -rf $T; mkdir -p $T &&
+  tar -xf build/scratch/tag-checks/tree-518f5a46.tar -C $T && cd $T &&
+  cmake --preset release > /dev/null 2>&1 && cmake --build build/release -j4 > build.txt 2>&1 &&
+  echo "built: $(grep -c warning: build.txt) warnings" &&
+  bash <repo>/build/scratch/tag-checks/t5/t5.sh $T' 2>&1 | tail -20

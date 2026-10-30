@@ -1,0 +1,7 @@
+carrier/one_wire: holds (52 states)
+carrier/two_wires: holds (398 states)
+carrier/control_only: holds (361 states)
+carrier/old_send: FAILS: LIVE_END: both carriers wait for each other (504 states)
+   trace: 1 begins its abort ; 1 sends its abort on C ; 0 reads ABORT on C ; 1 sends its abort on D ; 0 reads ABORT on D
+carrier/old_send_one_wire: FAILS: LIVE_END: both carriers wait for each other (56 states)
+   trace: 1 begins its abort ; 1 sends its abort on D ; 0 reads ABORT on D

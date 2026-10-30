@@ -1,0 +1,18 @@
+credit_wait/design rounds=1,1 credits=1 bits=32              SC  states=        266 depth= 24 (miss<4e-25) -> ok +live
+credit_wait/design rounds=1,1,1 credits=1 bits=32            SC  states=     23,355 depth= 42 (miss<3e-21) -> ok +live
+credit_wait/design rounds=2,1,1 credits=1 bits=32            TSO states=    103,512 depth= 58 (miss<7e-20) -> ok +live
+credit_wait/design rounds=1,1,1 credits=1 bits=2             SC  states=     23,355 depth= 42 (miss<3e-21) -> ok +live
+credit_wait/design rounds=2,1,1 credits=1 bits=2             SC  states=    103,564 depth= 58 (miss<7e-20) -> ok +live
+credit_wait/design rounds=1,1,1 credits=2 bits=32            TSO states=     10,791 depth= 34 (miss<7e-22) -> ok +live
+credit_wait/pool_handoff rounds=1,1,1 credits=1 bits=32      SC  states=      3,999 depth= 38 (miss<1e-22) -> VIOLATION
+    BARGE: a free credit was taken while a waiter was queued for one
+    trace: T2:load ('state',)->1 ; T2:cas ('state',) 1->0 True ; T2:ghost ('$held',)=0 ; T2:load ('state',)->0 ; T1:load ('state',)->0 ; T2:cas ('state',) 0->1 True ; T2:load ('waiters',)->0 ; T2:ghost ('$done',)=1 ; T1:ghost ('$waiting',)=1 ; T1:add ('waiters',)->1 ; T1:load ('wake',)->0 ; T1:load ('state',)->1 ; T0:load ('state',)->1 ; T0:cas ('state',) 1->0 True ; T3:await ok ; T3: CHECK FAILED: BARGE: a free credit was taken while a waiter was queued for one
+credit_wait/wake_any rounds=1,1,1 credits=1 bits=32          SC  states=      2,156 depth= 34 (miss<3e-23) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T2:load ('state',)->1 ; T2:cas ('state',) 1->0 True ; T2:ghost ('$held',)=0 ; T2:load ('state',)->0 ; T1:load ('state',)->0 ; T1:cas ('state',) 0->64 True ; T2:cas ('state',) 0->1 False ; T2:load ('state',)->64 ; T1:load ('wake',)->0 ; T1:load ('state',)->64 ; T2:cas ('state',) 64->4160 True ; T1:futex_wait ('wake',) SLEEP ; T2:add ('wake',)->1 ; T0:load ('state',)->4160 ; T0:cas ('state',) 4160->4224 True ; T0:load ('wake',)->1 ; T0:load ('state',)->4224 ; T0:futex_wait ('wake',) SLEEP ; T2:futex_wake ('wake',) n=1 mask 4294967295 woke [0] ; T2:ghost ('$done',)=1 ; T0:load ('wake',)->1 ; T0:load ('state',)->4224 ; T0:futex_wait ('wake',) SLEEP
+credit_wait/bump_first rounds=1,1 credits=1 bits=32          SC  states=         64 depth= 21 (miss<3e-26) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T1:load ('state',)->1 ; T1:cas ('state',) 1->0 True ; T1:ghost ('$held',)=0 ; T1:load ('state',)->0 ; T0:load ('state',)->0 ; T0:cas ('state',) 0->64 True ; T1:cas ('state',) 0->1 False ; T1:load ('state',)->64 ; T1:add ('wake',)->1 ; T0:load ('wake',)->1 ; T0:load ('state',)->64 ; T1:cas ('state',) 64->4160 True ; T1:futex_wake ('wake',) n=1073741824 mask 1 woke [] ; T1:ghost ('$done',)=1 ; T0:futex_wait ('wake',) mask 1 SLEEP
+credit_wait/eager_available rounds=1,1,1 credits=1 bits=32   SC  states=        620 depth= 30 (miss<2e-24) -> VIOLATION
+    OVERSUBSCRIBED: more credits held than there are
+    trace: T2:load ('state',)->1 ; T2:cas ('state',) 1->0 True ; T2:ghost ('$held',)=0 ; T2:load ('state',)->0 ; T1:load ('state',)->0 ; T1:cas ('state',) 0->64 True ; T2:cas ('state',) 0->1 False ; T2:load ('state',)->64 ; T2:cas ('state',) 64->4161 True ; T2:add ('wake',)->1 ; T2:futex_wake ('wake',) n=1073741824 mask 1 woke [] ; T2:ghost ('$done',)=1 ; T1:load ('wake',)->1 ; T1:load ('state',)->4161 ; T1:ghost ('$held',)=1 ; T0:load ('state',)->4161 ; T0:cas ('state',) 4161->4160 True ; T3:await ok ; T3: CHECK FAILED: OVERSUBSCRIBED: more credits held than there are

@@ -1,0 +1,15 @@
+-- Install configuration: "RelWithDebInfo"
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/lib/libosoe.so.0.2.0
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/lib/libosoe.so.0
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/lib/libosoe.so
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/include/shmem.h
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/include/pshmem.h
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/include/shmemx.h
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/include/mpp/shmem.h
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/include/mpp/shmemx.h
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/bin/osoe-launch
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/bin/osoe-stat
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/bin/osoe-pacer
+-- Set non-toolchain portion of runtime path of "/home/pi/osoe/build/release-run/readme/prefix/bin/osoe-pacer" to "$ORIGIN/../lib"
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/bin/oshcc
+-- Installing: /home/pi/osoe/build/release-run/readme/prefix/lib/osoe/osoe-statics.ld

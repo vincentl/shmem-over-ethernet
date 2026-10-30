@@ -1,0 +1,17 @@
+caller 0 handler 0 ms status 0: srun 0, handler finished 1, 0.44 s - ok
+caller 0 handler 0 ms status 7: srun 7, handler finished 1, 0.35 s - ok
+caller 0 handler 200 ms status 0: srun 0, handler finished 1, 0.46 s - ok
+caller 0 handler 200 ms status 7: srun 7, handler finished 1, 0.47 s - ok
+caller 0 handler 1000 ms status 0: srun 0, handler finished 1, 1.25 s - ok
+caller 0 handler 1000 ms status 7: srun 7, handler finished 1, 1.25 s - ok
+caller 0 handler 5000 ms status 0: srun 0, handler finished 1, 5.26 s - ok
+caller 0 handler 5000 ms status 7: srun 7, handler finished 1, 5.27 s - ok
+caller 3 handler 0 ms status 0: srun 0, handler finished 1, 0.35 s - ok
+caller 3 handler 0 ms status 7: srun 7, handler finished 1, 0.34 s - ok
+caller 3 handler 200 ms status 0: srun 0, handler finished 1, 0.44 s - ok
+caller 3 handler 200 ms status 7: srun 7, handler finished 1, 0.46 s - ok
+caller 3 handler 1000 ms status 0: srun 0, handler finished 1, 1.26 s - ok
+caller 3 handler 1000 ms status 7: srun 7, handler finished 1, 1.26 s - ok
+caller 3 handler 5000 ms status 0: srun 0, handler finished 1, 5.26 s - ok
+caller 3 handler 5000 ms status 7: srun 7, handler finished 1, 5.25 s - ok
+16 of 16 ok

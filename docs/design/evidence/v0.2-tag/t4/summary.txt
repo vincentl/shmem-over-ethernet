@@ -1,0 +1,200 @@
+== progress
+14:00:03 lock held; load 1.24 4.22 7.07; memory: 1761 MiB free, 7330 MiB available; /dev/shm: 0 entries
+14:00:03 phase build begins; load 1.24 4.22 7.07
+14:00:37 phase build ends rc=0; load 2.66 4.25 6.97
+14:00:37 phase sos-h0 begins; load 2.66 4.25 6.97
+14:02:48 phase sos-h0 ends rc=0; load 2.60 3.56 6.36
+14:02:48 phase sos-h2 begins; load 2.60 3.56 6.36
+14:04:59 phase sos-h2 ends rc=0; load 2.94 3.24 5.87
+14:04:59 phase teams-h0 begins; load 2.94 3.24 5.87
+14:05:03 phase teams-h0 ends rc=0; load 4.23 3.50 5.94
+14:05:03 phase teams-h2 begins; load 4.23 3.50 5.94
+14:05:08 phase teams-h2 ends rc=0; load 5.17 3.71 5.99
+14:05:08 all phases ended
+DONE
+
+== SOS at 4 x 2 (0,0,1,1,2,2,3,3), OSOE_PROGRESS_HELPERS=0
+== T4 SOS, map 0,0,1,1,2,2,3,3, OSOE_PROGRESS_HELPERS=0, tree unknown, 2026-10-30T18:00:37Z, load 2.66 4.25 6.97
+== summary (helpers 0, map 0,0,1,1,2,2,3,3)
+programs built and run: 163
+exit 0 on the map: 161
+build failures: 2
+runs failing: 2
+slowest runs: 65.3s unit/mt_membar;26.1s unit/spam;8.9s unit/bigget;
+/dev/shm entries new since the start: 0
+DONE
+-- runs not exiting 0:
+unit/shmem_team_b2b_collectives              0-0-1-1-2-2-3-3  exit 1      0.1s shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 640 bytes (spec §9.10.8: dest must hold ever | 
+unit/shmemalign                              0-0-1-1-2-2-3-3  exit 1      0.1s shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8) | 
+-- builds failing:
+unit/c11_shmem_test_all_any_some             BUILD FAILED  ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+unit/c11_shmem_wait_until_all_any_some       BUILD FAILED  ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+
+== SOS at 4 x 2 (0,0,1,1,2,2,3,3), OSOE_PROGRESS_HELPERS=2
+== T4 SOS, map 0,0,1,1,2,2,3,3, OSOE_PROGRESS_HELPERS=2, tree 0edd95a9ae82f4f977200c4670be74b5c369e53b, 2026-10-30T18:02:48Z, load 2.60 3.56 6.36
+== summary (helpers 2, map 0,0,1,1,2,2,3,3)
+programs built and run: 163
+exit 0 on the map: 161
+build failures: 2
+runs failing: 2
+slowest runs: 67.7s unit/mt_membar;24.5s unit/spam;8.5s unit/bigget;
+/dev/shm entries new since the start: 0
+DONE
+-- runs not exiting 0:
+unit/shmem_team_b2b_collectives              0-0-1-1-2-2-3-3  exit 1      0.1s shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 640 bytes (spec §9.10.8: dest must hold ever | 
+unit/shmemalign                              0-0-1-1-2-2-3-3  exit 1      0.1s shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8) | 
+-- builds failing:
+unit/c11_shmem_test_all_any_some             BUILD FAILED  ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+unit/c11_shmem_wait_until_all_any_some       BUILD FAILED  ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+
+== team programs at 70 PEs, OSOE_PROGRESS_HELPERS=0
+== T4 team programs at 70 PEs, OSOE_PROGRESS_HELPERS=0, tree 0edd95a9ae82f4f977200c4670be74b5c369e53b, 2026-10-30T18:04:59Z, load 2.94 3.24 5.87
+OSOE_PROGRESS_HELPERS=0
+shmem_team_reuse_teams one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+shmem_team_reuse_teams ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+reduce_active_set one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=70 out-lines=71 err-lines=0 failure-words=0 | 
+reduce_active_set ten-nodes: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=70 out-lines=71 err-lines=0 failure-words=0 | 
+broadcast_active_set one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=142 err-lines=0 failure-words=0 | 
+broadcast_active_set ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=142 err-lines=0 failure-words=0 | 
+repeated_barriers one-node: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+repeated_barriers ten-nodes: rc=0 70PEs 0.5s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+shmem_team_max one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | The number of teams created for PE 0 is : 64
+shmem_team_max ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | The number of teams created for PE 0 is : 64
+shmem_team_split_2d one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=107 err-lines=0 failure-words=105 | 
+shmem_team_split_2d ten-nodes: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=107 err-lines=0 failure-words=105 | 
+collect_active_set one-node-32: rc=0 32PEs 0.0s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=33 err-lines=0 failure-words=0 | 
+collect_active_set four-nodes-32: rc=0 32PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=33 err-lines=0 failure-words=0 | 
+split_shared nodes=61: rc=0 61PEs 0.2s valid=61 invalid=0 nonzero-returns=0 out-lines=61 err-lines=0
+split_shared nodes=62: rc=0 62PEs 0.2s valid=62 invalid=0 nonzero-returns=0 out-lines=62 err-lines=0
+split_shared nodes=64: rc=0 64PEs 0.2s valid=64 invalid=0 nonzero-returns=0 out-lines=64 err-lines=0
+split_shared nodes=70: rc=0 70PEs 0.3s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+split_shared ten-nodes-of-7=70: rc=0 70PEs 0.2s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+split_shared one-node=70: rc=0 70PEs 0.1s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+== summary (helpers 0)
+runs: 20, rc=0: 20, not rc=0: 0
+/dev/shm entries new since the start: 0
+DONE
+
+== team programs at 70 PEs, OSOE_PROGRESS_HELPERS=2
+== T4 team programs at 70 PEs, OSOE_PROGRESS_HELPERS=2, tree 0edd95a9ae82f4f977200c4670be74b5c369e53b, 2026-10-30T18:05:03Z, load 4.23 3.50 5.94
+OSOE_PROGRESS_HELPERS=2
+shmem_team_reuse_teams one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+shmem_team_reuse_teams ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+reduce_active_set one-node: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=70 out-lines=71 err-lines=0 failure-words=0 | 
+reduce_active_set ten-nodes: rc=0 70PEs 0.3s no-number=0 dry=0 rank-failures=0 iterations=70 out-lines=71 err-lines=0 failure-words=0 | 
+broadcast_active_set one-node: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=142 err-lines=0 failure-words=0 | 
+broadcast_active_set ten-nodes: rc=0 70PEs 0.3s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=142 err-lines=0 failure-words=0 | 
+repeated_barriers one-node: rc=0 70PEs 0.5s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+repeated_barriers ten-nodes: rc=0 70PEs 0.8s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+shmem_team_max one-node: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | The number of teams created for PE 0 is : 64
+shmem_team_max ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | The number of teams created for PE 0 is : 64
+shmem_team_split_2d one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=107 err-lines=0 failure-words=105 | 
+shmem_team_split_2d ten-nodes: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=107 err-lines=0 failure-words=105 | 
+collect_active_set one-node-32: rc=0 32PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=33 err-lines=0 failure-words=0 | 
+collect_active_set four-nodes-32: rc=0 32PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=33 err-lines=0 failure-words=0 | 
+split_shared nodes=61: rc=0 61PEs 0.2s valid=61 invalid=0 nonzero-returns=0 out-lines=61 err-lines=0
+split_shared nodes=62: rc=0 62PEs 0.2s valid=62 invalid=0 nonzero-returns=0 out-lines=62 err-lines=0
+split_shared nodes=64: rc=0 64PEs 0.2s valid=64 invalid=0 nonzero-returns=0 out-lines=64 err-lines=0
+split_shared nodes=70: rc=0 70PEs 0.3s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+split_shared ten-nodes-of-7=70: rc=0 70PEs 0.1s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+split_shared one-node=70: rc=0 70PEs 0.1s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+== summary (helpers 2)
+runs: 20, rc=0: 20, not rc=0: 0
+/dev/shm entries new since the start: 0
+DONE
+
+== SOS at 4 x 2, a second pass (sos-repeat/), OSOE_PROGRESS_HELPERS=0
+== T4 SOS, map 0,0,1,1,2,2,3,3, OSOE_PROGRESS_HELPERS=0, tree 0edd95a9ae82f4f977200c4670be74b5c369e53b, 2026-10-30T18:09:02Z, load 2.57 2.79 5.06
+== summary (helpers 0, map 0,0,1,1,2,2,3,3)
+programs built and run: 163
+exit 0 on the map: 161
+build failures: 2
+runs failing: 2
+slowest runs: 63.4s unit/mt_membar;26.1s unit/spam;8.4s unit/bigget;
+/dev/shm entries new since the start: 0
+DONE
+-- runs not exiting 0:
+unit/shmem_team_b2b_collectives exit 1
+unit/shmemalign exit 1
+-- builds failing:
+unit/c11_shmem_test_all_any_some
+unit/c11_shmem_wait_until_all_any_some
+
+== SOS at 4 x 2, a second pass (sos-repeat/), OSOE_PROGRESS_HELPERS=2
+== T4 SOS, map 0,0,1,1,2,2,3,3, OSOE_PROGRESS_HELPERS=2, tree 0edd95a9ae82f4f977200c4670be74b5c369e53b, 2026-10-30T18:11:11Z, load 2.60 2.55 4.66
+== summary (helpers 2, map 0,0,1,1,2,2,3,3)
+programs built and run: 163
+exit 0 on the map: 161
+build failures: 2
+runs failing: 2
+slowest runs: 67.4s unit/mt_membar;25.4s unit/spam;8.6s unit/bigget;
+/dev/shm entries new since the start: 0
+DONE
+-- runs not exiting 0:
+unit/shmem_team_b2b_collectives exit 1
+unit/shmemalign exit 1
+-- builds failing:
+unit/c11_shmem_test_all_any_some
+unit/c11_shmem_wait_until_all_any_some
+
+== 70-PE team programs, three more passes at each helper count (teams70-repeats/)
+== 2026-10-30T18:07:52Z, load 0.40 2.23 5.05
+repeat 1, helpers 0: runs: 20, rc=0: 20, not rc=0: 0
+repeat 1, helpers 2: runs: 20, rc=0: 20, not rc=0: 0
+repeat 2, helpers 0: runs: 20, rc=0: 20, not rc=0: 0
+repeat 2, helpers 2: runs: 20, rc=0: 20, not rc=0: 0
+repeat 3, helpers 0: runs: 20, rc=0: 20, not rc=0: 0
+repeat 3, helpers 2: runs: 20, rc=0: 20, not rc=0: 0
+DONE
+
+== helpers-threads.txt
+== 2026-10-30T18:07:14Z, load 0.77 2.55 5.28, CPUs online 4
+-- OSOE_PROGRESS_HELPERS=0, threads of the job's processes at 2.5 s:
+   pid 3007148: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007149: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007150: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007151: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007152: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007153: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007154: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007155: osoe-agent x1; t4-sleep4 x1; 
+   launcher exit 0; 0 lines of output
+-- OSOE_PROGRESS_HELPERS=2, threads of the job's processes at 2.5 s:
+   pid 3007564: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007565: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007566: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007567: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007568: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007569: osoe-agent x1; t4-sleep4 x1; 
+   pid 3007570: osoe-agent x1; osoe-helper-1 x1; osoe-helper-2 x1; t4-sleep4 x1; 
+   pid 3007571: osoe-agent x1; t4-sleep4 x1; 
+   launcher exit 0; 0 lines of output
+DONE
+
+== helpers-check.txt
+== 2026-10-30T18:06:59Z, load 0.99 2.69 5.37, CPUs online 4
+-- OSOE_PROGRESS_HELPERS=0, SHMEM_DEBUG=1, map 0,0,1,1,2,2,3,3
+   exit 0
+-- OSOE_PROGRESS_HELPERS=2, SHMEM_DEBUG=1, map 0,0,1,1,2,2,3,3
+   exit 0
+-- OSOE_PROGRESS_HELPERS=auto, SHMEM_DEBUG=1, map 0,0,1,1,2,2,3,3
+osoe: node 0 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 1 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 2 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 3 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+   exit 0
+-- OSOE_PROGRESS_HELPERS unset (the default), SHMEM_DEBUG=1
+osoe: node 0 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 1 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 2 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 3 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+DONE
+
+== what else used the VM (load-sampler.py; samples 10 s apart, load-teams-repeats.log 1 s apart)
+   machine = cores busy in all; T4 = those of T4's own processes alive across a sample (short-lived programs are mostly missed, so low);
+   others = cores used by live processes outside T4's own
+load-build.log: 3 samples; machine mean 3.78 max 3.88 cores; T4 mean 0.00; others mean 0.02 max 0.02; samples with others >= 0.25 core: 0; outside processes seen at 0.10 core or more: none
+load-sos-h0.log: 13 samples; machine mean 0.88 max 3.14 cores; T4 mean 0.09; others mean 0.03 max 0.12; samples with others >= 0.25 core: 0; outside processes seen at 0.10 core or more: /usr/local/bin/lima-guestagent
+load-sos-h2.log: 13 samples; machine mean 0.87 max 3.06 cores; T4 mean 0.10; others mean 0.04 max 0.14; samples with others >= 0.25 core: 0; outside processes seen at 0.10 core or more: /usr/local/bin/lima-guestagent
+load-sos-repeat.log: 25 samples; machine mean 0.87 max 3.11 cores; T4 mean 0.09; others mean 0.04 max 0.16; samples with others >= 0.25 core: 0; outside processes seen at 0.10 core or more: /usr/local/bin/lima-guestagent
+load-teams-repeats.log: 29 samples; machine mean 2.04 max 2.38 cores; T4 mean 0.00; others mean 1.15 max 1.30; samples with others >= 0.25 core: 27; outside processes seen at 0.10 core or more: /usr/local/bin/lima-guestagent

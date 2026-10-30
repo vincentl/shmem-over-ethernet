@@ -1,0 +1,46 @@
+credit/design pes=1 ops=2 C=1 [descriptors]                  SC  states=         21 depth= 20 (miss<3e-27) -> ok +live
+credit/design pes=2 ops=1 C=1 [descriptors]                  SC  states=        117 depth= 23 (miss<9e-26) -> ok +live
+credit/design pes=2 ops=2 C=1 [descriptors]                  SC  states=        545 depth= 47 (miss<2e-24) -> ok +live
+credit/design pes=2 ops=2 C=2 [descriptors]                  SC  states=      1,279 depth= 44 (miss<1e-23) -> ok +live
+credit/race_take pes=1 ops=2 C=1 [descriptors]               SC  states=         21 depth= 20 (miss<3e-27) -> ok +live
+credit/race_take pes=2 ops=2 C=1 [descriptors]               SC  states=         51 depth= 40 (miss<2e-26) -> VIOLATION
+    CREDITS: credits went to -1: handed out twice
+    trace: T1:await ok ; T1:add ('credits',)->0 ; T1:check ok ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:check ok ; T2:drain pe1 ; T1:await ok ; T1:add ('land', 1)->0 ; T1:add ('credits',)->1 ; T1:await ok ; T0:await ok ; T1:add ('credits',)->0 ; T1:check ok ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:check ok ; T2:drain pe1 ; T1:await ok ; T1:add ('land', 1)->0 ; T0:add ('credits',)->-1 ; T0: CHECK FAILED: CREDITS: credits went to -1: handed out twice
+credit/on_apply pes=1 ops=2 C=1 [descriptors]                SC  states=         19 depth= 18 (miss<2e-27) -> ok +live
+credit/on_apply pes=2 ops=2 C=1 [descriptors]                SC  states=         78 depth= 36 (miss<4e-26) -> VIOLATION
+    DESCRIPTORS: 2 reply descriptors alive on the connection, credit is 1
+    trace: T1:load ('credits',)->1 ; T1:cas ('credits',) 1->0 True ; T1:check ok ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:check ok ; T2:drain pe1 ; T1:await ok ; T1:add ('land', 1)->0 ; T1:load ('credits',)->1 ; T1:cas ('credits',) 1->0 True ; T1:check ok ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:check ok ; T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2: CHECK FAILED: DESCRIPTORS: 2 reply descriptors alive on the connection, credit is 1
+credit/on_drain pes=1 ops=2 C=1 [descriptors]                SC  states=         19 depth= 18 (miss<2e-27) -> ok +live
+credit/on_drain pes=2 ops=2 C=1 [descriptors]                SC  states=        609 depth= 41 (miss<2e-24) -> ok +live
+credit/none pes=1 ops=2 C=1 [descriptors]                    SC  states=         13 depth= 12 (miss<1e-27) -> ok +live
+credit/none pes=2 ops=2 C=1 [descriptors]                    SC  states=         51 depth= 24 (miss<2e-26) -> VIOLATION
+    DESCRIPTORS: 2 reply descriptors alive on the connection, credit is 1
+    trace: T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:check ok ; T2:drain pe1 ; T1:await ok ; T1:add ('land', 1)->0 ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2: CHECK FAILED: DESCRIPTORS: 2 reply descriptors alive on the connection, credit is 1
+credit/design nbi pes=1 ops=2 C=1 [descriptors]              SC  states=         29 depth= 20 (miss<5e-27) -> ok +live
+credit/design nbi pes=1 ops=3 C=2 [descriptors]              SC  states=        156 depth= 30 (miss<2e-25) -> ok +live
+credit/on_drain nbi pes=1 ops=2 C=1 [descriptors]            SC  states=         42 depth= 18 (miss<1e-26) -> ok +live
+credit/on_apply nbi pes=1 ops=2 C=1 [descriptors]            SC  states=         38 depth= 18 (miss<9e-27) -> VIOLATION
+    DESCRIPTORS: 2 reply descriptors alive on the connection, credit is 1
+    trace: T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2:check ok ; T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2: CHECK FAILED: DESCRIPTORS: 2 reply descriptors alive on the connection, credit is 1
+credit/design pes=1 ops=2 C=1 [landing]                      SC  states=         31 depth= 20 (miss<6e-27) -> ok +live
+credit/design pes=2 ops=1 C=1 [landing]                      SC  states=        164 depth= 23 (miss<2e-25) -> ok +live
+credit/design pes=2 ops=2 C=1 [landing]                      SC  states=        888 depth= 47 (miss<5e-24) -> ok +live
+credit/design pes=2 ops=2 C=2 [landing]                      SC  states=      1,999 depth= 44 (miss<3e-23) -> ok +live
+credit/race_take pes=1 ops=2 C=1 [landing]                   SC  states=         31 depth= 20 (miss<6e-27) -> ok +live
+credit/race_take pes=2 ops=2 C=1 [landing]                   SC  states=         68 depth= 40 (miss<3e-26) -> VIOLATION
+    CREDITS: credits went to -1: handed out twice
+    trace: T1:await ok ; T1:add ('credits',)->0 ; T1:check ok ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:drain pe1 ; T2:check ok ; T1:await ok ; T1:add ('land', 1)->0 ; T1:add ('credits',)->1 ; T1:await ok ; T0:await ok ; T1:add ('credits',)->0 ; T1:check ok ; T1:add ('sent', 1)->1 ; T2:accept pe1 ; T2:drain pe1 ; T2:check ok ; T1:await ok ; T1:add ('land', 1)->0 ; T0:add ('credits',)->-1 ; T0: CHECK FAILED: CREDITS: credits went to -1: handed out twice
+credit/on_apply pes=1 ops=2 C=1 [landing]                    SC  states=         27 depth= 18 (miss<5e-27) -> ok +live
+credit/on_apply pes=2 ops=2 C=1 [landing]                    SC  states=      1,048 depth= 39 (miss<7e-24) -> ok +live
+credit/on_drain pes=1 ops=2 C=1 [landing]                    SC  states=         27 depth= 18 (miss<5e-27) -> ok +live
+credit/on_drain pes=2 ops=2 C=1 [landing]                    SC  states=        968 depth= 40 (miss<6e-24) -> ok +live
+credit/none pes=1 ops=2 C=1 [landing]                        SC  states=         18 depth= 12 (miss<2e-27) -> ok +live
+credit/none pes=2 ops=2 C=1 [landing]                        SC  states=        226 depth= 24 (miss<3e-25) -> ok +live
+credit/design nbi pes=1 ops=2 C=1 [landing]                  SC  states=         43 depth= 20 (miss<1e-26) -> ok +live
+credit/design nbi pes=1 ops=3 C=2 [landing]                  SC  states=        276 depth= 30 (miss<5e-25) -> ok +live
+credit/on_drain nbi pes=1 ops=2 C=1 [landing]                SC  states=         27 depth= 18 (miss<5e-27) -> VIOLATION
+    LANDING: 2 replies in flight toward one PE, its landing zone holds 1
+    trace: T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2:drain pe0 ; T2:check ok ; T1:await ok ; T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2:drain pe0 ; T2: CHECK FAILED: LANDING: 2 replies in flight toward one PE, its landing zone holds 1
+credit/on_apply nbi pes=1 ops=2 C=1 [landing]                SC  states=         27 depth= 18 (miss<5e-27) -> VIOLATION
+    LANDING: 2 replies in flight toward one PE, its landing zone holds 1
+    trace: T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2:drain pe0 ; T2:check ok ; T1:await ok ; T0:load ('credits',)->1 ; T0:cas ('credits',) 1->0 True ; T0:check ok ; T0:add ('sent', 0)->1 ; T2:accept pe0 ; T2:drain pe0 ; T2: CHECK FAILED: LANDING: 2 replies in flight toward one PE, its landing zone holds 1

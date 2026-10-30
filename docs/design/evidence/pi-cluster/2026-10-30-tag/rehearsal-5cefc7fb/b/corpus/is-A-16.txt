@@ -1,0 +1,59 @@
+
+
+ NAS Parallel Benchmarks 3.2 -- IS Benchmark
+
+ Size:  8388608  (class A)
+ Iterations:   10
+ Number of processes:     16
+
+   iteration
+        1
+        2
+        3
+        4
+        5
+        6
+        7
+        8
+        9
+        10
+
+
+ IS Benchmark Completed
+ Class           =                        A
+ Size            =                  8388608
+ Iterations      =                       10
+ Time in seconds =                     2.00
+ Total processes =                       16
+ Compiled procs  =                       16
+ Mop/s total     =                    41.94
+ Mop/s/process   =                     2.62
+ Operation type  =              keys ranked
+ Verification    =               SUCCESSFUL
+ Version         =                      3.2
+ Compile date    =              30 Oct 2026
+
+ Compile options:
+    SHMEMCC      = /home/pi/osoe/build/release/tools/wrapper/o...
+    CLINK        = $(SHMEMCC)
+    CSHMEM_LIB   = (none)
+    CSHMEM_INC   = (none)
+    CMPI_LIB     = (none)
+    CMPI_INC     = -I/home/pi/osoe/build/corpus/npb/stub
+    CFLAGS       = -O2 -g -fpermissive
+    CLINKFLAGS   = -O2 -g
+
+
+ Please send the results of this run to:
+
+ NPB Development Team
+ Internet: npb@nas.nasa.gov
+ 
+ If email is not available, send this to:
+
+ MS T27A-1
+ NASA Ames Research Center
+ Moffett Field, CA  94035-1000
+
+ Fax: 650-604-3957
+

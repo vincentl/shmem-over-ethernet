@@ -1,0 +1,26 @@
+== T4 team programs at 70 PEs, OSOE_PROGRESS_HELPERS=0, tree 0edd95a9ae82f4f977200c4670be74b5c369e53b, 2026-10-30T18:04:59Z, load 2.94 3.24 5.87
+OSOE_PROGRESS_HELPERS=0
+shmem_team_reuse_teams one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+shmem_team_reuse_teams ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+reduce_active_set one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=70 out-lines=71 err-lines=0 failure-words=0 | 
+reduce_active_set ten-nodes: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=70 out-lines=71 err-lines=0 failure-words=0 | 
+broadcast_active_set one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=142 err-lines=0 failure-words=0 | 
+broadcast_active_set ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=142 err-lines=0 failure-words=0 | 
+repeated_barriers one-node: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+repeated_barriers ten-nodes: rc=0 70PEs 0.5s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | 
+shmem_team_max one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | The number of teams created for PE 0 is : 64
+shmem_team_max ten-nodes: rc=0 70PEs 0.2s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=70 err-lines=0 failure-words=0 | The number of teams created for PE 0 is : 64
+shmem_team_split_2d one-node: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=107 err-lines=0 failure-words=105 | 
+shmem_team_split_2d ten-nodes: rc=0 70PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=107 err-lines=0 failure-words=105 | 
+collect_active_set one-node-32: rc=0 32PEs 0.0s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=33 err-lines=0 failure-words=0 | 
+collect_active_set four-nodes-32: rc=0 32PEs 0.1s no-number=0 dry=0 rank-failures=0 iterations=0 out-lines=33 err-lines=0 failure-words=0 | 
+split_shared nodes=61: rc=0 61PEs 0.2s valid=61 invalid=0 nonzero-returns=0 out-lines=61 err-lines=0
+split_shared nodes=62: rc=0 62PEs 0.2s valid=62 invalid=0 nonzero-returns=0 out-lines=62 err-lines=0
+split_shared nodes=64: rc=0 64PEs 0.2s valid=64 invalid=0 nonzero-returns=0 out-lines=64 err-lines=0
+split_shared nodes=70: rc=0 70PEs 0.3s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+split_shared ten-nodes-of-7=70: rc=0 70PEs 0.2s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+split_shared one-node=70: rc=0 70PEs 0.1s valid=70 invalid=0 nonzero-returns=0 out-lines=70 err-lines=0
+== summary (helpers 0)
+runs: 20, rc=0: 20, not rc=0: 0
+/dev/shm entries new since the start: 0
+DONE

@@ -1,0 +1,22 @@
+wait_word/always_wake targets=1,2                            TSO states=      2,751 depth= 21 (miss<5e-23) -> ok +live
+wait_word/design targets=1                                   SC  states=         42 depth=  9 (miss<1e-26) -> ok +live
+wait_word/design targets=1,2                                 SC  states=      2,846 depth= 21 (miss<5e-23) -> ok +live
+wait_word/design targets=1,2                                 TSO states=      2,846 depth= 21 (miss<5e-23) -> ok +live
+wait_word/design targets=2,2                                 TSO states=      3,329 depth= 22 (miss<7e-23) -> ok +live
+wait_word/design targets=1,2,2                               TSO states=     56,839 depth= 31 (miss<2e-20) -> ok +live
+wait_word/count_first targets=1                              SC  states=         12 depth=  6 (miss<9e-28) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T1:load ('waiters',)->0 ; T0:add ('waiters',)->1 ; T0:load ('word',)->0 ; T0:load ('level',)->0 ; T1:store ('level',)=1 ; T0:futex_wait ('word',) SLEEP
+wait_word/register_late targets=1                            SC  states=         23 depth=  8 (miss<3e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T0:load ('word',)->0 ; T0:load ('level',)->0 ; T1:store ('level',)=1 ; T1:load ('waiters',)->0 ; T0:add ('waiters',)->1 ; T0:futex_wait ('word',) SLEEP
+wait_word/release_level targets=1                            SC  states=         42 depth=  9 (miss<1e-26) -> ok +live
+wait_word/release_level targets=1                            TSO states=         13 depth=  7 (miss<1e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T1:store(buf) ('level',)=1 ; T1:load ('waiters',)->0 ; T0:add ('waiters',)->1 ; T0:load ('word',)->0 ; T0:load ('level',)->0 ; T1:flush ('level',)=1 ; T0:futex_wait ('word',) SLEEP
+wait_word/wake_one targets=1,2                               SC  states=      2,459 depth= 22 (miss<4e-23) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T1:add ('waiters',)->1 ; T1:load ('word',)->0 ; T1:load ('level',)->0 ; T1:futex_wait ('word',) SLEEP ; T0:add ('waiters',)->2 ; T0:load ('word',)->0 ; T0:load ('level',)->0 ; T2:store ('level',)=1 ; T2:load ('waiters',)->2 ; T0:futex_wait ('word',) SLEEP ; T2:add ('word',)->1 ; T2:futex_wake ('word',) n=1 mask 4294967295 woke [1] ; T1:load ('word',)->1 ; T1:load ('level',)->1 ; T2:store ('level',)=2 ; T2:load ('waiters',)->2 ; T1:futex_wait ('word',) SLEEP ; T2:add ('word',)->2 ; T2:futex_wake ('word',) n=1 mask 4294967295 woke [1] ; T1:load ('word',)->2 ; T1:load ('level',)->2 ; T1:add ('waiters',)->1
+wait_word/no_bump targets=1                                  SC  states=         26 depth=  7 (miss<4e-27) -> LOST WAKE
+    T0 asleep with nothing left to wake it
+    trace: T0:add ('waiters',)->1 ; T0:load ('word',)->0 ; T0:load ('level',)->0 ; T1:store ('level',)=1 ; T1:load ('waiters',)->1 ; T1:futex_wake ('word',) ; T0:futex_wait ('word',) SLEEP

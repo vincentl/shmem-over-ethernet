@@ -1,0 +1,22 @@
+== 2026-10-30T18:13:22Z on /var/tmp/t1 (tree-tag.tar); load 2.14 2.32 4.30
+-- 18:13:22 release under load, eight busy loops
+release-under-load: 100% tests passed, 0 tests failed out of 1214
+-- 18:22:07 the floor's pins, load 25.12 16.83 10.48
+floor pins, run 1: The following tests passed:
+100% tests passed, 0 tests failed out of 1
+  reported: median get/floor=2.031 (2.01-2.04)
+  reported: median put_quiet/floor=2.033 (2.00-2.05)
+  reported: median fetch_add/floor=2.021 (1.99-2.03)
+floor pins, run 2: The following tests passed:
+100% tests passed, 0 tests failed out of 1
+  reported: median get/floor=1.963 (1.95-1.98)
+  reported: median put_quiet/floor=1.960 (1.94-1.98)
+  reported: median fetch_add/floor=1.947 (1.93-1.96)
+floor pins, run 3: The following tests passed:
+100% tests passed, 0 tests failed out of 1
+  reported: median get/floor=2.026 (1.98-2.05)
+  reported: median put_quiet/floor=2.015 (1.97-2.04)
+  reported: median fetch_add/floor=2.001 (1.96-2.03)
+tier3's floor tests with the pins: The following tests passed:
+100% tests passed, 0 tests failed out of 3
+== 18:24:03 done

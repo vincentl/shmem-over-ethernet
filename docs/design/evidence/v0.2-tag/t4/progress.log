@@ -1,0 +1,23 @@
+13:08:12 T4 starts (pid 2637630); waiting for the VM's lock; load 5.96 7.17 9.69
+14:00:03 lock held; load 1.24 4.22 7.07; memory: 1761 MiB free, 7330 MiB available; /dev/shm: 0 entries
+-- the busiest processes as the lock was taken:
+    PID     ELAPSED %CPU COMMAND
+    625  2-05:07:33  1.9 /usr/local/bin/lima-guestagent daemon --vsock-port 2222 --runtime-dir=/run/lima-guestagent
+    926  2-05:07:33  0.1 containerd
+    654  2-05:07:33  0.1 /usr/sbin/slurmctld --systemd
+    846  2-05:07:33  0.0 rootlesskit --state-dir=/run/user/501/containerd-rootless --net=gvisor-tap-vsock --mtu=65520 --slirp4netns-sandbox=auto --slirp4netns-s
+     29  2-05:07:36  0.0 [ksoftirqd/2]
+     16  2-05:07:36  0.0 [ksoftirqd/0]
+     34  2-05:07:36  0.0 [ksoftirqd/3]
+14:00:03 phase build begins; load 1.24 4.22 7.07
+14:00:37 phase build ends rc=0; load 2.66 4.25 6.97
+14:00:37 phase sos-h0 begins; load 2.66 4.25 6.97
+14:02:48 phase sos-h0 ends rc=0; load 2.60 3.56 6.36
+14:02:48 phase sos-h2 begins; load 2.60 3.56 6.36
+14:04:59 phase sos-h2 ends rc=0; load 2.94 3.24 5.87
+14:04:59 phase teams-h0 begins; load 2.94 3.24 5.87
+14:05:03 phase teams-h0 ends rc=0; load 4.23 3.50 5.94
+14:05:03 phase teams-h2 begins; load 4.23 3.50 5.94
+14:05:08 phase teams-h2 ends rc=0; load 5.17 3.71 5.99
+14:05:08 all phases ended
+DONE

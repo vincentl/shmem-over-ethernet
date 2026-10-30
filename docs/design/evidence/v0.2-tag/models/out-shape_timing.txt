@@ -1,0 +1,12 @@
+design: 0 failure(s)
+broken message_cost (o = 0, h 94 and B 116 refitted): fails
+    TABLE: the fit lands 321 of the Pi's 558 lines within the noise, fewer than the record's 326
+broken interior (an interior lead counted k, not k + 1): fails
+    TERMS: reduce on 5 nodes at k = 2: the closed form counts 2 pieces on the busiest link, the loop 3
+broken lane (its rows the ceiling's, as before P3): fails
+    LANE: a lane has 9 rows in a job of 513 nodes at a ceiling of 8, not 10
+    LANE: a lane has 9 rows in a job of 1024 nodes at a ceiling of 8, not 10
+broken last piece (charged a whole period, as before P4): fails
+    LAST: on two nodes of the Pi, 16 KiB k + 1 takes another algorithm than 16 KiB k for 256 k of 256, from k = 1
+    LAST: a byte past whole pieces costs the closed form what it costs the simulation within 0.184 of the call at the median and 0.820 at worst, beyond 0.01 and 0.15
+ok

@@ -1,0 +1,948 @@
+ERROR: ld.so: object '/tmp/x86-tag-shim/$LIB/libfutex2-shim.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+ERROR: ld.so: object '/tmp/x86-tag-shim/$LIB/libfutex2-shim.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+Test project /var/tmp/x86-tag/full/build/release
+        Start    1: base.size
+  1/581 Test    #1: base.size ..................................................   Passed    0.02 sec
+        Start    2: base.environment
+  2/581 Test    #2: base.environment ...........................................   Passed    0.01 sec
+        Start    3: base.node-map
+  3/581 Test    #3: base.node-map ..............................................   Passed    0.01 sec
+        Start    4: base.futex
+  4/581 Test    #4: base.futex .................................................Subprocess aborted***Exception:   0.01 sec
+        Start    5: base.epoch
+  5/581 Test    #5: base.epoch .................................................Subprocess aborted***Exception:   0.01 sec
+        Start    6: base.stall-watch
+  6/581 Test    #6: base.stall-watch ...........................................   Passed    0.19 sec
+        Start    7: base.hostlist
+  7/581 Test    #7: base.hostlist ..............................................   Passed    0.02 sec
+        Start    8: base.siphash
+  8/581 Test    #8: base.siphash ...............................................   Passed    0.01 sec
+        Start    9: base.lock-free
+  9/581 Test    #9: base.lock-free .............................................   Passed    0.01 sec
+        Start   10: base.print-line
+ 10/581 Test   #10: base.print-line ............................................   Passed    0.02 sec
+        Start   11: base.lock-free.never
+ 11/581 Test   #11: base.lock-free.never .......................................   Passed    0.06 sec
+        Start   12: base.serializing-fence
+ 12/581 Test   #12: base.serializing-fence .....................................   Passed    0.04 sec
+        Start   13: shmem.info
+ 13/581 Test   #13: shmem.info .................................................   Passed    0.01 sec
+        Start   14: shmem.header-surface
+ 14/581 Test   #14: shmem.header-surface .......................................   Passed    0.01 sec
+        Start   15: shmem.exports
+ 15/581 Test   #15: shmem.exports ..............................................   Passed    0.05 sec
+        Start   16: shmem.profiling_aliases
+ 16/581 Test   #16: shmem.profiling_aliases ....................................   Passed    0.40 sec
+        Start   17: shmem.version.library
+ 17/581 Test   #17: shmem.version.library ......................................   Passed    0.01 sec
+        Start   18: shmem.boundary
+ 18/581 Test   #18: shmem.boundary .............................................   Passed    0.62 sec
+        Start   19: shmem.settings-documented
+ 19/581 Test   #19: shmem.settings-documented ..................................   Passed    0.07 sec
+        Start   20: shmem.settings-known
+ 20/581 Test   #20: shmem.settings-known .......................................   Passed    0.12 sec
+        Start   21: shmem.pass-expressions
+ 21/581 Test   #21: shmem.pass-expressions .....................................   Passed   12.21 sec
+        Start   22: shmem.whole-lines
+ 22/581 Test   #22: shmem.whole-lines ..........................................   Passed    0.01 sec
+        Start   23: shmem.license-lines
+ 23/581 Test   #23: shmem.license-lines ........................................   Passed    0.13 sec
+        Start   24: shmem.memory-orders
+ 24/581 Test   #24: shmem.memory-orders ........................................   Passed    0.04 sec
+        Start   25: shmem.static-link
+ 25/581 Test   #25: shmem.static-link ..........................................   Passed    3.63 sec
+        Start   26: shmem.strict-c11
+ 26/581 Test   #26: shmem.strict-c11 ...........................................   Passed   40.96 sec
+        Start   27: shmem.single-node.configure
+ 27/581 Test   #27: shmem.single-node.configure ................................   Passed    0.38 sec
+        Start   28: shmem.allocator
+ 28/581 Test   #28: shmem.allocator ............................................   Passed    0.01 sec
+        Start   29: shmem.collective-tree
+ 29/581 Test   #29: shmem.collective-tree ......................................   Passed    0.01 sec
+        Start   30: shmem.shape.choice
+ 30/581 Test   #30: shmem.shape.choice .........................................   Passed    0.01 sec
+        Start   31: shmem.shape.grid
+ 31/581 Test   #31: shmem.shape.grid ...........................................   Passed    0.02 sec
+        Start   32: shmem.shape.places-grid
+ 32/581 Test   #32: shmem.shape.places-grid ....................................   Passed    0.02 sec
+        Start   33: shmem.circulant.arithmetic
+ 33/581 Test   #33: shmem.circulant.arithmetic .................................   Passed    0.48 sec
+        Start   34: shmem.watch-range
+ 34/581 Test   #34: shmem.watch-range ..........................................   Passed    0.01 sec
+        Start   48: shmem.rank-map
+ 35/581 Test   #48: shmem.rank-map .............................................   Passed    0.07 sec
+        Start   62: shmem.fatal-order
+ 36/581 Test   #62: shmem.fatal-order ..........................................   Passed    1.16 sec
+        Start   63: shmem.abort-end
+ 37/581 Test   #63: shmem.abort-end ............................................   Passed    3.54 sec
+        Start   64: shmem.blocked-record
+ 38/581 Test   #64: shmem.blocked-record .......................................   Passed    4.03 sec
+        Start   65: shmem.own-address
+ 39/581 Test   #65: shmem.own-address ..........................................   Passed    0.01 sec
+        Start   66: shmem.bootstrap.captured-batch-script
+ 40/581 Test   #66: shmem.bootstrap.captured-batch-script ......................   Passed    0.01 sec
+        Start   67: shmem.bootstrap.captured-block-1x4-node0
+ 41/581 Test   #67: shmem.bootstrap.captured-block-1x4-node0 ...................   Passed    0.01 sec
+        Start   68: shmem.bootstrap.captured-cyclic-1x4-node0
+ 42/581 Test   #68: shmem.bootstrap.captured-cyclic-1x4-node0 ..................   Passed    0.01 sec
+        Start   69: shmem.bootstrap.captured-plane-1x4-node0
+ 43/581 Test   #69: shmem.bootstrap.captured-plane-1x4-node0 ...................   Passed    0.01 sec
+        Start   70: shmem.bootstrap.captured-single-node0
+ 44/581 Test   #70: shmem.bootstrap.captured-single-node0 ......................   Passed    0.01 sec
+        Start   71: shmem.bootstrap.osoe-over-slurm
+ 45/581 Test   #71: shmem.bootstrap.osoe-over-slurm ............................   Passed    0.01 sec
+        Start   72: shmem.bootstrap.written-block-4x4-node1
+ 46/581 Test   #72: shmem.bootstrap.written-block-4x4-node1 ....................   Passed    0.01 sec
+        Start   73: shmem.bootstrap.written-cyclic-4x4-node2
+ 47/581 Test   #73: shmem.bootstrap.written-cyclic-4x4-node2 ...................   Passed    0.01 sec
+        Start   74: shmem.bootstrap.written-gtids-disagree
+ 48/581 Test   #74: shmem.bootstrap.written-gtids-disagree .....................   Passed    0.01 sec
+        Start   75: shmem.bootstrap.written-het-job
+ 49/581 Test   #75: shmem.bootstrap.written-het-job ............................   Passed    0.01 sec
+        Start   76: shmem.bootstrap.written-relative-step
+ 50/581 Test   #76: shmem.bootstrap.written-relative-step ......................   Passed    0.01 sec
+        Start   77: shmem.bootstrap.written-special-step
+ 51/581 Test   #77: shmem.bootstrap.written-special-step .......................   Passed    0.01 sec
+        Start   91: shmem.max-teams.local-disagree
+ 52/581 Test   #91: shmem.max-teams.local-disagree .............................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start   92: shmem.max-teams.local-disagree.lead
+ 53/581 Test   #92: shmem.max-teams.local-disagree.lead ........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start   93: shmem.max-teams.invalid.3
+ 54/581 Test   #93: shmem.max-teams.invalid.3 ..................................   Passed    0.02 sec
+        Start   94: shmem.max-teams.invalid.1025
+ 55/581 Test   #94: shmem.max-teams.invalid.1025 ...............................   Passed    0.02 sec
+        Start   95: shmem.max-teams.invalid.x
+ 56/581 Test   #95: shmem.max-teams.invalid.x ..................................   Passed    0.02 sec
+        Start   97: shmem.collective-pipeline.invalid.0
+ 57/581 Test   #97: shmem.collective-pipeline.invalid.0 ........................   Passed    0.02 sec
+        Start   98: shmem.collective-pipeline.invalid.9
+ 58/581 Test   #98: shmem.collective-pipeline.invalid.9 ........................   Passed    0.02 sec
+        Start   99: shmem.collective-pipeline.invalid.x
+ 59/581 Test   #99: shmem.collective-pipeline.invalid.x ........................   Passed    0.02 sec
+        Start  100: shmem.collective-fanout.local-disagree
+ 60/581 Test  #100: shmem.collective-fanout.local-disagree .....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  101: shmem.collective-pipeline.local-disagree
+ 61/581 Test  #101: shmem.collective-pipeline.local-disagree ...................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  103: shmem.small-collective-bytes.invalid.127
+ 62/581 Test  #103: shmem.small-collective-bytes.invalid.127 ...................   Passed    0.02 sec
+        Start  104: shmem.small-collective-bytes.invalid.16385
+ 63/581 Test  #104: shmem.small-collective-bytes.invalid.16385 .................   Passed    0.02 sec
+        Start  105: shmem.small-collective-bytes.invalid.x
+ 64/581 Test  #105: shmem.small-collective-bytes.invalid.x .....................   Passed    0.02 sec
+        Start  106: shmem.small-collective-bytes.local-disagree
+ 65/581 Test  #106: shmem.small-collective-bytes.local-disagree ................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  107: shmem.collective-shape.invalid.shape-bogus
+ 66/581 Test  #107: shmem.collective-shape.invalid.shape-bogus .................   Passed    0.02 sec
+        Start  108: shmem.collective-shape.invalid.hop-0
+ 67/581 Test  #108: shmem.collective-shape.invalid.hop-0 .......................   Passed    0.02 sec
+        Start  109: shmem.collective-shape.invalid.bandwidth-x
+ 68/581 Test  #109: shmem.collective-shape.invalid.bandwidth-x .................   Passed    0.02 sec
+        Start  110: shmem.collective-shape.invalid.message-too-large
+ 69/581 Test  #110: shmem.collective-shape.invalid.message-too-large ...........   Passed    0.02 sec
+        Start  111: shmem.collective-shape.invalid.hop-alone
+ 70/581 Test  #111: shmem.collective-shape.invalid.hop-alone ...................   Passed    0.02 sec
+        Start  112: shmem.collective-shape.invalid.bandwidth-alone
+ 71/581 Test  #112: shmem.collective-shape.invalid.bandwidth-alone .............   Passed    0.02 sec
+        Start  113: shmem.collective-shape.local-disagree
+ 72/581 Test  #113: shmem.collective-shape.local-disagree ......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  114: shmem.link.local-disagree
+ 73/581 Test  #114: shmem.link.local-disagree ..................................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  122: shmem.link.none.0-0
+ 74/581 Test  #122: shmem.link.none.0-0 ........................................***Failed  Required regular expression not found. Regex=[LINK OK
+]  0.02 sec
+        Start  129: shmem.unsent.one-node.0-0
+ 75/581 Test  #129: shmem.unsent.one-node.0-0 ..................................***Failed  Required regular expression not found. Regex=[UNSENT OK
+]  0.02 sec
+        Start  139: shmem.start-up.max-threads.zero
+ 76/581 Test  #139: shmem.start-up.max-threads.zero ............................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  140: shmem.start-up.max-threads.differs
+ 77/581 Test  #140: shmem.start-up.max-threads.differs .........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  141: shmem.start-up.landing-bytes.differs
+ 78/581 Test  #141: shmem.start-up.landing-bytes.differs .......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  142: shmem.start-up.landing-bytes.partial-extent
+ 79/581 Test  #142: shmem.start-up.landing-bytes.partial-extent ................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.03 sec
+        Start  143: shmem.landing-default.L1
+ 80/581 Test  #143: shmem.landing-default.L1 ...................................***Failed  Required regular expression not found. Regex=[LANDING OK
+]  0.02 sec
+        Start  144: shmem.landing-default.L4
+ 81/581 Test  #144: shmem.landing-default.L4 ...................................***Failed  Required regular expression not found. Regex=[LANDING OK
+]  0.03 sec
+        Start  145: shmem.landing-default.L5
+ 82/581 Test  #145: shmem.landing-default.L5 ...................................***Failed  Required regular expression not found. Regex=[LANDING OK
+]  0.03 sec
+        Start  146: shmem.landing-default.L8
+ 83/581 Test  #146: shmem.landing-default.L8 ...................................***Failed  Required regular expression not found. Regex=[LANDING OK
+]  0.04 sec
+        Start  147: shmem.landing-default.L16
+ 84/581 Test  #147: shmem.landing-default.L16 ..................................***Failed  Required regular expression not found. Regex=[LANDING OK
+]  0.09 sec
+        Start  148: shmem.landing-default.L17
+ 85/581 Test  #148: shmem.landing-default.L17 ..................................***Failed  Required regular expression not found. Regex=[LANDING OK
+]  0.11 sec
+        Start  151: shmem.start-up.am-chunk.invalid
+ 86/581 Test  #151: shmem.start-up.am-chunk.invalid ............................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.44 sec
+        Start  152: shmem.start-up.am-buffer.invalid
+ 87/581 Test  #152: shmem.start-up.am-buffer.invalid ...........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.50 sec
+        Start  153: shmem.start-up.am-buffer-budget.invalid
+ 88/581 Test  #153: shmem.start-up.am-buffer-budget.invalid ....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.40 sec
+        Start  154: shmem.start-up.am-credits.invalid
+ 89/581 Test  #154: shmem.start-up.am-credits.invalid ..........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.06 sec
+        Start  155: shmem.start-up.am-hugepages.invalid
+ 90/581 Test  #155: shmem.start-up.am-hugepages.invalid ........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.11 sec
+        Start  156: shmem.start-up.landing-bytes.invalid
+ 91/581 Test  #156: shmem.start-up.landing-bytes.invalid .......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.13 sec
+        Start  157: shmem.start-up.wire-bytes.invalid
+ 92/581 Test  #157: shmem.start-up.wire-bytes.invalid ..........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.19 sec
+        Start  158: shmem.start-up.wire-unsent-bytes.invalid
+ 93/581 Test  #158: shmem.start-up.wire-unsent-bytes.invalid ...................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.15 sec
+        Start  159: shmem.start-up.wire-unsent-bytes-large.invalid
+ 94/581 Test  #159: shmem.start-up.wire-unsent-bytes-large.invalid .............***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.31 sec
+        Start  160: shmem.start-up.wire-zero-copy.invalid
+ 95/581 Test  #160: shmem.start-up.wire-zero-copy.invalid ......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.57 sec
+        Start  161: shmem.start-up.wire-zero-copy-bytes.invalid
+ 96/581 Test  #161: shmem.start-up.wire-zero-copy-bytes.invalid ................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.38 sec
+        Start  162: shmem.start-up.progress-helpers.invalid
+ 97/581 Test  #162: shmem.start-up.progress-helpers.invalid ....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.64 sec
+        Start  163: shmem.start-up.progress-helpers-many.invalid
+ 98/581 Test  #163: shmem.start-up.progress-helpers-many.invalid ...............***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.79 sec
+        Start  164: shmem.start-up.test-print-link.invalid
+ 99/581 Test  #164: shmem.start-up.test-print-link.invalid .....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.55 sec
+        Start  165: shmem.start-up.test-print-link-large.invalid
+100/581 Test  #165: shmem.start-up.test-print-link-large.invalid ...............***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.51 sec
+        Start  166: shmem.start-up.mesh-port-range.invalid
+101/581 Test  #166: shmem.start-up.mesh-port-range.invalid .....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.62 sec
+        Start  167: shmem.start-up.mesh-slot.invalid
+102/581 Test  #167: shmem.start-up.mesh-slot.invalid ...........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.35 sec
+        Start  168: shmem.start-up.mesh-slot-large.invalid
+103/581 Test  #168: shmem.start-up.mesh-slot-large.invalid .....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.65 sec
+        Start  169: shmem.start-up.test-mesh-hold.invalid
+104/581 Test  #169: shmem.start-up.test-mesh-hold.invalid ......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.68 sec
+        Start  170: shmem.start-up.test-mesh-hold-node.invalid
+105/581 Test  #170: shmem.start-up.test-mesh-hold-node.invalid .................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.44 sec
+        Start  171: shmem.start-up.mesh-data-wires.invalid
+106/581 Test  #171: shmem.start-up.mesh-data-wires.invalid .....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.65 sec
+        Start  172: shmem.start-up.test-hold-data-wires.invalid
+107/581 Test  #172: shmem.start-up.test-hold-data-wires.invalid ................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.54 sec
+        Start  173: shmem.start-up.test-team-generation.invalid
+108/581 Test  #173: shmem.start-up.test-team-generation.invalid ................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.30 sec
+        Start  174: shmem.start-up.test-team-generation-large.invalid
+109/581 Test  #174: shmem.start-up.test-team-generation-large.invalid ..........***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.23 sec
+        Start  199: shmem.start-up.own-environment.non-lead
+110/581 Test  #199: shmem.start-up.own-environment.non-lead ....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  8.34 sec
+        Start  200: shmem.start-up.own-environment.lead
+111/581 Test  #200: shmem.start-up.own-environment.lead ........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.33 sec
+        Start  201: shmem.start-up.own-identity.non-lead
+112/581 Test  #201: shmem.start-up.own-identity.non-lead .......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.57 sec
+        Start  202: shmem.start-up.own-identity.lead
+113/581 Test  #202: shmem.start-up.own-identity.lead ...........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.89 sec
+        Start  203: shmem.start-up.never-calls-init.non-lead
+114/581 Test  #203: shmem.start-up.never-calls-init.non-lead ...................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.48 sec
+        Start  204: shmem.start-up.lead-ends-in-join
+115/581 Test  #204: shmem.start-up.lead-ends-in-join ...........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  3.23 sec
+        Start  205: shmem.start-up.lead-ends-before-ready
+116/581 Test  #205: shmem.start-up.lead-ends-before-ready ......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.91 sec
+        Start  206: shmem.start-up.lead-ends-before-ready.same-ids
+117/581 Test  #206: shmem.start-up.lead-ends-before-ready.same-ids .............***Failed  Required regular expression not found. Regex=[START AFTER LEAD ENDS OK
+]  2.48 sec
+        Start  207: shmem.start-up.lead-ends-before-ready.same-ids.no-launch
+118/581 Test  #207: shmem.start-up.lead-ends-before-ready.same-ids.no-launch ...***Failed  Required regular expression not found. Regex=[START AFTER LEAD ENDS OK
+]  2.60 sec
+        Start  208: shmem.start-up.same-ids
+119/581 Test  #208: shmem.start-up.same-ids ....................................***Failed  Required regular expression not found. Regex=[SAME IDS OK
+]  4.32 sec
+        Start  209: shmem.start-up.tombstone-gc
+120/581 Test  #209: shmem.start-up.tombstone-gc ................................   Passed    1.34 sec
+        Start  210: shmem.start-up.pid-namespaces
+121/581 Test  #210: shmem.start-up.pid-namespaces ..............................***Failed  Required regular expression not found. Regex=[job exited [1-9].*PEs refusing the node by name: [123]
+]  1.60 sec
+        Start  211: shmem.start-up.pid-namespace-leftover
+122/581 Test  #211: shmem.start-up.pid-namespace-leftover ......................***Failed  Required regular expression not found. Regex=[made in another PID namespace, pid:[[][0-9]+[]], where this process is in pid:[[][0-9]+[]]: its creator's pid, [0-9]+, says nothing here.*the start by the same ids exited [1-9].*where this one is pid:[[][0-9]+[]], so its pids say nothing here. left alone.*the segment is left after --gc
+]  0.37 sec
+        Start  212: shmem.start-up.never-calls-init.no-progress-timeout
+123/581 Test  #212: shmem.start-up.never-calls-init.no-progress-timeout ........***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.60 sec
+        Start  213: shmem.start-up.never-calls-init.lead
+124/581 Test  #213: shmem.start-up.never-calls-init.lead .......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.27 sec
+        Start  233: shmem.multinode.0-0-0-0
+125/581 Test  #233: shmem.multinode.0-0-0-0 ....................................***Failed    0.64 sec
+        Start  266: shmem.internode.0-0-0-0
+126/581 Test  #266: shmem.internode.0-0-0-0 ....................................***Failed    0.79 sec
+        Start  277: shmem.slurm.internode.0-0-0-0
+127/581 Test  #277: shmem.slurm.internode.0-0-0-0 ..............................***Failed    0.74 sec
+        Start  285: shmem.heap-shift.rma.L4
+128/581 Test  #285: shmem.heap-shift.rma.L4 ....................................***Failed    0.60 sec
+        Start  286: shmem.heap-shift.amo.L4
+129/581 Test  #286: shmem.heap-shift.amo.L4 ....................................***Failed    0.69 sec
+        Start  287: shmem.heap-shift.amo-types.L4
+130/581 Test  #287: shmem.heap-shift.amo-types.L4 ..............................***Failed    0.98 sec
+        Start  288: shmem.heap-shift.amo-nbi.L4
+131/581 Test  #288: shmem.heap-shift.amo-nbi.L4 ................................***Failed    0.76 sec
+        Start  289: shmem.heap-shift.wait.L4
+132/581 Test  #289: shmem.heap-shift.wait.L4 ...................................***Failed    0.36 sec
+        Start  290: shmem.heap-shift.wait-many.L4
+133/581 Test  #290: shmem.heap-shift.wait-many.L4 ..............................***Failed    0.66 sec
+        Start  291: shmem.heap-shift.signal.L4
+134/581 Test  #291: shmem.heap-shift.signal.L4 .................................***Failed    0.76 sec
+        Start  292: shmem.heap-shift.team.L4
+135/581 Test  #292: shmem.heap-shift.team.L4 ...................................***Failed    1.09 sec
+        Start  293: shmem.heap-shift.malloc.L4
+136/581 Test  #293: shmem.heap-shift.malloc.L4 .................................***Failed    0.83 sec
+        Start  294: shmem.heap-shift.barrier.L4
+137/581 Test  #294: shmem.heap-shift.barrier.L4 ................................***Failed    0.94 sec
+        Start  297: shmem.heap-shift.invalid
+138/581 Test  #297: shmem.heap-shift.invalid ...................................   Passed    0.62 sec
+        Start  298: shmem.refuse.heap_base_unaligned
+139/581 Test  #298: shmem.refuse.heap_base_unaligned ...........................   Passed    0.91 sec
+        Start  299: shmem.refuse.heap_base_signed
+140/581 Test  #299: shmem.refuse.heap_base_signed ..............................   Passed    0.38 sec
+        Start  300: shmem.refuse.heap_base_not_mapped
+141/581 Test  #300: shmem.refuse.heap_base_not_mapped ..........................***Failed  Required regular expression not found. Regex=[OSOE_HEAP_BASE=0x7fffffffffff0000: cannot map this node's [0-9]+-byte heap there: it runs past
+]  0.98 sec
+        Start  301: shmem.heap-base.candidates
+142/581 Test  #301: shmem.heap-base.candidates .................................***Failed  Error regular expression found in output. Regex=[exited with status [1-9]]  1.00 sec
+        Start  302: shmem.refuse.test_notice_seconds.2s
+143/581 Test  #302: shmem.refuse.test_notice_seconds.2s ........................   Passed    1.10 sec
+        Start  303: shmem.refuse.test_notice_seconds.0
+144/581 Test  #303: shmem.refuse.test_notice_seconds.0 .........................   Passed    0.86 sec
+        Start  306: shmem.limits.0-0
+145/581 Test  #306: shmem.limits.0-0 ...........................................***Failed  Required regular expression not found. Regex=[LIMITS RAISED OK
+]  0.98 sec
+        Start  319: shmem.start-up.test-online-cpus.invalid
+146/581 Test  #319: shmem.start-up.test-online-cpus.invalid ....................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  1.12 sec
+        Start  320: shmem.start-up.machine-pes.invalid
+147/581 Test  #320: shmem.start-up.machine-pes.invalid .........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.90 sec
+        Start  321: shmem.start-up.turnover-wake.invalid
+148/581 Test  #321: shmem.start-up.turnover-wake.invalid .......................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  0.66 sec
+        Start  349: shmem.fatal-start-pes
+149/581 Test  #349: shmem.fatal-start-pes ......................................***Failed  Required regular expression not found. Regex=[shmem_putmem: .* is not within the symmetric heap
+]  1.16 sec
+        Start  350: shmem.exit-without-finalize.init
+150/581 Test  #350: shmem.exit-without-finalize.init ...........................***Failed  Required regular expression not found. Regex=[PE 1: the process exited without calling shmem_finalize
+]  1.39 sec
+        Start  351: shmem.exit-without-finalize.start_pes
+151/581 Test  #351: shmem.exit-without-finalize.start_pes ......................***Failed  Required regular expression not found. Regex=[osoe-launch: timeout after 4 s
+]  0.80 sec
+        Start  352: shmem.kill-after-init.KILL.one-node
+152/581 Test  #352: shmem.kill-after-init.KILL.one-node ........................***Failed  Required regular expression not found. Regex=[killed by signal
+]  1.40 sec
+        Start  353: shmem.kill-after-init.TERM.one-node
+153/581 Test  #353: shmem.kill-after-init.TERM.one-node ........................***Failed  Required regular expression not found. Regex=[killed by signal
+]  1.63 sec
+        Start  354: shmem.kill-after-init.kept.one-node
+154/581 Test  #354: shmem.kill-after-init.kept.one-node ........................***Failed  Required regular expression not found. Regex=[kept for post-mortem reading.*removed
+]  1.28 sec
+        Start  355: shmem.launcher-signals.term.one-node
+155/581 Test  #355: shmem.launcher-signals.term.one-node .......................***Failed  Required regular expression not found. Regex=[launcher exited 143.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0
+] 30.22 sec
+        Start  356: shmem.launcher-signals.int.one-node
+156/581 Test  #356: shmem.launcher-signals.int.one-node ........................***Failed  Required regular expression not found. Regex=[launcher exited 130.*escalated to SIGKILL: 0.*PEs still running: 0.*with a name: 0
+] 30.23 sec
+        Start  357: shmem.launcher-signals.kill.one-node
+157/581 Test  #357: shmem.launcher-signals.kill.one-node .......................***Failed  Required regular expression not found. Regex=[PEs still running: 0.*with a name: 0
+] 30.26 sec
+        Start  358: shmem.launcher.timeout-summary
+158/581 Test  #358: shmem.launcher.timeout-summary .............................***Failed  Required regular expression not found. Regex=[osoe-launch: timeout after 3 s. killing 2 process[(]es[)] of job [0-9]+.*where job [0-9]+ waits, by osoe-stat --summary [0-9]+:.*node 0 .* world 
+]  1.37 sec
+        Start  359: shmem.leftovers.reclaim.one-node
+159/581 Test  #359: shmem.leftovers.reclaim.one-node ...........................***Failed  Required regular expression not found. Regex=[reclaimed /dev/shm.*job exited 0.*with a name afterwards: 0
+]  1.54 sec
+        Start  360: shmem.leftovers.live.one-node
+160/581 Test  #360: shmem.leftovers.live.one-node ..............................***Failed  Required regular expression not found. Regex=[job exited [1-9].*the refusal names the owner: yes.*with a name afterwards: 1
+]  1.73 sec
+        Start  374: shmem.core-exclusion.0-0
+161/581 Test  #374: shmem.core-exclusion.0-0 ...................................***Failed    0.97 sec
+        Start  375: shmem.dev-shm-capacity.heaps
+162/581 Test  #375: shmem.dev-shm-capacity.heaps ...............................***Failed  Required regular expression not found. Regex=[/dev/shm has [0-9]+ MiB free, but this node's control segment and 2 heaps.*launcher exited 1
+]  0.20 sec
+        Start  377: shmem.dev-shm-capacity.warned
+163/581 Test  #377: shmem.dev-shm-capacity.warned ..............................***Failed  Required regular expression not found. Regex=[and 2 heaps.*continuing, since OSOE_SHM_CAPACITY_CHECK=0.*launcher exited 0
+]  1.85 sec
+        Start  378: shmem.dev-shm-capacity.node-ends
+164/581 Test  #378: shmem.dev-shm-capacity.node-ends ...........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  1.04 sec
+        Start  379: shmem.dev-shm-capacity.broken-pipe
+165/581 Test  #379: shmem.dev-shm-capacity.broken-pipe .........................***Failed  Required regular expression not found. Regex=[BROKEN PIPE OK
+]  0.17 sec
+        Start  384: shmem.no-io-uring.one-node
+166/581 Test  #384: shmem.no-io-uring.one-node .................................***Failed    0.44 sec
+        Start  391: shmem.heap-size.3.1M
+167/581 Test  #391: shmem.heap-size.3.1M .......................................***Failed  Required regular expression not found. Regex=[holds 3250586 bytes: yes
+]  0.89 sec
+        Start  392: shmem.heap-size.1000
+168/581 Test  #392: shmem.heap-size.1000 .......................................***Failed  Required regular expression not found. Regex=[holds 1000 bytes: yes
+]  0.92 sec
+        Start  393: shmem.init.L1
+169/581 Test  #393: shmem.init.L1 ..............................................***Failed    0.63 sec
+        Start  394: shmem.init.L2
+170/581 Test  #394: shmem.init.L2 ..............................................***Failed    1.32 sec
+        Start  395: shmem.init.L4
+171/581 Test  #395: shmem.init.L4 ..............................................***Failed    1.59 sec
+        Start  397: shmem.fork.L1
+172/581 Test  #397: shmem.fork.L1 ..............................................***Failed    0.31 sec
+        Start  398: shmem.fork.L2
+173/581 Test  #398: shmem.fork.L2 ..............................................***Failed    0.10 sec
+        Start  399: shmem.fork.L4
+174/581 Test  #399: shmem.fork.L4 ..............................................***Failed    2.32 sec
+        Start  400: shmem.barrier.L1
+175/581 Test  #400: shmem.barrier.L1 ...........................................***Failed    0.86 sec
+        Start  401: shmem.barrier.L2
+176/581 Test  #401: shmem.barrier.L2 ...........................................***Failed    0.67 sec
+        Start  402: shmem.barrier.L4
+177/581 Test  #402: shmem.barrier.L4 ...........................................***Failed    0.13 sec
+        Start  403: shmem.quiet.litmus.L2
+178/581 Test  #403: shmem.quiet.litmus.L2 ......................................***Failed    2.05 sec
+        Start  404: shmem.malloc.L1
+179/581 Test  #404: shmem.malloc.L1 ............................................***Failed    1.46 sec
+        Start  405: shmem.malloc.L2
+180/581 Test  #405: shmem.malloc.L2 ............................................***Failed    1.61 sec
+        Start  406: shmem.malloc.L4
+181/581 Test  #406: shmem.malloc.L4 ............................................***Failed    1.35 sec
+        Start  407: shmem.set-range.L1
+182/581 Test  #407: shmem.set-range.L1 .........................................***Failed    0.93 sec
+        Start  408: shmem.set-range.L2
+183/581 Test  #408: shmem.set-range.L2 .........................................***Failed    0.98 sec
+        Start  409: shmem.set-range.L4
+184/581 Test  #409: shmem.set-range.L4 .........................................***Failed    1.71 sec
+        Start  410: shmem.rma.L1
+185/581 Test  #410: shmem.rma.L1 ...............................................***Failed    1.20 sec
+        Start  411: shmem.rma.L2
+186/581 Test  #411: shmem.rma.L2 ...............................................***Failed    1.88 sec
+        Start  412: shmem.rma.L4
+187/581 Test  #412: shmem.rma.L4 ...............................................***Failed    1.52 sec
+        Start  413: shmem.amo.L1
+188/581 Test  #413: shmem.amo.L1 ...............................................***Failed    1.50 sec
+        Start  414: shmem.amo.L2
+189/581 Test  #414: shmem.amo.L2 ...............................................***Failed    1.58 sec
+        Start  415: shmem.amo.L4
+190/581 Test  #415: shmem.amo.L4 ...............................................***Failed    1.44 sec
+        Start  416: shmem.wait.L1
+191/581 Test  #416: shmem.wait.L1 ..............................................***Failed    0.43 sec
+        Start  417: shmem.wait.L2
+192/581 Test  #417: shmem.wait.L2 ..............................................***Failed    3.25 sec
+        Start  418: shmem.wait.L4
+193/581 Test  #418: shmem.wait.L4 ..............................................***Failed    1.62 sec
+        Start  419: shmem.signal.L1
+194/581 Test  #419: shmem.signal.L1 ............................................***Failed    1.50 sec
+        Start  420: shmem.signal.L2
+195/581 Test  #420: shmem.signal.L2 ............................................***Failed    1.52 sec
+        Start  421: shmem.signal.L4
+196/581 Test  #421: shmem.signal.L4 ............................................***Failed    1.46 sec
+        Start  422: shmem.quiet.L1
+197/581 Test  #422: shmem.quiet.L1 .............................................***Failed    1.58 sec
+        Start  423: shmem.quiet.L2
+198/581 Test  #423: shmem.quiet.L2 .............................................***Failed    1.54 sec
+        Start  424: shmem.quiet.L4
+199/581 Test  #424: shmem.quiet.L4 .............................................***Failed    1.67 sec
+        Start  425: shmem.heap.L1
+200/581 Test  #425: shmem.heap.L1 ..............................................***Failed    1.13 sec
+        Start  426: shmem.heap.L2
+201/581 Test  #426: shmem.heap.L2 ..............................................***Failed    1.67 sec
+        Start  427: shmem.heap.L4
+202/581 Test  #427: shmem.heap.L4 ..............................................***Failed    2.19 sec
+        Start  428: shmem.landing.L1
+203/581 Test  #428: shmem.landing.L1 ...........................................***Failed    0.17 sec
+        Start  429: shmem.landing.L2
+204/581 Test  #429: shmem.landing.L2 ...........................................***Failed    3.73 sec
+        Start  430: shmem.landing.L4
+205/581 Test  #430: shmem.landing.L4 ...........................................***Failed    1.27 sec
+        Start  431: shmem.amo-types.L1
+206/581 Test  #431: shmem.amo-types.L1 .........................................***Failed    0.19 sec
+        Start  432: shmem.amo-types.L2
+207/581 Test  #432: shmem.amo-types.L2 .........................................***Failed    3.19 sec
+        Start  433: shmem.amo-types.L4
+208/581 Test  #433: shmem.amo-types.L4 .........................................***Failed    2.55 sec
+        Start  434: shmem.amo-deprecated.L1
+209/581 Test  #434: shmem.amo-deprecated.L1 ....................................***Failed    2.25 sec
+        Start  435: shmem.amo-deprecated.L2
+210/581 Test  #435: shmem.amo-deprecated.L2 ....................................***Failed    2.30 sec
+        Start  436: shmem.amo-deprecated.L4
+211/581 Test  #436: shmem.amo-deprecated.L4 ....................................***Failed    2.15 sec
+        Start  439: shmem.amo-nbi.L1
+212/581 Test  #439: shmem.amo-nbi.L1 ...........................................***Failed    2.99 sec
+        Start  440: shmem.amo-nbi.L2
+213/581 Test  #440: shmem.amo-nbi.L2 ...........................................***Failed    1.86 sec
+        Start  441: shmem.amo-nbi.L4
+214/581 Test  #441: shmem.amo-nbi.L4 ...........................................***Failed    3.86 sec
+        Start  444: shmem.amo-nbi.misuse
+215/581 Test  #444: shmem.amo-nbi.misuse .......................................***Failed  Required regular expression not found. Regex=[shmem_long_atomic_fetch_add_nbi: \[0x[0-9a-f]+, \+8\) is n
+]  2.47 sec
+        Start  445: shmem.typed-rma.L1
+216/581 Test  #445: shmem.typed-rma.L1 .........................................***Failed    1.44 sec
+        Start  446: shmem.typed-rma.L2
+217/581 Test  #446: shmem.typed-rma.L2 .........................................***Failed    2.32 sec
+        Start  447: shmem.typed-rma.L4
+218/581 Test  #447: shmem.typed-rma.L4 .........................................***Failed    2.66 sec
+        Start  451: shmem.typed-rma.ibput-misuse
+219/581 Test  #451: shmem.typed-rma.ibput-misuse ...............................***Failed  Required regular expression not found. Regex=[shmem_long_ibput: dst 1, sst 2 below bsize 2. spec
+]  2.24 sec
+        Start  452: shmem.typed-rma.iput-misuse
+220/581 Test  #452: shmem.typed-rma.iput-misuse ................................***Failed  Required regular expression not found. Regex=[shmem_long_iput: dst -1, sst 1. spec .+ requires each stride at least 1
+]  1.88 sec
+        Start  453: shmem.typed-rma.iget-misuse
+221/581 Test  #453: shmem.typed-rma.iget-misuse ................................***Failed  Required regular expression not found. Regex=[shmem_long_iget: dst 1, sst 0. spec .+ requires each stride at least 1
+]  2.54 sec
+        Start  454: shmem.typed-rma.iput64-misuse
+222/581 Test  #454: shmem.typed-rma.iput64-misuse ..............................***Failed  Required regular expression not found. Regex=[shmem_iput64: dst 1, sst 0. spec .+ requires each stride at least 1
+]  2.34 sec
+        Start  455: shmem.get-nbi.L1
+223/581 Test  #455: shmem.get-nbi.L1 ...........................................***Failed    3.05 sec
+        Start  456: shmem.get-nbi.L2
+224/581 Test  #456: shmem.get-nbi.L2 ...........................................***Failed    3.00 sec
+        Start  457: shmem.get-nbi.L4
+225/581 Test  #457: shmem.get-nbi.L4 ...........................................***Failed    2.73 sec
+        Start  458: shmem.reduce.L1
+226/581 Test  #458: shmem.reduce.L1 ............................................***Failed    3.65 sec
+        Start  459: shmem.reduce.L2
+227/581 Test  #459: shmem.reduce.L2 ............................................***Failed    2.32 sec
+        Start  460: shmem.reduce.L4
+228/581 Test  #460: shmem.reduce.L4 ............................................***Failed    3.12 sec
+        Start  464: shmem.broadcast.L1
+229/581 Test  #464: shmem.broadcast.L1 .........................................***Failed    3.20 sec
+        Start  465: shmem.broadcast.L2
+230/581 Test  #465: shmem.broadcast.L2 .........................................***Failed    2.46 sec
+        Start  466: shmem.broadcast.L4
+231/581 Test  #466: shmem.broadcast.L4 .........................................***Failed    2.57 sec
+        Start  474: shmem.headers.c99
+232/581 Test  #474: shmem.headers.c99 ..........................................   Passed    0.04 sec
+        Start  475: shmem.headers.c11
+233/581 Test  #475: shmem.headers.c11 ..........................................   Passed    0.05 sec
+        Start  476: shmem.headers.c17
+234/581 Test  #476: shmem.headers.c17 ..........................................   Passed    0.06 sec
+        Start  477: shmem.headers.c23
+235/581 Test  #477: shmem.headers.c23 ..........................................   Passed    0.03 sec
+        Start  478: shmem.headers.c++11
+236/581 Test  #478: shmem.headers.c++11 ........................................   Passed    0.09 sec
+        Start  479: shmem.headers.c++17
+237/581 Test  #479: shmem.headers.c++17 ........................................   Passed    0.03 sec
+        Start  480: shmem.profiler-plain-names
+238/581 Test  #480: shmem.profiler-plain-names .................................   Passed    0.05 sec
+        Start  481: shmem.generic-arity.fetch_add_nbi
+239/581 Test  #481: shmem.generic-arity.fetch_add_nbi ..........................   Passed    0.04 sec
+        Start  482: shmem.generic-arity.fetch_add
+240/581 Test  #482: shmem.generic-arity.fetch_add ..............................   Passed    0.02 sec
+        Start  483: shmem.generic-arity.put
+241/581 Test  #483: shmem.generic-arity.put ....................................   Passed    0.05 sec
+        Start  484: shmem.generic-arity.signal_add
+242/581 Test  #484: shmem.generic-arity.signal_add .............................   Passed    0.02 sec
+        Start  485: shmem.generic-arity.signal_set
+243/581 Test  #485: shmem.generic-arity.signal_set .............................   Passed    0.02 sec
+        Start  486: shmem.active-set.L1
+244/581 Test  #486: shmem.active-set.L1 ........................................***Failed    2.38 sec
+        Start  487: shmem.active-set.L2
+245/581 Test  #487: shmem.active-set.L2 ........................................***Failed    3.13 sec
+        Start  488: shmem.active-set.L4
+246/581 Test  #488: shmem.active-set.L4 ........................................***Failed    2.62 sec
+        Start  491: shmem.active-set.partial
+247/581 Test  #491: shmem.active-set.partial ...................................***Failed  Required regular expression not found. Regex=[shmem_long_sum_to_all: the active set \(PE_start 0, logPE_stride 0, PE_size 3\) is not a set of this job's 2 PEs
+]  3.16 sec
+        Start  492: shmem.active-set-partial.L1
+248/581 Test  #492: shmem.active-set-partial.L1 ................................***Failed    4.07 sec
+        Start  493: shmem.active-set-partial.L2
+249/581 Test  #493: shmem.active-set-partial.L2 ................................***Failed    2.52 sec
+        Start  494: shmem.active-set-partial.L4
+250/581 Test  #494: shmem.active-set-partial.L4 ................................***Failed    4.08 sec
+        Start  498: shmem.active-set-partial.bad-root
+251/581 Test  #498: shmem.active-set-partial.bad-root ..........................***Failed  Required regular expression not found. Regex=[shmem_broadcast64: PE_root 2 is not a rank of its active set of 2
+]  4.05 sec
+        Start  499: shmem.statics.L1
+252/581 Test  #499: shmem.statics.L1 ...........................................***Failed    3.20 sec
+        Start  500: shmem.statics.L2
+253/581 Test  #500: shmem.statics.L2 ...........................................***Failed    4.92 sec
+        Start  501: shmem.statics.L4
+254/581 Test  #501: shmem.statics.L4 ...........................................***Failed    4.43 sec
+        Start  504: shmem.statics.pie.L2
+255/581 Test  #504: shmem.statics.pie.L2 .......................................***Failed    3.90 sec
+        Start  506: shmem.statics.misuse
+256/581 Test  #506: shmem.statics.misuse .......................................***Failed  Required regular expression not found. Regex=[shmem_int_p: .* is neither within the symmetric heap nor among the program's global and static variables
+]  2.94 sec
+        Start  507: shmem.lock.L1
+257/581 Test  #507: shmem.lock.L1 ..............................................***Failed    3.10 sec
+        Start  508: shmem.lock.L2
+258/581 Test  #508: shmem.lock.L2 ..............................................***Failed    3.66 sec
+        Start  509: shmem.lock.L4
+259/581 Test  #509: shmem.lock.L4 ..............................................***Failed    3.30 sec
+        Start  512: shmem.lock.misuse.clear
+260/581 Test  #512: shmem.lock.misuse.clear ....................................***Failed  Required regular expression not found. Regex=[shmem_clear_lock: this PE does not hold the lock it clears
+]  3.58 sec
+        Start  513: shmem.lock.misuse.twice
+261/581 Test  #513: shmem.lock.misuse.twice ....................................***Failed  Required regular expression not found. Regex=[shmem_set_lock: this PE holds the lock already
+]  4.87 sec
+        Start  514: shmem.lock.misuse.garbage
+262/581 Test  #514: shmem.lock.misuse.garbage ..................................***Failed  Required regular expression not found. Regex=[shmem_set_lock: the lock's queue names PE [0-9]+, which is not waiting for it
+]  3.51 sec
+        Start  515: shmem.collect.L1
+263/581 Test  #515: shmem.collect.L1 ...........................................***Failed    2.28 sec
+        Start  516: shmem.collect.L2
+264/581 Test  #516: shmem.collect.L2 ...........................................***Failed    4.50 sec
+        Start  517: shmem.collect.L4
+265/581 Test  #517: shmem.collect.L4 ...........................................***Failed    5.17 sec
+        Start  520: shmem.alltoall.L1
+266/581 Test  #520: shmem.alltoall.L1 ..........................................***Failed    1.56 sec
+        Start  521: shmem.alltoall.L2
+267/581 Test  #521: shmem.alltoall.L2 ..........................................***Failed    4.85 sec
+        Start  522: shmem.alltoall.L4
+268/581 Test  #522: shmem.alltoall.L4 ..........................................***Failed    4.94 sec
+        Start  527: shmem.alltoall.stride
+269/581 Test  #527: shmem.alltoall.stride ......................................***Failed  Required regular expression not found. Regex=[shmem_long_alltoalls: strides 0 and 1. both must be at least 1
+]  4.26 sec
+        Start  528: shmem.collect.partial
+270/581 Test  #528: shmem.collect.partial ......................................***Failed  Required regular expression not found. Regex=[shmem_fcollect64: PE 1 called it, and is not in its active set \(PE_start 0, logPE_stride 0, PE_size 1\)
+]  3.85 sec
+        Start  610: shmem.internal-region.L2
+271/581 Test  #610: shmem.internal-region.L2 ...................................***Failed    5.19 sec
+        Start  613: shmem.exit-without-finalize.first-word
+272/581 Test  #613: shmem.exit-without-finalize.first-word .....................***Failed  Required regular expression not found. Regex=[THE FIRST WORD WAITED FOR
+] 31.13 sec
+        Start  614: shmem.team-storage.local-order
+273/581 Test  #614: shmem.team-storage.local-order .............................***Failed    6.52 sec
+        Start  619: shmem.team-claim.1024
+274/581 Test  #619: shmem.team-claim.1024 ......................................***Failed  Required regular expression not found. Regex=[TEAM CLAIMS: a pool of 1024 blocks in [0-9]+ words?, 0 failures
+]  1.53 sec
+        Start  620: shmem.team-claim.200
+275/581 Test  #620: shmem.team-claim.200 .......................................***Failed  Required regular expression not found. Regex=[TEAM CLAIMS: a pool of 200 blocks in [0-9]+ words?, 0 failures
+]  4.18 sec
+        Start  621: shmem.team-claim.40
+276/581 Test  #621: shmem.team-claim.40 ........................................***Failed  Required regular expression not found. Regex=[TEAM CLAIMS: a pool of 40 blocks in [0-9]+ words?, 0 failures
+]  3.48 sec
+        Start  624: shmem.team-split.L1
+277/581 Test  #624: shmem.team-split.L1 ........................................***Failed    3.20 sec
+        Start  625: shmem.team-split.L2
+278/581 Test  #625: shmem.team-split.L2 ........................................***Failed    4.34 sec
+        Start  626: shmem.team-split.L4
+279/581 Test  #626: shmem.team-split.L4 ........................................***Failed    4.03 sec
+        Start  627: shmem.team-split.exhaust.L4
+280/581 Test  #627: shmem.team-split.exhaust.L4 ................................***Failed  Error regular expression found in output. Regex=[CHECK[(]|exited with status|killed by signal|timeout after]  6.94 sec
+        Start  628: shmem.team-split.too-many.L4
+281/581 Test  #628: shmem.team-split.too-many.L4 ...............................***Failed  Error regular expression found in output. Regex=[CHECK[(]|exited with status|killed by signal|timeout after]  3.36 sec
+        Start  629: shmem.team-split.dry.L3
+282/581 Test  #629: shmem.team-split.dry.L3 ....................................***Failed  Error regular expression found in output. Regex=[CHECK[(]|exited with status|killed by signal|timeout after]  4.31 sec
+        Start  630: shmem.team-split.full.L4
+283/581 Test  #630: shmem.team-split.full.L4 ...................................***Failed  Error regular expression found in output. Regex=[CHECK[(]|exited with status|killed by signal|timeout after]  4.65 sec
+        Start  631: shmem.team-split.reuse.L4
+284/581 Test  #631: shmem.team-split.reuse.L4 ..................................***Failed  Error regular expression found in output. Regex=[CHECK[(]|exited with status|killed by signal|timeout after]  4.16 sec
+        Start  632: shmem.team-split.stale-handle.L2
+285/581 Test  #632: shmem.team-split.stale-handle.L2 ...........................***Failed  Required regular expression not found. Regex=[every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed. the number names another team since
+]  7.27 sec
+        Start  633: shmem.team-split.divergent.0-0-0-0
+286/581 Test  #633: shmem.team-split.divergent.0-0-0-0 .........................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_team_split_[a-z2]+: the parent team's PEs called it with different arguments, which spec .*same on every PE. this PE passed start 0, stride 1 and size [34]
+]  6.00 sec
+        Start  635: shmem.team-split.divergent-2d.0-0-0-0
+287/581 Test  #635: shmem.team-split.divergent-2d.0-0-0-0 ......................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_team_split_[a-z2]+: the parent team's PEs called it with different arguments, which spec .*same on every PE. this PE passed xrange [12]
+]  3.82 sec
+        Start  637: shmem.malloc.divergent.malloc.0-0-0-0
+288/581 Test  #637: shmem.malloc.divergent.malloc.0-0-0-0 ......................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_malloc: the PEs called it with different arguments, which spec .*same on every PE. this PE passed size (1000|1008)
+]  5.75 sec
+        Start  639: shmem.malloc.divergent.hints.0-0-0-0
+289/581 Test  #639: shmem.malloc.divergent.hints.0-0-0-0 .......................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_malloc_with_hints: the PEs called it with different arguments, which spec .*same on every PE. this PE passed size 1000 and hints [0-9]+
+]  5.47 sec
+        Start  640: shmem.malloc.divergent.calloc.0-0-0-0
+290/581 Test  #640: shmem.malloc.divergent.calloc.0-0-0-0 ......................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_calloc: the PEs called it with different arguments, which spec .*same on every PE. this PE passed count (2 and size 500|4 and size 250)
+]  8.49 sec
+        Start  641: shmem.malloc.divergent.align.0-0-0-0
+291/581 Test  #641: shmem.malloc.divergent.align.0-0-0-0 .......................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_align: the PEs called it with different arguments, which spec .*same on every PE. this PE passed alignment (16|64) and size 1000
+]  5.34 sec
+        Start  642: shmem.malloc.divergent.realloc.0-0-0-0
+292/581 Test  #642: shmem.malloc.divergent.realloc.0-0-0-0 .....................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_realloc: the PEs called it with different arguments, which spec .*same on every PE. this PE passed the block at offset [0-9]+ of the symmetric heap and size (2000|3000)
+]  5.52 sec
+        Start  643: shmem.malloc.divergent.free.0-0-0-0
+293/581 Test  #643: shmem.malloc.divergent.free.0-0-0-0 ........................***Failed  Required regular expression not found. Regex=[osoe: PE [0-3]: shmem_free: the PEs called it with different arguments, which spec .*same on every PE. this PE passed the block at offset [0-9]+ of the symmetric heap
+]  5.63 sec
+        Start  645: shmem.malloc.equivalent.0-0-0-0
+294/581 Test  #645: shmem.malloc.equivalent.0-0-0-0 ............................***Failed  Required regular expression not found. Regex=[every check passed
+]  4.65 sec
+        Start  647: shmem.collective-check.kind.0-0-0-0
+295/581 Test  #647: shmem.collective-check.kind.0-0-0-0 ........................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  5.62 sec
+        Start  649: shmem.collective-check.gather.0-0-0-0
+296/581 Test  #649: shmem.collective-check.gather.0-0-0-0 ......................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  6.08 sec
+        Start  651: shmem.collective-check.root.0-0-0-0
+297/581 Test  #651: shmem.collective-check.root.0-0-0-0 ........................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  7.38 sec
+        Start  653: shmem.collective-check.count.0-0-0-0
+298/581 Test  #653: shmem.collective-check.count.0-0-0-0 .......................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  6.27 sec
+        Start  655: shmem.collective-check.sync.0-0-0-0
+299/581 Test  #655: shmem.collective-check.sync.0-0-0-0 ........................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  5.91 sec
+        Start  657: shmem.collective-check.alltoall.0-0-0-0
+300/581 Test  #657: shmem.collective-check.alltoall.0-0-0-0 ....................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  6.98 sec
+        Start  659: shmem.collective-check.off.0-0-0-0
+301/581 Test  #659: shmem.collective-check.off.0-0-0-0 .........................***Failed  Required regular expression not found. Regex=[returned from its collective, which it must not
+]  6.81 sec
+        Start  660: shmem.collective-check.default.0-0-0-0
+302/581 Test  #660: shmem.collective-check.default.0-0-0-0 .....................***Failed  Required regular expression not found. Regex=[the PEs of node 0 called different collectives on .*, or the same one with different arguments: PE [0-3] is in .* and PE [0-3] in .* [(]OSOE_CHECK_COLLECTIVES[)]
+]  6.92 sec
+        Start  661: shmem.collective-check.unsaid.0-0-0-0
+303/581 Test  #661: shmem.collective-check.unsaid.0-0-0-0 ......................***Failed  Required regular expression not found. Regex=[PE 1, of this node, said no call for .*'s collective [0-9]+ where this PE checks the node's calls [(]OSOE_CHECK_COLLECTIVES[)]
+]  7.39 sec
+        Start  662: shmem.collective-check.clean.reduce.0-0-0-0
+304/581 Test  #662: shmem.collective-check.clean.reduce.0-0-0-0 ................***Failed   10.17 sec
+        Start  664: shmem.collective-check.clean.broadcast.0-0-0-0
+305/581 Test  #664: shmem.collective-check.clean.broadcast.0-0-0-0 .............***Failed    5.80 sec
+        Start  666: shmem.collective-check.clean.collect.0-0-0-0
+306/581 Test  #666: shmem.collective-check.clean.collect.0-0-0-0 ...............***Failed    8.55 sec
+        Start  668: shmem.collective-check.clean.alltoall.0-0-0-0
+307/581 Test  #668: shmem.collective-check.clean.alltoall.0-0-0-0 ..............***Failed    6.57 sec
+        Start  670: shmem.collective-check.clean.scan.0-0-0-0
+308/581 Test  #670: shmem.collective-check.clean.scan.0-0-0-0 ..................***Failed    8.54 sec
+        Start  672: shmem.collective-check.clean.team.0-0-0-0
+309/581 Test  #672: shmem.collective-check.clean.team.0-0-0-0 ..................***Failed    7.04 sec
+        Start  673: shmem.team-split.generations.L2
+310/581 Test  #673: shmem.team-split.generations.L2 ............................***Failed  Required regular expression not found. Regex=[every check before the stale handle passed.*shmem_team_my_pe: 0x[0-9a-f]+ is team 3, which this PE has destroyed. the number names another team since
+]  7.49 sec
+        Start  683: shmem.team-blocks.local-disagree
+311/581 Test  #683: shmem.team-blocks.local-disagree ...........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+]  8.05 sec
+        Start  684: shmem.team-blocks.invalid.7
+312/581 Test  #684: shmem.team-blocks.invalid.7 ................................   Passed    5.83 sec
+        Start  685: shmem.team-blocks.invalid.65537
+313/581 Test  #685: shmem.team-blocks.invalid.65537 ............................   Passed    5.44 sec
+        Start  686: shmem.team-blocks.invalid.x
+314/581 Test  #686: shmem.team-blocks.invalid.x ................................   Passed    6.71 sec
+        Start  692: shmem.multiple.L1
+315/581 Test  #692: shmem.multiple.L1 ..........................................***Failed    9.22 sec
+        Start  693: shmem.multiple.L2
+316/581 Test  #693: shmem.multiple.L2 ..........................................***Failed    6.70 sec
+        Start  694: shmem.multiple.L4
+317/581 Test  #694: shmem.multiple.L4 ..........................................***Failed   13.02 sec
+        Start  702: shmem.multiple.exhaust
+318/581 Test  #702: shmem.multiple.exhaust .....................................***Failed  Required regular expression not found. Regex=[more live threads of this PE have called the library than OSOE_MAX_THREADS=2 allows
+]  8.71 sec
+        Start  703: shmem.team-threads.L1
+319/581 Test  #703: shmem.team-threads.L1 ......................................***Failed    7.18 sec
+        Start  704: shmem.team-threads.L2
+320/581 Test  #704: shmem.team-threads.L2 ......................................***Failed    8.45 sec
+        Start  705: shmem.team-threads.L4
+321/581 Test  #705: shmem.team-threads.L4 ......................................***Failed    8.21 sec
+        Start  709: shmem.context-team-destroy.L1
+322/581 Test  #709: shmem.context-team-destroy.L1 ..............................***Failed   10.07 sec
+        Start  710: shmem.context-team-destroy.L2
+323/581 Test  #710: shmem.context-team-destroy.L2 ..............................***Failed    7.22 sec
+        Start  711: shmem.context-team-destroy.L4
+324/581 Test  #711: shmem.context-team-destroy.L4 ..............................***Failed    8.50 sec
+        Start  712: shmem.team-levels.L1
+325/581 Test  #712: shmem.team-levels.L1 .......................................***Failed    6.34 sec
+        Start  713: shmem.team-levels.L2
+326/581 Test  #713: shmem.team-levels.L2 .......................................***Failed    7.42 sec
+        Start  714: shmem.team-levels.L4
+327/581 Test  #714: shmem.team-levels.L4 .......................................***Failed   10.51 sec
+        Start  717: shmem.multiple.landing-unaligned
+328/581 Test  #717: shmem.multiple.landing-unaligned ...........................***Failed  Required regular expression not found. Regex=[OSOE_GET_LANDING_BYTES=1500 is not a multiple of the landing zone's 1024-byte extents
+]  9.20 sec
+        Start  718: shmem.thread-places.held
+329/581 Test  #718: shmem.thread-places.held ...................................***Failed  Required regular expression not found. Regex=[a worker made one call and lives on.*more live threads of this PE have called the library than OSOE_MAX_THREADS=2 allows
+]  7.21 sec
+        Start  719: shmem.thread-places.freed
+330/581 Test  #719: shmem.thread-places.freed ..................................***Failed  Required regular expression not found. Regex=[20 workers each made one call and exited
+]  6.14 sec
+        Start  720: shmem.agent-slice.L1
+331/581 Test  #720: shmem.agent-slice.L1 .......................................***Failed   10.22 sec
+        Start  721: shmem.agent-slice.L2
+332/581 Test  #721: shmem.agent-slice.L2 .......................................***Failed    8.51 sec
+        Start  722: shmem.agent-slice.L4
+333/581 Test  #722: shmem.agent-slice.L4 .......................................***Failed    8.00 sec
+        Start  723: shmem.agent-slice.set.L2
+334/581 Test  #723: shmem.agent-slice.set.L2 ...................................***Failed   11.74 sec
+        Start  724: shmem.agent-slice.kernel.L2
+335/581 Test  #724: shmem.agent-slice.kernel.L2 ................................***Failed    9.88 sec
+        Start  725: shmem.agent-slice.refused.L2
+336/581 Test  #725: shmem.agent-slice.refused.L2 ...............................***Failed  Required regular expression not found. Regex=[OSOE_AGENT_SLICE_US=50: 0, or 100 to 100000 microseconds
+]  7.76 sec
+        Start  728: shmem.agent-cpus.node.L3
+337/581 Test  #728: shmem.agent-cpus.node.L3 ...................................***Failed  Required regular expression not found. Regex=[AGENT CPUS OK
+]  6.82 sec
+        Start  729: shmem.agent-cpus.refused.L2
+338/581 Test  #729: shmem.agent-cpus.refused.L2 ................................***Failed  Required regular expression not found. Regex=[OSOE_AGENT_CPUS=all: task, for its own PE's CPUs, or node
+]  7.10 sec
+        Start  730: shmem.deadlock.waits.0-0-0-0
+339/581 Test  #730: shmem.deadlock.waits.0-0-0-0 ...............................***Failed  Required regular expression not found. Regex=[every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s
+]  7.65 sec
+        Start  732: shmem.deadlock.reinit.0-0-0-0
+340/581 Test  #732: shmem.deadlock.reinit.0-0-0-0 ..............................***Failed  Required regular expression not found. Regex=[every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_int_wait_until [(]heap [+][0-9a-fx]+[)], for [0-9]+ s
+] 11.48 sec
+        Start  734: shmem.deadlock.mismatch.0-0-0-0
+341/581 Test  #734: shmem.deadlock.mismatch.0-0-0-0 ............................***Failed  Required regular expression not found. Regex=[every PE of the job waits in the library.*: PE [0-9, ]+ in shmem_barrier_all [(]epoch [0-9]+[)], for [0-9]+ s
+] 10.42 sec
+        Start  738: shmem.deadlock.computing.0-0-0-0
+342/581 Test  #738: shmem.deadlock.computing.0-0-0-0 ...........................***Failed  Required regular expression not found. Regex=[DEADLOCK TEST OK: computing
+] 16.65 sec
+        Start  740: shmem.deadlock.sleeping.0-0-0-0
+343/581 Test  #740: shmem.deadlock.sleeping.0-0-0-0 ............................***Failed  Required regular expression not found. Regex=[DEADLOCK TEST OK: sleeping
+] 10.62 sec
+        Start  742: shmem.deadlock.helper.0-0-0-0
+344/581 Test  #742: shmem.deadlock.helper.0-0-0-0 ..............................***Failed  Required regular expression not found. Regex=[DEADLOCK TEST OK: helper
+] 16.76 sec
+        Start  744: shmem.deadlock.busy.0-0-0-0
+345/581 Test  #744: shmem.deadlock.busy.0-0-0-0 ................................***Failed  Required regular expression not found. Regex=[DEADLOCK TEST OK: busy
+] 10.20 sec
+        Start  750: shmem.deadlock.between.0-0-0-0
+346/581 Test  #750: shmem.deadlock.between.0-0-0-0 .............................***Failed  Required regular expression not found. Regex=[DEADLOCK TEST OK: between
+] 10.14 sec
+        Start  752: shmem.deadlock.off.0-0-0-0
+347/581 Test  #752: shmem.deadlock.off.0-0-0-0 .................................   Passed   18.82 sec
+        Start  754: shmem.deadlock.refused.L2
+348/581 Test  #754: shmem.deadlock.refused.L2 ..................................***Failed  Required regular expression not found. Regex=[OSOE_DEADLOCK_SECONDS=soon: 0 to turn deadlock detection off
+]  9.00 sec
+        Start  804: shmem.scan.L1
+349/581 Test  #804: shmem.scan.L1 ..............................................***Failed   10.72 sec
+        Start  805: shmem.scan.L2
+350/581 Test  #805: shmem.scan.L2 ..............................................***Failed   13.50 sec
+        Start  806: shmem.scan.L4
+351/581 Test  #806: shmem.scan.L4 ..............................................***Failed    9.53 sec
+        Start  816: shmem.context.L1
+352/581 Test  #816: shmem.context.L1 ...........................................***Failed    9.76 sec
+        Start  817: shmem.context.L2
+353/581 Test  #817: shmem.context.L2 ...........................................***Failed   10.39 sec
+        Start  818: shmem.context.L4
+354/581 Test  #818: shmem.context.L4 ...........................................***Failed    9.51 sec
+        Start  822: shmem.context.misuse.destroyed
+355/581 Test  #822: shmem.context.misuse.destroyed .............................***Failed  Required regular expression not found. Regex=[shmem_ctx_long_put
+] 11.62 sec
+        Start  823: shmem.context.misuse.foreign
+356/581 Test  #823: shmem.context.misuse.foreign ...............................***Failed  Required regular expression not found. Regex=[shmem_ctx_long_put
+]  4.45 sec
+        Start  824: shmem.context.misuse.invalid
+357/581 Test  #824: shmem.context.misuse.invalid ...............................***Failed  Required regular expression not found. Regex=[shmem_ctx_long_put
+] 16.25 sec
+        Start  825: shmem.context.misuse.outside
+358/581 Test  #825: shmem.context.misuse.outside ...............................***Failed  Required regular expression not found. Regex=[shmem_ctx_long_put
+] 10.82 sec
+        Start  826: shmem.context.misuse.default
+359/581 Test  #826: shmem.context.misuse.default ...............................***Failed  Required regular expression not found. Regex=[shmem_ctx_destroy
+] 12.00 sec
+        Start  827: shmem.context.misuse.private-team
+360/581 Test  #827: shmem.context.misuse.private-team ..........................***Failed  Required regular expression not found. Regex=[shmem_team_destroy
+] 10.78 sec
+        Start  828: shmem.context.misuse.after-team
+361/581 Test  #828: shmem.context.misuse.after-team ............................***Failed  Required regular expression not found. Regex=[shmem_ctx_long_put
+] 13.25 sec
+        Start  829: shmem.max-contexts.local-disagree
+362/581 Test  #829: shmem.max-contexts.local-disagree ..........................***Failed  Required regular expression not found. Regex=[REFUSAL OK
+] 19.93 sec
+        Start  830: shmem.max-contexts.invalid.0
+363/581 Test  #830: shmem.max-contexts.invalid.0 ...............................   Passed   11.16 sec
+        Start  831: shmem.max-contexts.invalid.4097
+364/581 Test  #831: shmem.max-contexts.invalid.4097 ............................   Passed   10.23 sec
+        Start  832: shmem.max-contexts.invalid.x
+365/581 Test  #832: shmem.max-contexts.invalid.x ...............................   Passed    8.82 sec
+        Start  833: shmem.context.pool-1.L2
+366/581 Test  #833: shmem.context.pool-1.L2 ....................................***Failed    8.40 sec
+        Start  834: shmem.context.pool-3.L2
+367/581 Test  #834: shmem.context.pool-3.L2 ....................................***Failed   10.31 sec
+        Start  835: shmem.context.pool-3.said-once.L2
+368/581 Test  #835: shmem.context.pool-3.said-once.L2 ..........................***Failed  Required regular expression not found. Regex=[COUNT OK
+] 12.77 sec
+        Start  836: shmem.surface.L1
+369/581 Test  #836: shmem.surface.L1 ...........................................***Failed    8.41 sec
+        Start  837: shmem.surface.L2
+370/581 Test  #837: shmem.surface.L2 ...........................................***Failed   16.77 sec
+        Start  838: shmem.surface.L4
+371/581 Test  #838: shmem.surface.L4 ...........................................***Failed    9.54 sec
+        Start  839: shmem.agent-wake.L4
+372/581 Test  #839: shmem.agent-wake.L4 ........................................***Failed    7.86 sec
+        Start  840: shmem.start-pes.L1
+373/581 Test  #840: shmem.start-pes.L1 .........................................***Failed   12.23 sec
+        Start  841: shmem.start-pes.L2
+374/581 Test  #841: shmem.start-pes.L2 .........................................***Failed   14.34 sec
+        Start  842: shmem.start-pes.L4
+375/581 Test  #842: shmem.start-pes.L4 .........................................***Failed   15.89 sec
+        Start  843: shmem.profile.L1
+376/581 Test  #843: shmem.profile.L1 ...........................................***Failed   15.99 sec
+        Start  844: shmem.profile.L2
+377/581 Test  #844: shmem.profile.L2 ...........................................***Failed   13.01 sec
+        Start  845: shmem.profile.L4
+378/581 Test  #845: shmem.profile.L4 ...........................................***Failed   11.59 sec
+        Start  846: shmem.team.L1
+379/581 Test  #846: shmem.team.L1 ..............................................***Failed   13.91 sec
+        Start  847: shmem.team.L2
+380/581 Test  #847: shmem.team.L2 ..............................................***Failed   15.18 sec
+        Start  848: shmem.team.L4
+381/581 Test  #848: shmem.team.L4 ..............................................***Failed   19.07 sec
+        Start  849: shmem.thread.L1
+382/581 Test  #849: shmem.thread.L1 ............................................***Failed   11.90 sec
+        Start  850: shmem.thread.L2
+383/581 Test  #850: shmem.thread.L2 ............................................***Failed    9.49 sec
+        Start  851: shmem.thread.L4
+384/581 Test  #851: shmem.thread.L4 ............................................***Failed   10.82 sec
+        Start  852: shmem.wait-many.L1
+385/581 Test  #852: shmem.wait-many.L1 .........................................***Failed   11.12 sec
+        Start  853: shmem.wait-many.L2
+386/581 Test  #853: shmem.wait-many.L2 .........................................***Failed    9.61 sec
+        Start  854: shmem.wait-many.L4
+387/581 Test  #854: shmem.wait-many.L4 .........................................***Failed   13.37 sec
+        Start  855: shmem.stat.L1
+388/581 Test  #855: shmem.stat.L1 ..............................................***Failed   14.30 sec
+        Start  856: shmem.stat.L2
+389/581 Test  #856: shmem.stat.L2 ..............................................***Failed   13.42 sec
+        Start  857: shmem.stat.L4
+390/581 Test  #857: shmem.stat.L4 ..............................................***Failed   17.30 sec
+        Start  858: shmem.stat.view.many-pes
+391/581 Test  #858: shmem.stat.view.many-pes ...................................***Failed  Required regular expression not found. Regex=[STAT VIEWS OK
+] 60.46 sec
+        Start  863: shmem.stat.gc.not-a-segment
+392/581 Test  #863: shmem.stat.gc.not-a-segment ................................   Passed    2.27 sec
+        Start  864: shmem.stat.gc.shrunk-under-read
+393/581 Test  #864: shmem.stat.gc.shrunk-under-read ............................***Failed  Error regular expression found in output. Regex=[--gc exited [1-9]] 19.59 sec
+        Start  865: shmem.stat.link
+394/581 Test  #865: shmem.stat.link ............................................***Failed   17.43 sec
+        Start  866: shmem.global-exit.L1
+395/581 Test  #866: shmem.global-exit.L1 .......................................***Failed  Required regular expression not found. Regex=[GLOBAL EXIT OK
+] 20.50 sec
+        Start  867: shmem.global-exit.fatal.L1
+396/581 Test  #867: shmem.global-exit.fatal.L1 .................................***Failed  Required regular expression not found. Regex=[GLOBAL EXIT OK
+] 14.13 sec
+        Start  868: shmem.global-exit.L2
+397/581 Test  #868: shmem.global-exit.L2 .......................................***Failed  Required regular expression not found. Regex=[GLOBAL EXIT OK
+] 16.51 sec
+        Start  869: shmem.global-exit.fatal.L2
+398/581 Test  #869: shmem.global-exit.fatal.L2 .................................***Failed  Required regular expression not found. Regex=[GLOBAL EXIT OK
+] 21.09 sec
+        Start  870: shmem.global-exit.L4

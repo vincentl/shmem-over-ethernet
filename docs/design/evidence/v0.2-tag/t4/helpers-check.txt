@@ -1,0 +1,17 @@
+== 2026-10-30T18:06:59Z, load 0.99 2.69 5.37, CPUs online 4
+-- OSOE_PROGRESS_HELPERS=0, SHMEM_DEBUG=1, map 0,0,1,1,2,2,3,3
+   exit 0
+-- OSOE_PROGRESS_HELPERS=2, SHMEM_DEBUG=1, map 0,0,1,1,2,2,3,3
+   exit 0
+-- OSOE_PROGRESS_HELPERS=auto, SHMEM_DEBUG=1, map 0,0,1,1,2,2,3,3
+osoe: node 0 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 1 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 2 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 3 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+   exit 0
+-- OSOE_PROGRESS_HELPERS unset (the default), SHMEM_DEBUG=1
+osoe: node 0 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 1 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 2 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+osoe: node 3 runs 0 progress helpers (OSOE_PROGRESS_HELPERS=auto): the job's nodes 4, this node's PEs 2, this machine's 8 and CPUs online 4 - two need no more PEs than CPUs
+DONE

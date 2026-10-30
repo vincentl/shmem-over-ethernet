@@ -1,0 +1,50 @@
+visit/copy          quiet writes=1 states=    30 -> ok
+visit/copy          quiet writes=2 states=    63 -> ok
+visit/copy          quiet writes=3 states=    76 -> ok
+visit/copy          quiet writes=4 states=    89 -> ok
+visit/zero_copy     quiet writes=1 states=    67 -> ok
+visit/zero_copy     quiet writes=2 states=   221 -> ok
+visit/zero_copy     quiet writes=3 states=   331 -> ok
+visit/zero_copy     quiet writes=4 states=   454 -> ok
+visit/zc_unmarked   quiet writes=1 states=    67 -> ok
+visit/zc_unmarked   quiet writes=2 states=   163 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=False, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=False, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; visit ; visit ; ask ; notify 0 ; complete 1 ; visit
+visit/zc_unmarked   quiet writes=3 states=   276 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=False, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=False, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; visit ; visit ; ask ; complete 0 ; notify 1 ; visit
+visit/zc_unmarked   quiet writes=4 states=   396 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=False, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=False, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; notify 1 ; visit ; write ; visit ; complete 0 ; visit ; visit ; ask ; notify 0 ; complete 1 ; visit
+visit/zc_both_lent  quiet writes=1 states=    79 -> ok
+visit/zc_both_lent  quiet writes=2 states=   183 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=False, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=False, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; visit ; visit ; ask ; complete 1 ; notify both ; visit
+visit/zc_both_lent  quiet writes=3 states=   281 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=False, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=False, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; visit ; visit ; ask ; complete 0 ; notify both ; visit
+visit/zc_both_lent  quiet writes=4 states=   386 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=True, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=False, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=False, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; notify 1 ; visit ; write ; visit ; complete 0 ; visit ; visit ; ask ; complete 1 ; notify both ; visit
+visit/copy          close writes=1 states=    25 -> ok
+visit/copy          close writes=2 states=    38 -> ok
+visit/copy          close writes=3 states=    51 -> ok
+visit/copy          close writes=4 states=    64 -> ok
+visit/zero_copy     close writes=1 states=    77 -> ok
+visit/zero_copy     close writes=2 states=   173 -> ok
+visit/zero_copy     close writes=3 states=   228 -> ok
+visit/zero_copy     close writes=4 states=   296 -> ok
+visit/zc_unmarked   close writes=1 states=    77 -> ok
+visit/zc_unmarked   close writes=2 states=   173 -> ok
+visit/zc_unmarked   close writes=3 states=   228 -> ok
+visit/zc_unmarked   close writes=4 states=   296 -> ok
+visit/zc_both_lent  close writes=1 states=    89 -> ok
+visit/zc_both_lent  close writes=2 states=    99 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=False, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=True, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=True, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; visit ; visit ; complete 1 ; visit ; close ; peer goodbye and end ; notify both ; visit
+visit/zc_both_lent  close writes=3 states=   149 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=False, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=True, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=True, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; visit ; visit ; complete 0 ; visit ; close ; peer goodbye and end ; notify both ; visit
+visit/zc_both_lent  close writes=4 states=   219 -> STUCK
+    STUCK: ack_coming=False, acked=False, asked=False, asks=(False, False), busy=False, by_reference=(False, False), carried=False, closing=True, data=(False, False), dirty=False, done=(False, False), goodbye=NONE, owed=(0, 0), peer_ended=True, readable=False, st=('OPEN', 'FREE'), submitted=(False, False), writes_left=0
+    trace: visit ; write ; visit ; visit ; write ; visit ; complete 0 ; notify 0 ; visit ; write ; visit ; complete 1 ; notify 1 ; visit ; write ; visit ; complete 0 ; visit ; visit ; complete 1 ; visit ; close ; peer goodbye and end ; notify both ; visit

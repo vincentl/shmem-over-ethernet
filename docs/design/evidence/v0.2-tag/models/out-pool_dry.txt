@@ -1,0 +1,48 @@
+pool_dry/member/design                                       SC  states=      2,075 depth= 37 (miss<3e-23) -> ok +live
+pool_dry/member/design                                       TSO states=      6,327 depth= 55 (miss<3e-22) -> ok +live
+pool_dry/parent/design                                       SC  states=         90 depth= 13 (miss<5e-26) -> ok +live
+pool_dry/parent/design                                       TSO states=        135 depth= 16 (miss<1e-25) -> ok +live
+pool_dry/remote/design                                       SC  states=         62 depth= 12 (miss<2e-26) -> ok +live
+pool_dry/remote/design                                       TSO states=         82 depth= 13 (miss<4e-26) -> ok +live
+pool_dry/split_first/design                                  SC  states=         52 depth= 17 (miss<2e-26) -> ok +live
+pool_dry/split_first/design                                  TSO states=         56 depth= 18 (miss<2e-26) -> ok +live
+pool_dry/two/design                                          SC  states=         13 depth= 12 (miss<1e-27) -> ok +live
+pool_dry/two/design                                          TSO states=         16 depth= 14 (miss<2e-27) -> ok +live
+pool_dry/two/first                                           SC  states=          8 depth=  7 (miss<4e-28) -> TRAPPED
+    no finished state is reachable at all
+    trace: TRAPPED: no finished state is reachable from here
+pool_dry/two/first                                           TSO states=         10 depth=  9 (miss<6e-28) -> TRAPPED
+    no finished state is reachable at all
+    trace: TRAPPED: no finished state is reachable from here
+pool_dry/member/odd_only                                     SC  states=         53 depth= 18 (miss<2e-26) -> VIOLATION
+    LEGIT: A failed dry, having found block 0 nobody (free)
+    trace: T2:load ('free',)->0 ; T2:await ok ; T2:load ('free',)->0 ; T2:load ('gen', 0)->1 ; T2:load ('members', 0)->2 ; T2:load ('holders', 0)->2 ; T2:check ok ; T2:ghost ('$done',)=1 ; T0:add ('holders', 0)->1 ; T1:add ('holders', 0)->0 ; T1:add ('gen', 0)->2 ; T0:load ('free',)->0 ; T0:await ok ; T0:load ('free',)->0 ; T1:or ('free',) 0->1 ; T1:ghost ('$done',)=2 ; T0:load ('gen', 0)->2 ; T0: CHECK FAILED: LEGIT: A failed dry, having found block 0 nobody (free)
+pool_dry/member/odd_only                                     TSO states=         69 depth= 22 (miss<3e-26) -> VIOLATION
+    LEGIT: A failed dry, having found block 0 nobody (free)
+    trace: T2:load ('free',)->0 ; T2:or ('fence',) 0->0 ; T2:await ok ; T2:load ('free',)->0 ; T2:load ('gen', 0)->1 ; T2:load ('members', 0)->2 ; T2:load ('holders', 0)->2 ; T2:check ok ; T2:ghost ('$done',)=1 ; T0:add ('holders', 0)->1 ; T1:add ('holders', 0)->0 ; T1:add ('gen', 0)->2 ; T0:load ('free',)->0 ; T0:or ('fence',) 0->0 ; T0:await ok ; T0:load ('free',)->0 ; T1:or ('free',) 0->1 ; T1:ghost ('$done',)=2 ; T0:load ('gen', 0)->2 ; T0: CHECK FAILED: LEGIT: A failed dry, having found block 0 nobody (free)
+pool_dry/member/zero_at_leave                                SC  states=         54 depth= 18 (miss<2e-26) -> VIOLATION
+    LEGIT: A failed dry, having found block 0 T, destroyed before the split
+    trace: T2:load ('free',)->0 ; T2:await ok ; T2:load ('free',)->0 ; T2:load ('members', 0)->2 ; T2:load ('holders', 0)->2 ; T2:check ok ; T2:ghost ('$done',)=1 ; T0:add ('holders', 0)->1 ; T1:add ('holders', 0)->0 ; T1:store ('members', 0)=0 ; T1:add ('gen', 0)->2 ; T0:load ('free',)->0 ; T0:await ok ; T0:load ('free',)->0 ; T0:load ('members', 0)->0 ; T0:load ('free',)->0 ; T0: CHECK FAILED: LEGIT: A failed dry, having found block 0 T, destroyed before the split
+pool_dry/member/zero_at_leave                                TSO states=         69 depth= 22 (miss<3e-26) -> VIOLATION
+    LEGIT: A failed dry, having found block 0 T, destroyed before the split
+    trace: T2:load ('free',)->0 ; T2:or ('fence',) 0->0 ; T2:await ok ; T2:load ('free',)->0 ; T2:load ('members', 0)->2 ; T2:load ('holders', 0)->2 ; T2:check ok ; T2:ghost ('$done',)=1 ; T0:add ('holders', 0)->1 ; T1:add ('holders', 0)->0 ; T1:store(buf) ('members', 0)=0 ; T1:flush ('members', 0)=0 ; T1:add ('gen', 0)->2 ; T0:load ('free',)->0 ; T0:or ('fence',) 0->0 ; T0:await ok ; T0:load ('free',)->0 ; T0:load ('members', 0)->0 ; T0:load ('free',)->0 ; T0: CHECK FAILED: LEGIT: A failed dry, having found block 0 T, destroyed before the split
+pool_dry/parent/first_round_final                            SC  states=        152 depth= 15 (miss<1e-25) -> VIOLATION
+    LEGIT: A failed dry, having found block 0 T, destroyed before the split
+    trace: T0:load ('free',)->0 ; T0:load ('members', 0)->2 ; T0:load ('holders', 0)->2 ; T0: CHECK FAILED: LEGIT: A failed dry, having found block 0 T, destroyed before the split
+pool_dry/parent/first_round_final                            TSO states=        220 depth= 18 (miss<3e-25) -> VIOLATION
+    LEGIT: A failed dry, having found block 0 T, destroyed before the split
+    trace: T0:load ('free',)->0 ; T0:load ('members', 0)->2 ; T0:load ('holders', 0)->2 ; T0: CHECK FAILED: LEGIT: A failed dry, having found block 0 T, destroyed before the split
+pool_dry/split_first/departing                               SC  states=         73 depth= 19 (miss<3e-26) -> TRAPPED
+    this step enters a set of states from which no finished state is reachable: from here the model can run forever without finishing
+    trace: T1:store ('departing', 0)=1 ; TRAPPED: no finished state is reachable from here
+pool_dry/split_first/departing                               TSO states=        100 depth= 21 (miss<6e-26) -> TRAPPED
+    this step enters a set of states from which no finished state is reachable: from here the model can run forever without finishing
+    trace: T2:add ('arrived',)->1 ; T1:store(buf) ('departing', 0)=1 ; T1:flush ('departing', 0)=1 ; TRAPPED: no finished state is reachable from here
+pool_dry/one/design                                          SC  states=          5 depth=  4 (miss<2e-28) -> ok +live
+pool_dry/one/design                                          TSO states=          7 depth=  6 (miss<3e-28) -> ok +live
+pool_dry/one/singleton_claims                                SC  states=         11 depth= 10 (miss<8e-28) -> VIOLATION
+    SPARE: A failed dry where its one team of more than one PE needed one block, and one was free
+    trace: T0:load ('free',)->1 ; T0:cas ('free',) 1->0 True ; T0:store ('members', 0)=0 ; T0:load ('free',)->0 ; T0:await ok ; T0:load ('free',)->0 ; T0:load ('members', 0)->0 ; T0:load ('free',)->0 ; T0:load ('members', 1)->1 ; T0:load ('holders', 1)->1 ; T0: CHECK FAILED: SPARE: A failed dry where its one team of more than one PE needed one block, and one was free
+pool_dry/one/singleton_claims                                TSO states=         13 depth= 12 (miss<1e-27) -> VIOLATION
+    SPARE: A failed dry where its one team of more than one PE needed one block, and one was free
+    trace: T0:load ('free',)->1 ; T0:cas ('free',) 1->0 True ; T0:store(buf) ('members', 0)=0 ; T0:load ('free',)->0 ; T0:flush ('members', 0)=0 ; T0:or ('fence',) 0->0 ; T0:await ok ; T0:load ('free',)->0 ; T0:load ('members', 0)->0 ; T0:load ('free',)->0 ; T0:load ('members', 1)->1 ; T0:load ('holders', 1)->1 ; T0: CHECK FAILED: SPARE: A failed dry where its one team of more than one PE needed one block, and one was free

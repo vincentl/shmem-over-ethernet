@@ -1,0 +1,10 @@
+osoe-pacer 0.2.0 library=osoe openshmem=1.6 thread=serialized pes=16 nodes=4 layout=4,4,4,4 hosts=pi-[001-004] heap=256m memory=128m seed=1 report=5 exercises=mailbox,atomics,rma,locks,collectives,waits,sort,alltoall labels=hosts
+exercise mailbox sends=4 slot=256 forms=20 round_trips=128 seconds=3600 memory=4.8k
+exercise atomics cases=71 contexts=default,private,serialized slots=16 operations=64 claims=16 seconds=3600 memory=704
+exercise rma halo=8..1m cases=198 kinds=29 flags=atomic_add,signal_add,signal_set puts=putmem,putmem_nbi,uint64_put,putmem_signal,putmem_signal_nbi seconds=3600 memory=1.2m
+exercise locks locks=8 acquisitions=4 seconds=3600 memory=336
+exercise collectives typed=319 timed=87 sizes=8..128k teams=world,even seconds=3600 memory=4.1m
+exercise waits types=12 forms=14 comparisons=6 words=4 cases=168 seconds=3600 memory=96
+exercise sort mode=rounds exchange=fetch-add ptr=yes keys=524288 asked=4194304 capacity=593920 local_sort=lsd-scratch private=9.2m seconds=3600 memory=9.1m
+exercise alltoall teams=world,even blocks=8,64,512,4096,65536 variants=alltoall,alltoallmem,alltoalls,put,get,signal,iput,ibput seconds=3600 memory=5.1m
+osoe-pacer failures=0 seconds=3600.7

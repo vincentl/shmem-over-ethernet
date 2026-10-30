@@ -1,0 +1,36 @@
+=== unit/shmem_team_b2b_collectives 0-0-1-1-2-2-3-3
+osoe: PE 2: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 640 bytes (spec §9.10.8: dest must hold every member's block)
+osoe: PE 3: shmem_long_collect: dest has room for 80 bytes to the end of its allocation, and the result is 640 bytes (spec §9.10.8: dest must hold every member's block)
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 7 killed by signal 15
+osoe-launch: rank 0 killed by signal 15
+osoe-launch: rank 4 killed by signal 15
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 6 killed by signal 15
+--- last lines
+osoe-launch: rank 2 exited with status 1
+osoe-launch: rank 6 killed by signal 15
+osoe-launch: rank 5 killed by signal 15
+osoe-launch: rank 1 killed by signal 15
+=== unit/shmemalign 0-0-1-1-2-2-3-3
+osoe: PE 0: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 1: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 7: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 6: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 5: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 2: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 4: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+osoe: PE 3: shmem_align: alignment 2 is not a power of two that is a multiple of sizeof(void *) (8)
+--- last lines
+osoe-launch: rank 3 exited with status 1
+osoe-launch: rank 4 exited with status 1
+osoe-launch: rank 5 exited with status 1
+osoe-launch: rank 6 exited with status 1
+=== unit/c11_shmem_test_all_any_some BUILD FAILED
+/var/tmp/t4-tree/shmem/include/shmem.h:1705:15: error: ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+/var/tmp/t4-tree/shmem/include/shmem.h:1705:15: error: ‘_Generic’ selector of type ‘short unsigned int *’ is not compatible with any association
+/var/tmp/t4-tree/shmem/include/shmem.h:1708:15: error: ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+=== unit/c11_shmem_wait_until_all_any_some BUILD FAILED
+/var/tmp/t4-tree/shmem/include/shmem.h:1686:15: error: ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
+/var/tmp/t4-tree/shmem/include/shmem.h:1686:15: error: ‘_Generic’ selector of type ‘short unsigned int *’ is not compatible with any association
+/var/tmp/t4-tree/shmem/include/shmem.h:1689:15: error: ‘_Generic’ selector of type ‘short int *’ is not compatible with any association
