@@ -141,7 +141,8 @@ static int open_watch(uint32_t i, pid_t pid)
  * 2's second adversarial read). On the stack: no allocation on this path. */
 enum { OUTLAST_BATCH = 64 };
 
-void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until)
+void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until,
+                           bool (*stop)(void))
 {
     struct pollfd watch[OUTLAST_BATCH];
     pid_t unwatched[OUTLAST_BATCH];         /* where no pidfd could be had */
@@ -165,7 +166,7 @@ void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until)
         }
         /* Every pidfd of the batch, until each has said its process ended. */
         nfds_t open_count = n;
-        while (open_count && !osoe_deadline_expired(until)) {
+        while (open_count && !osoe_deadline_expired(until) && !(stop && stop())) {
             int r = poll(watch, n, 100);
             if (r < 0 && errno != EINTR)
                 break;                          /* cannot wait: as for an expired bound */
@@ -183,9 +184,9 @@ void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until)
         struct timespec millisecond = { 0, 1000 * 1000 };
         for (uint32_t j = 0; j < k; j++)
             while (!(kill(unwatched[j], 0) != 0 && errno == ESRCH) &&
-                   !osoe_deadline_expired(until))
+                   !osoe_deadline_expired(until) && !(stop && stop()))
                 nanosleep(&millisecond, NULL);
-        if (osoe_deadline_expired(until))
+        if (osoe_deadline_expired(until) || (stop && stop()))
             return;
     }
 }

@@ -22,8 +22,8 @@ adversarial read found the race on one node too):
     carrier: its end ends its stream, which tells the carrier's node that this
     node is done.
   * The lead of the carrier's node, after its goodbye, waits for the other
-    node's end of stream - but not for a node whose goodbye named another
-    caller, which carries that one (two callers on two nodes at once).
+    node's end of stream - unless its node is outranked: one carrier for the
+    job, the lowest-ranked of the nodes' (P1, below).
 
 Every PE is a process with two threads, its main thread and its agent
 (§3.12). The lead's agent owns the node's sockets: only it can tell the other
@@ -120,8 +120,8 @@ Options
   kills     srun -K1: after the first nonzero exit, a launcher thread kills
             every process still running, one step each, interleaved with
             everything else. On in every built case it can pass; with it,
-            two callers on two nodes at once (`both`) fail NO_KILL - the
-            residual the README states.
+            two callers on two nodes at once (`both`) failed NO_KILL until
+            P1 - the variant per_node.
 
 Variants (each breaks one rule above)
   caller_exits      the caller ends its process itself. On the lead, the
@@ -173,8 +173,29 @@ Variants (each breaks one rule above)
   wait_every_node   every lead waits for the other node's end, not only the
                     carrier's: each waits for the other. STUCK (the code's
                     bound would end both, and then race).
-  no_exclusion      the carrier's node's lead waits for a node whose goodbye
-                    named another caller, which waits for it in turn. STUCK.
+  per_node          the rules before P1: each carrier its own node's, a
+                    carrier's node excluding a node whose goodbye named
+                    another caller, and the code's sends a superset here: with
+                    `kills`, `both` fails NO_KILL - the first carrier to leave
+                    is a bad exit while the other node runs (round four's
+                    conformance F1). Its exclusion was needed: without it each
+                    waited for the other, STUCK (a variant gone with it).
+  old_send          nothing to a peer whose goodbye has arrived, P1's first
+                    rule broken: a higher carrier's node never hears of the
+                    lower, and each waits for the other's end. STUCK.
+  demoted_unwaited  the outranked node's lead waits, as before P1, for every
+                    PE but the carrier: its end tells the lowest carrier's node
+                    that it is done while its demoted carrier still runs.
+                    NO_KILL.
+  status_kept       the demoted carrier leaves with its own status: a bad exit
+                    while the other node runs. NO_KILL.
+  carrier_unmoved   the carrier does not reread the word: it waits for its
+                    lead, which waits for it. STUCK.
+  outranked_waits   the outranked node's lead waits for the lower node's end,
+                    which waits for its own. STUCK.
+  lowest_excludes   the lowest carrier's node excludes a node whose goodbye
+                    named a higher caller, as per_node does: it leaves while
+                    that node runs. NO_KILL.
 
 Properties
   TERMINATES  every process ends: no state is STUCK with a process alive and
@@ -189,6 +210,33 @@ Properties
               exit, for srun -K1 to kill.
   ONE_END     a process is ended by the thread that claimed it (abort.c's
               `ending`), never by a second thread beside it.
+  ONE_CARRIER at most one process leaves with a status other than 0 - one
+              carrier for the job (but in per_node).
+
+The job's single carrier (P1, built 2026-10-30; the model first in
+docs/design/evidence/exit-carrier/): with callers on several nodes, each wins
+its own node's word, and the job's carrier is the lowest-ranked of them.
+
+  * A carrier's node tells a peer even where the peer's own goodbye has
+    arrived, when it named a caller ranked above this node's carrier
+    (progress.c's peer_outranked_here). Every other send is the code's: none to
+    a peer whose goodbye arrived.
+  * A carrier's node whose lead reads a goodbye naming a caller ranked below
+    its carrier is outranked: one more word in the node's segment (node.h's
+    `outranked`), set before anything else. Its lead then waits for no other
+    node, and before its end for every other PE of its node, the carrier among
+    them; the carrier, which rereads the word at each of its wait's polls
+    (osoe_liveness_outlast polls every 100 ms), waits for nobody and leaves
+    with 0 - by exit, its handlers run, as a caller whose declaration lost does.
+  * A carrier's node not outranked waits for every other node's end - none
+    excluded - so the lowest carrier leaves last of the job.
+
+Its cases: `both`, `both_lead_a` (A's lead the lower caller) and `both_lead_b`
+(B's lead the outranked carrier), each under `kills`. Two more, run by hand
+for their size: `three_lead_b` - A's PA, B's lead and PB - holds in 24.6
+million states, the trapped-state check skipped past 12 million; `three` - A's
+PA, B's PB and QB - found nothing in the engine's bound of 100 million
+(docs/design/evidence/exit-carrier/).
 
 Usage: abort_exit_model.py [substring ...]
 """
@@ -231,6 +279,12 @@ def EXIT_LOCK(p):   return ('$exit_lock', p)       # who holds exit's lock: 0, M
 def CALLED(p):      return ('$called', p)          # p's program called shmem_global_exit
 def ORIGIN(x, y):   return ('$origin', x, y)       # the rank y's ABORT named, once x read it
 def KILLING():      return ('$killing',)           # a process has left nonzero: -K1 ends the rest
+def OUTRANKED(x):   return ('$outranked', x)       # P1: x's carrier is not the job's
+
+
+def single(variant):
+    """Whether the variant has P1's single carrier: every one but per_node."""
+    return variant != 'per_node'
 
 
 def word_of(disposition, rank, status):
@@ -261,6 +315,8 @@ def status_at_end(variant, M, p, word):
         return word % 16 if M[CALLED(p)] else 0
     if variant == 'status_everywhere':
         return word % 16
+    if single(variant) and M[OUTRANKED(NODE_OF[p])] and variant != 'status_kept':
+        return 0
     if rank_of(word) == RANK[p]:
         return 0 if variant == 'caller_zero' else word % 16
     return 0
@@ -275,8 +331,20 @@ def waits_for(variant, local, M, p):
     w = M[WORD(x)]
     if disposition(w) != GLOBAL or variant == 'called_carries':
         return ()
+    others = tuple(q for q in local[x] if q != p)
+    if single(variant) and M[OUTRANKED(x)]:
+        # Outranked: nobody here carries. The lead's end - its end of stream -
+        # waits for every other PE, the demoted carrier among them; nobody else
+        # waits, the demoted carrier included, once it has reread the word.
+        if variant == 'carrier_unmoved' and rank_of(w) == RANK[p]:
+            return others
+        if is_lead(p):
+            if variant == 'demoted_unwaited':
+                return tuple(q for q in others if RANK[q] != rank_of(w))
+            return others
+        return ()
     if rank_of(w) == RANK[p]:
-        return () if variant == 'no_carrier_wait' else tuple(q for q in local[x] if q != p)
+        return () if variant == 'no_carrier_wait' else others
     if is_lead(p) and variant != 'no_lead_wait':
         return tuple(q for q in local[x] if q != p and RANK[q] != rank_of(w))
     return ()
@@ -434,7 +502,14 @@ def agent(variant, local, p, options):
                                                                  'no_remote_wait') and (
                 carrier_node(M, x) or variant == 'wait_every_node')
             then = PC_REMOTE if remote else PC_END
-            if not M[SENT(x, y)] and not dead_peer:
+            if single(variant):
+                # Nothing to a peer whose goodbye has arrived, unless it named a
+                # caller ranked above this node's carrier, which must hear of it.
+                tell = not M[HEARD(x, y)] or (variant != 'old_send' and carrier_node(M, x)
+                                              and M[ORIGIN(x, y)] > rank_of(w))
+            else:
+                tell = True             # a superset of the code's sends (above)
+            if not M[SENT(x, y)] and not dead_peer and tell:
                 return [({QUEUED(x, y): M[WORD(x)], SENT(x, y): 1}, {'pc': then},
                          f'{name}: sends {y} the abortive goodbye')]
             return [({}, {'pc': then}, f'{name}: has told every peer')]
@@ -443,8 +518,19 @@ def agent(variant, local, p, options):
             # stream, reading what comes before it - but not for a node whose
             # goodbye named another caller, which carries its own.
             w = M[WORD(x)]
-            excluded = (M[HEARD(x, y)] and M[ORIGIN(x, y)] != rank_of(w)
-                        and variant != 'no_exclusion')
+            excluded = M[HEARD(x, y)] and M[ORIGIN(x, y)] != rank_of(w)     # per_node's
+            if single(variant):
+                # Only a lower caller excuses a node from waiting: it is then
+                # outranked, the word set first, and waits for no node at all.
+                lower = M[HEARD(x, y)] and M[ORIGIN(x, y)] < rank_of(w)
+                if lower and not M[OUTRANKED(x)]:
+                    return [({OUTRANKED(x): 1}, {},
+                             f'{name}: {y} carries {NAME_OF[M[ORIGIN(x, y)]]}, ranked below '
+                             f'{NAME_OF[rank_of(w)]}: this node is outranked')]
+                if M[OUTRANKED(x)] and variant != 'outranked_waits':
+                    return [({}, {'pc': PC_END}, f'{name}: outranked; waits for no other node')]
+                higher = M[HEARD(x, y)] and M[ORIGIN(x, y)] > rank_of(w)
+                excluded = higher and variant == 'lowest_excludes'
             if M[EOF(x, y)]:
                 return [({}, {'pc': PC_END}, f'{name}: {y} has ended')]
             if excluded:
@@ -678,7 +764,7 @@ def early_caller(variant, local, p, status):
 
 # ---- assembly -------------------------------------------------------------------
 
-BAD_STATUS_CALLER, BAD_STATUS_OTHER, BAD_SECOND_END, BAD_KILL, BAD_JOB = 1, 2, 3, 4, 5
+BAD_STATUS_CALLER, BAD_STATUS_OTHER, BAD_SECOND_END, BAD_KILL, BAD_JOB, BAD_TWO = 1, 2, 3, 4, 5, 6
 BAD = {
     BAD_STATUS_CALLER: 'STATUS: a process whose program called shmem_global_exit exited with '
                        'a status neither 0 nor one a caller gave',
@@ -688,6 +774,7 @@ BAD = {
     BAD_KILL: 'NO_KILL: a process was still running at the first nonzero exit, and srun -K1 '
               'killed it',
     BAD_JOB: 'JOB_STATUS: srun\'s status, the highest of every task\'s, is no caller\'s',
+    BAD_TWO: 'ONE_CARRIER: two processes left with a status other than 0',
 }
 
 
@@ -720,7 +807,7 @@ def thread(step, initial, callers, role):
                      ('END', ('done',))])
 
 
-def launcher(processes, callers, kills):
+def launcher(processes, callers, kills, one_carrier=False):
     """srun, with -K1 under the `kills` option: once any task has left with a
     nonzero status, every task still running is sent SIGTERM - one step each,
     in any order and interleaved with everything else, as slurmstepd's signal
@@ -730,8 +817,10 @@ def launcher(processes, callers, kills):
         alive = [p for p in processes if M[ALIVE(p)]]
         if not alive:
             job = max(M[STAT(p)] for p in processes)
-            return [({}, {'finished': 1, 'bad': 0 if job in callers else BAD_JOB},
-                     f'srun returns {job}')]
+            bad = 0 if job in callers else BAD_JOB
+            if one_carrier and sum(1 for p in processes if M[STAT(p)] != 0) > 1:
+                bad = bad or BAD_TWO
+            return [({}, {'finished': 1, 'bad': bad}, f'srun returns {job}')]
         if not (kills and M[KILLING()]):
             return []
         out = []
@@ -755,6 +844,12 @@ CASES_OF = {
     'nonlead': {'callers': {'PA': 5}, 'waiters': ('LA',), 'local': LOCAL},
     'lead': {'callers': {'LA': 5}, 'waiters': (), 'local': LOCAL},
     'both': {'callers': {'PA': 5, 'PB': 6}, 'waiters': (), 'local': LOCAL},
+    'both_lead_a': {'callers': {'LA': 5, 'PB': 6}, 'waiters': (), 'local': LOCAL},
+    'both_lead_b': {'callers': {'PA': 5, 'LB': 6}, 'waiters': (), 'local': LOCAL},
+    # Run by hand (above): `three_lead_b` takes 20 minutes, `three` more than 100
+    # million states.
+    'three': {'callers': {'PA': 5, 'PB': 6, 'QB': 7}, 'waiters': (), 'local': LOCAL_WITH_Q},
+    'three_lead_b': {'callers': {'PA': 5, 'LB': 6, 'PB': 7}, 'waiters': (), 'local': LOCAL},
     'on_b': {'callers': {'PB': 5}, 'waiters': (), 'local': LOCAL_WITH_Q},
     'same_node_both': {'callers': {'PB': 5, 'QB': 6}, 'waiters': (), 'local': LOCAL_WITH_Q},
     'finish': {'callers': {'PA': 5}, 'waiters': (), 'finishers': ('LA',), 'local': LOCAL},
@@ -792,10 +887,11 @@ def case(variant, which, options):
     for p in shape.get('exiters', ()):
         step, initial = exiter(variant, local, p)
         threads.append(thread(step, initial, callers, MAIN))
-    threads.append(launcher(processes, callers, options['kills']))
+    threads.append(launcher(processes, callers, options['kills'], single(variant)))
     mem = {KILLING(): 0}
     for x in NODES:
         mem[WORD(x)] = 0
+        mem[OUTRANKED(x)] = 0
         y = PEER[x]
         for k in (QUEUED, KFIN, SENT, HEARD, EOF, ORIGIN):
             mem[k(x, y)] = 0
@@ -830,7 +926,10 @@ CASES = [
     ('built', 'on_b', KILLS, True),
     ('built', 'same_node_both', KILLS, True),
     ('built', 'both', BUILT, True),
-    ('built', 'both', KILLS, 'NO_KILL'),        # the residual: two nodes, two callers
+    ('built', 'both', KILLS, True),             # P1: one carrier for the job
+    ('built', 'both_lead_a', KILLS, True),
+    ('built', 'both_lead_b', KILLS, True),
+    ('per_node', 'both', KILLS, 'NO_KILL'),     # the rules before P1: the residual
     ('built', 'nonlead', PART_B, True),
     ('built', 'nonlead', NO_HELP, True),        # the carrier's wait: no sweep needed
     ('no_carrier_wait', 'nonlead', NO_HELP, 'STUCK'),   # Part B's finding, without it
@@ -853,7 +952,12 @@ CASES = [
     ('no_lead_wait', 'nonlead', KILLS, 'NO_KILL'),
     ('no_remote_wait', 'nonlead', KILLS, 'NO_KILL'),
     ('wait_every_node', 'nonlead', KILLS, 'STUCK'),
-    ('no_exclusion', 'both', BUILT, 'STUCK'),
+    ('old_send', 'both', KILLS, 'STUCK'),
+    ('demoted_unwaited', 'both', KILLS, 'NO_KILL'),
+    ('status_kept', 'both', KILLS, 'NO_KILL'),
+    ('carrier_unmoved', 'both', KILLS, 'STUCK'),
+    ('outranked_waits', 'both', KILLS, 'STUCK'),
+    ('lowest_excludes', 'both', KILLS, 'NO_KILL'),
 ]
 
 if __name__ == '__main__':

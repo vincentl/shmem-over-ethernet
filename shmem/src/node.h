@@ -32,7 +32,9 @@
 #include "collective-tree.h"
 
 #define OSOE_NODE_MAGIC  UINT64_C(0x65646f6e656f736f)  /* "osoenode", little-endian */
-/* 42: each PE's PID namespace in its slot and the lead's in the header (D26);
+/* 43: the header's `outranked`, beside the abort word: this node's carrier of a
+ * global exit outranked by another node's, the job's single carrier (P1). 42:
+ * each PE's PID namespace in its slot and the lead's in the header (D26);
  * a team of one's published epoch naming no block, since it claims none (P7);
  * the data collectives' waits in the tree state (D1); each owner's late flags,
  * transport.am.late_flags (T38); and OSOE_BLOCKED_DETAIL_CONNECTING, kept for
@@ -41,7 +43,7 @@
  * owner's last pass (D8). 39: team.tree.collect_way, the way a team's last
  * collect found its places, and the header's OSOE_COLLECTIVE_PLACES (v0.2, P30
  * and P31). */
-#define OSOE_NODE_LAYOUT 42
+#define OSOE_NODE_LAYOUT 43
 
 enum osoe_phase {
     OSOE_PHASE_EMPTY = 0,       /* slot unused */
@@ -1104,6 +1106,15 @@ struct osoe_node_header {
      * sleeps on it, the declarer wakes each agent on the agent's own. */
     _Alignas(OSOE_CACHELINE)
     _Atomic uint64_t aborting;
+    /* Since layout 43 (P1): nonzero once this node's carrier of a global exit -
+     * the PE its abort word names, one of its own - is outranked, a peer's
+     * abortive goodbye having named a caller ranked below it, so that the job's
+     * single carrier is another node's and this node's PEs all leave with 0
+     * (abort.h). Stored once, with release, by the lead's agent in its wait for
+     * the other nodes' ends (progress-host.c); loaded with acquire by the
+     * carrier at each poll of its wait for its node (osoe_liveness_outlast) and
+     * by the lead before its own (abort.c). */
+    _Atomic uint32_t outranked;
 
     /* The AM layer's node record, appended at layout 8, sat here until layout
      * 36 moved it to the owner section, a record an owner (struct
@@ -1679,6 +1690,14 @@ bool osoe_node_declare_abort(struct osoe_node *n, uint32_t pe, int status,
 /* Wake every local agent, the lead's first, so each finds the abort word at
  * once rather than at its next sweep. O(L). */
 void osoe_node_wake_agents(struct osoe_node *n);
+
+/* Mark this node's carrier outranked (`outranked`, P1): one release store, by
+ * the lead's agent alone. */
+void osoe_node_outrank(struct osoe_node *n);
+
+/* Whether this node's carrier is outranked: an acquire load, false where the
+ * node has no header yet. */
+bool osoe_node_outranked(const struct osoe_node *n);
 
 /* The abort word's disposition, with the rank and status it names when it is
  * not OSOE_ABORT_NONE. One load. */

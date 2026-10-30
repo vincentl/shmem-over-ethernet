@@ -1297,6 +1297,15 @@ static uint64_t data_wires_wait_ns(uint64_t most)
     return due <= now ? 0 : due - now < most ? due - now : most;
 }
 
+/* Whether world rank `rank` is one of this node's PEs. */
+static bool local_rank(uint32_t rank)
+{
+    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
+        if (osoe.bootstrap.gtids[i] == rank)
+            return true;
+    return false;
+}
+
 /*
  * Owner `o`'s part of the job's end, on its thread: tell every peer of its
  * wires - an abortive goodbye on each that still has someone to tell - and keep
@@ -1322,7 +1331,8 @@ static void abort_wires(struct osoe_progress_owner *o, const struct osoe_deadlin
     enum osoe_abort_disposition how = osoe_node_abort_read(&osoe.node, &pe, &status);
     if (!o->ring->enabled)
         osoe_ring_enable(o->ring);
-    osoe_progress_abort(o, pe, status, (uint32_t)how, how == OSOE_ABORT_GLOBAL_EXIT);
+    osoe_progress_abort(o, pe, status, (uint32_t)how, how == OSOE_ABORT_GLOBAL_EXIT,
+                        how == OSOE_ABORT_GLOBAL_EXIT && local_rank(pe));
     /* On demand, the agent's data wires being made (data-wires.h): the
      * hand-over closed, its listener answering no one new, its calls
      * abandoned, a caller it answered served to its confirmation and told. */
@@ -1656,15 +1666,6 @@ static bool helpers_say(uint32_t kind, uint64_t *applied)
 
 /* ---- the job's end ------------------------------------------------------ */
 
-/* Whether world rank `rank` is one of this node's PEs. */
-static bool local_rank(uint32_t rank)
-{
-    for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
-        if (osoe.bootstrap.gtids[i] == rank)
-            return true;
-    return false;
-}
-
 /*
  * The job is ending: tell every peer, on every wire, before this process ends
  * (abort.h) - owner 0 its own wires, and each helper its own, reading the
@@ -1692,21 +1693,31 @@ void osoe_progress_host_abort(void)
      * A global exit called on this node: the PE carrying its status leaves
      * last (abort.h), so this lead outlasts every other node first. Each other
      * lead ends only after its own node's PEs, and its end ends its stream, so
-     * once every stream has ended nothing of the job runs but this node. Not
-     * a node whose own goodbye named another caller: it carries that one, and
-     * each waiting for the other would only run both to the bound. With
-     * helpers, judged on the control wires alone, the ones owner 0 holds: a
-     * process's end ends all its streams at once, and of two carriers the first
-     * to begin tells the other on its control wire (carrier_model.py's
-     * control_only).
+     * once every stream has ended nothing of the job runs but this node.
+     *
+     * One carrier for the job (P1): with callers on several nodes, each node's
+     * own winning the node's word, the job's is the lowest-ranked of them. A
+     * peer whose goodbye named a caller ranked below this node's carrier makes
+     * this node outranked: it waits for no other node, and marks the node's
+     * word before its own end, which then waits for every PE here, the carrier
+     * among them (abort.c). A peer whose goodbye named a higher caller is
+     * waited for, as any peer is: this node's goodbye, sent even where that
+     * peer's had arrived (progress.c's peer_outranked_here), outranks it, and
+     * it ends. With helpers, judged on the control wires alone, the ones owner
+     * 0 holds: a process's end ends all its streams at once, and every
+     * carrier's lead tells its peers on its control wires (carrier_model.py).
      */
     if (how != OSOE_ABORT_GLOBAL_EXIT || !local_rank(pe))
         return;
     struct osoe_deadline last = osoe_deadline_in(UINT64_C(1000000000) *
                                                  OSOE_ABORT_LEAD_WAIT_SECONDS);
-    while (!osoe_progress_peers_ended(o, pe) && !osoe_deadline_expired(&last))
-        if (!osoe_progress_poll(o) && !osoe_progress_peers_ended(o, pe))
+    while (!osoe_progress_outranked(o, pe) && !osoe_progress_peers_ended(o) &&
+           !osoe_deadline_expired(&last))
+        if (!osoe_progress_poll(o) && !osoe_progress_outranked(o, pe) &&
+            !osoe_progress_peers_ended(o))
             osoe_ring_wait(o->ring, OSOE_SWEEP_NS);
+    if (osoe_progress_outranked(o, pe))
+        osoe_node_outrank(&osoe.node);
 }
 
 /*

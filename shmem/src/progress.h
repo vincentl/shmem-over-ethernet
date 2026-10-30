@@ -405,6 +405,11 @@ struct osoe_progress_owner {
      * same bytes for every peer, built once. */
     bool aborting;
     bool abort_keeps_stream;                    /* a global exit's (osoe_progress_abort) */
+    /* The rank the goodbye names, and whether this node carries it - a global
+     * exit called here (P1): such a node still tells a peer whose own goodbye
+     * named a caller ranked above it (progress.c's peer_outranked_here). */
+    uint32_t abort_origin;
+    bool abort_carries;
     uint64_t abort_held_until_ns;               /* OSOE_TEST_HOLD_GOODBYE's end, or 0 */
     unsigned char abort_segment[OSOE_PROGRESS_ABORT_SEGMENT_BYTES];
     uint32_t abort_segment_bytes;
@@ -607,16 +612,24 @@ bool osoe_progress_closed(const struct osoe_progress_owner *o);
  * not a fatal; nor is a peer's end of stream without its goodbye.
  */
 void osoe_progress_abort(struct osoe_progress_owner *o, uint32_t pe, int32_t status,
-                         uint32_t disposition, bool keep_stream);
+                         uint32_t disposition, bool keep_stream, bool carries);
 
 /* Every connection of owner `o` has had its abortive goodbye acknowledged by
  * the peer's kernel, or has nobody to tell. O(N) calls to the kernel. */
 bool osoe_progress_aborted(const struct osoe_progress_owner *o);
 
-/* The stream of every peer of owner `o`'s has ended, by its end of stream or
- * an error, but a peer whose own abort named a rank other than `carrier`: a
- * node carrying its own caller of shmem_global_exit (abort.h). O(N). */
-bool osoe_progress_peers_ended(const struct osoe_progress_owner *o, uint32_t carrier);
+/* Whether a peer of owner `o`'s has said it ends carrying a caller ranked below
+ * `carrier`, this node's (P1): an abortive goodbye on any wire `o` holds naming a
+ * lower rank. With no helpers `o` holds both of a peer's wires; with them the
+ * lead's agent judges by the control wires, on which every carrier's lead tells
+ * its peers (carrier_model.py). Then this node is outranked. O(N). */
+bool osoe_progress_outranked(const struct osoe_progress_owner *o, uint32_t carrier);
+
+/* The stream of every peer of owner `o`'s has ended, by its end of stream or an
+ * error - every peer, none excluded since P1: a peer carrying a higher caller is
+ * outranked by this node's goodbye and ends, and one carrying a lower makes this
+ * node outranked instead (osoe_progress_outranked). O(N). */
+bool osoe_progress_peers_ended(const struct osoe_progress_owner *o);
 
 /* The peer-slot index for a peer node, or OSOE_CONNECTION_NONE for this node. */
 uint32_t osoe_progress_slot(const struct osoe_progress *p, uint32_t peer);

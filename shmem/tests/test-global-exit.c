@@ -70,6 +70,24 @@
  *              too, with STATUS + 1, at the same moment: the declaration that
  *              wins carries its status and leaves last; the other caller
  *              leaves with 0 (abort.c)
+ *   two-nodes  two-callers, the PE after the caller on another node and 100 ms
+ *              later, the caller's node holding its goodbye to that node half a
+ *              second (global-exit.sh sets OSOE_TEST_HOLD_GOODBYE): both calls
+ *              win their nodes' words, the later node's goodbye arrives first,
+ *              and the caller's node must still tell it (P1's first rule); the
+ *              caller, ranked lower, carries for the job and leaves last. The
+ *              other, outranked, has slow-handler's handler, a second long, and
+ *              must finish it before its node's lead ends: the carrier, with
+ *              none, would otherwise leave while it runs
+ *   all-callers
+ *              compute, and every PE calls shmem_global_exit at the same moment,
+ *              with STATUS + its rank, as every PE does that detects the same
+ *              failure - each with an atexit handler that says it began and
+ *              then, a second later, that it ran: one PE carries for the whole
+ *              job (P1) and leaves last, so that a launcher ending the step at
+ *              the first bad exit kills nobody, and every handler that began
+ *              finishes. A PE whose call another node's end outran leaves as
+ *              one that did not call, running none
  *   slow-handler
  *              compute, with an atexit handler on the caller's PE alone that
  *              takes a second and then prints a line: under a launcher that
@@ -123,6 +141,7 @@ static void slow_handler(void)
 
 static void slow_handler_ran(void)
 {
+    fprintf(stderr, "PE %d: handler began\n", my_pe);
     struct timespec second = { 1, 0 };
     nanosleep(&second, NULL);
     printf("PE %d: handler ran after a second\n", my_pe);
@@ -148,7 +167,8 @@ int main(int argc, char **argv)
     my_pe = me;
     if (strcmp(mode, "handlers") == 0)
         atexit(handler_ran);
-    if (strcmp(mode, "slow-handler") == 0 && me == caller)
+    if ((strcmp(mode, "slow-handler") == 0 && me == caller) || strcmp(mode, "all-callers") == 0 ||
+        (strcmp(mode, "two-nodes") == 0 && me == (caller + 1) % npes))
         atexit(slow_handler_ran);
     /* Held for good: nothing of this program unlocks it (see the modes). */
     const char *held = getenv("OSOE_TEST_HELD_RANK");
@@ -197,13 +217,15 @@ int main(int argc, char **argv)
             }
         }
     } else {
-        int second = strcmp(mode, "two-callers") == 0 ? (caller + 1) % npes : -1;
-        if (me == caller || me == second) {
-            char second_how[16];
-            snprintf(second_how, sizeof second_how, "%d", atoi(how) + 1);
-            struct timespec settle = { 0, 200 * 1000 * 1000 };
+        int later = strcmp(mode, "two-nodes") == 0;
+        int second = strcmp(mode, "two-callers") == 0 || later ? (caller + 1) % npes : -1;
+        int every = strcmp(mode, "all-callers") == 0;
+        if (me == caller || me == second || every) {
+            char own_how[16];
+            snprintf(own_how, sizeof own_how, "%d", atoi(how) + (every ? me : 1));
+            struct timespec settle = { 0, (me == second && later ? 300 : 200) * 1000 * 1000 };
             nanosleep(&settle, NULL);           /* the others are computing by now */
-            end_the_job(me == second ? second_how : how);
+            end_the_job(every || me == second ? own_how : how);
         }
         volatile unsigned long spins = 0;
         while (seconds() < start + COMPUTE_SECONDS)
