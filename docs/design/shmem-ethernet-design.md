@@ -5644,8 +5644,13 @@ block as the spec's Example 33 and SOS read §9.10.6.
 node's PEs are compared too, unless `OSOE_CHECK_COLLECTIVES=0`; it was off until
 timed at many PEs a node (H12, 2026-10-28), nothing one round could see from 16
 to 64 PEs a node, and at 256 nothing but the barrier's 672 µs to 975, and the
-author turned it on. A PE at 0 beside PEs at the default is named by the one
-that compares.
+author turned it on. That barrier's cost is mostly a start-up cost, in
+`osoe-bench quick`'s 200 trips after 200 of warm-up (the tenth review, scale
+S2): a sync's comparer is its last arriver, whichever PE that is, and the first
+time a PE compares on a team it reads the said words in each node-mate's heap
+object, a minor fault a page, P - 1 on the barrier's path; after a thousand
+barriers the check cost one 3% in the development VM, in H12's shape. A PE at
+0 beside PEs at the default is named by the one that compares.
 Each member says its call - kind, operation, element and width, bytes where all
 must agree, a broadcast's root, an alltoall's strides, a scan's inclusiveness -
 in three spare words of its own internal region's release-counter line for the
@@ -6462,11 +6467,13 @@ setting, no word at the rendezvous and no layout version came with it. Träff's
 therefore runs on every team to 65,536 nodes, the rows the reduce-scatter's
 words hold, at every ceiling; with the rows the ceiling sized alone it had run
 only to 512 nodes at the default of 8, a team of 513 nodes or more taking a tree
-at every size, where the cost model finds Träff's faster for 1 MiB by 3.2 times
-at 513 nodes and 4.3 at 4,096 (its event simulation, which runs the trees
-faster than the closed form does at that size, 2.7 to 2.9 times at 513 and
-1,024). A lane is longer than the ceiling's only past 512 nodes at the default:
-a row of 128 KiB at the defaults on each of a PE's lanes for each doubling of
+at every size, where the cost model finds Träff's faster for 1 MiB on the Pi's
+link, at the capacity of 8, by 2.05 times at 513 nodes and 2.47 at 4,096 - its
+event simulation, which runs the trees faster than the closed form does at
+that size, by 1.19 at 513 and 1.18 at 1,024, the best tree 22.3 and 21.6 ms
+against Träff's 18.7 and 18.3 (at the capacity of 4 it was until 2026-10-28,
+by 3.2 and 4.3 times, and by the simulation 2.9 and 2.7). A lane is longer
+than the ceiling's only past 512 nodes at the default: a row of 128 KiB at the defaults on each of a PE's lanes for each doubling of
 the nodes, 2.1 MiB a PE at 1,024 nodes, 6.4 at 4,096 and 14.9 at 65,536 (a row
 of 64 KiB, and 1.1, 3.2 and 7.4, at the capacity of 4 it was until
 2026-10-28). Before
