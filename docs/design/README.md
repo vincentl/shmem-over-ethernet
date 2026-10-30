@@ -13,8 +13,8 @@ Beside the notes are six proposals, each saying at its head what became of
 it: `osoe-pacer-proposal.md`, the stress tester's, `team-resources-proposal.md`,
 the team redesign's, `progress-helpers-proposal.md`, v0.2 step 4's,
 `mesh-schedule-proposal.md`, a start-up schedule for the connection mesh,
-postponed, `blocking-get-proposal.md`, question 4's exploration of a
-blocking get a piece at a time, for the author's decision, and
+built (H23), `blocking-get-proposal.md`, question 4's exploration of a
+blocking get a piece at a time, decided and built as its (b), and
 `collect-scan-proposal.md`, P30's design and model for `collect`'s places,
 built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a

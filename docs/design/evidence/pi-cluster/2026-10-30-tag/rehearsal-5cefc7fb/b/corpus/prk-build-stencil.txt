@@ -1,0 +1,12 @@
+#########################################################################
+##### No file loop_body_star.incl -- invoking loop_gen to create it #####
+#########################################################################
+../../common/Stencil/loop_gen 2 1
+############################################################################
+##### No file loop_body_compact.incl -- invoking loop_gen to create it #####
+############################################################################
+../../common/Stencil/loop_gen 2 0
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2  -DSHMEM -DRESTRICT_KEYWORD=0 -DVERBOSE=0 -DLOOPGEN=0 -DDOUBLE=1   -DRADIUS=2 -DSTAR=1  -DSPLITFENCE=0  -I../../include -c stencil.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2  -DSHMEM -DRESTRICT_KEYWORD=0 -DVERBOSE=0 -DLOOPGEN=0 -DDOUBLE=1   -DRADIUS=2 -DSTAR=1  -DSPLITFENCE=0  -I../../include -c ../../common/wtime.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2  -DSHMEM -DRESTRICT_KEYWORD=0 -DVERBOSE=0 -DLOOPGEN=0 -DDOUBLE=1   -DRADIUS=2 -DSTAR=1  -DSPLITFENCE=0  -I../../include -c ../../common/SHMEM_bail_out.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -o stencil   -O2  -DSHMEM stencil.o wtime.o SHMEM_bail_out.o  -lm

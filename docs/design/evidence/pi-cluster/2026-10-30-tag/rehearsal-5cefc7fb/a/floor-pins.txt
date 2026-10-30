@@ -1,0 +1,17 @@
+pair 0 fastest_us floor=155.4 get=170.8 put_quiet=169.4 fetch_add=171.0 median_us floor=157.4 get=173.5 put_quiet=171.9 fetch_add=172.9 stream_mib_per_s floor=112 library=112
+pair 1 fastest_us floor=155.0 get=170.6 put_quiet=169.5 fetch_add=170.5 median_us floor=157.2 get=173.8 put_quiet=172.2 fetch_add=173.2 stream_mib_per_s floor=112 library=112
+pair 2 fastest_us floor=155.0 get=170.9 put_quiet=169.6 fetch_add=170.8 median_us floor=156.8 get=174.1 put_quiet=172.1 fetch_add=173.1 stream_mib_per_s floor=112 library=112
+pair 3 fastest_us floor=154.9 get=170.7 put_quiet=166.2 fetch_add=170.6 median_us floor=157.1 get=173.3 put_quiet=171.8 fetch_add=172.9 stream_mib_per_s floor=112 library=112
+pair 4 fastest_us floor=155.6 get=171.2 put_quiet=170.1 fetch_add=170.8 median_us floor=157.5 get=173.4 put_quiet=172.0 fetch_add=173.0 stream_mib_per_s floor=112 library=112
+pair 5 fastest_us floor=154.9 get=170.6 put_quiet=168.1 fetch_add=170.7 median_us floor=156.8 get=173.9 put_quiet=171.9 fetch_add=172.9 stream_mib_per_s floor=112 library=112
+pair 6 fastest_us floor=154.9 get=156.5 put_quiet=168.8 fetch_add=169.9 median_us floor=157.1 get=173.6 put_quiet=172.0 fetch_add=172.9 stream_mib_per_s floor=112 library=112
+ratio, the median of 7 pairs (range):
+  fastest get/floor=1.100 (1.01-1.10)
+  fastest put_quiet/floor=1.090 (1.07-1.09)
+  fastest fetch_add/floor=1.101 (1.10-1.10)
+  median put_quiet/get=0.991 (0.99-0.99)
+  median fetch_add/get=0.997 (0.99-1.00)
+  stream library/floor=0.999 (0.999-0.999)
+  reported: median get/floor=1.105 (1.10-1.11)
+  reported: median put_quiet/floor=1.095 (1.09-1.10)
+  reported: median fetch_add/floor=1.100 (1.10-1.10)

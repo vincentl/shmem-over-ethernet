@@ -1,0 +1,18 @@
+rendezvous/design/agree                                      SC  states=        344 depth= 35 (miss<7e-25) -> ok +live
+rendezvous/design/value@3                                    SC  states=        295 depth= 22 (miss<5e-25) -> ok +live
+rendezvous/design/count@3=9                                  SC  states=        165 depth= 16 (miss<2e-25) -> ok +live
+rendezvous/design/count@1=9                                  SC  states=         98 depth= 13 (miss<6e-26) -> ok +live
+rendezvous/design/count@2=3                                  SC  states=        118 depth= 19 (miss<9e-26) -> ok +live
+rendezvous/design/count@0=9                                  SC  states=         48 depth=  8 (miss<1e-26) -> ok +live
+rendezvous/design/count@0=2                                  SC  states=         48 depth=  8 (miss<1e-26) -> ok +live
+rendezvous/children_first/agree                              SC  states=        266 depth= 35 (miss<4e-25) -> ok +live
+rendezvous/children_first/value@3                            SC  states=        192 depth= 18 (miss<2e-25) -> ok +live
+rendezvous/children_first/count@3=9                          SC  states=         11 depth= 10 (miss<8e-28) -> STUCK
+    T0 blocked at pc 0 (nd)
+    trace: T3:node 3: listens ; T2:node 2: listens ; T2:node 2: has its children; closes its listener ; T2:node 2: has every report ; T1:node 1: listens ; T0:node 0: listens ; T2:node 2: calls node 0 ; T0:node 0: accepts node 2 ; T2:node 2: is node 0's child ; T2:node 2: reports to node 0
+rendezvous/no_hello_count/count@3=9                          SC  states=         19 depth= 18 (miss<2e-27) -> STUCK
+    T0 blocked at pc 0 (nd)
+    trace: T3:node 3: listens ; T2:node 2: listens ; T1:node 1: listens ; T3:node 3: calls node 1 ; T0:node 0: listens ; T2:node 2: calls node 0 ; T1:node 1: calls node 0 ; T0:node 0: accepts node 2 ; T2:node 2: is node 0's child ; T2:node 2: has its children; closes its listener ; T2:node 2: has every report ; T2:node 2: reports to node 0 ; T0:node 0: accepts node 1 ; T1:node 1: is node 0's child ; T1:node 1: accepts node 3 ; T3:node 3: is node 1's child ; T1:node 1: has its children; closes its listener ; T0:node 0: has its children; closes its listener
+rendezvous/root_checks_only/value@3                          SC  states=         30 depth= 29 (miss<6e-27) -> VIOLATION
+    AGREE: node 0 left the rendezvous while a node disagrees with it
+    trace: T3:node 3: listens ; T2:node 2: listens ; T1:node 1: listens ; T3:node 3: calls node 1 ; T0:node 0: listens ; T2:node 2: calls node 0 ; T1:node 1: calls node 0 ; T0:node 0: accepts node 2 ; T2:node 2: is node 0's child ; T2:node 2: has its children; closes its listener ; T2:node 2: has every report ; T2:node 2: reports to node 0 ; T0:node 0: accepts node 1 ; T1:node 1: is node 0's child ; T1:node 1: accepts node 3 ; T3:node 3: is node 1's child ; T3:node 3: has its children; closes its listener ; T3:node 3: has every report ; T3:node 3: reports to node 1 ; T1:node 1: has its children; closes its listener ; T1:node 1: reads node 3's report ; T1:node 1: has every report ; T1:node 1: reports to node 0 ; T0:node 0: has its children; closes its listener ; T0:node 0: reads node 1's report ; T0:node 0: reads node 2's report ; T0:node 0: has every report ; T0:node 0: builds the tables ; T0:node 0: sends the tables down and leaves ; T0: CHECK FAILED: AGREE: node 0 left the rendezvous while a node disagrees with it

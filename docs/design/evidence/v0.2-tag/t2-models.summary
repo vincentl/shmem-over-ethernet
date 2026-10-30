@@ -1,0 +1,7 @@
+2026-10-30T15:35:45Z T2 on tree-518f5a46.tar: 100% tests passed, 0 tests failed out of 6 in 13 min
+Test #1029: model.dirty_set ..................   Passed  370.58 sec
+Test #1031: model.watch_list .................   Passed   31.64 sec
+Test #1032: model.landing_extent .............   Passed    3.94 sec
+Test #1033: model.copy_out_claim .............   Passed   18.80 sec
+Test #1034: model.pe_quiet ...................   Passed   59.94 sec
+Test #1030: model.get_completion .............   Passed  827.61 sec

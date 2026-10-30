@@ -1,0 +1,35 @@
+arrival/design members=1 epochs=2                            SC  states=        182 depth= 30 (miss<2e-25) -> ok +live
+arrival/design members=2 epochs=2                            SC  states=        239 depth= 34 (miss<4e-25) -> ok +live
+arrival/design members=3 epochs=2                            SC  states=        315 depth= 38 (miss<6e-25) -> ok +live
+arrival/design members=2 epochs=3                            SC  states=        422 depth= 51 (miss<1e-24) -> ok +live
+arrival/design members=2 epochs=2                            TSO states=        250 depth= 36 (miss<4e-25) -> ok +live
+arrival/design members=3 epochs=2                            TSO states=        326 depth= 40 (miss<7e-25) -> ok +live
+arrival/wake_after members=2 epochs=1                        SC  states=         43 depth= 17 (miss<1e-26) -> STUCK
+    T0 blocked at pc 8 (await)
+    trace: T2:load ('handoff',)->0 ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T2:load ('wake',)->1 ; T0:futex_wake ('wake',) ; T2:futex_wait ('wake',) SLEEP
+arrival/wake_after members=2 epochs=2                        SC  states=         66 depth= 34 (miss<3e-26) -> STUCK
+    T0 blocked at pc 17 (await)
+    trace: T2:load ('handoff',)->0 ; T2:load ('wake',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T2:load ('handoff',)->1 ; T2:load ('wake',)->1 ; T2:check ok ; T2:ghost ('$consumed',)=1 + add ('forwarded',)->1 ; T3:await ok ; T3:add ('released',)->1 ; T2:load ('handoff',)->1 ; T0:await ok ; T1:add ('arrived',)->3 ; T0:await ok ; T0:add ('arrived',)->4 ; T0:check ok ; T0:ghost ('$posted',)=2 + store ('handoff',)=2 ; T0:add ('wake',)->2 ; T2:load ('wake',)->2 ; T0:futex_wake ('wake',) ; T2:futex_wait ('wake',) SLEEP
+arrival/wake_after members=3 epochs=2                        SC  states=         79 depth= 38 (miss<4e-26) -> STUCK
+    T0 blocked at pc 17 (await)
+    trace: T3:load ('handoff',)->0 ; T3:load ('wake',)->0 ; T3:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:add ('arrived',)->3 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T3:load ('handoff',)->1 ; T3:load ('wake',)->1 ; T3:check ok ; T3:ghost ('$consumed',)=1 + add ('forwarded',)->1 ; T4:await ok ; T4:add ('released',)->1 ; T3:load ('handoff',)->1 ; T0:await ok ; T2:add ('arrived',)->4 ; T0:await ok ; T1:add ('arrived',)->5 ; T0:await ok ; T0:add ('arrived',)->6 ; T0:check ok ; T0:ghost ('$posted',)=2 + store ('handoff',)=2 ; T0:add ('wake',)->2 ; T3:load ('wake',)->2 ; T0:futex_wake ('wake',) ; T3:futex_wait ('wake',) SLEEP
+arrival/nowake members=2 epochs=1                            SC  states=          8 depth=  7 (miss<4e-28) -> STUCK
+    T0 blocked at pc 7 (await)
+    trace: T2:load ('wake',)->0 ; T2:load ('handoff',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1
+arrival/nowake members=2 epochs=2                            SC  states=          8 depth=  7 (miss<4e-28) -> STUCK
+    T0 blocked at pc 7 (await)
+    trace: T2:load ('wake',)->0 ; T2:load ('handoff',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1
+arrival/consume_reread members=2 epochs=1                    SC  states=         87 depth= 18 (miss<5e-26) -> ok +live
+arrival/consume_reread members=2 epochs=2                    SC  states=        115 depth= 36 (miss<8e-26) -> VIOLATION
+    OVERWRITE: epoch 2 posted over epoch 1, which the lead has not consumed: one word per team is not enough
+    trace: T2:load ('wake',)->0 ; T2:load ('handoff',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T2:load ('wake',)->1 ; T2:load ('handoff',)->1 ; T2:check ok ; T2:add ('forwarded',)->1 ; T3:await ok ; T3:add ('released',)->1 ; T0:await ok ; T1:add ('arrived',)->3 ; T0:await ok ; T0:add ('arrived',)->4 ; T0: CHECK FAILED: OVERWRITE: epoch 2 posted over epoch 1, which the lead has not consumed: one word per team is not enough
+arrival/consume_reread members=3 epochs=2                    SC  states=        144 depth= 40 (miss<1e-25) -> VIOLATION
+    OVERWRITE: epoch 2 posted over epoch 1, which the lead has not consumed: one word per team is not enough
+    trace: T3:load ('wake',)->0 ; T3:load ('handoff',)->0 ; T3:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:add ('arrived',)->3 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T3:load ('wake',)->1 ; T3:load ('handoff',)->1 ; T3:check ok ; T3:add ('forwarded',)->1 ; T4:await ok ; T4:add ('released',)->1 ; T0:await ok ; T2:add ('arrived',)->4 ; T0:await ok ; T1:add ('arrived',)->5 ; T0:await ok ; T0:add ('arrived',)->6 ; T0: CHECK FAILED: OVERWRITE: epoch 2 posted over epoch 1, which the lead has not consumed: one word per team is not enough
+arrival/noconsume members=2 epochs=1                         SC  states=         65 depth= 17 (miss<3e-26) -> ok +live
+arrival/noconsume members=2 epochs=2                         SC  states=         18 depth= 17 (miss<2e-27) -> VIOLATION
+    ORDER: epoch 1 forwarded after 1: an arrival was repeated
+    trace: T2:load ('wake',)->0 ; T2:load ('handoff',)->0 ; T2:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T2:load ('wake',)->1 ; T2:load ('handoff',)->1 ; T2:check ok ; T2:ghost ('$consumed',)=1 + add ('forwarded',)->1 ; T3:await ok ; T3:add ('released',)->1 ; T2:load ('wake',)->1 ; T2:load ('handoff',)->1 ; T2: CHECK FAILED: ORDER: epoch 1 forwarded after 1: an arrival was repeated
+arrival/noconsume members=3 epochs=2                         SC  states=         19 depth= 18 (miss<2e-27) -> VIOLATION
+    ORDER: epoch 1 forwarded after 1: an arrival was repeated
+    trace: T3:load ('wake',)->0 ; T3:load ('handoff',)->0 ; T3:futex_wait ('wake',) SLEEP ; T0:add ('arrived',)->1 ; T0:add ('arrived',)->2 ; T0:add ('arrived',)->3 ; T0:check ok ; T0:ghost ('$posted',)=1 + store ('handoff',)=1 ; T0:add ('wake',)->1 ; T0:futex_wake ('wake',) ; T3:load ('wake',)->1 ; T3:load ('handoff',)->1 ; T3:check ok ; T3:ghost ('$consumed',)=1 + add ('forwarded',)->1 ; T4:await ok ; T4:add ('released',)->1 ; T3:load ('wake',)->1 ; T3:load ('handoff',)->1 ; T3: CHECK FAILED: ORDER: epoch 1 forwarded after 1: an arrival was repeated

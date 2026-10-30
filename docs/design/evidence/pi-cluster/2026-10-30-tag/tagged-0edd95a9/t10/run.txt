@@ -1,0 +1,10 @@
+start 15:44:08
+e-band: 0
+osu: 0
+band-4x4-link-1: 0
+band-4x1-link-1: 0
+osu-reduce-4x1-link-1: 0
+osu-reduce-4x4-link-1: 0
+osu-broadcast-4x4-link-1: 0
+band-4x4-tree-1: 0
+band-4x1-tree-1: 0

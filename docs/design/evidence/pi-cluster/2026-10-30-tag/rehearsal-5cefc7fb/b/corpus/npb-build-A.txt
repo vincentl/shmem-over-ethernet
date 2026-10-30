@@ -1,0 +1,23 @@
+   =========================================
+   =      NAS Parallel Benchmarks 3.2      =
+   =              OpenSHMEM/C              =
+   =========================================
+
+cd IS; make NPROCS=16 CLASS=A
+make[1]: Entering directory '/home/pi/osoe/build/corpus/npb/IS'
+make[2]: Entering directory '/home/pi/osoe/build/corpus/npb/sys'
+cc -g  -o setparams setparams.c
+setparams.c: In function ‘check_info’:
+setparams.c:270:31: warning: multi-character character constant [-Wmultichar]
+  270 |   if (class == 'D' && type == 'IS') {
+      |                               ^~~~
+make[2]: Leaving directory '/home/pi/osoe/build/corpus/npb/sys'
+../sys/setparams is 16 A 
+/home/pi/osoe/build/release/tools/wrapper/oshcc  -c -I/home/pi/osoe/build/corpus/npb/stub  -O2 -g -fpermissive is.c
+is.c:894:1: warning: return type defaults to ‘int’ [-Wimplicit-int]
+  894 | main( argc, argv )
+      | ^~~~
+cd ../common; /home/pi/osoe/build/release/tools/wrapper/oshcc  -c -I/home/pi/osoe/build/corpus/npb/stub  -O2 -g -fpermissive c_print_results.c
+cd ../common; /home/pi/osoe/build/release/tools/wrapper/oshcc  -c -I/home/pi/osoe/build/corpus/npb/stub  -O2 -g -fpermissive c_timers.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -g -o ../bin/is.A.16 is.o ../common/c_print_results.o ../common/c_timers.o 
+make[1]: Leaving directory '/home/pi/osoe/build/corpus/npb/IS'

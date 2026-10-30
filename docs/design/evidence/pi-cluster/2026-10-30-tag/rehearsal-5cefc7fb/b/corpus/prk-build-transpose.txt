@@ -1,0 +1,4 @@
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2  -DSHMEM -DVERBOSE=0  -DBARRIER_SYNCH=0  -I../../include -c transpose.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2  -DSHMEM -DVERBOSE=0  -DBARRIER_SYNCH=0  -I../../include -c ../../common/wtime.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2  -DSHMEM -DVERBOSE=0  -DBARRIER_SYNCH=0  -I../../include -c ../../common/SHMEM_bail_out.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -o transpose   -O2  -DSHMEM transpose.o wtime.o SHMEM_bail_out.o  -lm

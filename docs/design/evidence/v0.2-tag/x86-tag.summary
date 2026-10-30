@@ -1,0 +1,14 @@
+== 2026-10-30T18:28:27Z x86-tag on Debian GNU/Linux 13 (trixie), 6.12.111+deb13-cloud-arm64, x86_64-linux-gnu-gcc (Debian 14.2.0-19) 14.2.0
+single-node built: 0 warnings; ELF 64-bit LSB shared object, x86-64
+full built: 0 warnings; Checking for module 'liburing>=2.6'
+single-node under Rosetta: 99% tests passed, 7 tests failed out of 585; real	1m19.814s
+	165 - shmem.no-io-uring.one-node (Failed)               tier2
+	168 - shmem.refuse.no-futex (Failed)                    tier2
+	169 - env.probe.no-futex (Failed)                       env
+	170 - shmem.refuse.no-shared-futex (Failed)             tier2
+	428 - shmem.dead-pe.no-pidfd.sibling.L4 (Failed)        tier2
+	429 - shmem.dead-pe.no-pidfd.lead.L4 (Failed)           tier2
+	624 - tools.pacer.installed.one-node (Failed)           tier2
+single-node's failures again, one at a time: 0% tests passed, 7 tests failed out of 7
+-- 18:58:07 the full build's first run stalled Rosetta's daemon (342 failed or timed out by test 429 of 581); the VM restarted; again, load 0.07 0.02 0.00
+-- 19:27:56 the second run stalled the daemon too (358 failed or timed out by test 461 of 581); the VM restarted; one at a time, load 0.44 0.10 0.03

@@ -1,0 +1,4 @@
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2 -DSHMEM   -DSYNCHRONOUS=0 -DVERBOSE=0 -DRESTRICT_KEYWORD=0  -I../../include -c p2p.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2 -DSHMEM   -DSYNCHRONOUS=0 -DVERBOSE=0 -DRESTRICT_KEYWORD=0  -I../../include -c ../../common/wtime.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -O2 -DSHMEM   -DSYNCHRONOUS=0 -DVERBOSE=0 -DRESTRICT_KEYWORD=0  -I../../include -c ../../common/SHMEM_bail_out.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=gnu11 -o p2p   -O2 -DSHMEM p2p.o wtime.o SHMEM_bail_out.o  -lm

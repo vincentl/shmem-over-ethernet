@@ -1,0 +1,29 @@
+lock/design pes=2 rounds=2 testers=0                         SC  states=        497 depth= 40 (miss<2e-24) -> ok +live
+lock/design pes=3 rounds=1 testers=0                         SC  states=      1,077 depth= 36 (miss<7e-24) -> ok +live
+lock/design pes=3 rounds=2 testers=0                         SC  states=     14,561 depth= 63 (miss<1e-21) -> ok +live
+lock/design pes=3 rounds=2 testers=1                         SC  states=      6,945 depth= 63 (miss<3e-22) -> ok +live
+lock/design pes=4 rounds=1 testers=1                         SC  states=      6,681 depth= 50 (miss<3e-22) -> ok +live
+lock/reset_late pes=3 rounds=1 testers=0                     SC  states=         68 depth= 30 (miss<3e-26) -> STUCK
+    T0 blocked at pc 8 (await)
+    trace: T2:swap ; T2:store ('node', 2)=0 ; T2:ghost ('$in',)=1 ; T2:check ok ; T2:check ok ; T2:ghost ('$in',)=0,('$queue',)=() ; T2:load ('node', 2)->0 ; T2:cas ('tail',) 3->0 True ; T1:swap ; T0:swap ; T0:store ('node', 0)=0 ; T0:or ('node', 1) 0->1 ; T1:store ('node', 1)=0 ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=(0,) ; T1:load ('node', 1)->0 ; T1:cas ('tail',) 2->0 False
+lock/no_wait_next pes=3 rounds=1 testers=0                   SC  states=         29 depth= 24 (miss<5e-27) -> STUCK
+    T0 blocked at pc 9 (await)
+    trace: T2:store ('node', 2)=0 ; T2:swap ; T2:ghost ('$in',)=1 ; T2:check ok ; T2:check ok ; T2:ghost ('$in',)=0,('$queue',)=() ; T2:load ('node', 2)->0 ; T2:cas ('tail',) 3->0 True ; T1:store ('node', 1)=0 ; T1:swap ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=() ; T1:load ('node', 1)->0 ; T0:store ('node', 0)=0 ; T0:swap ; T1:cas ('tail',) 2->0 False ; T0:or ('node', 1) 0->1
+lock/store_clear pes=3 rounds=2 testers=0                    SC  states=        148 depth= 56 (miss<1e-25) -> STUCK
+    T0 blocked at pc 9 (await)
+    trace: T2:store ('node', 2)=0 ; T2:swap ; T2:ghost ('$in',)=1 ; T2:check ok ; T2:check ok ; T2:ghost ('$in',)=0,('$queue',)=() ; T2:load ('node', 2)->0 ; T2:cas ('tail',) 3->0 True ; T2:store ('node', 2)=0 ; T2:swap ; T2:ghost ('$in',)=1 ; T2:check ok ; T2:check ok ; T2:ghost ('$in',)=0,('$queue',)=() ; T2:load ('node', 2)->0 ; T2:cas ('tail',) 3->0 True ; T1:store ('node', 1)=0 ; T1:swap ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=() ; T1:load ('node', 1)->0 ; T1:cas ('tail',) 2->0 True ; T1:store ('node', 1)=0 ; T0:store ('node', 0)=0 ; T0:swap ; T1:swap ; T1:or ('node', 0) 0->2 ; T0:ghost ('$in',)=1 ; T0:check ok ; T0:check ok ; T0:ghost ('$in',)=0,('$queue',)=(1,) ; T0:load ('node', 0)->2 ; T0:or ('node', 1) 0->256 ; T1:await ok ; T0:store ('node', 0)=0 ; T0:swap ; T0:or ('node', 1) 256->257 ; T1:store ('node', 1)=0 ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=(0,) ; T1:load ('node', 1)->0 ; T1:cas ('tail',) 2->0 False
+lock/test_swaps pes=3 rounds=1 testers=1                     SC  states=        381 depth= 36 (miss<9e-25) -> STUCK
+    T0 blocked at pc 9 (await)
+    trace: T2:store ('node', 2)=0 ; T1:store ('node', 1)=0 ; T1:swap ; T2:swap ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=() ; T1:load ('node', 1)->0 ; T1:cas ('tail',) 2->0 False ; T0:store ('node', 0)=0 ; T0:swap ; T0:or ('node', 2) 0->1
+lock/no_link pes=2 rounds=1 testers=0                        SC  states=         20 depth= 16 (miss<3e-27) -> STUCK
+    T0 blocked at pc 9 (await)
+    trace: T1:store ('node', 1)=0 ; T1:swap ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=() ; T1:load ('node', 1)->0 ; T0:store ('node', 0)=0 ; T0:swap ; T1:cas ('tail',) 2->0 False
+lock/grant_tail pes=3 rounds=1 testers=0                     SC  states=        185 depth= 38 (miss<2e-25) -> VIOLATION
+    P2: PE 0 entered out of turn: queue (1, 0)
+    trace: T2:store ('node', 2)=0 ; T2:swap ; T2:ghost ('$in',)=1 ; T2:check ok ; T2:check ok ; T2:ghost ('$in',)=0,('$queue',)=() ; T2:load ('node', 2)->0 ; T1:store ('node', 1)=0 ; T1:swap ; T2:cas ('tail',) 3->0 False ; T1:or ('node', 2) 0->2 ; T2:woke ; T2:check ok ; T0:store ('node', 0)=0 ; T0:swap ; T2:load ('tail',)->1 ; T2:or ('node', 0) 0->256 ; T0:or ('node', 1) 0->1 ; T0:await ok ; T0:andn ('node', 0) 256->0 ; T0:ghost ('$in',)=1 ; T0:check ok ; T0: CHECK FAILED: P2: PE 0 entered out of turn: queue (1, 0)
+lock/enter_early pes=2 rounds=1 testers=0                    SC  states=         91 depth= 21 (miss<5e-26) -> VIOLATION
+    P1: two PEs in the critical region
+    trace: T1:store ('node', 1)=0 ; T1:swap ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T0:store ('node', 0)=0 ; T0:swap ; T0:or ('node', 1) 0->1 ; T0:andn ('node', 0) 0->0 ; T0:ghost ('$in',)=2 ; T0: CHECK FAILED: P1: two PEs in the critical region
+lock/no_andn pes=3 rounds=1 testers=0                        SC  states=        129 depth= 29 (miss<1e-25) -> VIOLATION
+    SUCCESSOR: a release woke to node 0x100, with no successor
+    trace: T2:store ('node', 2)=0 ; T2:swap ; T2:ghost ('$in',)=1 ; T2:check ok ; T2:check ok ; T2:ghost ('$in',)=0,('$queue',)=() ; T2:load ('node', 2)->0 ; T1:store ('node', 1)=0 ; T1:swap ; T2:cas ('tail',) 3->0 False ; T1:or ('node', 2) 0->2 ; T2:woke ; T2:check ok ; T2:or ('node', 1) 0->256 ; T1:await ok ; T1:ghost ('$in',)=1 ; T1:check ok ; T1:check ok ; T1:ghost ('$in',)=0,('$queue',)=() ; T1:load ('node', 1)->256 ; T0:store ('node', 0)=0 ; T0:swap ; T1:cas ('tail',) 2->0 False ; T1:woke ; T1: CHECK FAILED: SUCCESSOR: a release woke to node 0x100, with no successor

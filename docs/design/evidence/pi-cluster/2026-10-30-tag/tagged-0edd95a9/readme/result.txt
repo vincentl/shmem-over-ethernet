@@ -1,0 +1,17 @@
+host: pi-login Debian GNU/Linux 13 (trixie) aarch64 6.18.50+rpt-rpi-2712; Raspberry Pi 5 Model B Rev 1.0; memory 8062 MiB, /dev/shm 4032 MiB free
+ring.c: 20 lines, from the README
+quick start build: 0 in 119 s, 0 warnings
+version: osoe-launch (osoe) 0.2.0
+ring built: 0
+ring, four PEs: 0, the 4 lines right
+ring, two logical nodes: 0, the 4 lines right
+probe: 0 13 ok, 6 other lines
+install: 0 oshcc osoe-launch osoe-pacer osoe-stat 
+installed oshcc: 0
+ring under srun -K1 --cpu-bind=none -N2 --ntasks-per-node=4: 0, the 8 lines right
+probe on every node (Getting started, step 2): 0 52 ok, 24 other lines
+the job path, srun -K1 --cpu-bind=none -N4 --ntasks-per-node=4 osoe-pacer --quick (step 4): 0 osoe-pacer failures=0 seconds=7.2
+batch script: 0, the 16 lines right
+osoe-stat --summary 2478 through srun --jobid=2478 --overlap -N4 --ntasks-per-node=1: 0, lines of 4 nodes, 31 lines
+the job it read: osoe-pacer failures=0 seconds=60.7
+DONE

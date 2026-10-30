@@ -1,0 +1,20 @@
+start 10:24:56
+pacer-default: 0 osoe-pacer failures=0 seconds=3037.5
+pacer-accumulate: 0 osoe-pacer failures=0 seconds=604.9
+pacer-pull: 0 osoe-pacer failures=0 seconds=600.2
+pacer-no-ptr: 0 osoe-pacer failures=0 seconds=599.5
+pacer-mailbox: 0 osoe-pacer failures=0 seconds=600.1
+pacer-teams: 0 osoe-pacer failures=0 seconds=600.1
+pacer-atomics: 0 osoe-pacer failures=0 seconds=600.0
+pacer-rma: 0 osoe-pacer failures=0 seconds=600.0
+pacer-locks: 0 osoe-pacer failures=0 seconds=600.0
+pacer-memory: 0 osoe-pacer failures=0 seconds=610.0
+pacer-collectives: 0 osoe-pacer failures=0 seconds=616.7
+pacer-waits: 0 osoe-pacer failures=0 seconds=300.0
+pacer-deprecated: 0 osoe-pacer failures=0 seconds=300.0
+pacer-start-pes: 0 start-pes failures=0
+pacer-teams-exhaust: 0 osoe-pacer failures=0 seconds=0.2
+coverage-run: 0 osoe-pacer failures=0 seconds=355.0
+coverage-mix-run: 0 osoe-pacer failures=0 seconds=122.4
+coverage-start-pes-run: 0 start-pes failures=0
+end 13:16:09

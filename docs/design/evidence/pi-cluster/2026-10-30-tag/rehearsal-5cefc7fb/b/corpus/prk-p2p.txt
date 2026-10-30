@@ -1,0 +1,8 @@
+Parallel Research Kernels version 2.17
+SHMEM pipeline execution on 2D grid
+Number of ranks            = 16
+Grid sizes                 = 2000, 2000
+Number of iterations       = 10
+No handshake between neighbor threads
+Solution validates
+Rate (MFlops/s): 690.417740 Avg time (s): 0.011576

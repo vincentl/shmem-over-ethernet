@@ -1,0 +1,77 @@
+    .. abort/goodbye [0:1]: 155,648 states, 10,280/s, stack 27, depth 19 (max 47), largest ('$q', 1, 0, 0)=41, 15s
+abort/goodbye [0:1]                                          SC  states=    246,112 depth= 47 (miss<4e-19) -> ok +live
+    .. abort/goodbye [1:1]: 139,264 states, 9,096/s, stack 39, depth 20 (max 47), largest ('$q', 0, 1, 0)=41, 15s
+abort/goodbye [1:1]                                          SC  states=    223,290 depth= 47 (miss<3e-19) -> ok +live
+    .. abort/goodbye [0:1,2:2]: 172,032 states, 11,275/s, stack 25, depth 16 (max 47), largest ('$q', 1, 0, 0)=41, 15s
+abort/goodbye [0:1,2:2]                                      SC  states=    339,416 depth= 47 (miss<7e-19) -> ok +live
+    .. abort/goodbye [2:3]: 425,984 states, 28,347/s, stack 55, depth 28 (max 39), largest ('$q', 2, 1, 0)=43, 15s
+    .. abort/goodbye [2:3]: 794,624 states, 26,393/s, stack 45, depth 21 (max 39), largest ('$q', 0, 1, 0)=43, 30s
+    .. abort/goodbye [2:3]: 1,138,688 states, 25,169/s, stack 75, depth 36 (max 41), largest ('$q', 0, 1, 1)=32, 45s
+    .. abort/goodbye [2:3]: 1,417,216 states, 23,459/s, stack 54, depth 31 (max 41), largest ('$q', 1, 2, 0)=43, 60s
+    .. abort/goodbye [2:3]: 1,679,360 states, 22,233/s, stack 72, depth 31 (max 41), largest ('$q', 0, 2, 0)=43, 76s
+    .. abort/goodbye [2:3]: 1,933,312 states, 21,294/s, stack 78, depth 36 (max 42), largest ('$q', 0, 2, 0)=32, 91s
+    .. abort/goodbye [2:3]: 2,220,032 states, 20,978/s, stack 69, depth 33 (max 43), largest ('$q', 1, 0, 0)=32, 106s
+    .. abort/goodbye [2:3]: 2,506,752 states, 20,706/s, stack 66, depth 32 (max 43), largest ('$q', 1, 0, 0)=32, 121s
+    .. abort/goodbye [2:3]: 2,842,624 states, 20,880/s, stack 68, depth 28 (max 43), largest ('$q', 0, 1, 0)=43, 136s
+    .. abort/goodbye [2:3]: 3,203,072 states, 21,170/s, stack 66, depth 32 (max 43), largest ('$q', 1, 0, 1)=32, 151s
+    .. abort/goodbye [2:3]: 3,596,288 states, 21,612/s, stack 55, depth 29 (max 43), largest ('$q', 0, 2, 1)=32, 166s
+    .. abort/goodbye [2:3]: 3,948,544 states, 21,704/s, stack 54, depth 27 (max 43), largest ('$q', 1, 0, 1)=32, 182s
+    .. abort/goodbye [2:3]: 4,136,960 states, 20,958/s, stack 62, depth 32 (max 47), largest ('$q', 0, 1, 0)=32, 197s
+    .. abort/goodbye [2:3]: 4,284,416 states, 20,152/s, stack 76, depth 35 (max 47), largest ('$q', 0, 2, 0)=43, 213s
+    .. abort/goodbye [2:3]: 4,530,176 states, 19,888/s, stack 73, depth 38 (max 47), largest ('$q', 1, 0, 0)=32, 228s
+    .. abort/goodbye [2:3]: 4,743,168 states, 19,518/s, stack 63, depth 36 (max 47), largest ('$q', 0, 1, 1)=32, 243s
+    .. abort/goodbye [2:3]: 4,947,968 states, 19,147/s, stack 56, depth 30 (max 47), largest ('$q', 2, 1, 1)=32, 258s
+    .. abort/goodbye [2:3]: 5,160,960 states, 18,826/s, stack 65, depth 33 (max 47), largest ('$q', 0, 1, 0)=32, 274s
+    .. abort/goodbye [2:3]: 5,341,184 states, 18,460/s, stack 61, depth 30 (max 47), largest ('$q', 0, 1, 1)=32, 289s
+    .. abort/goodbye [2:3]: 5,652,480 states, 18,552/s, stack 60, depth 33 (max 47), largest ('$q', 0, 1, 0)=32, 305s
+    .. abort/goodbye [2:3]: 5,971,968 states, 18,667/s, stack 57, depth 34 (max 47), largest ('$q', 2, 1, 0)=24, 320s
+    .. abort/goodbye [2:3]: 6,299,648 states, 18,807/s, stack 64, depth 35 (max 47), largest ('$q', 1, 2, 0)=43, 335s
+    .. abort/goodbye [2:3]: 6,586,368 states, 18,817/s, stack 61, depth 33 (max 47), largest ('$q', 2, 0, 0)=32, 350s
+    .. abort/goodbye [2:3]: 6,864,896 states, 18,806/s, stack 56, depth 31 (max 47), largest ('$q', 1, 2, 0)=43, 365s
+    .. abort/goodbye [2:3]: 7,200,768 states, 18,937/s, stack 71, depth 31 (max 47), largest ('$q', 0, 1, 1)=32, 380s
+    .. abort/goodbye [2:3]: 7,544,832 states, 19,081/s, stack 64, depth 33 (max 47), largest ('$q', 0, 2, 0)=43, 395s
+    .. abort/goodbye [2:3]: 7,962,624 states, 19,398/s, stack 50, depth 30 (max 47), largest ('$q', 0, 1, 0)=24, 410s
+    .. abort/goodbye [2:3]: 8,380,416 states, 19,685/s, stack 55, depth 34 (max 47), largest ('$q', 1, 0, 0)=43, 426s
+    .. abort/goodbye [2:3]: 8,708,096 states, 19,745/s, stack 59, depth 31 (max 47), largest ('$q', 2, 1, 0)=43, 441s
+    .. abort/goodbye [2:3]: 9,125,888 states, 20,011/s, stack 71, depth 33 (max 47), largest ('$q', 0, 1, 0)=32, 456s
+    .. abort/goodbye [2:3]: 9,535,488 states, 20,233/s, stack 34, depth 22 (max 47), largest ('$q', 1, 2, 0)=43, 471s
+    .. abort/goodbye [2:3]: 9,953,280 states, 20,460/s, stack 68, depth 34 (max 47), largest ('$q', 0, 1, 1)=32, 486s
+    .. abort/goodbye [2:3]: 10,412,032 states, 20,756/s, stack 66, depth 33 (max 47), largest ('$q', 0, 1, 0)=32, 502s
+    .. abort/goodbye [2:3]: 10,813,440 states, 20,923/s, stack 74, depth 37 (max 47), largest ('$q', 0, 1, 1)=32, 517s
+    .. abort/goodbye [2:3]: 11,280,384 states, 21,204/s, stack 43, depth 27 (max 47), largest ('$q', 2, 1, 0)=43, 532s
+    .. abort/goodbye [2:3]: 11,681,792 states, 21,346/s, stack 35, depth 24 (max 47), largest ('$q', 0, 2, 0)=43, 547s
+abort/goodbye [2:3]                                          SC  states= 11,810,055 depth= 47 (miss<9e-16) -> ok +live
+    .. abort/goodbye [1:crash]: 237,568 states, 15,243/s, stack 66, depth 30 (max 47), largest ('$q', 1, 2, 1)=32, 16s
+    .. abort/goodbye [1:crash]: 507,904 states, 16,537/s, stack 56, depth 29 (max 47), largest ('$q', 2, 0, 0)=32, 31s
+    .. abort/goodbye [1:crash]: 802,816 states, 17,541/s, stack 61, depth 29 (max 47), largest ('$q', 0, 1, 0)=32, 46s
+    .. abort/goodbye [1:crash]: 1,187,840 states, 19,531/s, stack 59, depth 30 (max 47), largest ('$q', 2, 1, 1)=32, 61s
+    .. abort/goodbye [1:crash]: 1,441,792 states, 18,959/s, stack 59, depth 29 (max 47), largest ('$q', 0, 1, 0)=32, 76s
+    .. abort/goodbye [1:crash]: 1,679,360 states, 18,429/s, stack 52, depth 28 (max 47), largest ('$q', 0, 1, 0)=32, 91s
+    .. abort/goodbye [1:crash]: 1,990,656 states, 18,679/s, stack 51, depth 29 (max 47), largest ('$q', 2, 1, 0)=43, 107s
+    .. abort/goodbye [1:crash]: 2,318,336 states, 19,023/s, stack 38, depth 24 (max 47), largest ('$q', 0, 1, 0)=32, 122s
+abort/goodbye [1:crash]                                      SC  states=  2,337,232 depth= 47 (miss<3e-17) -> ok +live
+abort/tree [0:1]                                             SC  states=     87,648 depth= 47 (miss<5e-20) -> VIOLATION
+    STATUS: node 2's processes exited with the failure status, where every abort was a global exit with a status of its own
+    trace: T2:node 2: members arrive ; T2:node 2 -> 1: ARRIVE ; T1:node 1 <- 2: ARRIVE ; T1:node 1: members arrive ; T1:node 1 -> 0: ARRIVE ; T0:node 0 <- 1: ARRIVE ; T0:node 0: starts an abort, status 1 ; T0:node 0 -> 1: ABORT(1) ; T1:node 1 <- 0: ABORT(1) ; T1:node 1 -> 2: ABORT(1) ; T1:node 1: its processes exit, status 1 ; T1:node 1: ended ; T0:node 0 <- 1: FIN ; T0:node 0: its processes exit, status 1 ; T2:node 2 <- 0: FIN ; T2:node 2 <- 1: ABORT(1) ; T2:node 2 <- 1: FIN ; T2:node 2 -> 1: ABORT(3) ; T2:node 2: its processes exit, status 3 ; T2: CHECK FAILED: STATUS: node 2's processes exited with the failure status, where every abort was a global exit with a status of its own
+abort/exit_first [0:1]                                       SC  states=     87,270 depth= 47 (miss<5e-20) -> VIOLATION
+    STATUS: node 2's processes exited with the failure status, where every abort was a global exit with a status of its own
+    trace: T2:node 2: members arrive ; T2:node 2 -> 1: ARRIVE ; T1:node 1 <- 2: ARRIVE ; T1:node 1: members arrive ; T1:node 1 -> 0: ARRIVE ; T0:node 0 <- 1: ARRIVE ; T0:node 0: starts an abort, status 1 ; T0:node 0: its processes exit, status 1 ; T2:node 2 <- 0: FIN ; T2:node 2: its processes exit, status 3 ; T2: CHECK FAILED: STATUS: node 2's processes exited with the failure status, where every abort was a global exit with a status of its own
+    .. abort/closing_drops [0:1]: 188,416 states, 12,537/s, stack 17, depth 12 (max 47), largest ('$q', 1, 0, 0)=41, 15s
+abort/closing_drops [0:1]                                    SC  states=    246,112 depth= 47 (miss<4e-19) -> ok +live
+abort/resend [0:1]                                           SC  states=     87,271 depth= 47 (miss<5e-20) -> VIOLATION
+    ONCE: node 2 sent node 1 a second ABORT
+    trace: T2:node 2: members arrive ; T2:node 2 -> 1: ARRIVE ; T1:node 1 <- 2: ARRIVE ; T1:node 1: members arrive ; T1:node 1 -> 0: ARRIVE ; T0:node 0 <- 1: ARRIVE ; T0:node 0: starts an abort, status 1 ; T0:node 0 -> 2: ABORT(1) ; T2:node 2 <- 0: ABORT(1) ; T2:node 2 -> 1: ABORT(1) ; T2:node 2 -> 1: ABORT(1) ; T2: CHECK FAILED: ONCE: node 2 sent node 1 a second ABORT
+    .. abort/no_abort [1:crash]: 221,184 states, 14,621/s, stack 64, depth 24 (max 47), largest ('$q', 2, 0, 0)=32, 15s
+    .. abort/no_abort [1:crash]: 466,944 states, 15,385/s, stack 64, depth 31 (max 47), largest ('$q', 2, 0, 0)=32, 30s
+    .. abort/no_abort [1:crash]: 704,512 states, 15,384/s, stack 80, depth 30 (max 47), largest ('$q', 2, 1, 1)=32, 46s
+    .. abort/no_abort [1:crash]: 974,848 states, 15,965/s, stack 69, depth 34 (max 47), largest ('$q', 0, 1, 0)=32, 61s
+    .. abort/no_abort [1:crash]: 1,179,648 states, 15,460/s, stack 59, depth 35 (max 47), largest ('$q', 2, 1, 0)=24, 76s
+    .. abort/no_abort [1:crash]: 1,433,600 states, 15,615/s, stack 51, depth 24 (max 47), largest ('$q', 1, 0, 1)=32, 92s
+    .. abort/no_abort [1:crash]: 1,662,976 states, 15,547/s, stack 34, depth 23 (max 47), largest ('$q', 0, 1, 0)=32, 107s
+abort/no_abort [1:crash]                                     SC  states=  1,725,010 depth= 47 (miss<2e-17) -> ok +live
+abort/no_abort [0:1]                                         SC  states=     87,270 depth= 47 (miss<5e-20) -> VIOLATION
+    STATUS: node 2's processes exited with the failure status, where every abort was a global exit with a status of its own
+    trace: T2:node 2: members arrive ; T2:node 2 -> 1: ARRIVE ; T1:node 1 <- 2: ARRIVE ; T1:node 1: members arrive ; T1:node 1 -> 0: ARRIVE ; T0:node 0 <- 1: ARRIVE ; T0:node 0: starts an abort, status 1 ; T0:node 0: its processes exit, status 1 ; T2:node 2 <- 0: FIN ; T2:node 2: its processes exit, status 3 ; T2: CHECK FAILED: STATUS: node 2's processes exited with the failure status, where every abort was a global exit with a status of its own
+abort/send_error_ends [0:1]                                  SC  states=    116,485 depth= 47 (miss<9e-20) -> VIOLATION
+    STATUS: node 1's processes exited with the failure status, where every abort was a global exit with a status of its own
+    trace: T2:node 2: members arrive ; T2:node 2 -> 1: ARRIVE ; T1:node 1 <- 2: ARRIVE ; T1:node 1: members arrive ; T1:node 1 -> 0: ARRIVE ; T0:node 0: starts an abort, status 1 ; T0:node 0 -> 2: ABORT(1) ; T2:node 2 <- 0: ABORT(1) ; T2:node 2 -> 1: ABORT(1) ; T2:node 2 -> 0: ABORT(1) ; T2:node 2: its processes exit, status 1 ; T2:node 2: ended ; T0:node 0 <- 2: ABORT(1) ; T0:node 0 <- 2: FIN ; T0:node 0 -> 1: ABORT(1) ; T0:node 0: its processes exit, status 1 ; T1:node 1: its send to node 0 fails on 0's reset ; T1:node 1 <- 2: ABORT(1) ; T1:node 1 <- 2: FIN ; T1:node 1 <- 0: ABORT(1) ; T1:node 1 <- 0: FIN ; T1:node 1 -> 2: ABORT(3) ; T1:node 1: its processes exit, status 3 ; T1: CHECK FAILED: STATUS: node 1's processes exited with the failure status, where every abort was a global exit with a status of its own

@@ -1,0 +1,1 @@
+../../shmem/tests/places-grid.txt: 9360 lines, as the model writes them

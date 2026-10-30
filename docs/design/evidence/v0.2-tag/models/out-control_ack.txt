@@ -1,0 +1,21 @@
+control-ack/design APP={0: 1, 1: 1} DET={0: 1, 1: 0}: holds (54907 states): holds; at most 5 segments a side; quiet held at some state: [True, True] as expected
+control-ack/busy_without_request APP={0: 1, 1: 1} DET={0: 1, 1: 0}: holds (54907 states): holds; at most 5 segments a side; quiet held at some state: [True, True] as expected
+control-ack/unacked APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (64 states): SAFETY: node 0 quiet with 1 tree messages sealed and 0 applied as expected
+   trace: 0 enqueues a tree message ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0
+control-ack/answer_asks APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (208 states): QUIESCES: segment 1 asks with nothing wanted as expected
+   trace: 0 enqueues a tree message ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 asks quiet (False) ; 0 visits, receiving 0
+control-ack/no_owe_clear APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (80036 states): BOUNDED: sequence 10 reached the cap as expected
+   trace: 1 visits, receiving 0 ; 1 reaps its send completion ; 1 visits, receiving 0 ; 1 reaps its send completion ; 1 visits, receiving 0 ; 1 reaps its send completion ; 1 visits, receiving 0 ; 1 reaps its send completion ; 1 visits, receiving 0 ; 1 reaps its send completion ; 1 visits, receiving 0 ; 1 reaps its send completion ; 1 visits, receiving 0 ; 1 reaps its send completion
+control-ack/no_request_in_flush APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (7148 states): LIVE_QUIET: a state from which both quiets never hold as expected
+   trace: 0 enqueues a tree message ; 0 enqueues a detector message
+control-ack/quiet_no_mark APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (120 states): STRANDED: node 0 owes a seal, its busy bit clear, nothing to read as expected
+   trace: 0 enqueues a tree message ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 asks quiet (False)
+control-ack/no_owe APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (20065 states): LIVE_QUIET: a state from which both quiets never hold as expected
+   trace: 0 enqueues a tree message ; 0 enqueues a detector message
+control-ack/goodbye_by_count APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (506 states): NO_LATE: node 1 enqueues a tree message after its goodbye as expected
+   trace: 0 enqueues a tree message ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 asks quiet (False) ; 0 enqueues a detector message ; 0 visits, receiving 0 ; 1 visits, receiving 2
+control-ack/no_flagged APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (128597 states): BOUNDED: sequence 10 reached the cap as expected
+   trace: 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 reaps its send completion ; 0 visits, receiving 0 ; 0 reaps its send completion
+control-ack/goodbye_no_ack APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (57529 states): LIVE_QUIET_EACH: node 0 not closing, its quiet never holds as expected
+   trace: 0 enqueues a tree message ; 1 enqueues a tree message ; 1 visits, receiving 0 ; 0 visits, receiving 1 ; 1 reaps its send completion ; 1 visits, receiving 1 ; 1 closes
+control-ack/no_goodbye_seal APP={0: 1, 1: 1} DET={0: 1, 1: 0}: FAILS (15885 states): LIVE_CLOSE: a state from which the close never ends as expected

@@ -1,0 +1,21 @@
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=1 -c isx.c -o obj/isx.o_s
+isx.c:800:23: warning: ‘gather_rank_counts’ defined but not used [-Wunused-function]
+  800 | static unsigned int * gather_rank_counts(_timer_t * const timer)
+      |                       ^~~~~~~~~~~~~~~~~~
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=1 -c pcg_basic.c -o obj/pcg_basic.o_s
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=1 -c timer.c -o obj/timer.o_s
+/home/pi/osoe/build/release/tools/wrapper/oshcc obj/isx.o_s obj/pcg_basic.o_s obj/timer.o_s -o bin/isx.strong -lrt -lm 
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=2 -c isx.c -o obj/isx.o_w
+isx.c:800:23: warning: ‘gather_rank_counts’ defined but not used [-Wunused-function]
+  800 | static unsigned int * gather_rank_counts(_timer_t * const timer)
+      |                       ^~~~~~~~~~~~~~~~~~
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=2 -c pcg_basic.c -o obj/pcg_basic.o_w
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=2 -c timer.c -o obj/timer.o_w
+/home/pi/osoe/build/release/tools/wrapper/oshcc obj/isx.o_w obj/pcg_basic.o_w obj/timer.o_w -o bin/isx.weak  -lrt -lm 
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=3 -c isx.c -o obj/isx.o_wi
+isx.c:800:23: warning: ‘gather_rank_counts’ defined but not used [-Wunused-function]
+  800 | static unsigned int * gather_rank_counts(_timer_t * const timer)
+      |                       ^~~~~~~~~~~~~~~~~~
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=3 -c pcg_basic.c -o obj/pcg_basic.o_wi
+/home/pi/osoe/build/release/tools/wrapper/oshcc -O2 -std=gnu99 -Wall -D SCALING_OPTION=3 -c timer.c -o obj/timer.o_wi
+/home/pi/osoe/build/release/tools/wrapper/oshcc obj/isx.o_wi obj/pcg_basic.o_wi obj/timer.o_wi -o bin/isx.weak_iso -lrt -lm 

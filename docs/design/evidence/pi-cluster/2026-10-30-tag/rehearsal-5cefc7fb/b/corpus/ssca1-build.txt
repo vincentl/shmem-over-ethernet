@@ -1,0 +1,22 @@
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o main.o main.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o parameters.o parameters.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o gen_sim_matrix.o gen_sim_matrix.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o gen_scal_data.o gen_scal_data.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o pairwise_align.o pairwise_align.c
+In file included from /usr/include/aarch64-linux-gnu/bits/libc-header-start.h:33,
+                 from /usr/include/stdio.h:28,
+                 from pairwise_align.c:22:
+/usr/include/features.h:199:3: warning: #warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE" [-Wcpp]
+  199 | # warning "_BSD_SOURCE and _SVID_SOURCE are deprecated, use _DEFAULT_SOURCE"
+      |   ^~~~~~~
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o glibc_sort.o glibc_sort.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o scan_backwards.o scan_backwards.c
+scan_backwards.c: In function ‘doScan’:
+scan_backwards.c:322:9: warning: ‘memcpy’ forming offset [24, 31] is out of the bounds [0, 24] of object ‘test_seq’ with type ‘seq_data_t’ {aka ‘struct _seq_data_t’} [-Warray-bounds=]
+  322 |         memcpy(&(A->bestSeqs[*bestR]), &test_seq, sizeof(seq_t));
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+scan_backwards.c:266:14: note: ‘test_seq’ declared here
+  266 |   seq_data_t test_seq;
+      |              ^~~~~~~~
+/home/pi/osoe/build/release/tools/wrapper/oshcc -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers -I.  -c -o util.o util.c
+/home/pi/osoe/build/release/tools/wrapper/oshcc main.o parameters.o gen_sim_matrix.o gen_scal_data.o pairwise_align.o glibc_sort.o scan_backwards.o util.o -std=c99 -Wall -pipe -g -DUSE_SHMEM  -O3 -pipe -frename-registers  -o ssca1 -lm 

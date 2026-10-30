@@ -1,0 +1,2199 @@
+Internal ctest changing into directory: /home/pi/osoe/build/release
+Test project /home/pi/osoe/build/release
+          Start   55: shmem.wire-pair
+          Start   57: shmem.mesh.refused-caller
+          Start   58: shmem.barrier-am.0-1-2
+          Start   59: shmem.barrier-am.0-0-1-1-2-2
+   1/1093 Test   #57: shmem.mesh.refused-caller .........................................................   Passed    0.01 sec
+          Start   60: shmem.barrier-am.0-0-0-1-2-2
+   2/1093 Test   #55: shmem.wire-pair ...................................................................   Passed    0.16 sec
+   3/1093 Test   #58: shmem.barrier-am.0-1-2 ............................................................   Passed    0.15 sec
+          Start   61: shmem.barrier-am.0-1-2-0-1-0
+          Start   78: shmem.job.0
+   4/1093 Test   #78: shmem.job.0 .......................................................................   Passed    0.01 sec
+          Start   79: shmem.job.0-0-0-0
+   5/1093 Test   #79: shmem.job.0-0-0-0 .................................................................   Passed    0.01 sec
+          Start   80: shmem.job.0-1-2-3
+   6/1093 Test   #60: shmem.barrier-am.0-0-0-1-2-2 ......................................................   Passed    0.17 sec
+          Start   81: shmem.job.0-0-0-1-2-2
+   7/1093 Test   #59: shmem.barrier-am.0-0-1-1-2-2 ......................................................   Passed    0.18 sec
+          Start   82: shmem.job.0-1-2-0-1-0
+   8/1093 Test   #80: shmem.job.0-1-2-3 .................................................................   Passed    0.05 sec
+          Start   83: shmem.job.duplicate-rank
+   9/1093 Test   #61: shmem.barrier-am.0-1-2-0-1-0 ......................................................   Passed    0.08 sec
+          Start   84: shmem.job.unclaimed-rank
+  10/1093 Test   #81: shmem.job.0-0-0-1-2-2 .............................................................   Passed    0.06 sec
+          Start   85: shmem.job.duplicate-rank.slow-message
+  11/1093 Test   #82: shmem.job.0-1-2-0-1-0 .............................................................   Passed    0.06 sec
+          Start   86: shmem.job.disagree.symmetric-size
+  12/1093 Test   #83: shmem.job.duplicate-rank ..........................................................   Passed    0.05 sec
+  13/1093 Test   #84: shmem.job.unclaimed-rank ..........................................................   Passed    0.05 sec
+          Start   87: shmem.job.disagree.fanout
+          Start   88: shmem.job.disagree.max-teams
+  14/1093 Test   #86: shmem.job.disagree.symmetric-size .................................................   Passed    0.10 sec
+          Start   89: shmem.job.disagree.architecture
+  15/1093 Test   #88: shmem.job.disagree.max-teams ......................................................   Passed    0.09 sec
+          Start   90: shmem.job.disagree.agreement-word
+  16/1093 Test   #87: shmem.job.disagree.fanout .........................................................   Passed    0.09 sec
+          Start   91: shmem.max-teams.local-disagree
+  17/1093 Test   #91: shmem.max-teams.local-disagree ....................................................   Passed    0.06 sec
+          Start   92: shmem.max-teams.local-disagree.lead
+  18/1093 Test   #89: shmem.job.disagree.architecture ...................................................   Passed    0.09 sec
+          Start   93: shmem.max-teams.invalid.3
+  19/1093 Test   #90: shmem.job.disagree.agreement-word .................................................   Passed    0.09 sec
+          Start   94: shmem.max-teams.invalid.1025
+  20/1093 Test   #93: shmem.max-teams.invalid.3 .........................................................   Passed    0.03 sec
+          Start   95: shmem.max-teams.invalid.x
+  21/1093 Test   #94: shmem.max-teams.invalid.1025 ......................................................   Passed    0.03 sec
+          Start   96: shmem.job.disagree.pipeline
+  22/1093 Test   #92: shmem.max-teams.local-disagree.lead ...............................................   Passed    0.06 sec
+          Start   97: shmem.collective-pipeline.invalid.0
+  23/1093 Test   #95: shmem.max-teams.invalid.x .........................................................   Passed    0.03 sec
+          Start   98: shmem.collective-pipeline.invalid.9
+  24/1093 Test   #97: shmem.collective-pipeline.invalid.0 ...............................................   Passed    0.02 sec
+          Start   99: shmem.collective-pipeline.invalid.x
+  25/1093 Test   #98: shmem.collective-pipeline.invalid.9 ...............................................   Passed    0.03 sec
+          Start  100: shmem.collective-fanout.local-disagree
+  26/1093 Test   #99: shmem.collective-pipeline.invalid.x ...............................................   Passed    0.03 sec
+          Start  101: shmem.collective-pipeline.local-disagree
+  27/1093 Test  #100: shmem.collective-fanout.local-disagree ............................................   Passed    0.05 sec
+          Start  102: shmem.job.disagree.small-collective-bytes
+  28/1093 Test   #96: shmem.job.disagree.pipeline .......................................................   Passed    0.10 sec
+          Start  103: shmem.small-collective-bytes.invalid.127
+  29/1093 Test  #101: shmem.collective-pipeline.local-disagree ..........................................   Passed    0.05 sec
+          Start  104: shmem.small-collective-bytes.invalid.16385
+  30/1093 Test  #103: shmem.small-collective-bytes.invalid.127 ..........................................   Passed    0.03 sec
+          Start  105: shmem.small-collective-bytes.invalid.x
+  31/1093 Test  #104: shmem.small-collective-bytes.invalid.16385 ........................................   Passed    0.03 sec
+          Start  106: shmem.small-collective-bytes.local-disagree
+  32/1093 Test  #105: shmem.small-collective-bytes.invalid.x ............................................   Passed    0.03 sec
+          Start  107: shmem.collective-shape.invalid.shape-bogus
+  33/1093 Test  #107: shmem.collective-shape.invalid.shape-bogus ........................................   Passed    0.03 sec
+          Start  108: shmem.collective-shape.invalid.hop-0
+  34/1093 Test  #102: shmem.job.disagree.small-collective-bytes .........................................   Passed    0.09 sec
+          Start  109: shmem.collective-shape.invalid.bandwidth-x
+  35/1093 Test  #106: shmem.small-collective-bytes.local-disagree .......................................   Passed    0.06 sec
+          Start  110: shmem.collective-shape.invalid.message-too-large
+  36/1093 Test  #108: shmem.collective-shape.invalid.hop-0 ..............................................   Passed    0.03 sec
+  37/1093 Test  #109: shmem.collective-shape.invalid.bandwidth-x ........................................   Passed    0.03 sec
+          Start  111: shmem.collective-shape.invalid.hop-alone
+          Start  112: shmem.collective-shape.invalid.bandwidth-alone
+  38/1093 Test  #110: shmem.collective-shape.invalid.message-too-large ..................................   Passed    0.03 sec
+          Start  113: shmem.collective-shape.local-disagree
+  39/1093 Test  #111: shmem.collective-shape.invalid.hop-alone ..........................................   Passed    0.03 sec
+  40/1093 Test  #112: shmem.collective-shape.invalid.bandwidth-alone ....................................   Passed    0.03 sec
+          Start  114: shmem.link.local-disagree
+          Start  115: shmem.job.disagree.collective-shape
+  41/1093 Test  #113: shmem.collective-shape.local-disagree .............................................   Passed    0.05 sec
+          Start  116: shmem.job.disagree.link
+  42/1093 Test  #114: shmem.link.local-disagree .........................................................   Passed    0.05 sec
+          Start  117: shmem.link.measured.0-0-1-1
+  43/1093 Test  #115: shmem.job.disagree.collective-shape ...............................................   Passed    0.09 sec
+          Start  118: shmem.link.measured.0-1-2
+  44/1093 Test  #116: shmem.job.disagree.link ...........................................................   Passed    0.10 sec
+          Start  119: shmem.link.few-lanes.0-1
+  45/1093 Test  #119: shmem.link.few-lanes.0-1 ..........................................................   Passed    0.32 sec
+          Start  120: shmem.link.set.0-0-1-1
+  46/1093 Test   #85: shmem.job.duplicate-rank.slow-message .............................................   Passed    1.07 sec
+          Start  121: shmem.link.fixed.0-1
+  47/1093 Test  #118: shmem.link.measured.0-1-2 .........................................................   Passed    0.51 sec
+          Start  122: shmem.link.none.0-0
+  48/1093 Test  #117: shmem.link.measured.0-0-1-1 .......................................................   Passed    0.65 sec
+          Start  123: shmem.unsent.measured.0-0-1-1
+  49/1093 Test  #122: shmem.link.none.0-0 ...............................................................   Passed    0.17 sec
+          Start  124: shmem.unsent.set.0-1
+  50/1093 Test  #121: shmem.link.fixed.0-1 ..............................................................   Passed    0.26 sec
+          Start  125: shmem.unsent.floor.0-1-2
+  51/1093 Test  #120: shmem.link.set.0-0-1-1 ............................................................   Passed    0.56 sec
+          Start  126: shmem.unsent.fixed.0-1
+  52/1093 Test  #124: shmem.unsent.set.0-1 ..............................................................   Passed    0.30 sec
+          Start  127: shmem.unsent.by-hand.0-1
+  53/1093 Test  #125: shmem.unsent.floor.0-1-2 ..........................................................   Passed    0.46 sec
+          Start  128: shmem.unsent.none.0-1
+  54/1093 Test  #126: shmem.unsent.fixed.0-1 ............................................................   Passed    0.29 sec
+          Start  129: shmem.unsent.one-node.0-0
+  55/1093 Test  #123: shmem.unsent.measured.0-0-1-1 .....................................................   Passed    0.62 sec
+          Start  130: shmem.job.disagree.node-count
+  56/1093 Test  #127: shmem.unsent.by-hand.0-1 ..........................................................   Passed    0.28 sec
+          Start  131: shmem.job.disagree.leaf-node-count
+  57/1093 Test  #129: shmem.unsent.one-node.0-0 .........................................................   Passed    0.18 sec
+          Start  132: shmem.job.disagree.root-node-count
+  58/1093 Test  #128: shmem.unsent.none.0-1 .............................................................   Passed    0.30 sec
+          Start  133: shmem.job.secret
+  59/1093 Test  #133: shmem.job.secret ..................................................................   Passed    0.07 sec
+          Start  134: shmem.job.secret.missing
+  60/1093 Test  #130: shmem.job.disagree.node-count .....................................................   Passed    8.07 sec
+          Start  135: shmem.job.secret.different
+  61/1093 Test  #131: shmem.job.disagree.leaf-node-count ................................................   Passed    8.07 sec
+          Start  136: shmem.job.secret.disagree.root-node-count
+  62/1093 Test  #136: shmem.job.secret.disagree.root-node-count .........................................   Passed    0.05 sec
+          Start  137: shmem.job.secret.disagree.leaf-node-count
+  63/1093 Test  #137: shmem.job.secret.disagree.leaf-node-count .........................................   Passed    0.05 sec
+          Start  138: shmem.job.secret.disagree.node-count
+  64/1093 Test  #132: shmem.job.disagree.root-node-count ................................................   Passed    8.07 sec
+          Start  139: shmem.start-up.max-threads.zero
+  65/1093 Test  #139: shmem.start-up.max-threads.zero ...................................................   Passed    0.05 sec
+          Start  140: shmem.start-up.max-threads.differs
+  66/1093 Test  #140: shmem.start-up.max-threads.differs ................................................   Passed    0.05 sec
+          Start  141: shmem.start-up.landing-bytes.differs
+  67/1093 Test  #141: shmem.start-up.landing-bytes.differs ..............................................   Passed    0.05 sec
+          Start  142: shmem.start-up.landing-bytes.partial-extent
+  68/1093 Test  #134: shmem.job.secret.missing ..........................................................   Passed    8.06 sec
+          Start  143: shmem.landing-default.L1
+  69/1093 Test  #142: shmem.start-up.landing-bytes.partial-extent .......................................   Passed    0.05 sec
+          Start  144: shmem.landing-default.L4
+  70/1093 Test  #143: shmem.landing-default.L1 ..........................................................   Passed    0.05 sec
+          Start  145: shmem.landing-default.L5
+  71/1093 Test  #144: shmem.landing-default.L4 ..........................................................   Passed    0.53 sec
+          Start  146: shmem.landing-default.L8
+  72/1093 Test  #145: shmem.landing-default.L5 ..........................................................   Passed    0.67 sec
+          Start  147: shmem.landing-default.L16
+  73/1093 Test  #146: shmem.landing-default.L8 ..........................................................   Passed    1.13 sec
+          Start  148: shmem.landing-default.L17
+  74/1093 Test  #147: shmem.landing-default.L16 .........................................................   Passed    2.35 sec
+          Start  149: shmem.landing-default.0-0-0-0-0-1
+  75/1093 Test  #149: shmem.landing-default.0-0-0-0-0-1 .................................................   Passed    0.91 sec
+          Start  150: shmem.landing-default.set.0-0-1
+  76/1093 Test  #148: shmem.landing-default.L17 .........................................................   Passed    2.50 sec
+          Start  151: shmem.start-up.am-chunk.invalid
+  77/1093 Test  #151: shmem.start-up.am-chunk.invalid ...................................................   Passed    0.05 sec
+          Start  152: shmem.start-up.am-buffer.invalid
+  78/1093 Test  #152: shmem.start-up.am-buffer.invalid ..................................................   Passed    0.05 sec
+          Start  153: shmem.start-up.am-buffer-budget.invalid
+  79/1093 Test  #153: shmem.start-up.am-buffer-budget.invalid ...........................................   Passed    0.05 sec
+          Start  154: shmem.start-up.am-credits.invalid
+  80/1093 Test  #154: shmem.start-up.am-credits.invalid .................................................   Passed    0.05 sec
+          Start  155: shmem.start-up.am-hugepages.invalid
+  81/1093 Test  #155: shmem.start-up.am-hugepages.invalid ...............................................   Passed    0.05 sec
+          Start  156: shmem.start-up.landing-bytes.invalid
+  82/1093 Test  #150: shmem.landing-default.set.0-0-1 ...................................................   Passed    0.48 sec
+          Start  157: shmem.start-up.wire-bytes.invalid
+  83/1093 Test  #156: shmem.start-up.landing-bytes.invalid ..............................................   Passed    0.05 sec
+          Start  158: shmem.start-up.wire-unsent-bytes.invalid
+  84/1093 Test  #157: shmem.start-up.wire-bytes.invalid .................................................   Passed    0.05 sec
+          Start  159: shmem.start-up.wire-unsent-bytes-large.invalid
+  85/1093 Test  #158: shmem.start-up.wire-unsent-bytes.invalid ..........................................   Passed    0.05 sec
+          Start  160: shmem.start-up.wire-zero-copy.invalid
+  86/1093 Test  #159: shmem.start-up.wire-unsent-bytes-large.invalid ....................................   Passed    0.05 sec
+          Start  161: shmem.start-up.wire-zero-copy-bytes.invalid
+  87/1093 Test  #160: shmem.start-up.wire-zero-copy.invalid .............................................   Passed    0.05 sec
+          Start  162: shmem.start-up.progress-helpers.invalid
+  88/1093 Test  #161: shmem.start-up.wire-zero-copy-bytes.invalid .......................................   Passed    0.05 sec
+          Start  163: shmem.start-up.progress-helpers-many.invalid
+  89/1093 Test  #162: shmem.start-up.progress-helpers.invalid ...........................................   Passed    0.05 sec
+          Start  164: shmem.start-up.test-print-link.invalid
+  90/1093 Test  #163: shmem.start-up.progress-helpers-many.invalid ......................................   Passed    0.05 sec
+          Start  165: shmem.start-up.test-print-link-large.invalid
+  91/1093 Test  #164: shmem.start-up.test-print-link.invalid ............................................   Passed    0.05 sec
+          Start  166: shmem.start-up.mesh-port-range.invalid
+  92/1093 Test  #165: shmem.start-up.test-print-link-large.invalid ......................................   Passed    0.05 sec
+          Start  167: shmem.start-up.mesh-slot.invalid
+  93/1093 Test  #166: shmem.start-up.mesh-port-range.invalid ............................................   Passed    0.05 sec
+          Start  168: shmem.start-up.mesh-slot-large.invalid
+  94/1093 Test  #167: shmem.start-up.mesh-slot.invalid ..................................................   Passed    0.05 sec
+          Start  169: shmem.start-up.test-mesh-hold.invalid
+  95/1093 Test  #168: shmem.start-up.mesh-slot-large.invalid ............................................   Passed    0.05 sec
+          Start  170: shmem.start-up.test-mesh-hold-node.invalid
+  96/1093 Test  #169: shmem.start-up.test-mesh-hold.invalid .............................................   Passed    0.05 sec
+          Start  171: shmem.start-up.mesh-data-wires.invalid
+  97/1093 Test  #170: shmem.start-up.test-mesh-hold-node.invalid ........................................   Passed    0.05 sec
+          Start  172: shmem.start-up.test-hold-data-wires.invalid
+  98/1093 Test  #171: shmem.start-up.mesh-data-wires.invalid ............................................   Passed    0.05 sec
+          Start  173: shmem.start-up.test-team-generation.invalid
+  99/1093 Test  #172: shmem.start-up.test-hold-data-wires.invalid .......................................   Passed    0.05 sec
+          Start  174: shmem.start-up.test-team-generation-large.invalid
+ 100/1093 Test  #173: shmem.start-up.test-team-generation.invalid .......................................   Passed    0.05 sec
+          Start  175: shmem.mesh.hold
+ 101/1093 Test  #174: shmem.start-up.test-team-generation-large.invalid .................................   Passed    0.05 sec
+          Start  176: shmem.mesh.slot
+ 102/1093 Test  #176: shmem.mesh.slot ...................................................................   Passed    1.57 sec
+          Start  177: shmem.mesh.none
+ 103/1093 Test  #135: shmem.job.secret.different ........................................................   Passed    8.07 sec
+          Start  178: shmem.mesh.crowd
+ 104/1093 Test  #175: shmem.mesh.hold ...................................................................   Passed    2.82 sec
+          Start  179: shmem.data-wires.ring.0-1-2-3-4
+ 105/1093 Test  #138: shmem.job.secret.disagree.node-count ..............................................   Passed    8.10 sec
+          Start  180: shmem.data-wires.skip.0-1-2-3-4
+ 106/1093 Test  #179: shmem.data-wires.ring.0-1-2-3-4 ...................................................   Passed    0.32 sec
+          Start  181: shmem.data-wires.ring.0-0-1-1-2-2-3-3.helpers-2
+ 107/1093 Test  #177: shmem.mesh.none ...................................................................   Passed    1.56 sec
+          Start  182: shmem.data-wires.stall-caller
+ 108/1093 Test  #180: shmem.data-wires.skip.0-1-2-3-4 ...................................................   Passed    0.39 sec
+          Start  183: shmem.data-wires.stall-callee
+ 109/1093 Test  #181: shmem.data-wires.ring.0-0-1-1-2-2-3-3.helpers-2 ...................................   Passed    0.32 sec
+          Start  184: shmem.data-wires.stall-long
+ 110/1093 Test  #178: shmem.mesh.crowd ..................................................................   Passed    4.00 sec
+          Start  185: shmem.data-wires.stall-stat
+ 111/1093 Test  #182: shmem.data-wires.stall-caller .....................................................   Passed    4.13 sec
+          Start  186: shmem.data-wires.stall-timeout
+ 112/1093 Test  #183: shmem.data-wires.stall-callee .....................................................   Passed    4.12 sec
+          Start  187: shmem.data-wires.exit
+ 113/1093 Test  #187: shmem.data-wires.exit .............................................................   Passed    0.41 sec
+          Start  188: shmem.data-wires.budget-fits
+ 114/1093 Test  #188: shmem.data-wires.budget-fits ......................................................   Passed    0.12 sec
+          Start  189: shmem.data-wires.budget-refused
+ 115/1093 Test  #189: shmem.data-wires.budget-refused ...................................................   Passed    0.12 sec
+          Start  190: shmem.data-wires.budget-eager
+ 116/1093 Test  #190: shmem.data-wires.budget-eager .....................................................   Passed    0.09 sec
+          Start  191: shmem.data-wires.disagree.0-1
+ 117/1093 Test  #191: shmem.data-wires.disagree.0-1 .....................................................   Passed    0.10 sec
+          Start  192: shmem.mesh.port-range.0-1-2
+ 118/1093 Test  #192: shmem.mesh.port-range.0-1-2 .......................................................   Passed    0.46 sec
+          Start  193: shmem.mesh.port-range.one-port.0-1
+ 119/1093 Test  #186: shmem.data-wires.stall-timeout ....................................................   Passed    2.10 sec
+          Start  194: shmem.rendezvous.alias.0-1
+ 120/1093 Test  #184: shmem.data-wires.stall-long .......................................................   Passed    6.11 sec
+          Start  195: shmem.rendezvous.not-this-host.0-1
+ 121/1093 Test  #194: shmem.rendezvous.alias.0-1 ........................................................   Passed    0.27 sec
+          Start  196: shmem.start-up.am-buffer.differs
+ 122/1093 Test  #196: shmem.start-up.am-buffer.differs ..................................................   Passed    0.11 sec
+          Start  197: shmem.start-up.am-buffer.lead-larger
+ 123/1093 Test  #197: shmem.start-up.am-buffer.lead-larger ..............................................   Passed    0.10 sec
+          Start  198: shmem.start-up.progress-helpers.differs
+ 124/1093 Test  #198: shmem.start-up.progress-helpers.differs ...........................................   Passed    0.06 sec
+          Start  199: shmem.start-up.own-environment.non-lead
+ 125/1093 Test  #199: shmem.start-up.own-environment.non-lead ...........................................   Passed    0.06 sec
+          Start  200: shmem.start-up.own-environment.lead
+ 126/1093 Test  #200: shmem.start-up.own-environment.lead ...............................................   Passed    0.06 sec
+          Start  201: shmem.start-up.own-identity.non-lead
+ 127/1093 Test  #185: shmem.data-wires.stall-stat .......................................................   Passed    5.10 sec
+          Start  202: shmem.start-up.own-identity.lead
+ 128/1093 Test  #193: shmem.mesh.port-range.one-port.0-1 ................................................   Passed    8.07 sec
+          Start  203: shmem.start-up.never-calls-init.non-lead
+ 129/1093 Test  #195: shmem.rendezvous.not-this-host.0-1 ................................................   Passed    8.07 sec
+          Start  204: shmem.start-up.lead-ends-in-join
+ 130/1093 Test  #201: shmem.start-up.own-identity.non-lead ..............................................   Passed    8.07 sec
+          Start  205: shmem.start-up.lead-ends-before-ready
+ 131/1093 Test  #205: shmem.start-up.lead-ends-before-ready .............................................   Passed    0.27 sec
+          Start  206: shmem.start-up.lead-ends-before-ready.same-ids
+ 132/1093 Test  #202: shmem.start-up.own-identity.lead ..................................................   Passed    8.07 sec
+          Start  207: shmem.start-up.lead-ends-before-ready.same-ids.no-launch
+ 133/1093 Test  #204: shmem.start-up.lead-ends-in-join ..................................................   Passed    3.06 sec
+          Start  208: shmem.start-up.same-ids
+ 134/1093 Test  #206: shmem.start-up.lead-ends-before-ready.same-ids ....................................   Passed    2.34 sec
+          Start  209: shmem.start-up.tombstone-gc
+ 135/1093 Test  #209: shmem.start-up.tombstone-gc .......................................................   Passed    0.02 sec
+          Start  210: shmem.start-up.pid-namespaces
+ 136/1093 Test  #208: shmem.start-up.same-ids ...........................................................   Passed    0.12 sec
+          Start  211: shmem.start-up.pid-namespace-leftover
+ 137/1093 Test  #211: shmem.start-up.pid-namespace-leftover .............................................   Passed    0.02 sec
+          Start  212: shmem.start-up.never-calls-init.no-progress-timeout
+ 138/1093 Test  #210: shmem.start-up.pid-namespaces .....................................................   Passed    1.04 sec
+          Start  213: shmem.start-up.never-calls-init.lead
+ 139/1093 Test  #207: shmem.start-up.lead-ends-before-ready.same-ids.no-launch ..........................   Passed    2.33 sec
+          Start  214: shmem.start-up.node-refuses.size-mismatch
+ 140/1093 Test  #212: shmem.start-up.never-calls-init.no-progress-timeout ...............................   Passed    3.05 sec
+          Start  215: shmem.start-up.node-refuses.own-environment-lead
+ 141/1093 Test  #203: shmem.start-up.never-calls-init.non-lead ..........................................   Passed   10.08 sec
+          Start  216: shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1
+ 142/1093 Test  #213: shmem.start-up.never-calls-init.lead ..............................................   Passed    8.07 sec
+          Start  217: shmem.start-up.descriptors.16-nodes
+ 143/1093 Test  #217: shmem.start-up.descriptors.16-nodes ...............................................   Passed    0.10 sec
+          Start  218: shmem.floor
+ 144/1093 Test  #214: shmem.start-up.node-refuses.size-mismatch .........................................   Passed    8.08 sec
+          Start  220: shmem.progress
+ 145/1093 Test  #220: shmem.progress ....................................................................   Passed    0.08 sec
+          Start  221: shmem.progress.forged-get-reply
+ 146/1093 Test  #221: shmem.progress.forged-get-reply ...................................................   Passed    0.07 sec
+          Start  222: shmem.progress.forged-get-reply-bounds
+ 147/1093 Test  #222: shmem.progress.forged-get-reply-bounds ............................................   Passed    0.10 sec
+          Start  223: shmem.progress.reset-while-ending
+ 148/1093 Test  #215: shmem.start-up.node-refuses.own-environment-lead ..................................   Passed    8.12 sec
+          Start  224: shmem.progress.forged-barrier-on-data
+ 149/1093 Test  #224: shmem.progress.forged-barrier-on-data .............................................   Passed    0.07 sec
+          Start  225: shmem.progress.forged-get-reply-on-control
+ 150/1093 Test  #216: shmem.start-up.never-calls-init.no-progress-timeout.0-0-1-1 .......................   Passed    5.20 sec
+          Start  226: shmem.owners.H2.N5
+ 151/1093 Test  #225: shmem.progress.forged-get-reply-on-control ........................................   Passed    0.12 sec
+          Start  227: shmem.owners.H3.N5
+ 152/1093 Test  #226: shmem.owners.H2.N5 ................................................................   Passed    0.09 sec
+          Start  228: shmem.owners.H2.N9
+ 153/1093 Test  #227: shmem.owners.H3.N5 ................................................................   Passed    0.06 sec
+          Start  229: shmem.owners.H3.N9
+ 154/1093 Test  #228: shmem.owners.H2.N9 ................................................................   Passed    0.06 sec
+          Start  230: shmem.connection-area.L1
+ 155/1093 Test  #230: shmem.connection-area.L1 ..........................................................   Passed    0.02 sec
+          Start  231: shmem.connection-area.L2
+ 156/1093 Test  #231: shmem.connection-area.L2 ..........................................................   Passed    0.01 sec
+          Start  232: shmem.connection-area.L4
+ 157/1093 Test  #229: shmem.owners.H3.N9 ................................................................   Passed    0.07 sec
+          Start  233: shmem.multinode.0-0-0-0
+ 158/1093 Test  #232: shmem.connection-area.L4 ..........................................................   Passed    0.01 sec
+          Start  234: shmem.multinode.0-1-2
+ 159/1093 Test  #234: shmem.multinode.0-1-2 .............................................................   Passed    0.35 sec
+          Start  235: shmem.multinode.zero-copy.0-1-2
+ 160/1093 Test  #233: shmem.multinode.0-0-0-0 ...........................................................   Passed    0.36 sec
+          Start  236: shmem.multinode.0-0-1-1-2-2
+ 161/1093 Test  #235: shmem.multinode.zero-copy.0-1-2 ...................................................   Passed    0.44 sec
+          Start  237: shmem.multinode.zero-copy.0-0-1-1-2-2
+ 162/1093 Test  #236: shmem.multinode.0-0-1-1-2-2 .......................................................   Passed    0.77 sec
+          Start  238: shmem.multinode.0-0-0-1-2-2
+ 163/1093 Test  #237: shmem.multinode.zero-copy.0-0-1-1-2-2 .............................................   Passed    0.80 sec
+          Start  239: shmem.multinode.zero-copy.0-0-0-1-2-2
+ 164/1093 Test  #238: shmem.multinode.0-0-0-1-2-2 .......................................................   Passed    0.70 sec
+          Start  240: shmem.multinode.0-1-2-0-1-0
+ 165/1093 Test  #239: shmem.multinode.zero-copy.0-0-0-1-2-2 .............................................   Passed    0.84 sec
+          Start  241: shmem.multinode.zero-copy.0-1-2-0-1-0
+ 166/1093 Test  #240: shmem.multinode.0-1-2-0-1-0 .......................................................   Passed    0.82 sec
+          Start  242: shmem.tree.k2.n7.p7
+ 167/1093 Test  #241: shmem.multinode.zero-copy.0-1-2-0-1-0 .............................................   Passed    0.65 sec
+          Start  243: shmem.tree.k2.n8.p8
+ 168/1093 Test  #242: shmem.tree.k2.n7.p7 ...............................................................   Passed    0.94 sec
+          Start  244: shmem.tree.k2.n13.p13
+ 169/1093 Test  #243: shmem.tree.k2.n8.p8 ...............................................................   Passed    1.15 sec
+          Start  245: shmem.tree.k2.n7.p10
+ 170/1093 Test  #244: shmem.tree.k2.n13.p13 .............................................................   Passed    1.48 sec
+          Start  246: shmem.tree.k2.n8.p11
+ 171/1093 Test  #245: shmem.tree.k2.n7.p10 ..............................................................   Passed    1.32 sec
+          Start  247: shmem.tree.k2.n13.p16
+ 172/1093 Test  #218: shmem.floor .......................................................................   Passed    8.68 sec
+          Start  248: shmem.tree.k4.n7.p7
+ 173/1093 Test  #246: shmem.tree.k2.n8.p11 ..............................................................   Passed    1.33 sec
+          Start  249: shmem.tree.k4.n8.p8
+ 174/1093 Test  #248: shmem.tree.k4.n7.p7 ...............................................................   Passed    0.78 sec
+          Start  250: shmem.tree.k4.n13.p13
+ 175/1093 Test  #249: shmem.tree.k4.n8.p8 ...............................................................   Passed    0.88 sec
+          Start  251: shmem.tree.k4.n7.p10
+ 176/1093 Test  #247: shmem.tree.k2.n13.p16 .............................................................   Passed    2.18 sec
+          Start  252: shmem.tree.k4.n8.p11
+ 177/1093 Test  #251: shmem.tree.k4.n7.p10 ..............................................................   Passed    1.06 sec
+          Start  253: shmem.tree.k4.n13.p16
+ 178/1093 Test  #250: shmem.tree.k4.n13.p13 .............................................................   Passed    1.42 sec
+          Start  254: shmem.work-discovery
+ 179/1093 Test  #254: shmem.work-discovery ..............................................................   Passed    0.17 sec
+          Start  255: shmem.turnover-wake.default
+ 180/1093 Test  #255: shmem.turnover-wake.default .......................................................   Passed    0.23 sec
+          Start  256: shmem.turnover-wake.all
+ 181/1093 Test  #252: shmem.tree.k4.n8.p11 ..............................................................   Passed    1.18 sec
+          Start  257: shmem.turnover-wake.hand-on
+ 182/1093 Test  #256: shmem.turnover-wake.all ...........................................................   Passed    0.37 sec
+          Start  258: shmem.turnover-wake.room
+ 183/1093 Test  #257: shmem.turnover-wake.hand-on .......................................................   Passed    0.37 sec
+          Start  259: shmem.turnover-wake.small.all
+ 184/1093 Test  #259: shmem.turnover-wake.small.all .....................................................   Passed    0.14 sec
+          Start  260: shmem.turnover-wake.small.hand-on
+ 185/1093 Test  #258: shmem.turnover-wake.room ..........................................................   Passed    0.29 sec
+          Start  261: shmem.turnover-wake.small.room
+ 186/1093 Test  #260: shmem.turnover-wake.small.hand-on .................................................   Passed    0.21 sec
+          Start  262: shmem.multinode.force-remote.0-1-2
+ 187/1093 Test  #261: shmem.turnover-wake.small.room ....................................................   Passed    0.12 sec
+          Start  263: shmem.multinode.force-remote.0-0-1-1-2-2
+ 188/1093 Test  #262: shmem.multinode.force-remote.0-1-2 ................................................   Passed    0.32 sec
+          Start  264: shmem.multinode.force-remote.0-0-0-1-2-2
+ 189/1093 Test  #253: shmem.tree.k4.n13.p16 .............................................................   Passed    1.80 sec
+          Start  265: shmem.multinode.force-remote.0-1-2-0-1-0
+ 190/1093 Test  #263: shmem.multinode.force-remote.0-0-1-1-2-2 ..........................................   Passed    0.64 sec
+          Start  266: shmem.internode.0-0-0-0
+ 191/1093 Test  #266: shmem.internode.0-0-0-0 ...........................................................   Passed    0.03 sec
+          Start  267: shmem.internode.0-1-2
+ 192/1093 Test  #267: shmem.internode.0-1-2 .............................................................   Passed    0.09 sec
+          Start  268: shmem.internode.zero-copy.0-1-2
+ 193/1093 Test  #268: shmem.internode.zero-copy.0-1-2 ...................................................   Passed    0.09 sec
+          Start  269: shmem.internode.0-0-1-1-2-2
+ 194/1093 Test  #264: shmem.multinode.force-remote.0-0-0-1-2-2 ..........................................   Passed    0.61 sec
+          Start  270: shmem.internode.zero-copy.0-0-1-1-2-2
+ 195/1093 Test  #269: shmem.internode.0-0-1-1-2-2 .......................................................   Passed    0.11 sec
+          Start  271: shmem.internode.0-0-0-1-2-2
+ 196/1093 Test  #270: shmem.internode.zero-copy.0-0-1-1-2-2 .............................................   Passed    0.12 sec
+          Start  272: shmem.internode.zero-copy.0-0-0-1-2-2
+ 197/1093 Test  #271: shmem.internode.0-0-0-1-2-2 .......................................................   Passed    0.11 sec
+          Start  273: shmem.internode.0-1-2-0-1-0
+ 198/1093 Test  #265: shmem.multinode.force-remote.0-1-2-0-1-0 ..........................................   Passed    0.62 sec
+          Start  274: shmem.internode.zero-copy.0-1-2-0-1-0
+ 199/1093 Test  #272: shmem.internode.zero-copy.0-0-0-1-2-2 .............................................   Passed    0.15 sec
+          Start  275: shmem.internode.zero-copy-refused.0-1-2
+ 200/1093 Test  #273: shmem.internode.0-1-2-0-1-0 .......................................................   Passed    0.14 sec
+          Start  277: shmem.slurm.internode.0-0-0-0
+ 201/1093 Test  #274: shmem.internode.zero-copy.0-1-2-0-1-0 .............................................   Passed    0.15 sec
+          Start  278: shmem.slurm.internode.0-1-2
+ 202/1093 Test  #277: shmem.slurm.internode.0-0-0-0 .....................................................   Passed    0.04 sec
+          Start  279: shmem.slurm.internode.0-0-1-1-2-2
+ 203/1093 Test  #275: shmem.internode.zero-copy-refused.0-1-2 ...........................................   Passed    0.13 sec
+          Start  280: shmem.slurm.internode.0-1-2-0-1-0
+ 204/1093 Test  #278: shmem.slurm.internode.0-1-2 .......................................................   Passed    0.13 sec
+          Start  281: shmem.internode.force-remote.0-1-2
+ 205/1093 Test  #279: shmem.slurm.internode.0-0-1-1-2-2 .................................................   Passed    0.12 sec
+          Start  282: shmem.internode.force-remote.0-0-1-1-2-2
+ 206/1093 Test  #280: shmem.slurm.internode.0-1-2-0-1-0 .................................................   Passed    0.12 sec
+          Start  283: shmem.internode.force-remote.0-0-0-1-2-2
+ 207/1093 Test  #281: shmem.internode.force-remote.0-1-2 ................................................   Passed    0.11 sec
+          Start  284: shmem.internode.force-remote.0-1-2-0-1-0
+ 208/1093 Test  #282: shmem.internode.force-remote.0-0-1-1-2-2 ..........................................   Passed    0.14 sec
+          Start  285: shmem.heap-shift.rma.L4
+ 209/1093 Test  #283: shmem.internode.force-remote.0-0-0-1-2-2 ..........................................   Passed    0.13 sec
+          Start  286: shmem.heap-shift.amo.L4
+ 210/1093 Test  #285: shmem.heap-shift.rma.L4 ...........................................................   Passed    0.10 sec
+          Start  287: shmem.heap-shift.amo-types.L4
+ 211/1093 Test  #284: shmem.internode.force-remote.0-1-2-0-1-0 ..........................................   Passed    0.15 sec
+          Start  288: shmem.heap-shift.amo-nbi.L4
+ 212/1093 Test  #286: shmem.heap-shift.amo.L4 ...........................................................   Passed    0.06 sec
+          Start  289: shmem.heap-shift.wait.L4
+ 213/1093 Test  #287: shmem.heap-shift.amo-types.L4 .....................................................   Passed    0.04 sec
+          Start  290: shmem.heap-shift.wait-many.L4
+ 214/1093 Test  #288: shmem.heap-shift.amo-nbi.L4 .......................................................   Passed    0.05 sec
+          Start  291: shmem.heap-shift.signal.L4
+ 215/1093 Test  #290: shmem.heap-shift.wait-many.L4 .....................................................   Passed    0.08 sec
+          Start  292: shmem.heap-shift.team.L4
+ 216/1093 Test  #289: shmem.heap-shift.wait.L4 ..........................................................   Passed    0.14 sec
+          Start  293: shmem.heap-shift.malloc.L4
+ 217/1093 Test  #291: shmem.heap-shift.signal.L4 ........................................................   Passed    0.12 sec
+          Start  294: shmem.heap-shift.barrier.L4
+ 218/1093 Test  #293: shmem.heap-shift.malloc.L4 ........................................................   Passed    0.15 sec
+          Start  295: shmem.heap-shift.internode.0-0-1-1-2-2
+ 219/1093 Test  #295: shmem.heap-shift.internode.0-0-1-1-2-2 ............................................   Passed    0.09 sec
+          Start  296: shmem.heap-shift.internode.0-1-2-0-1-0
+ 220/1093 Test  #296: shmem.heap-shift.internode.0-1-2-0-1-0 ............................................   Passed    0.10 sec
+          Start  297: shmem.heap-shift.invalid
+ 221/1093 Test  #292: shmem.heap-shift.team.L4 ..........................................................   Passed    0.39 sec
+          Start  298: shmem.refuse.heap_base_unaligned
+ 222/1093 Test  #297: shmem.heap-shift.invalid ..........................................................   Passed    0.03 sec
+          Start  299: shmem.refuse.heap_base_signed
+ 223/1093 Test  #298: shmem.refuse.heap_base_unaligned ..................................................   Passed    0.03 sec
+          Start  300: shmem.refuse.heap_base_not_mapped
+ 224/1093 Test  #299: shmem.refuse.heap_base_signed .....................................................   Passed    0.03 sec
+          Start  301: shmem.heap-base.candidates
+ 225/1093 Test  #300: shmem.refuse.heap_base_not_mapped .................................................   Passed    0.03 sec
+          Start  302: shmem.refuse.test_notice_seconds.2s
+ 226/1093 Test  #301: shmem.heap-base.candidates ........................................................   Passed    0.04 sec
+          Start  303: shmem.refuse.test_notice_seconds.0
+ 227/1093 Test  #302: shmem.refuse.test_notice_seconds.2s ...............................................   Passed    0.03 sec
+          Start  304: shmem.differential
+ 228/1093 Test  #303: shmem.refuse.test_notice_seconds.0 ................................................   Passed    0.03 sec
+          Start  305: shmem.ack-echo.0-1
+ 229/1093 Test  #294: shmem.heap-shift.barrier.L4 .......................................................   Passed    0.48 sec
+          Start  306: shmem.limits.0-0
+ 230/1093 Test  #306: shmem.limits.0-0 ..................................................................   Passed    0.04 sec
+          Start  307: shmem.limits.0-1
+ 231/1093 Test  #307: shmem.limits.0-1 ..................................................................   Passed    0.08 sec
+          Start  308: shmem.helper-wake.0-1-2-3
+ 232/1093 Test  #308: shmem.helper-wake.0-1-2-3 .........................................................   Passed    0.11 sec
+          Start  309: shmem.helper-wake.agent.0-1-2-3
+ 233/1093 Test  #309: shmem.helper-wake.agent.0-1-2-3 ...................................................   Passed    0.09 sec
+          Start  310: shmem.late-flags.0-1-2-3
+ 234/1093 Test  #304: shmem.differential ................................................................   Passed    0.44 sec
+          Start  311: shmem.late-flags.agent.0-1-2-3
+ 235/1093 Test  #305: shmem.ack-echo.0-1 ................................................................   Passed    0.59 sec
+          Start  312: shmem.keepalive.loopback-off.0-1
+ 236/1093 Test  #312: shmem.keepalive.loopback-off.0-1 ..................................................   Passed    0.08 sec
+          Start  313: shmem.keepalive.set-on.0-1
+ 237/1093 Test  #313: shmem.keepalive.set-on.0-1 ........................................................   Passed    0.07 sec
+          Start  314: shmem.helpers.auto.three
+ 238/1093 Test  #314: shmem.helpers.auto.three ..........................................................   Passed    0.08 sec
+          Start  315: shmem.helpers.auto.default
+ 239/1093 Test  #315: shmem.helpers.auto.default ........................................................   Passed    0.08 sec
+          Start  316: shmem.helpers.auto.two
+ 240/1093 Test  #316: shmem.helpers.auto.two ............................................................   Passed    0.08 sec
+          Start  317: shmem.helpers.auto.crowded
+ 241/1093 Test  #317: shmem.helpers.auto.crowded ........................................................   Passed    0.08 sec
+          Start  318: shmem.helpers.auto.machine
+ 242/1093 Test  #310: shmem.late-flags.0-1-2-3 ..........................................................   Passed    0.81 sec
+          Start  319: shmem.start-up.test-online-cpus.invalid
+ 243/1093 Test  #318: shmem.helpers.auto.machine ........................................................   Passed    0.09 sec
+          Start  320: shmem.start-up.machine-pes.invalid
+ 244/1093 Test  #311: shmem.late-flags.agent.0-1-2-3 ....................................................   Passed    0.80 sec
+          Start  321: shmem.start-up.turnover-wake.invalid
+ 245/1093 Test  #319: shmem.start-up.test-online-cpus.invalid ...........................................   Passed    0.06 sec
+          Start  322: shmem.helpers.deaf.0-1
+ 246/1093 Test  #320: shmem.start-up.machine-pes.invalid ................................................   Passed    0.05 sec
+          Start  323: shmem.helpers.abort-wait.0-0-1-1
+ 247/1093 Test  #321: shmem.start-up.turnover-wake.invalid ..............................................   Passed    0.06 sec
+          Start  324: shmem.helpers.reset-stream.0-0-1-1
+ 248/1093 Test  #322: shmem.helpers.deaf.0-1 ............................................................   Passed    0.56 sec
+          Start  325: shmem.reply-starvation.0-1-1-1-1-1-1
+ 249/1093 Test  #325: shmem.reply-starvation.0-1-1-1-1-1-1 ..............................................   Passed    0.25 sec
+          Start  326: shmem.unswept-wait
+ 250/1093 Test  #324: shmem.helpers.reset-stream.0-0-1-1 ................................................   Passed    1.01 sec
+          Start  327: shmem.unswept-wait.shared-context
+ 251/1093 Test  #323: shmem.helpers.abort-wait.0-0-1-1 ..................................................   Passed    1.32 sec
+          Start  328: shmem.hang-walk
+ 252/1093 Test  #328: shmem.hang-walk ...................................................................   Passed    0.11 sec
+          Start  329: shmem.hang-walk.reduce
+ 253/1093 Test  #326: shmem.unswept-wait ................................................................   Passed    0.69 sec
+          Start  330: shmem.hang-walk.reduce-large
+ 254/1093 Test  #330: shmem.hang-walk.reduce-large ......................................................   Passed    0.22 sec
+          Start  331: shmem.hang-walk.broadcast
+ 255/1093 Test  #329: shmem.hang-walk.reduce ............................................................   Passed    0.33 sec
+          Start  332: shmem.hang-walk.fcollect
+ 256/1093 Test  #327: shmem.unswept-wait.shared-context .................................................   Passed    0.88 sec
+ 257/1093 Test  #331: shmem.hang-walk.broadcast .........................................................   Passed    0.21 sec
+          Start  333: shmem.hang-walk.collect-scan
+          Start  334: shmem.hang-walk.collect-exchange
+ 258/1093 Test  #332: shmem.hang-walk.fcollect ..........................................................   Passed    0.34 sec
+          Start  335: shmem.hang-walk.circulant
+ 259/1093 Test  #334: shmem.hang-walk.collect-exchange ..................................................   Passed    0.22 sec
+          Start  336: shmem.hang-walk.summary
+ 260/1093 Test  #333: shmem.hang-walk.collect-scan ......................................................   Passed    0.36 sec
+          Start  337: shmem.reply-pool.0-0-0-1
+ 261/1093 Test  #335: shmem.hang-walk.circulant .........................................................   Passed    0.21 sec
+          Start  339: shmem.stopped-node.0-0-1
+ 262/1093 Test  #337: shmem.reply-pool.0-0-0-1 ..........................................................   Passed    0.96 sec
+          Start  340: shmem.stopped-node.no-progress
+ 263/1093 Test  #223: shmem.progress.reset-while-ending .................................................   Passed   20.07 sec
+          Start  341: shmem.stopped-node.keepalive
+ 264/1093 Test  #339: shmem.stopped-node.0-0-1 ..........................................................   Passed    3.08 sec
+          Start  342: shmem.stopped-bulk.0-0-1
+ 265/1093 Test  #336: shmem.hang-walk.summary ...........................................................   Passed    4.01 sec
+          Start  343: shmem.get-no-progress.0-1
+ 266/1093 Test  #341: shmem.stopped-node.keepalive ......................................................   Passed    6.08 sec
+          Start  344: shmem.get-no-progress.pieces-3.0-1
+ 267/1093 Test  #340: shmem.stopped-node.no-progress ....................................................   Passed   12.28 sec
+          Start  345: shmem.get-no-progress.pieces-20.0-1
+ 268/1093 Test  #343: shmem.get-no-progress.0-1 .........................................................   Passed   12.28 sec
+          Start  346: shmem.get-no-progress.zone-held.8.0-1-2
+ 269/1093 Test  #342: shmem.stopped-bulk.0-0-1 ..........................................................   Passed   15.18 sec
+          Start  347: shmem.get-no-progress.zone-held.150000.0-1-2
+ 270/1093 Test  #344: shmem.get-no-progress.pieces-3.0-1 ................................................   Passed   12.28 sec
+          Start  348: shmem.get-no-progress.nonblocking.0-1
+ 271/1093 Test  #345: shmem.get-no-progress.pieces-20.0-1 ...............................................   Passed   12.29 sec
+          Start  349: shmem.fatal-start-pes
+ 272/1093 Test  #349: shmem.fatal-start-pes .............................................................   Passed    0.01 sec
+          Start  350: shmem.exit-without-finalize.init
+ 273/1093 Test  #350: shmem.exit-without-finalize.init ..................................................   Passed    0.04 sec
+          Start  351: shmem.exit-without-finalize.start_pes
+ 274/1093 Test  #346: shmem.get-no-progress.zone-held.8.0-1-2 ...........................................   Passed   12.29 sec
+          Start  352: shmem.kill-after-init.KILL.one-node
+ 275/1093 Test  #352: shmem.kill-after-init.KILL.one-node ...............................................   Passed    0.03 sec
+          Start  353: shmem.kill-after-init.TERM.one-node
+ 276/1093 Test  #353: shmem.kill-after-init.TERM.one-node ...............................................   Passed    0.03 sec
+          Start  354: shmem.kill-after-init.kept.one-node
+ 277/1093 Test  #354: shmem.kill-after-init.kept.one-node ...............................................   Passed    0.02 sec
+          Start  355: shmem.launcher-signals.term.one-node
+ 278/1093 Test  #355: shmem.launcher-signals.term.one-node ..............................................   Passed    0.17 sec
+          Start  356: shmem.launcher-signals.int.one-node
+ 279/1093 Test  #356: shmem.launcher-signals.int.one-node ...............................................   Passed    0.16 sec
+          Start  357: shmem.launcher-signals.kill.one-node
+ 280/1093 Test  #357: shmem.launcher-signals.kill.one-node ..............................................   Passed    0.17 sec
+          Start  358: shmem.launcher.timeout-summary
+ 281/1093 Test  #351: shmem.exit-without-finalize.start_pes .............................................   Passed    4.04 sec
+          Start  359: shmem.leftovers.reclaim.one-node
+ 282/1093 Test  #359: shmem.leftovers.reclaim.one-node ..................................................   Passed    0.13 sec
+          Start  360: shmem.leftovers.live.one-node
+ 283/1093 Test  #360: shmem.leftovers.live.one-node .....................................................   Passed    0.03 sec
+          Start  361: shmem.kill-after-init.KILL
+ 284/1093 Test  #361: shmem.kill-after-init.KILL ........................................................   Passed    0.09 sec
+          Start  362: shmem.kill-after-init.TERM
+ 285/1093 Test  #362: shmem.kill-after-init.TERM ........................................................   Passed    0.08 sec
+          Start  363: shmem.kill-after-init.kept
+ 286/1093 Test  #363: shmem.kill-after-init.kept ........................................................   Passed    0.07 sec
+          Start  364: shmem.leftovers.reclaim
+ 287/1093 Test  #364: shmem.leftovers.reclaim ...........................................................   Passed    0.17 sec
+          Start  365: shmem.leftovers.live
+ 288/1093 Test  #365: shmem.leftovers.live ..............................................................   Passed    0.07 sec
+          Start  366: shmem.leftovers.gc
+ 289/1093 Test  #347: shmem.get-no-progress.zone-held.150000.0-1-2 ......................................   Passed   12.28 sec
+          Start  367: shmem.leftovers.restart
+ 290/1093 Test  #358: shmem.launcher.timeout-summary ....................................................   Passed    3.01 sec
+          Start  368: shmem.leftovers.restart.slow-lead
+ 291/1093 Test  #348: shmem.get-no-progress.nonblocking.0-1 .............................................   Passed   12.28 sec
+          Start  369: shmem.leftovers.restart.other-size
+ 292/1093 Test  #366: shmem.leftovers.gc ................................................................   Passed    9.09 sec
+          Start  370: shmem.launcher-signals.term
+ 293/1093 Test  #370: shmem.launcher-signals.term .......................................................   Passed    0.17 sec
+          Start  371: shmem.launcher-signals.int
+ 294/1093 Test  #371: shmem.launcher-signals.int ........................................................   Passed    0.17 sec
+          Start  372: shmem.launcher-signals.kill
+ 295/1093 Test  #367: shmem.leftovers.restart ...........................................................   Passed    9.24 sec
+          Start  373: shmem.core-exclusion.0-0-1-1
+ 296/1093 Test  #372: shmem.launcher-signals.kill .......................................................   Passed    0.17 sec
+          Start  374: shmem.core-exclusion.0-0
+ 297/1093 Test  #374: shmem.core-exclusion.0-0 ..........................................................   Passed    0.03 sec
+          Start  375: shmem.dev-shm-capacity.heaps
+ 298/1093 Test  #373: shmem.core-exclusion.0-0-1-1 ......................................................   Passed    0.09 sec
+          Start  376: shmem.dev-shm-capacity.connections
+ 299/1093 Test  #375: shmem.dev-shm-capacity.heaps ......................................................   Passed    0.02 sec
+          Start  377: shmem.dev-shm-capacity.warned
+ 300/1093 Test  #377: shmem.dev-shm-capacity.warned .....................................................   Passed    0.02 sec
+          Start  378: shmem.dev-shm-capacity.node-ends
+ 301/1093 Test  #376: shmem.dev-shm-capacity.connections ................................................   Passed    0.05 sec
+          Start  379: shmem.dev-shm-capacity.broken-pipe
+ 302/1093 Test  #378: shmem.dev-shm-capacity.node-ends ..................................................   Passed    0.04 sec
+          Start  380: shmem.am-size.notice
+ 303/1093 Test  #379: shmem.dev-shm-capacity.broken-pipe ................................................   Passed    0.03 sec
+          Start  381: shmem.refuse.old-kernel
+ 304/1093 Test  #381: shmem.refuse.old-kernel ...........................................................   Passed    0.01 sec
+          Start  383: shmem.refuse.no-shared-futex2
+ 305/1093 Test  #383: shmem.refuse.no-shared-futex2 .....................................................   Passed    0.01 sec
+          Start  384: shmem.no-io-uring.one-node
+ 306/1093 Test  #384: shmem.no-io-uring.one-node ........................................................   Passed    0.01 sec
+          Start  386: shmem.refuse.no-io-uring-setup
+ 307/1093 Test  #386: shmem.refuse.no-io-uring-setup ....................................................   Passed    0.01 sec
+          Start  388: shmem.refuse.no-io-uring-enable
+ 308/1093 Test  #388: shmem.refuse.no-io-uring-enable ...................................................   Passed    0.01 sec
+          Start  390: shmem.refuse.no-io-uring-enter
+ 309/1093 Test  #390: shmem.refuse.no-io-uring-enter ....................................................   Passed    0.01 sec
+          Start  391: shmem.heap-size.3.1M
+ 310/1093 Test  #391: shmem.heap-size.3.1M ..............................................................   Passed    0.03 sec
+          Start  392: shmem.heap-size.1000
+ 311/1093 Test  #392: shmem.heap-size.1000 ..............................................................   Passed    0.04 sec
+          Start  393: shmem.init.L1
+ 312/1093 Test  #393: shmem.init.L1 .....................................................................   Passed    0.01 sec
+          Start  394: shmem.init.L2
+ 313/1093 Test  #394: shmem.init.L2 .....................................................................   Passed    0.01 sec
+          Start  395: shmem.init.L4
+ 314/1093 Test  #395: shmem.init.L4 .....................................................................   Passed    0.01 sec
+          Start  396: shmem.init.40-sessions.0-1
+ 315/1093 Test  #380: shmem.am-size.notice ..............................................................   Passed    1.39 sec
+          Start  397: shmem.fork.L1
+ 316/1093 Test  #397: shmem.fork.L1 .....................................................................   Passed    0.01 sec
+          Start  398: shmem.fork.L2
+ 317/1093 Test  #398: shmem.fork.L2 .....................................................................   Passed    0.01 sec
+          Start  399: shmem.fork.L4
+ 318/1093 Test  #399: shmem.fork.L4 .....................................................................   Passed    0.01 sec
+          Start  400: shmem.barrier.L1
+ 319/1093 Test  #400: shmem.barrier.L1 ..................................................................   Passed    0.01 sec
+          Start  401: shmem.barrier.L2
+ 320/1093 Test  #401: shmem.barrier.L2 ..................................................................   Passed    0.15 sec
+          Start  402: shmem.barrier.L4
+ 321/1093 Test  #402: shmem.barrier.L4 ..................................................................   Passed    0.43 sec
+          Start  403: shmem.quiet.litmus.L2
+ 322/1093 Test  #403: shmem.quiet.litmus.L2 .............................................................***Skipped   0.01 sec
+          Start  404: shmem.malloc.L1
+ 323/1093 Test  #404: shmem.malloc.L1 ...................................................................   Passed    0.01 sec
+          Start  405: shmem.malloc.L2
+ 324/1093 Test  #405: shmem.malloc.L2 ...................................................................   Passed    0.05 sec
+          Start  406: shmem.malloc.L4
+ 325/1093 Test  #396: shmem.init.40-sessions.0-1 ........................................................   Passed    1.98 sec
+          Start  407: shmem.set-range.L1
+ 326/1093 Test  #407: shmem.set-range.L1 ................................................................   Passed    0.01 sec
+          Start  408: shmem.set-range.L2
+ 327/1093 Test  #408: shmem.set-range.L2 ................................................................   Passed    0.01 sec
+          Start  409: shmem.set-range.L4
+ 328/1093 Test  #409: shmem.set-range.L4 ................................................................   Passed    0.01 sec
+          Start  410: shmem.rma.L1
+ 329/1093 Test  #410: shmem.rma.L1 ......................................................................   Passed    0.01 sec
+          Start  411: shmem.rma.L2
+ 330/1093 Test  #406: shmem.malloc.L4 ...................................................................   Passed    0.13 sec
+          Start  412: shmem.rma.L4
+ 331/1093 Test  #411: shmem.rma.L2 ......................................................................   Passed    0.02 sec
+          Start  413: shmem.amo.L1
+ 332/1093 Test  #413: shmem.amo.L1 ......................................................................   Passed    0.01 sec
+          Start  414: shmem.amo.L2
+ 333/1093 Test  #412: shmem.rma.L4 ......................................................................   Passed    0.06 sec
+          Start  415: shmem.amo.L4
+ 334/1093 Test  #414: shmem.amo.L2 ......................................................................   Passed    0.02 sec
+          Start  416: shmem.wait.L1
+ 335/1093 Test  #368: shmem.leftovers.restart.slow-lead .................................................   Passed   10.20 sec
+          Start  417: shmem.wait.L2
+ 336/1093 Test  #415: shmem.amo.L4 ......................................................................   Passed    0.01 sec
+          Start  418: shmem.wait.L4
+ 337/1093 Test  #416: shmem.wait.L1 .....................................................................   Passed    0.11 sec
+          Start  419: shmem.signal.L1
+ 338/1093 Test  #417: shmem.wait.L2 .....................................................................   Passed    0.11 sec
+          Start  420: shmem.signal.L2
+ 339/1093 Test  #418: shmem.wait.L4 .....................................................................   Passed    0.11 sec
+          Start  421: shmem.signal.L4
+ 340/1093 Test  #419: shmem.signal.L1 ...................................................................   Passed    0.09 sec
+          Start  422: shmem.quiet.L1
+ 341/1093 Test  #420: shmem.signal.L2 ...................................................................   Passed    0.09 sec
+ 342/1093 Test  #422: shmem.quiet.L1 ....................................................................   Passed    0.01 sec
+          Start  423: shmem.quiet.L2
+          Start  424: shmem.quiet.L4
+ 343/1093 Test  #421: shmem.signal.L4 ...................................................................   Passed    0.10 sec
+          Start  425: shmem.heap.L1
+ 344/1093 Test  #423: shmem.quiet.L2 ....................................................................   Passed    0.01 sec
+          Start  426: shmem.heap.L2
+ 345/1093 Test  #424: shmem.quiet.L4 ....................................................................   Passed    0.01 sec
+          Start  427: shmem.heap.L4
+ 346/1093 Test  #425: shmem.heap.L1 .....................................................................   Passed    0.01 sec
+          Start  428: shmem.landing.L1
+ 347/1093 Test  #426: shmem.heap.L2 .....................................................................   Passed    0.01 sec
+          Start  429: shmem.landing.L2
+ 348/1093 Test  #428: shmem.landing.L1 ..................................................................   Passed    0.01 sec
+          Start  430: shmem.landing.L4
+ 349/1093 Test  #427: shmem.heap.L4 .....................................................................   Passed    0.02 sec
+          Start  431: shmem.amo-types.L1
+ 350/1093 Test  #429: shmem.landing.L2 ..................................................................   Passed    0.01 sec
+          Start  432: shmem.amo-types.L2
+ 351/1093 Test  #430: shmem.landing.L4 ..................................................................   Passed    0.01 sec
+ 352/1093 Test  #431: shmem.amo-types.L1 ................................................................   Passed    0.01 sec
+          Start  433: shmem.amo-types.L4
+          Start  434: shmem.amo-deprecated.L1
+ 353/1093 Test  #432: shmem.amo-types.L2 ................................................................   Passed    0.01 sec
+          Start  435: shmem.amo-deprecated.L2
+ 354/1093 Test  #434: shmem.amo-deprecated.L1 ...........................................................   Passed    0.01 sec
+          Start  436: shmem.amo-deprecated.L4
+ 355/1093 Test  #433: shmem.amo-types.L4 ................................................................   Passed    0.01 sec
+ 356/1093 Test  #435: shmem.amo-deprecated.L2 ...........................................................   Passed    0.01 sec
+          Start  437: shmem.amo-deprecated.0-0-1-1
+          Start  438: shmem.amo-deprecated.0-1-2-0-1-0
+ 357/1093 Test  #436: shmem.amo-deprecated.L4 ...........................................................   Passed    0.01 sec
+          Start  439: shmem.amo-nbi.L1
+ 358/1093 Test  #439: shmem.amo-nbi.L1 ..................................................................   Passed    0.01 sec
+          Start  440: shmem.amo-nbi.L2
+ 359/1093 Test  #440: shmem.amo-nbi.L2 ..................................................................   Passed    0.01 sec
+          Start  441: shmem.amo-nbi.L4
+ 360/1093 Test  #441: shmem.amo-nbi.L4 ..................................................................   Passed    0.01 sec
+          Start  442: shmem.amo-nbi.0-0-1-1
+ 361/1093 Test  #437: shmem.amo-deprecated.0-0-1-1 ......................................................   Passed    0.11 sec
+          Start  443: shmem.amo-nbi.0-1-2-0-1-0
+ 362/1093 Test  #438: shmem.amo-deprecated.0-1-2-0-1-0 ..................................................   Passed    0.12 sec
+          Start  444: shmem.amo-nbi.misuse
+ 363/1093 Test  #444: shmem.amo-nbi.misuse ..............................................................   Passed    0.03 sec
+          Start  445: shmem.typed-rma.L1
+ 364/1093 Test  #445: shmem.typed-rma.L1 ................................................................   Passed    0.01 sec
+          Start  446: shmem.typed-rma.L2
+ 365/1093 Test  #442: shmem.amo-nbi.0-0-1-1 .............................................................   Passed    0.13 sec
+          Start  447: shmem.typed-rma.L4
+ 366/1093 Test  #446: shmem.typed-rma.L2 ................................................................   Passed    0.01 sec
+          Start  448: shmem.typed-rma.0-0-1-1
+ 367/1093 Test  #447: shmem.typed-rma.L4 ................................................................   Passed    0.02 sec
+          Start  449: shmem.typed-rma.0-1-2-0-1-0
+ 368/1093 Test  #443: shmem.amo-nbi.0-1-2-0-1-0 .........................................................   Passed    0.14 sec
+          Start  450: shmem.typed-rma.force-remote.0-0-1-1
+ 369/1093 Test  #448: shmem.typed-rma.0-0-1-1 ...........................................................   Passed    0.14 sec
+          Start  451: shmem.typed-rma.ibput-misuse
+ 370/1093 Test  #451: shmem.typed-rma.ibput-misuse ......................................................   Passed    0.04 sec
+          Start  452: shmem.typed-rma.iput-misuse
+ 371/1093 Test  #449: shmem.typed-rma.0-1-2-0-1-0 .......................................................   Passed    0.18 sec
+          Start  453: shmem.typed-rma.iget-misuse
+ 372/1093 Test  #452: shmem.typed-rma.iput-misuse .......................................................   Passed    0.03 sec
+          Start  454: shmem.typed-rma.iput64-misuse
+ 373/1093 Test  #453: shmem.typed-rma.iget-misuse .......................................................   Passed    0.03 sec
+          Start  455: shmem.get-nbi.L1
+ 374/1093 Test  #450: shmem.typed-rma.force-remote.0-0-1-1 ..............................................   Passed    0.15 sec
+          Start  456: shmem.get-nbi.L2
+ 375/1093 Test  #455: shmem.get-nbi.L1 ..................................................................   Passed    0.01 sec
+          Start  457: shmem.get-nbi.L4
+ 376/1093 Test  #456: shmem.get-nbi.L2 ..................................................................   Passed    0.01 sec
+          Start  458: shmem.reduce.L1
+ 377/1093 Test  #457: shmem.get-nbi.L4 ..................................................................   Passed    0.01 sec
+          Start  459: shmem.reduce.L2
+ 378/1093 Test  #458: shmem.reduce.L1 ...................................................................   Passed    0.01 sec
+          Start  460: shmem.reduce.L4
+ 379/1093 Test  #454: shmem.typed-rma.iput64-misuse .....................................................   Passed    0.04 sec
+          Start  461: shmem.reduce.0-0-1-1
+ 380/1093 Test  #459: shmem.reduce.L2 ...................................................................   Passed    0.01 sec
+          Start  462: shmem.reduce.0-1-2-0-1-0
+ 381/1093 Test  #460: shmem.reduce.L4 ...................................................................   Passed    0.01 sec
+          Start  463: shmem.reduce.0-1-2-3-4
+ 382/1093 Test  #461: shmem.reduce.0-0-1-1 ..............................................................   Passed    0.12 sec
+          Start  464: shmem.broadcast.L1
+ 383/1093 Test  #464: shmem.broadcast.L1 ................................................................   Passed    0.01 sec
+          Start  465: shmem.broadcast.L2
+ 384/1093 Test  #462: shmem.reduce.0-1-2-0-1-0 ..........................................................   Passed    0.14 sec
+          Start  466: shmem.broadcast.L4
+ 385/1093 Test  #465: shmem.broadcast.L2 ................................................................   Passed    0.01 sec
+          Start  467: shmem.broadcast.0-0-1-1
+ 386/1093 Test  #466: shmem.broadcast.L4 ................................................................   Passed    0.01 sec
+          Start  468: shmem.broadcast.0-1-2-0-1-0
+ 387/1093 Test  #463: shmem.reduce.0-1-2-3-4 ............................................................   Passed    0.18 sec
+          Start  469: shmem.broadcast.0-1-2-3-4
+ 388/1093 Test  #467: shmem.broadcast.0-0-1-1 ...........................................................   Passed    0.09 sec
+          Start  470: shmem.reduce.force-remote.0-0-1-1
+ 389/1093 Test  #469: shmem.broadcast.0-1-2-3-4 .........................................................   Passed    0.10 sec
+          Start  471: shmem.broadcast.force-remote.0-0-1-1
+ 390/1093 Test  #470: shmem.reduce.force-remote.0-0-1-1 .................................................   Passed    0.10 sec
+          Start  486: shmem.active-set.L1
+ 391/1093 Test  #486: shmem.active-set.L1 ...............................................................   Passed    0.01 sec
+          Start  487: shmem.active-set.L2
+ 392/1093 Test  #487: shmem.active-set.L2 ...............................................................   Passed    0.02 sec
+          Start  488: shmem.active-set.L4
+ 393/1093 Test  #471: shmem.broadcast.force-remote.0-0-1-1 ..............................................   Passed    0.09 sec
+          Start  489: shmem.active-set.0-0-1-1
+ 394/1093 Test  #488: shmem.active-set.L4 ...............................................................   Passed    0.03 sec
+          Start  490: shmem.active-set.0-1-2-0-1-0
+ 395/1093 Test  #489: shmem.active-set.0-0-1-1 ..........................................................   Passed    0.16 sec
+          Start  491: shmem.active-set.partial
+ 396/1093 Test  #490: shmem.active-set.0-1-2-0-1-0 ......................................................   Passed    0.19 sec
+          Start  492: shmem.active-set-partial.L1
+ 397/1093 Test  #492: shmem.active-set-partial.L1 .......................................................   Passed    0.01 sec
+          Start  493: shmem.active-set-partial.L2
+ 398/1093 Test  #491: shmem.active-set.partial ..........................................................   Passed    0.06 sec
+          Start  494: shmem.active-set-partial.L4
+ 399/1093 Test  #493: shmem.active-set-partial.L2 .......................................................   Passed    0.01 sec
+          Start  495: shmem.active-set-partial.0-0-1-1
+ 400/1093 Test  #494: shmem.active-set-partial.L4 .......................................................   Passed    0.01 sec
+          Start  496: shmem.active-set-partial.0-1-2-0-1-0
+ 401/1093 Test  #495: shmem.active-set-partial.0-0-1-1 ..................................................   Passed    0.13 sec
+          Start  497: shmem.active-set-partial.0-0-0-1-1-1-2-2-2-3-3-3
+ 402/1093 Test  #369: shmem.leftovers.restart.other-size ................................................   Passed   10.22 sec
+          Start  498: shmem.active-set-partial.bad-root
+ 403/1093 Test  #498: shmem.active-set-partial.bad-root .................................................   Passed    0.04 sec
+          Start  499: shmem.statics.L1
+ 404/1093 Test  #499: shmem.statics.L1 ..................................................................   Passed    0.03 sec
+          Start  500: shmem.statics.L2
+ 405/1093 Test  #496: shmem.active-set-partial.0-1-2-0-1-0 ..............................................   Passed    0.23 sec
+          Start  501: shmem.statics.L4
+ 406/1093 Test  #500: shmem.statics.L2 ..................................................................   Passed    0.06 sec
+          Start  502: shmem.statics.0-0-1-1
+ 407/1093 Test  #501: shmem.statics.L4 ..................................................................   Passed    0.07 sec
+          Start  503: shmem.statics.0-1-2-0-1-0
+ 408/1093 Test  #502: shmem.statics.0-0-1-1 .............................................................   Passed    0.30 sec
+          Start  504: shmem.statics.pie.L2
+ 409/1093 Test  #504: shmem.statics.pie.L2 ..............................................................   Passed    0.07 sec
+          Start  505: shmem.statics.pie.0-0-1-1
+ 410/1093 Test  #503: shmem.statics.0-1-2-0-1-0 .........................................................   Passed    0.38 sec
+          Start  506: shmem.statics.misuse
+ 411/1093 Test  #468: shmem.broadcast.0-1-2-0-1-0 .......................................................   Passed    1.17 sec
+          Start  507: shmem.lock.L1
+ 412/1093 Test  #507: shmem.lock.L1 .....................................................................   Passed    0.04 sec
+          Start  508: shmem.lock.L2
+ 413/1093 Test  #506: shmem.statics.misuse ..............................................................   Passed    0.09 sec
+          Start  509: shmem.lock.L4
+ 414/1093 Test  #508: shmem.lock.L2 .....................................................................   Passed    0.08 sec
+          Start  510: shmem.lock.0-0-1-1
+ 415/1093 Test  #509: shmem.lock.L4 .....................................................................   Passed    0.10 sec
+          Start  511: shmem.lock.0-1-2-0-1-0
+ 416/1093 Test  #497: shmem.active-set-partial.0-0-0-1-1-1-2-2-2-3-3-3 ..................................   Passed    0.77 sec
+          Start  512: shmem.lock.misuse.clear
+ 417/1093 Test  #505: shmem.statics.pie.0-0-1-1 .........................................................   Passed    0.27 sec
+          Start  513: shmem.lock.misuse.twice
+ 418/1093 Test  #512: shmem.lock.misuse.clear ...........................................................   Passed    0.04 sec
+          Start  514: shmem.lock.misuse.garbage
+ 419/1093 Test  #513: shmem.lock.misuse.twice ...........................................................   Passed    0.05 sec
+          Start  515: shmem.collect.L1
+ 420/1093 Test  #515: shmem.collect.L1 ..................................................................   Passed    0.02 sec
+          Start  516: shmem.collect.L2
+ 421/1093 Test  #514: shmem.lock.misuse.garbage .........................................................   Passed    0.06 sec
+          Start  517: shmem.collect.L4
+ 422/1093 Test  #516: shmem.collect.L2 ..................................................................   Passed    0.02 sec
+          Start  518: shmem.collect.0-0-1-1
+ 423/1093 Test  #517: shmem.collect.L4 ..................................................................   Passed    0.03 sec
+          Start  519: shmem.collect.0-1-2-0-1-0
+ 424/1093 Test  #518: shmem.collect.0-0-1-1 .............................................................   Passed    0.15 sec
+          Start  520: shmem.alltoall.L1
+ 425/1093 Test  #520: shmem.alltoall.L1 .................................................................   Passed    0.01 sec
+          Start  521: shmem.alltoall.L2
+ 426/1093 Test  #519: shmem.collect.0-1-2-0-1-0 .........................................................   Passed    0.16 sec
+          Start  522: shmem.alltoall.L4
+ 427/1093 Test  #521: shmem.alltoall.L2 .................................................................   Passed    0.02 sec
+          Start  523: shmem.alltoall.0-0-1-1
+ 428/1093 Test  #510: shmem.lock.0-0-1-1 ................................................................   Passed    0.39 sec
+          Start  524: shmem.alltoall.0-1-2-0-1-0
+ 429/1093 Test  #522: shmem.alltoall.L4 .................................................................   Passed    0.04 sec
+          Start  525: shmem.collect.0-1-2-3
+ 430/1093 Test  #523: shmem.alltoall.0-0-1-1 ............................................................   Passed    0.15 sec
+          Start  526: shmem.collect.0-1-2-3-4-0-1-2-3-4-0-1-2-3-4-0-1-2-3-4
+ 431/1093 Test  #511: shmem.lock.0-1-2-0-1-0 ............................................................   Passed    0.50 sec
+          Start  527: shmem.alltoall.stride
+ 432/1093 Test  #524: shmem.alltoall.0-1-2-0-1-0 ........................................................   Passed    0.22 sec
+          Start  528: shmem.collect.partial
+ 433/1093 Test  #527: shmem.alltoall.stride .............................................................   Passed    0.06 sec
+          Start  529: shmem.collective-divergence
+ 434/1093 Test  #525: shmem.collect.0-1-2-3 .............................................................   Passed    0.21 sec
+          Start  530: shmem.collective-divergence.gather-size
+ 435/1093 Test  #528: shmem.collect.partial .............................................................   Passed    0.03 sec
+          Start  531: shmem.pipeline.0-0-1-1.in-flight-1
+ 436/1093 Test  #529: shmem.collective-divergence .......................................................   Passed    0.08 sec
+          Start  532: shmem.pipeline.0-0-1-1.in-flight-2
+ 437/1093 Test  #530: shmem.collective-divergence.gather-size ...........................................   Passed    0.10 sec
+          Start  533: shmem.pipeline.0-0-1-1.in-flight-4
+ 438/1093 Test  #526: shmem.collect.0-1-2-3-4-0-1-2-3-4-0-1-2-3-4-0-1-2-3-4 .............................   Passed    0.28 sec
+          Start  534: shmem.pipeline.0-1-2-0-1-0.in-flight-1
+ 439/1093 Test  #531: shmem.pipeline.0-0-1-1.in-flight-1 ................................................   Passed    0.37 sec
+          Start  535: shmem.pipeline.0-1-2-0-1-0.in-flight-2
+ 440/1093 Test  #532: shmem.pipeline.0-0-1-1.in-flight-2 ................................................   Passed    0.31 sec
+          Start  536: shmem.pipeline.0-1-2-0-1-0.in-flight-4
+ 441/1093 Test  #533: shmem.pipeline.0-0-1-1.in-flight-4 ................................................   Passed    0.30 sec
+          Start  537: shmem.pipeline.0-1-2-3-4.in-flight-1
+ 442/1093 Test  #535: shmem.pipeline.0-1-2-0-1-0.in-flight-2 ............................................   Passed    0.50 sec
+          Start  538: shmem.pipeline.0-1-2-3-4.in-flight-2
+ 443/1093 Test  #536: shmem.pipeline.0-1-2-0-1-0.in-flight-4 ............................................   Passed    0.51 sec
+          Start  539: shmem.pipeline.0-1-2-3-4.in-flight-4
+ 444/1093 Test  #534: shmem.pipeline.0-1-2-0-1-0.in-flight-1 ............................................   Passed    0.75 sec
+          Start  540: shmem.pipeline.0-1-2-3-4-5-6-7.in-flight-1
+ 445/1093 Test  #537: shmem.pipeline.0-1-2-3-4.in-flight-1 ..............................................   Passed    0.90 sec
+          Start  541: shmem.pipeline.0-1-2-3-4-5-6-7.in-flight-2
+ 446/1093 Test  #539: shmem.pipeline.0-1-2-3-4.in-flight-4 ..............................................   Passed    0.48 sec
+          Start  542: shmem.pipeline.0-1-2-3-4-5-6-7.in-flight-4
+ 447/1093 Test  #538: shmem.pipeline.0-1-2-3-4.in-flight-2 ..............................................   Passed    0.55 sec
+          Start  543: shmem.pipeline.0-1-2-3-4.stress
+ 448/1093 Test  #542: shmem.pipeline.0-1-2-3-4-5-6-7.in-flight-4 ........................................   Passed    0.97 sec
+          Start  544: shmem.pipeline.0-0-1-1.max-teams-4
+ 449/1093 Test  #541: shmem.pipeline.0-1-2-3-4-5-6-7.in-flight-2 ........................................   Passed    1.27 sec
+          Start  545: shmem.lanes.shared-lead
+ 450/1093 Test  #544: shmem.pipeline.0-0-1-1.max-teams-4 ................................................   Passed    0.41 sec
+          Start  546: shmem.lanes.two-threads
+ 451/1093 Test  #546: shmem.lanes.two-threads ...........................................................   Passed    0.17 sec
+          Start  547: shmem.lanes.turns
+ 452/1093 Test  #547: shmem.lanes.turns .................................................................   Passed    0.24 sec
+          Start  548: shmem.lanes.rotation
+ 453/1093 Test  #540: shmem.pipeline.0-1-2-3-4-5-6-7.in-flight-1 ........................................   Passed    2.26 sec
+          Start  549: shmem.lanes.boundary
+ 454/1093 Test  #545: shmem.lanes.shared-lead ...........................................................   Passed    0.68 sec
+          Start  550: shmem.lanes.boundary.small-collective-bytes-128
+ 455/1093 Test  #543: shmem.pipeline.0-1-2-3-4.stress ...................................................   Passed    1.82 sec
+          Start  551: shmem.lanes.boundary.collective-pipeline-4
+ 456/1093 Test  #549: shmem.lanes.boundary ..............................................................   Passed    0.11 sec
+          Start  552: shmem.lanes.reuse
+ 457/1093 Test  #550: shmem.lanes.boundary.small-collective-bytes-128 ...................................   Passed    0.11 sec
+          Start  553: shmem.lanes.scan-shared-parent
+ 458/1093 Test  #551: shmem.lanes.boundary.collective-pipeline-4 ........................................   Passed    0.12 sec
+          Start  554: shmem.lanes.scan-turns
+ 459/1093 Test  #548: shmem.lanes.rotation ..............................................................   Passed    0.32 sec
+          Start  555: shmem.lanes.scan-reuse
+ 460/1093 Test  #554: shmem.lanes.scan-turns ............................................................   Passed    0.21 sec
+          Start  556: shmem.lanes.mismatch
+ 461/1093 Test  #552: shmem.lanes.reuse .................................................................   Passed    0.29 sec
+          Start  557: shmem.lanes.scan-mismatch
+ 462/1093 Test  #556: shmem.lanes.mismatch ..............................................................   Passed    0.08 sec
+          Start  558: shmem.lanes.class-split-named
+ 463/1093 Test  #557: shmem.lanes.scan-mismatch .........................................................   Passed    0.08 sec
+          Start  559: shmem.lanes.class-split-broadcast
+ 464/1093 Test  #558: shmem.lanes.class-split-named .....................................................   Passed    0.08 sec
+          Start  560: shmem.lanes.class-split-hang
+ 465/1093 Test  #559: shmem.lanes.class-split-broadcast .................................................   Passed    0.08 sec
+          Start  561: shmem.lanes.threads
+ 466/1093 Test  #555: shmem.lanes.scan-reuse ............................................................   Passed    0.28 sec
+          Start  562: shmem.lanes.threads.two-a-node
+ 467/1093 Test  #553: shmem.lanes.scan-shared-parent ....................................................   Passed    0.63 sec
+          Start  563: shmem.allgather.0-0-1-1
+ 468/1093 Test  #563: shmem.allgather.0-0-1-1 ...........................................................   Passed    0.66 sec
+          Start  564: shmem.allgather.0-1-0-1
+ 469/1093 Test  #564: shmem.allgather.0-1-0-1 ...........................................................   Passed    0.68 sec
+          Start  565: shmem.allgather.0-0-1-1-2-2
+ 470/1093 Test  #560: shmem.lanes.class-split-hang ......................................................   Passed    2.20 sec
+          Start  566: shmem.allgather.0-1-2-0-1-2
+ 471/1093 Test  #565: shmem.allgather.0-0-1-1-2-2 .......................................................   Passed    0.80 sec
+          Start  567: shmem.allgather.0-0-1-1-2-2-3-3
+ 472/1093 Test  #566: shmem.allgather.0-1-2-0-1-2 .......................................................   Passed    0.80 sec
+          Start  568: shmem.allgather.0-1-2-3-0-1-2-3
+ 473/1093 Test  #567: shmem.allgather.0-0-1-1-2-2-3-3 ...................................................   Passed    0.81 sec
+          Start  569: shmem.allgather.0-0-1-1-2-2-3-3-4-4
+ 474/1093 Test  #568: shmem.allgather.0-1-2-3-0-1-2-3 ...................................................   Passed    0.93 sec
+          Start  570: shmem.allgather.0-1-2-3-4-0-1-2-3-4
+ 475/1093 Test  #561: shmem.lanes.threads ...............................................................   Passed    4.09 sec
+          Start  571: shmem.allgather.0-1-2-0-1-0
+ 476/1093 Test  #569: shmem.allgather.0-0-1-1-2-2-3-3-4-4 ...............................................   Passed    1.13 sec
+          Start  572: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3
+ 477/1093 Test  #572: shmem.collect-places.block.0-0-0-1-1-2-2-2-2-3 ....................................   Passed    0.23 sec
+          Start  573: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4
+ 478/1093 Test  #571: shmem.allgather.0-1-2-0-1-0 .......................................................   Passed    0.71 sec
+          Start  574: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3
+ 479/1093 Test  #573: shmem.collect-places.block.0-0-1-1-1-2-3-3-4-4 ....................................   Passed    0.25 sec
+          Start  575: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 480/1093 Test  #570: shmem.allgather.0-1-2-3-4-0-1-2-3-4 ...............................................   Passed    0.98 sec
+          Start  576: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2
+ 481/1093 Test  #574: shmem.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 ..........................   Passed    0.27 sec
+          Start  577: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3
+ 482/1093 Test  #575: shmem.collect-places.negative-stride.0-0-1-1-1-2-3-3-4-4 ..........................   Passed    0.28 sec
+          Start  578: shmem.collect-places.unordered.1-1-0-0-2-2
+ 483/1093 Test  #576: shmem.collect-places.cyclic.0-1-2-0-1-2-0-1-2 .....................................   Passed    0.25 sec
+          Start  579: shmem.collect-places.scan.block.0-0-1-1
+ 484/1093 Test  #578: shmem.collect-places.unordered.1-1-0-0-2-2 ........................................   Passed    0.17 sec
+          Start  580: shmem.collect-places.scan.block.0-0-1-2-2
+ 485/1093 Test  #577: shmem.collect-places.cyclic.0-1-2-3-0-1-2-3 .......................................   Passed    0.22 sec
+          Start  581: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3
+ 486/1093 Test  #579: shmem.collect-places.scan.block.0-0-1-1 ...........................................   Passed    0.14 sec
+          Start  582: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4
+ 487/1093 Test  #562: shmem.lanes.threads.two-a-node ....................................................   Passed    5.33 sec
+          Start  583: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6
+ 488/1093 Test  #580: shmem.collect-places.scan.block.0-0-1-2-2 .........................................   Passed    0.13 sec
+          Start  584: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7
+ 489/1093 Test  #581: shmem.collect-places.scan.block.0-0-0-1-1-2-2-2-2-3 ...............................   Passed    0.18 sec
+          Start  585: shmem.collect-places.scan.negative-stride.0-0-1-1
+ 490/1093 Test  #582: shmem.collect-places.scan.block.0-0-1-1-1-2-3-3-4-4 ...............................   Passed    0.20 sec
+          Start  586: shmem.collect-places.scan.negative-stride.0-0-1-2-2
+ 491/1093 Test  #583: shmem.collect-places.scan.block.0-1-1-2-3-3-4-5-6 .................................   Passed    0.18 sec
+          Start  587: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 492/1093 Test  #585: shmem.collect-places.scan.negative-stride.0-0-1-1 .................................   Passed    0.12 sec
+          Start  588: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6
+ 493/1093 Test  #586: shmem.collect-places.scan.negative-stride.0-0-1-2-2 ...............................   Passed    0.13 sec
+          Start  589: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2
+ 494/1093 Test  #584: shmem.collect-places.scan.block.0-0-1-2-3-3-4-5-6-7-7 .............................   Passed    0.23 sec
+          Start  590: shmem.collect-places.scan.unordered.1-1-0-0-2-2
+ 495/1093 Test  #587: shmem.collect-places.scan.negative-stride.0-0-1-1-1-2-3-3-4-4 .....................   Passed    0.16 sec
+          Start  591: shmem.collect-places.exchange.block.0-0-1-1
+ 496/1093 Test  #590: shmem.collect-places.scan.unordered.1-1-0-0-2-2 ...................................   Passed    0.13 sec
+          Start  592: shmem.collect-places.exchange.block.0-0-1-2-2
+ 497/1093 Test  #588: shmem.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 .......................   Passed    0.18 sec
+          Start  593: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3
+ 498/1093 Test  #589: shmem.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 ................................   Passed    0.16 sec
+          Start  594: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6
+ 499/1093 Test  #591: shmem.collect-places.exchange.block.0-0-1-1 .......................................   Passed    0.10 sec
+          Start  595: shmem.collect-places.exchange.negative-stride.0-0-1-2-2
+ 500/1093 Test  #592: shmem.collect-places.exchange.block.0-0-1-2-2 .....................................   Passed    0.13 sec
+          Start  596: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4
+ 501/1093 Test  #595: shmem.collect-places.exchange.negative-stride.0-0-1-2-2 ...........................   Passed    0.14 sec
+          Start  597: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2
+ 502/1093 Test  #593: shmem.collect-places.exchange.block.0-0-0-1-1-2-2-2-2-3 ...........................   Passed    0.18 sec
+          Start  598: shmem.collect-places.exchange.unordered.1-1-0-0-2-2
+ 503/1093 Test  #594: shmem.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 .............................   Passed    0.18 sec
+          Start  599: shmem.collect-places.totals.block.0-0-0-1-1-2-2-2-2-3
+ 504/1093 Test  #597: shmem.collect-places.exchange.cyclic.0-1-2-0-1-2-0-1-2 ............................   Passed    0.14 sec
+ 505/1093 Test  #598: shmem.collect-places.exchange.unordered.1-1-0-0-2-2 ...............................   Passed    0.13 sec
+          Start  600: shmem.collect-places.totals.negative-stride.0-0-1-1-1-2-3-3-4-4
+          Start  601: shmem.collect-places.totals.unordered.1-1-0-0-2-2
+ 506/1093 Test  #596: shmem.collect-places.exchange.negative-stride.0-0-1-1-1-2-3-3-4-4 .................   Passed    0.19 sec
+          Start  602: shmem.collect-places.members.block.0-0-1-2-2
+ 507/1093 Test  #599: shmem.collect-places.totals.block.0-0-0-1-1-2-2-2-2-3 .............................   Passed    0.15 sec
+          Start  603: shmem.collect-places.members.cyclic.0-1-2-0-1-2-0-1-2
+ 508/1093 Test  #601: shmem.collect-places.totals.unordered.1-1-0-0-2-2 .................................   Passed    0.13 sec
+          Start  604: shmem.collect-places.pi-link.block.0-0-0-1-1-2-2-2-2-3
+ 509/1093 Test  #602: shmem.collect-places.members.block.0-0-1-2-2 ......................................   Passed    0.15 sec
+          Start  605: shmem.collect-places.pi-link.negative-stride.0-0-1-2-2
+ 510/1093 Test  #603: shmem.collect-places.members.cyclic.0-1-2-0-1-2-0-1-2 .............................   Passed    0.13 sec
+          Start  606: shmem.collect-places.pi-link.unordered.1-0-2-3-4-5-6-7-8-9-10-11-12-13-14-15-16
+ 511/1093 Test  #600: shmem.collect-places.totals.negative-stride.0-0-1-1-1-2-3-3-4-4 ...................   Passed    0.18 sec
+          Start  607: shmem.collect-places.link.zeros.0-0-1-1-2-2-3
+ 512/1093 Test  #604: shmem.collect-places.pi-link.block.0-0-0-1-1-2-2-2-2-3 ............................   Passed    0.12 sec
+          Start  608: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3
+ 513/1093 Test  #605: shmem.collect-places.pi-link.negative-stride.0-0-1-2-2 ............................   Passed    0.12 sec
+          Start  609: shmem.collect-places.scan.zeros.0-0-1-1-2-2-3
+ 514/1093 Test  #606: shmem.collect-places.pi-link.unordered.1-0-2-3-4-5-6-7-8-9-10-11-12-13-14-15-16 ...   Passed    0.27 sec
+          Start  610: shmem.internal-region.L2
+ 515/1093 Test  #610: shmem.internal-region.L2 ..........................................................   Passed    0.02 sec
+          Start  611: shmem.internal-region.0-1
+ 516/1093 Test  #607: shmem.collect-places.link.zeros.0-0-1-1-2-2-3 .....................................   Passed    0.34 sec
+          Start  612: shmem.internal-region.0-0-1-1
+ 517/1093 Test  #611: shmem.internal-region.0-1 .........................................................   Passed    0.10 sec
+          Start  613: shmem.exit-without-finalize.first-word
+ 518/1093 Test  #608: shmem.collect-places.exchange.zeros.0-0-1-1-2-2-3 .................................   Passed    0.34 sec
+          Start  614: shmem.team-storage.local-order
+ 519/1093 Test  #609: shmem.collect-places.scan.zeros.0-0-1-1-2-2-3 .....................................   Passed    0.31 sec
+          Start  615: shmem.team-storage.0-1-2-0-1-0
+ 520/1093 Test  #612: shmem.internal-region.0-0-1-1 .....................................................   Passed    0.10 sec
+          Start  616: shmem.team-storage.0-0-1-1
+ 521/1093 Test  #614: shmem.team-storage.local-order ....................................................   Passed    0.05 sec
+          Start  617: shmem.team-storage.force-remote.0-0-1-1
+ 522/1093 Test  #615: shmem.team-storage.0-1-2-0-1-0 ....................................................   Passed    0.42 sec
+          Start  618: shmem.team-storage.local-order.internode
+ 523/1093 Test  #616: shmem.team-storage.0-0-1-1 ........................................................   Passed    0.41 sec
+          Start  619: shmem.team-claim.1024
+ 524/1093 Test  #617: shmem.team-storage.force-remote.0-0-1-1 ...........................................   Passed    0.40 sec
+          Start  620: shmem.team-claim.200
+ 525/1093 Test  #619: shmem.team-claim.1024 .............................................................   Passed    0.04 sec
+          Start  621: shmem.team-claim.40
+ 526/1093 Test  #620: shmem.team-claim.200 ..............................................................   Passed    0.03 sec
+          Start  622: shmem.gather-misuse.short-dest
+ 527/1093 Test  #621: shmem.team-claim.40 ...............................................................   Passed    0.03 sec
+          Start  623: shmem.gather-misuse.local-count
+ 528/1093 Test  #622: shmem.gather-misuse.short-dest ....................................................   Passed    0.09 sec
+          Start  624: shmem.team-split.L1
+ 529/1093 Test  #623: shmem.gather-misuse.local-count ...................................................   Passed    0.09 sec
+          Start  625: shmem.team-split.L2
+ 530/1093 Test  #624: shmem.team-split.L1 ...............................................................   Passed    0.03 sec
+          Start  626: shmem.team-split.L4
+ 531/1093 Test  #618: shmem.team-storage.local-order.internode ..........................................   Passed    0.40 sec
+          Start  627: shmem.team-split.exhaust.L4
+ 532/1093 Test  #627: shmem.team-split.exhaust.L4 .......................................................   Passed    0.03 sec
+          Start  628: shmem.team-split.too-many.L4
+ 533/1093 Test  #625: shmem.team-split.L2 ...............................................................   Passed    0.27 sec
+          Start  629: shmem.team-split.dry.L3
+ 534/1093 Test  #628: shmem.team-split.too-many.L4 ......................................................   Passed    0.03 sec
+          Start  630: shmem.team-split.full.L4
+ 535/1093 Test  #630: shmem.team-split.full.L4 ..........................................................   Passed    0.03 sec
+          Start  631: shmem.team-split.reuse.L4
+ 536/1093 Test  #631: shmem.team-split.reuse.L4 .........................................................   Passed    0.03 sec
+          Start  632: shmem.team-split.stale-handle.L2
+ 537/1093 Test  #632: shmem.team-split.stale-handle.L2 ..................................................   Passed    0.03 sec
+          Start  633: shmem.team-split.divergent.0-0-0-0
+ 538/1093 Test  #629: shmem.team-split.dry.L3 ...........................................................   Passed    0.13 sec
+ 539/1093 Test  #633: shmem.team-split.divergent.0-0-0-0 ................................................   Passed    0.03 sec
+          Start  634: shmem.team-split.divergent.0-0-1-1
+          Start  635: shmem.team-split.divergent-2d.0-0-0-0
+ 540/1093 Test  #635: shmem.team-split.divergent-2d.0-0-0-0 .............................................   Passed    0.03 sec
+          Start  636: shmem.team-split.divergent-2d.0-0-1-1
+ 541/1093 Test  #634: shmem.team-split.divergent.0-0-1-1 ................................................   Passed    0.08 sec
+          Start  637: shmem.malloc.divergent.malloc.0-0-0-0
+ 542/1093 Test  #637: shmem.malloc.divergent.malloc.0-0-0-0 .............................................   Passed    0.01 sec
+          Start  638: shmem.malloc.divergent.malloc.0-0-1-1
+ 543/1093 Test  #636: shmem.team-split.divergent-2d.0-0-1-1 .............................................   Passed    0.08 sec
+          Start  639: shmem.malloc.divergent.hints.0-0-0-0
+ 544/1093 Test  #639: shmem.malloc.divergent.hints.0-0-0-0 ..............................................   Passed    0.01 sec
+          Start  640: shmem.malloc.divergent.calloc.0-0-0-0
+ 545/1093 Test  #640: shmem.malloc.divergent.calloc.0-0-0-0 .............................................   Passed    0.01 sec
+          Start  641: shmem.malloc.divergent.align.0-0-0-0
+ 546/1093 Test  #641: shmem.malloc.divergent.align.0-0-0-0 ..............................................   Passed    0.01 sec
+          Start  642: shmem.malloc.divergent.realloc.0-0-0-0
+ 547/1093 Test  #642: shmem.malloc.divergent.realloc.0-0-0-0 ............................................   Passed    0.01 sec
+          Start  643: shmem.malloc.divergent.free.0-0-0-0
+ 548/1093 Test  #638: shmem.malloc.divergent.malloc.0-0-1-1 .............................................   Passed    0.06 sec
+          Start  644: shmem.malloc.divergent.free.0-0-1-1
+ 549/1093 Test  #643: shmem.malloc.divergent.free.0-0-0-0 ...............................................   Passed    0.01 sec
+          Start  645: shmem.malloc.equivalent.0-0-0-0
+ 550/1093 Test  #645: shmem.malloc.equivalent.0-0-0-0 ...................................................   Passed    0.01 sec
+          Start  646: shmem.malloc.equivalent.0-0-1-1
+ 551/1093 Test  #613: shmem.exit-without-finalize.first-word ............................................   Passed    1.23 sec
+          Start  647: shmem.collective-check.kind.0-0-0-0
+ 552/1093 Test  #644: shmem.malloc.divergent.free.0-0-1-1 ...............................................   Passed    0.06 sec
+          Start  648: shmem.collective-check.kind.0-0-1-1
+ 553/1093 Test  #646: shmem.malloc.equivalent.0-0-1-1 ...................................................   Passed    0.06 sec
+          Start  649: shmem.collective-check.gather.0-0-0-0
+ 554/1093 Test  #647: shmem.collective-check.kind.0-0-0-0 ...............................................   Passed    0.04 sec
+          Start  650: shmem.collective-check.gather.0-0-1-1
+ 555/1093 Test  #649: shmem.collective-check.gather.0-0-0-0 .............................................   Passed    0.03 sec
+          Start  651: shmem.collective-check.root.0-0-0-0
+ 556/1093 Test  #651: shmem.collective-check.root.0-0-0-0 ...............................................   Passed    0.03 sec
+          Start  652: shmem.collective-check.root.0-0-1-1
+ 557/1093 Test  #648: shmem.collective-check.kind.0-0-1-1 ...............................................   Passed    0.09 sec
+          Start  653: shmem.collective-check.count.0-0-0-0
+ 558/1093 Test  #650: shmem.collective-check.gather.0-0-1-1 .............................................   Passed    0.09 sec
+          Start  654: shmem.collective-check.count.0-0-1-1
+ 559/1093 Test  #653: shmem.collective-check.count.0-0-0-0 ..............................................   Passed    0.04 sec
+          Start  655: shmem.collective-check.sync.0-0-0-0
+ 560/1093 Test  #655: shmem.collective-check.sync.0-0-0-0 ...............................................   Passed    0.03 sec
+          Start  656: shmem.collective-check.sync.0-0-1-1
+ 561/1093 Test  #652: shmem.collective-check.root.0-0-1-1 ...............................................   Passed    0.09 sec
+          Start  657: shmem.collective-check.alltoall.0-0-0-0
+ 562/1093 Test  #654: shmem.collective-check.count.0-0-1-1 ..............................................   Passed    0.08 sec
+          Start  658: shmem.collective-check.alltoall.0-0-1-1
+ 563/1093 Test  #657: shmem.collective-check.alltoall.0-0-0-0 ...........................................   Passed    0.03 sec
+          Start  659: shmem.collective-check.off.0-0-0-0
+ 564/1093 Test  #659: shmem.collective-check.off.0-0-0-0 ................................................   Passed    0.03 sec
+          Start  660: shmem.collective-check.default.0-0-0-0
+ 565/1093 Test  #656: shmem.collective-check.sync.0-0-1-1 ...............................................   Passed    0.08 sec
+          Start  661: shmem.collective-check.unsaid.0-0-0-0
+ 566/1093 Test  #660: shmem.collective-check.default.0-0-0-0 ............................................   Passed    0.03 sec
+          Start  662: shmem.collective-check.clean.reduce.0-0-0-0
+ 567/1093 Test  #658: shmem.collective-check.alltoall.0-0-1-1 ...........................................   Passed    0.08 sec
+          Start  663: shmem.collective-check.clean.reduce.0-0-1-1
+ 568/1093 Test  #661: shmem.collective-check.unsaid.0-0-0-0 .............................................   Passed    0.04 sec
+          Start  664: shmem.collective-check.clean.broadcast.0-0-0-0
+ 569/1093 Test  #662: shmem.collective-check.clean.reduce.0-0-0-0 .......................................   Passed    0.04 sec
+          Start  665: shmem.collective-check.clean.broadcast.0-0-1-1
+ 570/1093 Test  #664: shmem.collective-check.clean.broadcast.0-0-0-0 ....................................   Passed    0.04 sec
+          Start  666: shmem.collective-check.clean.collect.0-0-0-0
+ 571/1093 Test  #666: shmem.collective-check.clean.collect.0-0-0-0 ......................................   Passed    0.03 sec
+          Start  667: shmem.collective-check.clean.collect.0-0-1-1
+ 572/1093 Test  #626: shmem.team-split.L4 ...............................................................   Passed    1.00 sec
+          Start  668: shmem.collective-check.clean.alltoall.0-0-0-0
+ 573/1093 Test  #663: shmem.collective-check.clean.reduce.0-0-1-1 .......................................   Passed    0.11 sec
+          Start  669: shmem.collective-check.clean.alltoall.0-0-1-1
+ 574/1093 Test  #665: shmem.collective-check.clean.broadcast.0-0-1-1 ....................................   Passed    0.10 sec
+          Start  670: shmem.collective-check.clean.scan.0-0-0-0
+ 575/1093 Test  #668: shmem.collective-check.clean.alltoall.0-0-0-0 .....................................   Passed    0.05 sec
+          Start  671: shmem.collective-check.clean.scan.0-0-1-1
+ 576/1093 Test  #667: shmem.collective-check.clean.collect.0-0-1-1 ......................................   Passed    0.11 sec
+ 577/1093 Test  #670: shmem.collective-check.clean.scan.0-0-0-0 .........................................   Passed    0.06 sec
+          Start  672: shmem.collective-check.clean.team.0-0-0-0
+          Start  673: shmem.team-split.generations.L2
+ 578/1093 Test  #673: shmem.team-split.generations.L2 ...................................................   Passed    0.04 sec
+          Start  674: shmem.team-split.0-0-1-1
+ 579/1093 Test  #669: shmem.collective-check.clean.alltoall.0-0-1-1 .....................................   Passed    0.13 sec
+          Start  675: shmem.team-split.0-1-2-0-1-0
+ 580/1093 Test  #671: shmem.collective-check.clean.scan.0-0-1-1 .........................................   Passed    0.13 sec
+          Start  676: shmem.team-split.0-1-2-3
+ 581/1093 Test  #672: shmem.collective-check.clean.team.0-0-0-0 .........................................   Passed    0.40 sec
+          Start  677: shmem.team-split.force-remote.0-0-1-1
+ 582/1093 Test  #674: shmem.team-split.0-0-1-1 ..........................................................   Passed    1.07 sec
+          Start  678: shmem.team-split.exhaust.0-0-1-1
+ 583/1093 Test  #676: shmem.team-split.0-1-2-3 ..........................................................   Passed    1.06 sec
+          Start  679: shmem.team-split.full.0-0-1-1
+ 584/1093 Test  #678: shmem.team-split.exhaust.0-0-1-1 ..................................................   Passed    0.09 sec
+          Start  680: shmem.team-split.reuse.0-0-1-1
+ 585/1093 Test  #679: shmem.team-split.full.0-0-1-1 .....................................................   Passed    0.09 sec
+          Start  681: shmem.team-split.reuse.0-1-2-0-1-0
+ 586/1093 Test  #680: shmem.team-split.reuse.0-0-1-1 ....................................................   Passed    0.09 sec
+          Start  682: shmem.team-release.held.0-1-2
+ 587/1093 Test  #681: shmem.team-split.reuse.0-1-2-0-1-0 ................................................   Passed    0.09 sec
+          Start  683: shmem.team-blocks.local-disagree
+ 588/1093 Test  #683: shmem.team-blocks.local-disagree ..................................................   Passed    0.05 sec
+          Start  684: shmem.team-blocks.invalid.7
+ 589/1093 Test  #684: shmem.team-blocks.invalid.7 .......................................................   Passed    0.03 sec
+          Start  685: shmem.team-blocks.invalid.65537
+ 590/1093 Test  #685: shmem.team-blocks.invalid.65537 ...................................................   Passed    0.03 sec
+          Start  686: shmem.team-blocks.invalid.x
+ 591/1093 Test  #677: shmem.team-split.force-remote.0-0-1-1 .............................................   Passed    1.05 sec
+          Start  687: shmem.job.disagree.team-blocks
+ 592/1093 Test  #686: shmem.team-blocks.invalid.x .......................................................   Passed    0.03 sec
+          Start  688: shmem.get-nbi.0-0-1-1
+ 593/1093 Test  #688: shmem.get-nbi.0-0-1-1 .............................................................   Passed    0.09 sec
+          Start  689: shmem.get-pieces.0-1
+ 594/1093 Test  #675: shmem.team-split.0-1-2-0-1-0 ......................................................   Passed    1.55 sec
+          Start  690: shmem.get-pieces.fallback.0-1
+ 595/1093 Test  #689: shmem.get-pieces.0-1 ..............................................................   Passed    0.09 sec
+          Start  691: shmem.get-nbi.0-1-2-0-1-0
+ 596/1093 Test  #690: shmem.get-pieces.fallback.0-1 .....................................................   Passed    0.09 sec
+          Start  692: shmem.multiple.L1
+ 597/1093 Test  #692: shmem.multiple.L1 .................................................................   Passed    0.01 sec
+          Start  693: shmem.multiple.L2
+ 598/1093 Test  #693: shmem.multiple.L2 .................................................................   Passed    0.01 sec
+          Start  694: shmem.multiple.L4
+ 599/1093 Test  #694: shmem.multiple.L4 .................................................................   Passed    0.01 sec
+          Start  695: shmem.multiple.0-1
+ 600/1093 Test  #691: shmem.get-nbi.0-1-2-0-1-0 .........................................................   Passed    0.10 sec
+          Start  696: shmem.multiple.checked.0-1
+ 601/1093 Test  #695: shmem.multiple.0-1 ................................................................   Passed    0.29 sec
+          Start  697: shmem.multiple.checked.0-1-2-0-1-0
+ 602/1093 Test  #696: shmem.multiple.checked.0-1 ........................................................   Passed    0.34 sec
+          Start  698: shmem.multiple.0-0-1-1
+ 603/1093 Test  #698: shmem.multiple.0-0-1-1 ............................................................   Passed    0.40 sec
+          Start  699: shmem.multiple.0-1-2-0-1-0
+ 604/1093 Test  #687: shmem.job.disagree.team-blocks ....................................................   Passed    1.07 sec
+          Start  700: shmem.multiple.default-zone.0-1
+ 605/1093 Test  #697: shmem.multiple.checked.0-1-2-0-1-0 ................................................   Passed    0.80 sec
+          Start  701: shmem.multiple.both-paths.0-1
+ 606/1093 Test  #700: shmem.multiple.default-zone.0-1 ...................................................   Passed    0.32 sec
+          Start  702: shmem.multiple.exhaust
+ 607/1093 Test  #682: shmem.team-release.held.0-1-2 .....................................................   Passed    1.60 sec
+          Start  703: shmem.team-threads.L1
+ 608/1093 Test  #703: shmem.team-threads.L1 .............................................................   Passed    0.01 sec
+          Start  704: shmem.team-threads.L2
+ 609/1093 Test  #702: shmem.multiple.exhaust ............................................................   Passed    0.05 sec
+          Start  705: shmem.team-threads.L4
+ 610/1093 Test  #704: shmem.team-threads.L2 .............................................................   Passed    0.03 sec
+          Start  706: shmem.team-threads.0-1
+ 611/1093 Test  #705: shmem.team-threads.L4 .............................................................   Passed    0.14 sec
+          Start  707: shmem.team-threads.0-1-2
+ 612/1093 Test  #706: shmem.team-threads.0-1 ............................................................   Passed    0.17 sec
+          Start  708: shmem.team-threads.0-0-1-1
+ 613/1093 Test  #701: shmem.multiple.both-paths.0-1 .....................................................   Passed    0.39 sec
+          Start  709: shmem.context-team-destroy.L1
+ 614/1093 Test  #709: shmem.context-team-destroy.L1 .....................................................   Passed    0.01 sec
+          Start  710: shmem.context-team-destroy.L2
+ 615/1093 Test  #699: shmem.multiple.0-1-2-0-1-0 ........................................................   Passed    0.75 sec
+          Start  711: shmem.context-team-destroy.L4
+ 616/1093 Test  #710: shmem.context-team-destroy.L2 .....................................................   Passed    0.02 sec
+          Start  712: shmem.team-levels.L1
+ 617/1093 Test  #712: shmem.team-levels.L1 ..............................................................   Passed    0.01 sec
+          Start  713: shmem.team-levels.L2
+ 618/1093 Test  #711: shmem.context-team-destroy.L4 .....................................................   Passed    0.02 sec
+ 619/1093 Test  #713: shmem.team-levels.L2 ..............................................................   Passed    0.01 sec
+          Start  714: shmem.team-levels.L4
+          Start  715: shmem.team-levels.0-1
+ 620/1093 Test  #714: shmem.team-levels.L4 ..............................................................   Passed    0.01 sec
+          Start  716: shmem.team-levels.0-0-1-1
+ 621/1093 Test  #707: shmem.team-threads.0-1-2 ..........................................................   Passed    0.25 sec
+          Start  717: shmem.multiple.landing-unaligned
+ 622/1093 Test  #708: shmem.team-threads.0-0-1-1 ........................................................   Passed    0.22 sec
+          Start  718: shmem.thread-places.held
+ 623/1093 Test  #717: shmem.multiple.landing-unaligned ..................................................   Passed    0.03 sec
+          Start  719: shmem.thread-places.freed
+ 624/1093 Test  #718: shmem.thread-places.held ..........................................................   Passed    0.03 sec
+          Start  720: shmem.agent-slice.L1
+ 625/1093 Test  #720: shmem.agent-slice.L1 ..............................................................   Passed    0.01 sec
+          Start  721: shmem.agent-slice.L2
+ 626/1093 Test  #715: shmem.team-levels.0-1 .............................................................   Passed    0.10 sec
+ 627/1093 Test  #719: shmem.thread-places.freed .........................................................   Passed    0.04 sec
+          Start  722: shmem.agent-slice.L4
+          Start  723: shmem.agent-slice.set.L2
+ 628/1093 Test  #721: shmem.agent-slice.L2 ..............................................................   Passed    0.01 sec
+          Start  724: shmem.agent-slice.kernel.L2
+ 629/1093 Test  #722: shmem.agent-slice.L4 ..............................................................   Passed    0.01 sec
+          Start  725: shmem.agent-slice.refused.L2
+ 630/1093 Test  #716: shmem.team-levels.0-0-1-1 .........................................................   Passed    0.11 sec
+          Start  726: shmem.agent-cpus.task.0-0-1-1
+ 631/1093 Test  #723: shmem.agent-slice.set.L2 ..........................................................   Passed    0.04 sec
+          Start  727: shmem.agent-cpus.node.0-0-1-1
+ 632/1093 Test  #724: shmem.agent-slice.kernel.L2 .......................................................   Passed    0.04 sec
+          Start  728: shmem.agent-cpus.node.L3
+ 633/1093 Test  #725: shmem.agent-slice.refused.L2 ......................................................   Passed    0.04 sec
+          Start  729: shmem.agent-cpus.refused.L2
+ 634/1093 Test  #728: shmem.agent-cpus.node.L3 ..........................................................   Passed    0.03 sec
+          Start  730: shmem.deadlock.waits.0-0-0-0
+ 635/1093 Test  #729: shmem.agent-cpus.refused.L2 .......................................................   Passed    0.03 sec
+          Start  731: shmem.deadlock.waits.0-0-1-1
+ 636/1093 Test  #726: shmem.agent-cpus.task.0-0-1-1 .....................................................   Passed    0.07 sec
+          Start  732: shmem.deadlock.reinit.0-0-0-0
+ 637/1093 Test  #727: shmem.agent-cpus.node.0-0-1-1 .....................................................   Passed    0.09 sec
+          Start  733: shmem.deadlock.reinit.0-0-1-1
+ 638/1093 Test  #730: shmem.deadlock.waits.0-0-0-0 ......................................................   Passed    2.04 sec
+          Start  734: shmem.deadlock.mismatch.0-0-0-0
+ 639/1093 Test  #732: shmem.deadlock.reinit.0-0-0-0 .....................................................   Passed    2.14 sec
+          Start  735: shmem.deadlock.mismatch.0-0-1-1
+ 640/1093 Test  #731: shmem.deadlock.waits.0-0-1-1 ......................................................   Passed    2.29 sec
+          Start  736: shmem.deadlock.mismatch.0-1-0-1
+ 641/1093 Test  #733: shmem.deadlock.reinit.0-0-1-1 .....................................................   Passed    2.33 sec
+          Start  737: shmem.deadlock.waits.helpers.0-0-1-1
+ 642/1093 Test  #734: shmem.deadlock.mismatch.0-0-0-0 ...................................................   Passed    2.13 sec
+          Start  738: shmem.deadlock.computing.0-0-0-0
+ 643/1093 Test  #735: shmem.deadlock.mismatch.0-0-1-1 ...................................................   Passed    2.28 sec
+          Start  739: shmem.deadlock.computing.0-0-1-1
+ 644/1093 Test  #736: shmem.deadlock.mismatch.0-1-0-1 ...................................................   Passed    2.29 sec
+          Start  740: shmem.deadlock.sleeping.0-0-0-0
+ 645/1093 Test  #737: shmem.deadlock.waits.helpers.0-0-1-1 ..............................................   Passed    2.39 sec
+          Start  741: shmem.deadlock.sleeping.0-0-1-1
+ 646/1093 Test  #738: shmem.deadlock.computing.0-0-0-0 ..................................................   Passed    4.03 sec
+          Start  742: shmem.deadlock.helper.0-0-0-0
+ 647/1093 Test  #739: shmem.deadlock.computing.0-0-1-1 ..................................................   Passed    4.08 sec
+          Start  743: shmem.deadlock.helper.0-0-1-1
+ 648/1093 Test  #740: shmem.deadlock.sleeping.0-0-0-0 ...................................................   Passed    4.03 sec
+          Start  744: shmem.deadlock.busy.0-0-0-0
+ 649/1093 Test  #741: shmem.deadlock.sleeping.0-0-1-1 ...................................................   Passed    4.09 sec
+          Start  745: shmem.deadlock.busy.0-0-1-1
+ 650/1093 Test  #742: shmem.deadlock.helper.0-0-0-0 .....................................................   Passed    4.06 sec
+          Start  746: shmem.deadlock.waits.probe-dropped.0-0-1-1
+ 651/1093 Test  #743: shmem.deadlock.helper.0-0-1-1 .....................................................   Passed    4.11 sec
+          Start  747: shmem.deadlock.helper-stale.0-0-1-1
+ 652/1093 Test  #744: shmem.deadlock.busy.0-0-0-0 .......................................................   Passed    4.06 sec
+          Start  748: shmem.deadlock.helper-busy.0-0-1-1
+ 653/1093 Test  #745: shmem.deadlock.busy.0-0-1-1 .......................................................   Passed    4.12 sec
+          Start  749: shmem.deadlock.helper-slow.0-0-1-1
+ 654/1093 Test  #746: shmem.deadlock.waits.probe-dropped.0-0-1-1 ........................................   Passed    6.44 sec
+          Start  750: shmem.deadlock.between.0-0-0-0
+ 655/1093 Test  #750: shmem.deadlock.between.0-0-0-0 ....................................................   Passed    2.54 sec
+          Start  751: shmem.deadlock.between.0-0-1-1
+ 656/1093 Test  #751: shmem.deadlock.between.0-0-1-1 ....................................................   Passed    2.60 sec
+          Start  752: shmem.deadlock.off.0-0-0-0
+ 657/1093 Test  #752: shmem.deadlock.off.0-0-0-0 ........................................................   Passed    6.04 sec
+          Start  753: shmem.deadlock.off.0-0-1-1
+ 658/1093 Test  #753: shmem.deadlock.off.0-0-1-1 ........................................................   Passed    6.04 sec
+          Start  754: shmem.deadlock.refused.L2
+ 659/1093 Test  #754: shmem.deadlock.refused.L2 .........................................................   Passed    0.03 sec
+          Start  755: shmem.shape.chosen.pi.4
+ 660/1093 Test  #755: shmem.shape.chosen.pi.4 ...........................................................   Passed    0.23 sec
+          Start  756: shmem.shape.chosen.pi.16
+ 661/1093 Test  #756: shmem.shape.chosen.pi.16 ..........................................................   Passed    0.58 sec
+          Start  757: shmem.shape.chosen.loopback.16
+ 662/1093 Test  #757: shmem.shape.chosen.loopback.16 ....................................................   Passed    0.64 sec
+          Start  760: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15
+ 663/1093 Test  #760: shmem.shape.back-to-back.0-1-2-3-4-5-6-7-8-9-10-11-12-13-14-15 ....................   Passed    1.43 sec
+          Start  761: shmem.shape.back-to-back.0-0-1-1-2-2-3-3-4-4-5-5-6-6-7-7
+ 664/1093 Test  #761: shmem.shape.back-to-back.0-0-1-1-2-2-3-3-4-4-5-5-6-6-7-7 ..........................   Passed    1.25 sec
+          Start  762: shmem.circulant.2
+ 665/1093 Test  #762: shmem.circulant.2 .................................................................   Passed    2.04 sec
+          Start  763: shmem.circulant.3
+ 666/1093 Test  #747: shmem.deadlock.helper-stale.0-0-1-1 ...............................................   Passed   30.05 sec
+          Start  764: shmem.circulant.4
+ 667/1093 Test  #748: shmem.deadlock.helper-busy.0-0-1-1 ................................................   Passed   30.05 sec
+          Start  765: shmem.circulant.5
+ 668/1093 Test  #763: shmem.circulant.3 .................................................................   Passed    0.69 sec
+          Start  766: shmem.circulant.6
+ 669/1093 Test  #749: shmem.deadlock.helper-slow.0-0-1-1 ................................................   Passed   30.06 sec
+          Start  767: shmem.circulant.7
+ 670/1093 Test  #764: shmem.circulant.4 .................................................................   Passed    2.90 sec
+          Start  768: shmem.circulant.8
+ 671/1093 Test  #765: shmem.circulant.5 .................................................................   Passed    4.63 sec
+          Start  769: shmem.circulant.9
+ 672/1093 Test  #766: shmem.circulant.6 .................................................................   Passed    5.36 sec
+          Start  770: shmem.circulant.12
+ 673/1093 Test  #767: shmem.circulant.7 .................................................................   Passed    5.52 sec
+          Start  771: shmem.circulant.16
+ 674/1093 Test  #768: shmem.circulant.8 .................................................................   Passed    7.78 sec
+          Start  772: shmem.circulant.17
+ 675/1093 Test  #769: shmem.circulant.9 .................................................................   Passed   11.08 sec
+          Start  776: shmem.circulant.8x2
+ 676/1093 Test  #770: shmem.circulant.12 ................................................................   Passed   12.75 sec
+          Start  777: shmem.circulant.5.perturb
+ 677/1093 Test  #771: shmem.circulant.16 ................................................................   Passed   13.67 sec
+          Start  778: shmem.circulant.16.perturb
+ 678/1093 Test  #772: shmem.circulant.17 ................................................................   Passed   14.16 sec
+          Start  779: shmem.circulant.4.threads
+ 679/1093 Test  #776: shmem.circulant.8x2 ...............................................................   Passed   10.51 sec
+          Start  780: shmem.circulant.16.threads
+ 680/1093 Test  #779: shmem.circulant.4.threads .........................................................   Passed    1.97 sec
+          Start  781: shmem.circulant.5.stress
+ 681/1093 Test  #777: shmem.circulant.5.perturb .........................................................   Passed   15.21 sec
+          Start  782: shmem.circulant.4.max-teams-4
+ 682/1093 Test  #780: shmem.circulant.16.threads ........................................................   Passed    7.56 sec
+          Start  783: shmem.circulant.16.tree
+ 683/1093 Test  #782: shmem.circulant.4.max-teams-4 .....................................................   Passed    4.44 sec
+          Start  784: shmem.circulant.7.lanes
+ 684/1093 Test  #784: shmem.circulant.7.lanes ...........................................................   Passed    0.85 sec
+          Start  785: shmem.circulant.5.lanes
+ 685/1093 Test  #785: shmem.circulant.5.lanes ...........................................................   Passed    0.65 sec
+          Start  786: shmem.circulant.5.ceiling-2
+ 686/1093 Test  #781: shmem.circulant.5.stress ..........................................................   Passed   13.46 sec
+          Start  787: shmem.circulant.9.ceiling-2
+ 687/1093 Test  #786: shmem.circulant.5.ceiling-2 .......................................................   Passed    8.79 sec
+          Start  788: shmem.circulant.17.ceiling-2
+ 688/1093 Test  #778: shmem.circulant.16.perturb ........................................................   Passed   31.17 sec
+          Start  790: shmem.circulant.5.capacity-1
+ 689/1093 Test  #787: shmem.circulant.9.ceiling-2 .......................................................   Passed   14.47 sec
+          Start  791: shmem.circulant.3.window-128
+ 690/1093 Test  #791: shmem.circulant.3.window-128 ......................................................   Passed    4.08 sec
+          Start  792: shmem.circulant.16.tiny
+ 691/1093 Test  #790: shmem.circulant.5.capacity-1 ......................................................   Passed    9.68 sec
+          Start  793: shmem.circulant.11.tiny
+ 692/1093 Test  #788: shmem.circulant.17.ceiling-2 ......................................................   Passed   20.12 sec
+          Start  794: shmem.circulant.12.tiny
+ 693/1093 Test  #793: shmem.circulant.11.tiny ...........................................................   Passed   15.24 sec
+          Start  795: shmem.circulant.3.helpers-0-2-2
+ 694/1093 Test  #792: shmem.circulant.16.tiny ...........................................................   Passed   17.59 sec
+          Start  796: shmem.circulant.4x2.helpers-0-3-1-2
+ 695/1093 Test  #783: shmem.circulant.16.tree ...........................................................   Passed   43.74 sec
+          Start  797: shmem.circulant.5.helpers-0-1-5-2-3
+ 696/1093 Test  #795: shmem.circulant.3.helpers-0-2-2 ...................................................   Passed    3.22 sec
+          Start  798: shmem.circulant.4.diverge
+ 697/1093 Test  #798: shmem.circulant.4.diverge .........................................................   Passed    0.15 sec
+          Start  799: shmem.circulant-grants.0-1-2
+ 698/1093 Test  #799: shmem.circulant-grants.0-1-2 ......................................................   Passed    0.20 sec
+          Start  800: shmem.circulant-grants.0-1-2-3
+ 699/1093 Test  #800: shmem.circulant-grants.0-1-2-3 ....................................................   Passed    0.19 sec
+          Start  801: shmem.circulant-grants.0-1-2-3-4
+ 700/1093 Test  #801: shmem.circulant-grants.0-1-2-3-4 ..................................................   Passed    0.18 sec
+          Start  802: shmem.circulant-grants.0-1-2-3-4-5-6-7-8
+ 701/1093 Test  #802: shmem.circulant-grants.0-1-2-3-4-5-6-7-8 ..........................................   Passed    0.19 sec
+          Start  803: shmem.circulant-grants.0-0-1-1-2-2
+ 702/1093 Test  #803: shmem.circulant-grants.0-0-1-1-2-2 ................................................   Passed    0.15 sec
+          Start  804: shmem.scan.L1
+ 703/1093 Test  #804: shmem.scan.L1 .....................................................................   Passed    0.02 sec
+          Start  805: shmem.scan.L2
+ 704/1093 Test  #805: shmem.scan.L2 .....................................................................   Passed    0.04 sec
+          Start  806: shmem.scan.L4
+ 705/1093 Test  #806: shmem.scan.L4 .....................................................................   Passed    0.04 sec
+          Start  807: shmem.scan.0-1-2-3
+ 706/1093 Test  #807: shmem.scan.0-1-2-3 ................................................................   Passed    0.27 sec
+          Start  808: shmem.scan.0-0-1-1
+ 707/1093 Test  #794: shmem.circulant.12.tiny ...........................................................   Passed   12.13 sec
+          Start  809: shmem.scan.0-1-2-0-1-0
+ 708/1093 Test  #808: shmem.scan.0-0-1-1 ................................................................   Passed    0.25 sec
+          Start  810: shmem.scan.0-0-0-1-2-2
+ 709/1093 Test  #809: shmem.scan.0-1-2-0-1-0 ............................................................   Passed    0.24 sec
+          Start  811: shmem.scan.force-remote.0-0-1-1
+ 710/1093 Test  #810: shmem.scan.0-0-0-1-2-2 ............................................................   Passed    0.23 sec
+          Start  812: shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4
+ 711/1093 Test  #811: shmem.scan.force-remote.0-0-1-1 ...................................................   Passed    0.25 sec
+          Start  813: shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4
+ 712/1093 Test  #796: shmem.circulant.4x2.helpers-0-3-1-2 ...............................................   Passed    5.03 sec
+          Start  814: shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4
+ 713/1093 Test  #813: shmem.scan.pipeline-1.fanout-2.0-1-2-3-4-0-1-2-3-4 ................................   Passed    0.59 sec
+          Start  815: shmem.scan.pipeline-8.0-1-2-3
+ 714/1093 Test  #812: shmem.scan.fanout-2.0-1-2-3-4-0-1-2-3-4 ...........................................   Passed    0.92 sec
+          Start  816: shmem.context.L1
+ 715/1093 Test  #815: shmem.scan.pipeline-8.0-1-2-3 .....................................................   Passed    0.22 sec
+          Start  817: shmem.context.L2
+ 716/1093 Test  #816: shmem.context.L1 ..................................................................   Passed    0.02 sec
+ 717/1093 Test  #817: shmem.context.L2 ..................................................................   Passed    0.01 sec
+          Start  818: shmem.context.L4
+          Start  819: shmem.context.0-0-1-1
+ 718/1093 Test  #797: shmem.circulant.5.helpers-0-1-5-2-3 ...............................................   Passed    4.22 sec
+          Start  820: shmem.context.0-1-2-0-1-0
+ 719/1093 Test  #818: shmem.context.L4 ..................................................................   Passed    0.02 sec
+          Start  821: shmem.context.force-remote.0-0-1-1
+ 720/1093 Test  #814: shmem.scan.pipeline-4.fanout-2.0-1-2-3-4-0-1-2-3-4 ................................   Passed    0.41 sec
+          Start  822: shmem.context.misuse.destroyed
+ 721/1093 Test  #822: shmem.context.misuse.destroyed ....................................................   Passed    0.03 sec
+          Start  823: shmem.context.misuse.foreign
+ 722/1093 Test  #819: shmem.context.0-0-1-1 .............................................................   Passed    0.14 sec
+          Start  824: shmem.context.misuse.invalid
+ 723/1093 Test  #823: shmem.context.misuse.foreign ......................................................   Passed    0.04 sec
+          Start  825: shmem.context.misuse.outside
+ 724/1093 Test  #821: shmem.context.force-remote.0-0-1-1 ................................................   Passed    0.15 sec
+          Start  826: shmem.context.misuse.default
+ 725/1093 Test  #820: shmem.context.0-1-2-0-1-0 .........................................................   Passed    0.17 sec
+          Start  827: shmem.context.misuse.private-team
+ 726/1093 Test  #824: shmem.context.misuse.invalid ......................................................   Passed    0.04 sec
+          Start  828: shmem.context.misuse.after-team
+ 727/1093 Test  #825: shmem.context.misuse.outside ......................................................   Passed    0.04 sec
+          Start  829: shmem.max-contexts.local-disagree
+ 728/1093 Test  #827: shmem.context.misuse.private-team .................................................   Passed    0.03 sec
+          Start  830: shmem.max-contexts.invalid.0
+ 729/1093 Test  #826: shmem.context.misuse.default ......................................................   Passed    0.05 sec
+ 730/1093 Test  #828: shmem.context.misuse.after-team ...................................................   Passed    0.04 sec
+          Start  831: shmem.max-contexts.invalid.4097
+          Start  832: shmem.max-contexts.invalid.x
+ 731/1093 Test  #830: shmem.max-contexts.invalid.0 ......................................................   Passed    0.03 sec
+          Start  833: shmem.context.pool-1.L2
+ 732/1093 Test  #831: shmem.max-contexts.invalid.4097 ...................................................   Passed    0.03 sec
+          Start  834: shmem.context.pool-3.L2
+ 733/1093 Test  #832: shmem.max-contexts.invalid.x ......................................................   Passed    0.03 sec
+          Start  835: shmem.context.pool-3.said-once.L2
+ 734/1093 Test  #833: shmem.context.pool-1.L2 ...........................................................   Passed    0.03 sec
+          Start  836: shmem.surface.L1
+ 735/1093 Test  #834: shmem.context.pool-3.L2 ...........................................................   Passed    0.03 sec
+          Start  837: shmem.surface.L2
+ 736/1093 Test  #836: shmem.surface.L1 ..................................................................   Passed    0.01 sec
+          Start  838: shmem.surface.L4
+ 737/1093 Test  #837: shmem.surface.L2 ..................................................................   Passed    0.01 sec
+          Start  839: shmem.agent-wake.L4
+ 738/1093 Test  #835: shmem.context.pool-3.said-once.L2 .................................................   Passed    0.04 sec
+          Start  840: shmem.start-pes.L1
+ 739/1093 Test  #838: shmem.surface.L4 ..................................................................   Passed    0.01 sec
+          Start  841: shmem.start-pes.L2
+ 740/1093 Test  #839: shmem.agent-wake.L4 ...............................................................   Passed    0.01 sec
+ 741/1093 Test  #840: shmem.start-pes.L1 ................................................................   Passed    0.01 sec
+          Start  842: shmem.start-pes.L4
+          Start  843: shmem.profile.L1
+ 742/1093 Test  #841: shmem.start-pes.L2 ................................................................   Passed    0.01 sec
+          Start  844: shmem.profile.L2
+ 743/1093 Test  #842: shmem.start-pes.L4 ................................................................   Passed    0.01 sec
+          Start  845: shmem.profile.L4
+ 744/1093 Test  #843: shmem.profile.L1 ..................................................................   Passed    0.01 sec
+          Start  846: shmem.team.L1
+ 745/1093 Test  #844: shmem.profile.L2 ..................................................................   Passed    0.01 sec
+          Start  847: shmem.team.L2
+ 746/1093 Test  #845: shmem.profile.L4 ..................................................................   Passed    0.01 sec
+          Start  848: shmem.team.L4
+ 747/1093 Test  #846: shmem.team.L1 .....................................................................   Passed    0.01 sec
+          Start  849: shmem.thread.L1
+ 748/1093 Test  #849: shmem.thread.L1 ...................................................................   Passed    0.01 sec
+          Start  850: shmem.thread.L2
+ 749/1093 Test  #850: shmem.thread.L2 ...................................................................   Passed    0.01 sec
+          Start  851: shmem.thread.L4
+ 750/1093 Test  #851: shmem.thread.L4 ...................................................................   Passed    0.01 sec
+          Start  852: shmem.wait-many.L1
+ 751/1093 Test  #852: shmem.wait-many.L1 ................................................................   Passed    0.01 sec
+          Start  853: shmem.wait-many.L2
+ 752/1093 Test  #853: shmem.wait-many.L2 ................................................................   Passed    0.05 sec
+          Start  854: shmem.wait-many.L4
+ 753/1093 Test  #847: shmem.team.L2 .....................................................................   Passed    0.13 sec
+          Start  855: shmem.stat.L1
+ 754/1093 Test  #854: shmem.wait-many.L4 ................................................................   Passed    0.05 sec
+          Start  856: shmem.stat.L2
+ 755/1093 Test  #855: shmem.stat.L1 .....................................................................   Passed    0.03 sec
+          Start  857: shmem.stat.L4
+ 756/1093 Test  #848: shmem.team.L4 .....................................................................   Passed    0.37 sec
+          Start  858: shmem.stat.view.many-pes
+ 757/1093 Test  #856: shmem.stat.L2 .....................................................................   Passed    0.38 sec
+          Start  859: shmem.stat.view.many-nodes
+ 758/1093 Test  #857: shmem.stat.L4 .....................................................................   Passed    0.41 sec
+          Start  860: shmem.stat.view.stopped
+ 759/1093 Test  #860: shmem.stat.view.stopped ...........................................................   Passed    2.33 sec
+          Start  861: shmem.stat.view.init-hang
+ 760/1093 Test  #861: shmem.stat.view.init-hang .........................................................   Passed    1.19 sec
+          Start  862: shmem.stat.view.last-pass
+ 761/1093 Test  #859: shmem.stat.view.many-nodes ........................................................   Passed    3.76 sec
+          Start  863: shmem.stat.gc.not-a-segment
+ 762/1093 Test  #863: shmem.stat.gc.not-a-segment .......................................................   Passed    0.01 sec
+          Start  864: shmem.stat.gc.shrunk-under-read
+ 763/1093 Test  #864: shmem.stat.gc.shrunk-under-read ...................................................   Passed    0.01 sec
+          Start  865: shmem.stat.link
+ 764/1093 Test  #865: shmem.stat.link ...................................................................   Passed    0.41 sec
+          Start  866: shmem.global-exit.L1
+ 765/1093 Test  #866: shmem.global-exit.L1 ..............................................................   Passed    0.24 sec
+          Start  867: shmem.global-exit.fatal.L1
+ 766/1093 Test  #829: shmem.max-contexts.local-disagree .................................................   Passed    5.19 sec
+          Start  868: shmem.global-exit.L2
+ 767/1093 Test  #867: shmem.global-exit.fatal.L1 ........................................................   Passed    0.24 sec
+          Start  869: shmem.global-exit.fatal.L2
+ 768/1093 Test  #868: shmem.global-exit.L2 ..............................................................   Passed    0.24 sec
+          Start  870: shmem.global-exit.L4
+ 769/1093 Test  #869: shmem.global-exit.fatal.L2 ........................................................   Passed    0.24 sec
+          Start  871: shmem.global-exit.fatal.L4
+ 770/1093 Test  #870: shmem.global-exit.L4 ..............................................................   Passed    0.25 sec
+          Start  872: shmem.global-exit.nonlead.one-node
+ 771/1093 Test  #858: shmem.stat.view.many-pes ..........................................................   Passed    5.29 sec
+          Start  873: shmem.global-exit.fatal.nonlead.one-node
+ 772/1093 Test  #871: shmem.global-exit.fatal.L4 ........................................................   Passed    0.32 sec
+          Start  874: shmem.global-exit.immediate.one-node
+ 773/1093 Test  #872: shmem.global-exit.nonlead.one-node ................................................   Passed    0.28 sec
+          Start  875: shmem.global-exit.start-pes.one-node
+ 774/1093 Test  #874: shmem.global-exit.immediate.one-node ..............................................   Passed    0.07 sec
+          Start  876: shmem.global-exit.returned.one-node
+ 775/1093 Test  #873: shmem.global-exit.fatal.nonlead.one-node ..........................................   Passed    0.25 sec
+          Start  877: shmem.global-exit.handlers.one-node
+ 776/1093 Test  #876: shmem.global-exit.returned.one-node ...............................................   Passed    0.25 sec
+          Start  878: shmem.global-exit.zero.one-node
+ 777/1093 Test  #875: shmem.global-exit.start-pes.one-node ..............................................   Passed    0.37 sec
+          Start  879: shmem.global-exit.two-callers.one-node
+ 778/1093 Test  #877: shmem.global-exit.handlers.one-node ...............................................   Passed    0.28 sec
+          Start  880: shmem.global-exit.held-stdout.one-node
+ 779/1093 Test  #878: shmem.global-exit.zero.one-node ...................................................   Passed    0.29 sec
+          Start  881: shmem.global-exit.caller-held-stdout.one-node
+ 780/1093 Test  #879: shmem.global-exit.two-callers.one-node ............................................   Passed    0.31 sec
+          Start  882: shmem.global-exit.stream.one-node
+ 781/1093 Test  #882: shmem.global-exit.stream.one-node .................................................   Passed    0.37 sec
+          Start  883: shmem.global-exit.0-1
+ 782/1093 Test  #883: shmem.global-exit.0-1 .............................................................   Passed    0.30 sec
+          Start  884: shmem.global-exit.fatal.0-1
+ 783/1093 Test  #884: shmem.global-exit.fatal.0-1 .......................................................   Passed    0.30 sec
+          Start  885: shmem.global-exit.0-0-1-1
+ 784/1093 Test  #885: shmem.global-exit.0-0-1-1 .........................................................   Passed    0.32 sec
+          Start  886: shmem.global-exit.fatal.0-0-1-1
+ 785/1093 Test  #886: shmem.global-exit.fatal.0-0-1-1 ...................................................   Passed    0.32 sec
+          Start  887: shmem.global-exit.0-1-2-0-1-0
+ 786/1093 Test  #862: shmem.stat.view.last-pass .........................................................   Passed    4.22 sec
+          Start  888: shmem.global-exit.fatal.0-1-2-0-1-0
+ 787/1093 Test  #887: shmem.global-exit.0-1-2-0-1-0 .....................................................   Passed    0.39 sec
+          Start  889: shmem.global-exit.nonlead.0-0-1-1
+ 788/1093 Test  #888: shmem.global-exit.fatal.0-1-2-0-1-0 ...............................................   Passed    0.41 sec
+          Start  890: shmem.global-exit.fatal.nonlead.0-0-1-1
+ 789/1093 Test  #889: shmem.global-exit.nonlead.0-0-1-1 .................................................   Passed    0.42 sec
+          Start  891: shmem.global-exit.immediate.0-0-1-1
+ 790/1093 Test  #890: shmem.global-exit.fatal.nonlead.0-0-1-1 ...........................................   Passed    0.32 sec
+          Start  892: shmem.global-exit.start-pes.0-0-1-1
+ 791/1093 Test  #891: shmem.global-exit.immediate.0-0-1-1 ...............................................   Passed    0.14 sec
+          Start  893: shmem.global-exit.returned.0-0-1-1
+ 792/1093 Test  #893: shmem.global-exit.returned.0-0-1-1 ................................................   Passed    0.31 sec
+          Start  894: shmem.global-exit.handlers.0-0-1-1
+ 793/1093 Test  #892: shmem.global-exit.start-pes.0-0-1-1 ...............................................   Passed    0.47 sec
+          Start  895: shmem.global-exit.held-stdout.0-0-1-1
+ 794/1093 Test  #894: shmem.global-exit.handlers.0-0-1-1 ................................................   Passed    0.39 sec
+          Start  896: shmem.global-exit.caller-held-stdout.0-0-1-1
+ 795/1093 Test  #880: shmem.global-exit.held-stdout.one-node ............................................   Passed   10.26 sec
+          Start  897: shmem.global-exit.zero.0-0-1-1
+ 796/1093 Test  #881: shmem.global-exit.caller-held-stdout.one-node .....................................   Passed   10.32 sec
+          Start  898: shmem.global-exit.two-callers.0-0-1-1
+ 797/1093 Test  #897: shmem.global-exit.zero.0-0-1-1 ....................................................   Passed    0.35 sec
+          Start  899: shmem.global-exit.two-nodes.0-0-1-1
+ 798/1093 Test  #898: shmem.global-exit.two-callers.0-0-1-1 .............................................   Passed    0.40 sec
+          Start  900: shmem.global-exit.all-callers.0-0-1-1
+ 799/1093 Test  #900: shmem.global-exit.all-callers.0-0-1-1 .............................................   Passed    1.45 sec
+          Start  901: shmem.global-exit.kills.L4
+ 800/1093 Test  #899: shmem.global-exit.two-nodes.0-0-1-1 ...............................................   Passed    1.91 sec
+          Start  902: shmem.global-exit.kills.slow-handler.0-0-1-1
+ 801/1093 Test  #901: shmem.global-exit.kills.L4 ........................................................   Passed    0.29 sec
+          Start  903: shmem.global-exit.kills.slow-handler.one-node
+ 802/1093 Test  #902: shmem.global-exit.kills.slow-handler.0-0-1-1 ......................................   Passed    1.34 sec
+          Start  904: shmem.global-exit.kills.nonlead.one-node
+ 803/1093 Test  #903: shmem.global-exit.kills.slow-handler.one-node .....................................   Passed    1.30 sec
+          Start  905: shmem.global-exit.kills.two-callers.one-node
+ 804/1093 Test  #896: shmem.global-exit.caller-held-stdout.0-0-1-1 ......................................   Passed   10.40 sec
+          Start  906: shmem.global-exit.kills.nonlead.0-0-1-1
+ 805/1093 Test  #904: shmem.global-exit.kills.nonlead.one-node ..........................................   Passed    0.28 sec
+          Start  907: shmem.global-exit.kills.nonlead-other-node.0-0-1-1
+ 806/1093 Test  #905: shmem.global-exit.kills.two-callers.one-node ......................................   Passed    0.33 sec
+          Start  908: shmem.global-exit.kills.two-callers.0-0-1-1
+ 807/1093 Test  #906: shmem.global-exit.kills.nonlead.0-0-1-1 ...........................................   Passed    0.40 sec
+          Start  909: shmem.global-exit.kills.two-nodes.0-0-1-1
+ 808/1093 Test  #907: shmem.global-exit.kills.nonlead-other-node.0-0-1-1 ................................   Passed    0.36 sec
+          Start  910: shmem.global-exit.kills.two-nodes.1-1-0-0
+ 809/1093 Test  #908: shmem.global-exit.kills.two-callers.0-0-1-1 .......................................   Passed    0.33 sec
+          Start  911: shmem.global-exit.kills.two-nodes.0-1-0-1
+ 810/1093 Test  #909: shmem.global-exit.kills.two-nodes.0-0-1-1 .........................................   Passed    1.91 sec
+          Start  912: shmem.global-exit.kills.all-callers.one-node
+ 811/1093 Test  #910: shmem.global-exit.kills.two-nodes.1-1-0-0 .........................................   Passed    1.84 sec
+          Start  913: shmem.global-exit.kills.all-callers.0-0-1-1
+ 812/1093 Test  #911: shmem.global-exit.kills.two-nodes.0-1-0-1 .........................................   Passed    1.83 sec
+          Start  914: shmem.global-exit.kills.all-callers.1-1-0-0
+ 813/1093 Test  #912: shmem.global-exit.kills.all-callers.one-node ......................................   Passed    2.26 sec
+          Start  915: shmem.global-exit.kills.all-callers.0-0-1-1-2-2
+ 814/1093 Test  #914: shmem.global-exit.kills.all-callers.1-1-0-0 .......................................   Passed    3.42 sec
+          Start  916: shmem.global-exit.kills.held-stdout.one-node
+ 815/1093 Test  #913: shmem.global-exit.kills.all-callers.0-0-1-1 .......................................   Passed    4.43 sec
+          Start  917: shmem.global-exit.kills.held-stdout.0-0-1-1
+ 816/1093 Test  #915: shmem.global-exit.kills.all-callers.0-0-1-1-2-2 ...................................   Passed    4.51 sec
+          Start  918: shmem.global-exit.kills.held-other-node.0-0-1-1
+ 817/1093 Test  #895: shmem.global-exit.held-stdout.0-0-1-1 .............................................   Passed   20.47 sec
+          Start  919: shmem.global-exit.kills.held-other-node.0-2-2-1
+ 818/1093 Test  #916: shmem.global-exit.kills.held-stdout.one-node ......................................   Passed   10.30 sec
+          Start  920: shmem.global-exit.stream.0-0-1-1
+ 819/1093 Test  #920: shmem.global-exit.stream.0-0-1-1 ..................................................   Passed    0.54 sec
+          Start  921: shmem.global-exit.stream.two-buffers.0-0-1-1
+ 820/1093 Test  #921: shmem.global-exit.stream.two-buffers.0-0-1-1 ......................................   Passed    0.49 sec
+          Start  922: shmem.keepalive.invalid
+ 821/1093 Test  #922: shmem.keepalive.invalid ...........................................................   Passed    0.05 sec
+          Start  923: shmem.dead-pe.sibling.L2
+ 822/1093 Test  #923: shmem.dead-pe.sibling.L2 ..........................................................   Passed    0.35 sec
+          Start  924: shmem.dead-pe.lead.L2
+ 823/1093 Test  #924: shmem.dead-pe.lead.L2 .............................................................   Passed    0.35 sec
+          Start  925: shmem.dead-pe.sibling.L4
+ 824/1093 Test  #925: shmem.dead-pe.sibling.L4 ..........................................................   Passed    0.35 sec
+          Start  926: shmem.dead-pe.lead.L4
+ 825/1093 Test  #926: shmem.dead-pe.lead.L4 .............................................................   Passed    0.35 sec
+          Start  927: shmem.dead-pe.sibling.0-0-1-1
+ 826/1093 Test  #927: shmem.dead-pe.sibling.0-0-1-1 .....................................................   Passed    0.42 sec
+          Start  928: shmem.dead-pe.lead.0-0-1-1
+ 827/1093 Test  #928: shmem.dead-pe.lead.0-0-1-1 ........................................................   Passed    0.37 sec
+          Start  929: shmem.dead-pe.lead.0-0-1-1.named
+ 828/1093 Test  #918: shmem.global-exit.kills.held-other-node.0-0-1-1 ...................................   Passed   10.39 sec
+          Start  930: shmem.dead-pe.lead.0-0-1-1-2-2.helpers-0.one-line
+ 829/1093 Test  #929: shmem.dead-pe.lead.0-0-1-1.named ..................................................   Passed    0.39 sec
+          Start  931: shmem.dead-pe.lead.0-0-1-1-2-2.helpers-2.one-line
+ 830/1093 Test  #930: shmem.dead-pe.lead.0-0-1-1-2-2.helpers-0.one-line .................................   Passed    0.42 sec
+          Start  932: shmem.fatal.kept-segment-named
+ 831/1093 Test  #932: shmem.fatal.kept-segment-named ....................................................   Passed    0.02 sec
+          Start  933: shmem.dead-pe.no-pidfd.sibling.L4
+ 832/1093 Test  #919: shmem.global-exit.kills.held-other-node.0-2-2-1 ...................................   Passed   10.40 sec
+          Start  934: shmem.dead-pe.no-pidfd.lead.L4
+ 833/1093 Test  #933: shmem.dead-pe.no-pidfd.sibling.L4 .................................................   Passed    0.34 sec
+          Start  935: shmem.dead-pe.lead-in-init
+ 834/1093 Test  #931: shmem.dead-pe.lead.0-0-1-1-2-2.helpers-2.one-line .................................   Passed    0.42 sec
+          Start  936: shmem.death-in-wait.barrier.L2
+ 835/1093 Test  #936: shmem.death-in-wait.barrier.L2 ....................................................   Passed    0.12 sec
+          Start  937: shmem.death-in-wait.wait_until.L2
+ 836/1093 Test  #937: shmem.death-in-wait.wait_until.L2 .................................................   Passed    0.12 sec
+          Start  938: shmem.death-in-wait.barrier.L4
+ 837/1093 Test  #934: shmem.dead-pe.no-pidfd.lead.L4 ....................................................   Passed    0.32 sec
+          Start  939: shmem.death-in-wait.wait_until.L4
+ 838/1093 Test  #938: shmem.death-in-wait.barrier.L4 ....................................................   Passed    0.11 sec
+          Start  940: shmem.death-in-wait.barrier.0-0-1-1
+ 839/1093 Test  #939: shmem.death-in-wait.wait_until.L4 .................................................   Passed    0.12 sec
+          Start  941: shmem.death-in-wait.wait_until.0-0-1-1
+ 840/1093 Test  #940: shmem.death-in-wait.barrier.0-0-1-1 ...............................................   Passed    0.17 sec
+          Start  942: shmem.version.start-up
+ 841/1093 Test  #942: shmem.version.start-up ............................................................   Passed    0.01 sec
+          Start  943: shmem.version.info
+ 842/1093 Test  #941: shmem.death-in-wait.wait_until.0-0-1-1 ............................................   Passed    0.17 sec
+          Start  944: shmem.version.start-up.sma
+ 843/1093 Test  #943: shmem.version.info ................................................................   Passed    0.01 sec
+          Start  945: shmem.version.info.sma
+ 844/1093 Test  #944: shmem.version.start-up.sma ........................................................   Passed    0.01 sec
+          Start  946: shmem.debug.SHMEM_DEBUG
+ 845/1093 Test  #945: shmem.version.info.sma ............................................................   Passed    0.01 sec
+          Start  947: shmem.debug.SMA_DEBUG
+ 846/1093 Test  #946: shmem.debug.SHMEM_DEBUG ...........................................................   Passed    0.01 sec
+          Start  948: shmem.version.info.every-variable
+ 847/1093 Test  #947: shmem.debug.SMA_DEBUG .............................................................   Passed    0.01 sec
+          Start  949: shmem.settings.unknown.near
+ 848/1093 Test  #949: shmem.settings.unknown.near .......................................................   Passed    0.04 sec
+          Start  950: shmem.settings.unknown.far
+ 849/1093 Test  #950: shmem.settings.unknown.far ........................................................   Passed    0.03 sec
+          Start  951: shmem.settings.unknown.known
+ 850/1093 Test  #951: shmem.settings.unknown.known ......................................................   Passed    0.03 sec
+          Start  952: shmem.refuse.no_launcher
+ 851/1093 Test  #952: shmem.refuse.no_launcher ..........................................................   Passed    0.02 sec
+          Start  953: shmem.refuse.slurm_not_a_step
+ 852/1093 Test  #953: shmem.refuse.slurm_not_a_step .....................................................   Passed    0.02 sec
+          Start  954: shmem.refuse.bad_size
+ 853/1093 Test  #954: shmem.refuse.bad_size .............................................................   Passed    0.05 sec
+          Start  955: shmem.refuse.size_mismatch
+ 854/1093 Test  #948: shmem.version.info.every-variable .................................................   Passed    0.22 sec
+          Start  956: shmem.refuse.bad_size_sma
+ 855/1093 Test  #955: shmem.refuse.size_mismatch ........................................................   Passed    0.05 sec
+          Start  957: shmem.refuse.zero_size
+ 856/1093 Test  #957: shmem.refuse.zero_size ............................................................   Passed    0.00 sec
+          Start  958: shmem.refuse.destroy_predefined_team
+ 857/1093 Test  #956: shmem.refuse.bad_size_sma .........................................................   Passed    0.05 sec
+          Start  959: shmem.refuse.team.shared
+ 858/1093 Test  #958: shmem.refuse.destroy_predefined_team ..............................................   Passed    0.01 sec
+          Start  960: shmem.refuse.team.destroyed
+ 859/1093 Test  #959: shmem.refuse.team.shared ..........................................................   Passed    0.03 sec
+          Start  961: shmem.refuse.team.destroyed-twice
+ 860/1093 Test  #961: shmem.refuse.team.destroyed-twice .................................................   Passed    0.03 sec
+          Start  962: shmem.refuse.team.never
+ 861/1093 Test  #960: shmem.refuse.team.destroyed .......................................................   Passed    0.08 sec
+          Start  963: shmem.refuse.team.destroyed.one-node
+ 862/1093 Test  #962: shmem.refuse.team.never ...........................................................   Passed    0.03 sec
+          Start  964: shmem.refuse.nonsymmetric_put
+ 863/1093 Test  #964: shmem.refuse.nonsymmetric_put .....................................................   Passed    0.01 sec
+          Start  977: shmem.no-spin.L8
+ 864/1093 Test  #963: shmem.refuse.team.destroyed.one-node ..............................................   Passed    0.03 sec
+          Start  996: launch.env
+ 865/1093 Test  #996: launch.env ........................................................................   Passed    0.01 sec
+          Start  997: launch.node-map
+ 866/1093 Test  #997: launch.node-map ...................................................................   Passed    0.01 sec
+          Start  998: launch.node-map-env
+ 867/1093 Test  #998: launch.node-map-env ...............................................................   Passed    0.03 sec
+          Start  999: launch.node-map-gap
+ 868/1093 Test  #999: launch.node-map-gap ...............................................................   Passed    0.00 sec
+          Start 1000: launch.failure
+ 869/1093 Test #1000: launch.failure ....................................................................   Passed    0.01 sec
+          Start 1001: launch.timeout
+ 870/1093 Test #1001: launch.timeout ....................................................................   Passed    1.01 sec
+          Start 1007: tools.bench.0-0-1-1
+ 871/1093 Test #1007: tools.bench.0-0-1-1 ...............................................................   Passed    1.23 sec
+          Start 1008: tools.bench.threads.0-1
+ 872/1093 Test #1008: tools.bench.threads.0-1 ...........................................................   Passed    0.09 sec
+          Start 1009: tools.bench.places.0-0-1-1
+ 873/1093 Test #1009: tools.bench.places.0-0-1-1 ........................................................   Passed    0.20 sec
+          Start 1010: tools.bench.collect-places.2
+ 874/1093 Test  #977: shmem.no-spin.L8 ..................................................................   Passed    3.04 sec
+          Start 1012: tools.pacer.0-0-0-0
+ 875/1093 Test #1010: tools.bench.collect-places.2 ......................................................   Passed    1.61 sec
+          Start 1013: tools.pacer.0-1-2-3
+ 876/1093 Test #1012: tools.pacer.0-0-0-0 ...............................................................   Passed    2.25 sec
+          Start 1014: tools.pacer.0-0-0-1-1-2
+ 877/1093 Test  #917: shmem.global-exit.kills.held-stdout.0-0-1-1 .......................................   Passed   20.40 sec
+          Start 1015: tools.pacer.0-1-0-1
+ 878/1093 Test #1013: tools.pacer.0-1-2-3 ...............................................................   Passed    4.90 sec
+          Start 1016: tools.pacer.mix.0-0-1-1
+ 879/1093 Test #1016: tools.pacer.mix.0-0-1-1 ...........................................................   Passed    0.40 sec
+          Start 1017: tools.pacer.mix.0-1-2-3
+ 880/1093 Test #1017: tools.pacer.mix.0-1-2-3 ...........................................................   Passed    0.43 sec
+          Start 1018: tools.pacer.mix.0-0-0-1-1-2
+ 881/1093 Test #1015: tools.pacer.0-1-0-1 ...............................................................   Passed    4.45 sec
+          Start 1019: tools.pacer.mix-end.0-0-0-0
+ 882/1093 Test #1018: tools.pacer.mix.0-0-0-1-1-2 .......................................................   Passed    0.53 sec
+          Start 1020: tools.pacer.mix-cycle.0-0-0-0-1-1-1-1
+ 883/1093 Test  #935: shmem.dead-pe.lead-in-init ........................................................   Passed   12.06 sec
+          Start 1021: tools.pacer.mix-node-mates.0-0-1-1
+ 884/1093 Test #1021: tools.pacer.mix-node-mates.0-0-1-1 ................................................   Passed    0.50 sec
+          Start 1022: tools.pacer.deprecated.0-1-2-0-1
+ 885/1093 Test #1014: tools.pacer.0-0-0-1-1-2 ...........................................................   Passed    6.52 sec
+          Start 1023: tools.pacer.waits.0-1-2
+ 886/1093 Test #1022: tools.pacer.deprecated.0-1-2-0-1 ..................................................   Passed    0.73 sec
+          Start 1024: tools.pacer.relay.0-1-2
+ 887/1093 Test #1023: tools.pacer.waits.0-1-2 ...........................................................   Passed    1.74 sec
+          Start 1025: tools.pacer.sort-paths.0-0-1-1
+ 888/1093 Test #1025: tools.pacer.sort-paths.0-0-1-1 ....................................................   Passed    0.20 sec
+          Start 1026: tools.pacer.print-signal.0-1-2-3
+ 889/1093 Test #1024: tools.pacer.relay.0-1-2 ...........................................................   Passed    1.98 sec
+          Start 1027: tools.pacer.counted.0-0-1-1
+ 890/1093 Test #1026: tools.pacer.print-signal.0-1-2-3 ..................................................   Passed    0.90 sec
+          Start 1028: tools.pacer.installed.0-0-1-1
+ 891/1093 Test #1027: tools.pacer.counted.0-0-1-1 .......................................................   Passed    0.42 sec
+          Start 1029: tools.pacer.library.0-0-1-1
+ 892/1093 Test #1029: tools.pacer.library.0-0-1-1 .......................................................   Passed    0.15 sec
+          Start 1030: tools.pacer.teams-exhaust.0-0-1-1
+ 893/1093 Test #1030: tools.pacer.teams-exhaust.0-0-1-1 .................................................   Passed    0.16 sec
+          Start 1031: tools.pacer.print.0-0-1-1
+ 894/1093 Test #1031: tools.pacer.print.0-0-1-1 .........................................................   Passed    0.11 sec
+          Start 1032: tools.pacer.print.0-1-2-3
+ 895/1093 Test #1032: tools.pacer.print.0-1-2-3 .........................................................   Passed    0.21 sec
+          Start 1033: tools.pacer.print.0-1-0-1
+ 896/1093 Test #1033: tools.pacer.print.0-1-0-1 .........................................................   Passed    0.14 sec
+          Start 1034: tools.pacer.start-pes.0-0-1-1
+ 897/1093 Test #1028: tools.pacer.installed.0-0-1-1 .....................................................   Passed    0.91 sec
+          Start 1035: tools.pacer.plant.start-pes-my-pe
+ 898/1093 Test #1034: tools.pacer.start-pes.0-0-1-1 .....................................................   Passed    0.10 sec
+          Start 1036: tools.pacer.plant.start-pes-put
+ 899/1093 Test #1035: tools.pacer.plant.start-pes-my-pe .................................................   Passed    0.09 sec
+          Start 1037: tools.pacer.plant.start-pes-realloc
+ 900/1093 Test #1036: tools.pacer.plant.start-pes-put ...................................................   Passed    0.08 sec
+          Start 1038: tools.pacer.plant.start-pes-align
+ 901/1093 Test #1037: tools.pacer.plant.start-pes-realloc ...............................................   Passed    0.08 sec
+          Start 1039: tools.pacer.start-pes.0-0-0-0
+ 902/1093 Test #1039: tools.pacer.start-pes.0-0-0-0 .....................................................   Passed    0.02 sec
+          Start 1040: tools.pacer.plant.start-pes-my-pe.0-0-0-0
+ 903/1093 Test #1038: tools.pacer.plant.start-pes-align .................................................   Passed    0.07 sec
+          Start 1041: tools.pacer.plant.start-pes-put.0-0-0-0
+ 904/1093 Test #1040: tools.pacer.plant.start-pes-my-pe.0-0-0-0 .........................................   Passed    0.02 sec
+          Start 1042: tools.pacer.plant.start-pes-realloc.0-0-0-0
+ 905/1093 Test #1041: tools.pacer.plant.start-pes-put.0-0-0-0 ...........................................   Passed    0.02 sec
+          Start 1043: tools.pacer.plant.start-pes-align.0-0-0-0
+ 906/1093 Test #1042: tools.pacer.plant.start-pes-realloc.0-0-0-0 .......................................   Passed    0.02 sec
+          Start 1044: tools.pacer.plant.sort-key
+ 907/1093 Test #1043: tools.pacer.plant.start-pes-align.0-0-0-0 .........................................   Passed    0.02 sec
+          Start 1045: tools.pacer.plant.sort-key.0-0-0-0
+ 908/1093 Test #1045: tools.pacer.plant.sort-key.0-0-0-0 ................................................   Passed    0.14 sec
+          Start 1046: tools.pacer.plant.sort-order
+ 909/1093 Test #1044: tools.pacer.plant.sort-key ........................................................   Passed    0.22 sec
+          Start 1047: tools.pacer.plant.sort-order.0-0-0-0
+ 910/1093 Test #1047: tools.pacer.plant.sort-order.0-0-0-0 ..............................................   Passed    0.10 sec
+          Start 1048: tools.pacer.plant.sort-range
+ 911/1093 Test #1046: tools.pacer.plant.sort-order ......................................................   Passed    0.20 sec
+          Start 1049: tools.pacer.plant.sort-range.0-0-0-0
+ 912/1093 Test #1049: tools.pacer.plant.sort-range.0-0-0-0 ..............................................   Passed    0.14 sec
+          Start 1050: tools.pacer.plant.sort-capacity
+ 913/1093 Test #1048: tools.pacer.plant.sort-range ......................................................   Passed    0.19 sec
+          Start 1051: tools.pacer.plant.sort-capacity.0-0-0-0
+ 914/1093 Test #1019: tools.pacer.mix-end.0-0-0-0 .......................................................   Passed    5.97 sec
+          Start 1052: tools.pacer.plant.alltoall-byte
+ 915/1093 Test #1051: tools.pacer.plant.sort-capacity.0-0-0-0 ...........................................   Passed    0.07 sec
+          Start 1053: tools.pacer.plant.alltoall-byte.0-0-0-0
+ 916/1093 Test #1050: tools.pacer.plant.sort-capacity ...................................................   Passed    0.15 sec
+          Start 1054: tools.pacer.plant.alltoall-gap
+ 917/1093 Test #1053: tools.pacer.plant.alltoall-byte.0-0-0-0 ...........................................   Passed    0.32 sec
+          Start 1055: tools.pacer.plant.alltoall-gap.0-0-0-0
+ 918/1093 Test #1055: tools.pacer.plant.alltoall-gap.0-0-0-0 ............................................   Passed    0.24 sec
+          Start 1056: tools.pacer.plant.mailbox-payload
+ 919/1093 Test #1054: tools.pacer.plant.alltoall-gap ....................................................   Passed    0.69 sec
+          Start 1057: tools.pacer.plant.mailbox-payload.0-0-0-0
+ 920/1093 Test #1052: tools.pacer.plant.alltoall-byte ...................................................   Passed    0.78 sec
+          Start 1058: tools.pacer.plant.mailbox-signal
+ 921/1093 Test #1057: tools.pacer.plant.mailbox-payload.0-0-0-0 .........................................   Passed    0.07 sec
+          Start 1059: tools.pacer.plant.mailbox-signal.0-0-0-0
+ 922/1093 Test #1059: tools.pacer.plant.mailbox-signal.0-0-0-0 ..........................................   Passed    0.07 sec
+          Start 1060: tools.pacer.plant.mailbox-count
+ 923/1093 Test #1056: tools.pacer.plant.mailbox-payload .................................................   Passed    0.64 sec
+          Start 1061: tools.pacer.plant.mailbox-count.0-0-0-0
+ 924/1093 Test #1058: tools.pacer.plant.mailbox-signal ..................................................   Passed    0.48 sec
+          Start 1062: tools.pacer.plant.mailbox-round-trip
+ 925/1093 Test #1061: tools.pacer.plant.mailbox-count.0-0-0-0 ...........................................   Passed    0.09 sec
+          Start 1063: tools.pacer.plant.threads-row
+ 926/1093 Test #1060: tools.pacer.plant.mailbox-count ...................................................   Passed    0.63 sec
+          Start 1064: tools.pacer.plant.threads-row.0-0-0-0
+ 927/1093 Test #1063: tools.pacer.plant.threads-row .....................................................   Passed    0.32 sec
+          Start 1065: tools.pacer.plant.threads-table
+ 928/1093 Test #1064: tools.pacer.plant.threads-row.0-0-0-0 .............................................   Passed    0.13 sec
+          Start 1066: tools.pacer.plant.threads-table.0-0-0-0
+ 929/1093 Test #1066: tools.pacer.plant.threads-table.0-0-0-0 ...........................................   Passed    0.17 sec
+          Start 1067: tools.pacer.plant.threads-count
+ 930/1093 Test #1062: tools.pacer.plant.mailbox-round-trip ..............................................   Passed    0.66 sec
+          Start 1068: tools.pacer.plant.threads-count.0-0-0-0
+ 931/1093 Test #1068: tools.pacer.plant.threads-count.0-0-0-0 ...........................................   Passed    0.15 sec
+          Start 1069: tools.pacer.plant.threads-pieces
+ 932/1093 Test #1065: tools.pacer.plant.threads-table ...................................................   Passed    0.52 sec
+          Start 1070: tools.pacer.plant.threads-pieces.0-0-0-0
+ 933/1093 Test #1067: tools.pacer.plant.threads-count ...................................................   Passed    0.44 sec
+          Start 1071: tools.pacer.plant.threads-collective
+ 934/1093 Test #1070: tools.pacer.plant.threads-pieces.0-0-0-0 ..........................................   Passed    0.13 sec
+          Start 1072: tools.pacer.plant.threads-collective.0-0-0-0
+ 935/1093 Test #1072: tools.pacer.plant.threads-collective.0-0-0-0 ......................................   Passed    0.12 sec
+          Start 1073: tools.pacer.plant.teams-query
+ 936/1093 Test #1069: tools.pacer.plant.threads-pieces ..................................................   Passed    0.41 sec
+          Start 1074: tools.pacer.plant.teams-query.0-0-0-0
+ 937/1093 Test #1074: tools.pacer.plant.teams-query.0-0-0-0 .............................................   Passed    0.13 sec
+          Start 1075: tools.pacer.plant.teams-collective
+ 938/1093 Test #1071: tools.pacer.plant.threads-collective ..............................................   Passed    0.38 sec
+          Start 1076: tools.pacer.plant.teams-collective.0-0-0-0
+ 939/1093 Test #1073: tools.pacer.plant.teams-query .....................................................   Passed    0.31 sec
+          Start 1077: tools.pacer.plant.teams-member
+ 940/1093 Test #1076: tools.pacer.plant.teams-collective.0-0-0-0 ........................................   Passed    0.07 sec
+          Start 1078: tools.pacer.plant.teams-member.0-0-0-0
+ 941/1093 Test #1078: tools.pacer.plant.teams-member.0-0-0-0 ............................................   Passed    0.09 sec
+          Start 1079: tools.pacer.plant.teams-ring
+ 942/1093 Test #1075: tools.pacer.plant.teams-collective ................................................   Passed    0.26 sec
+          Start 1080: tools.pacer.plant.teams-ring.0-0-0-0
+ 943/1093 Test #1077: tools.pacer.plant.teams-member ....................................................   Passed    0.19 sec
+          Start 1081: tools.pacer.plant.atomics-add
+ 944/1093 Test #1080: tools.pacer.plant.teams-ring.0-0-0-0 ..............................................   Passed    0.05 sec
+          Start 1082: tools.pacer.plant.atomics-add.0-0-0-0
+ 945/1093 Test #1082: tools.pacer.plant.atomics-add.0-0-0-0 .............................................   Passed    0.06 sec
+          Start 1083: tools.pacer.plant.atomics-fetch
+ 946/1093 Test #1079: tools.pacer.plant.teams-ring ......................................................   Passed    0.20 sec
+          Start 1084: tools.pacer.plant.atomics-fetch.0-0-0-0
+ 947/1093 Test #1084: tools.pacer.plant.atomics-fetch.0-0-0-0 ...........................................   Passed    0.14 sec
+          Start 1085: tools.pacer.plant.atomics-claim
+ 948/1093 Test #1081: tools.pacer.plant.atomics-add .....................................................   Passed    0.35 sec
+          Start 1086: tools.pacer.plant.atomics-claim.0-0-0-0
+ 949/1093 Test #1086: tools.pacer.plant.atomics-claim.0-0-0-0 ...........................................   Passed    0.12 sec
+          Start 1087: tools.pacer.plant.atomics-swap
+ 950/1093 Test #1083: tools.pacer.plant.atomics-fetch ...................................................   Passed    0.45 sec
+          Start 1088: tools.pacer.plant.atomics-swap.0-0-0-0
+ 951/1093 Test #1088: tools.pacer.plant.atomics-swap.0-0-0-0 ............................................   Passed    0.07 sec
+          Start 1089: tools.pacer.plant.atomics-set
+ 952/1093 Test #1085: tools.pacer.plant.atomics-claim ...................................................   Passed    0.44 sec
+          Start 1090: tools.pacer.plant.atomics-set.0-0-0-0
+ 953/1093 Test #1090: tools.pacer.plant.atomics-set.0-0-0-0 .............................................   Passed    0.12 sec
+          Start 1091: tools.pacer.plant.atomics-bitwise
+ 954/1093 Test #1087: tools.pacer.plant.atomics-swap ....................................................   Passed    0.40 sec
+          Start 1092: tools.pacer.plant.atomics-bitwise.0-0-0-0
+ 955/1093 Test #1092: tools.pacer.plant.atomics-bitwise.0-0-0-0 .........................................   Passed    0.11 sec
+          Start 1093: tools.pacer.plant.atomics-fetched-bit
+ 956/1093 Test #1089: tools.pacer.plant.atomics-set .....................................................   Passed    0.43 sec
+          Start 1094: tools.pacer.plant.atomics-fetched-bit.0-0-0-0
+ 957/1093 Test #1094: tools.pacer.plant.atomics-fetched-bit.0-0-0-0 .....................................   Passed    0.06 sec
+          Start 1095: tools.pacer.plant.rma-halo
+ 958/1093 Test #1091: tools.pacer.plant.atomics-bitwise .................................................   Passed    0.39 sec
+          Start 1096: tools.pacer.plant.rma-halo.0-0-0-0
+ 959/1093 Test #1093: tools.pacer.plant.atomics-fetched-bit .............................................   Passed    0.37 sec
+          Start 1097: tools.pacer.plant.rma-put
+ 960/1093 Test #1096: tools.pacer.plant.rma-halo.0-0-0-0 ................................................   Passed    1.46 sec
+          Start 1098: tools.pacer.plant.rma-put.0-0-0-0
+ 961/1093 Test #1095: tools.pacer.plant.rma-halo ........................................................   Passed    1.77 sec
+          Start 1099: tools.pacer.plant.rma-gap
+ 962/1093 Test #1097: tools.pacer.plant.rma-put .........................................................   Passed    1.84 sec
+          Start 1100: tools.pacer.plant.rma-gap.0-0-0-0
+ 963/1093 Test #1098: tools.pacer.plant.rma-put.0-0-0-0 .................................................   Passed    1.37 sec
+          Start 1101: tools.pacer.plant.rma-get
+ 964/1093 Test #1100: tools.pacer.plant.rma-gap.0-0-0-0 .................................................   Passed    1.41 sec
+          Start 1102: tools.pacer.plant.rma-get.0-0-0-0
+ 965/1093 Test #1099: tools.pacer.plant.rma-gap .........................................................   Passed    1.90 sec
+          Start 1103: tools.pacer.plant.rma-get-gap
+ 966/1093 Test #1101: tools.pacer.plant.rma-get .........................................................   Passed    1.93 sec
+          Start 1104: tools.pacer.plant.rma-get-gap.0-0-0-0
+ 967/1093 Test #1102: tools.pacer.plant.rma-get.0-0-0-0 .................................................   Passed    1.52 sec
+          Start 1105: tools.pacer.plant.rma-ptr
+ 968/1093 Test #1103: tools.pacer.plant.rma-get-gap .....................................................   Passed    1.92 sec
+          Start 1106: tools.pacer.plant.rma-ptr.0-0-0-0
+ 969/1093 Test #1104: tools.pacer.plant.rma-get-gap.0-0-0-0 .............................................   Passed    1.33 sec
+          Start 1107: tools.pacer.plant.locks-count
+ 970/1093 Test #1107: tools.pacer.plant.locks-count .....................................................   Passed    0.32 sec
+          Start 1108: tools.pacer.plant.locks-count.0-0-0-0
+ 971/1093 Test #1108: tools.pacer.plant.locks-count.0-0-0-0 .............................................   Passed    0.10 sec
+          Start 1109: tools.pacer.plant.locks-holder
+ 972/1093 Test #1105: tools.pacer.plant.rma-ptr .........................................................   Passed    1.77 sec
+          Start 1110: tools.pacer.plant.locks-holder.0-0-0-0
+ 973/1093 Test #1110: tools.pacer.plant.locks-holder.0-0-0-0 ............................................   Passed    0.09 sec
+          Start 1111: tools.pacer.plant.memory-free
+ 974/1093 Test #1109: tools.pacer.plant.locks-holder ....................................................   Passed    0.26 sec
+          Start 1112: tools.pacer.plant.memory-free.0-0-0-0
+ 975/1093 Test #1106: tools.pacer.plant.rma-ptr.0-0-0-0 .................................................   Passed    1.34 sec
+          Start 1113: tools.pacer.plant.memory-realloc
+ 976/1093 Test #1112: tools.pacer.plant.memory-free.0-0-0-0 .............................................   Passed    0.85 sec
+          Start 1114: tools.pacer.plant.memory-realloc.0-0-0-0
+ 977/1093 Test #1111: tools.pacer.plant.memory-free .....................................................   Passed    1.04 sec
+          Start 1115: tools.pacer.plant.memory-refused
+ 978/1093 Test #1113: tools.pacer.plant.memory-realloc ..................................................   Passed    1.12 sec
+          Start 1116: tools.pacer.plant.memory-refused.0-0-0-0
+ 979/1093 Test #1114: tools.pacer.plant.memory-realloc.0-0-0-0 ..........................................   Passed    0.88 sec
+          Start 1117: tools.pacer.plant.memory-granted
+ 980/1093 Test #1116: tools.pacer.plant.memory-refused.0-0-0-0 ..........................................   Passed    0.99 sec
+          Start 1118: tools.pacer.plant.memory-granted.0-0-0-0
+ 981/1093 Test #1115: tools.pacer.plant.memory-refused ..................................................   Passed    1.17 sec
+          Start 1119: tools.pacer.plant.memory-calloc
+ 982/1093 Test #1117: tools.pacer.plant.memory-granted ..................................................   Passed    1.10 sec
+          Start 1120: tools.pacer.plant.memory-calloc.0-0-0-0
+ 983/1093 Test #1118: tools.pacer.plant.memory-granted.0-0-0-0 ..........................................   Passed    0.91 sec
+          Start 1121: tools.pacer.plant.memory-align
+ 984/1093 Test #1119: tools.pacer.plant.memory-calloc ...................................................   Passed    1.18 sec
+          Start 1122: tools.pacer.plant.memory-align.0-0-0-0
+ 985/1093 Test #1120: tools.pacer.plant.memory-calloc.0-0-0-0 ...........................................   Passed    0.94 sec
+          Start 1123: tools.pacer.plant.memory-accessible
+ 986/1093 Test #1121: tools.pacer.plant.memory-align ....................................................   Passed    1.17 sec
+          Start 1124: tools.pacer.plant.memory-accessible.0-0-0-0
+ 987/1093 Test #1122: tools.pacer.plant.memory-align.0-0-0-0 ............................................   Passed    0.94 sec
+          Start 1125: tools.pacer.plant.memory-agree
+ 988/1093 Test #1123: tools.pacer.plant.memory-accessible ...............................................   Passed    1.18 sec
+          Start 1126: tools.pacer.plant.memory-agree.0-0-0-0
+ 989/1093 Test #1124: tools.pacer.plant.memory-accessible.0-0-0-0 .......................................   Passed    0.85 sec
+          Start 1127: tools.pacer.plant.collectives-reduce
+ 990/1093 Test #1125: tools.pacer.plant.memory-agree ....................................................   Passed    1.15 sec
+          Start 1128: tools.pacer.plant.collectives-reduce.0-0-0-0
+ 991/1093 Test #1126: tools.pacer.plant.memory-agree.0-0-0-0 ............................................   Passed    0.86 sec
+          Start 1129: tools.pacer.plant.collectives-reduce-folded
+ 992/1093 Test #1128: tools.pacer.plant.collectives-reduce.0-0-0-0 ......................................   Passed    0.52 sec
+          Start 1130: tools.pacer.plant.collectives-reduce-folded.0-0-0-0
+ 993/1093 Test #1127: tools.pacer.plant.collectives-reduce ..............................................   Passed    1.07 sec
+          Start 1131: tools.pacer.plant.collectives-scan
+ 994/1093 Test #1130: tools.pacer.plant.collectives-reduce-folded.0-0-0-0 ...............................   Passed    0.64 sec
+          Start 1132: tools.pacer.plant.collectives-scan.0-0-0-0
+ 995/1093 Test #1129: tools.pacer.plant.collectives-reduce-folded .......................................   Passed    0.90 sec
+          Start 1133: tools.pacer.plant.collectives-data
+ 996/1093 Test #1131: tools.pacer.plant.collectives-scan ................................................   Passed    0.86 sec
+          Start 1134: tools.pacer.plant.collectives-data.0-0-0-0
+ 997/1093 Test #1132: tools.pacer.plant.collectives-scan.0-0-0-0 ........................................   Passed    0.57 sec
+          Start 1135: tools.pacer.plant.collectives-gap
+ 998/1093 Test #1134: tools.pacer.plant.collectives-data.0-0-0-0 ........................................   Passed    0.52 sec
+          Start 1136: tools.pacer.plant.collectives-gap.0-0-0-0
+ 999/1093 Test #1133: tools.pacer.plant.collectives-data ................................................   Passed    1.18 sec
+          Start 1137: tools.pacer.plant.atomics-fetch-count
+1000/1093 Test #1136: tools.pacer.plant.collectives-gap.0-0-0-0 .........................................   Passed    0.55 sec
+          Start 1138: tools.pacer.plant.atomics-fetch-count.0-0-0-0
+1001/1093 Test #1138: tools.pacer.plant.atomics-fetch-count.0-0-0-0 .....................................   Passed    0.07 sec
+          Start 1139: tools.pacer.plant.atomics-attempts
+1002/1093 Test #1135: tools.pacer.plant.collectives-gap .................................................   Passed    0.93 sec
+          Start 1140: tools.pacer.plant.atomics-attempts.0-0-0-0
+1003/1093 Test #1140: tools.pacer.plant.atomics-attempts.0-0-0-0 ........................................   Passed    0.06 sec
+          Start 1141: tools.pacer.plant.rma-flag
+1004/1093 Test #1137: tools.pacer.plant.atomics-fetch-count .............................................   Passed    0.39 sec
+          Start 1142: tools.pacer.plant.rma-flag.0-0-0-0
+1005/1093 Test #1139: tools.pacer.plant.atomics-attempts ................................................   Passed    0.49 sec
+          Start 1143: tools.pacer.plant.rma-single
+1006/1093 Test #1142: tools.pacer.plant.rma-flag.0-0-0-0 ................................................   Passed    1.40 sec
+          Start 1144: tools.pacer.plant.rma-single.0-0-0-0
+1007/1093 Test #1141: tools.pacer.plant.rma-flag ........................................................   Passed    1.98 sec
+          Start 1145: tools.pacer.plant.rma-ptr-null
+1008/1093 Test #1143: tools.pacer.plant.rma-single ......................................................   Passed    1.87 sec
+          Start 1146: tools.pacer.plant.rma-ptr-null.0-0-0-0
+1009/1093 Test #1144: tools.pacer.plant.rma-single.0-0-0-0 ..............................................   Passed    1.42 sec
+          Start 1147: tools.pacer.plant.collectives-status
+1010/1093 Test #1146: tools.pacer.plant.rma-ptr-null.0-0-0-0 ............................................   Passed    1.34 sec
+          Start 1148: tools.pacer.plant.collectives-status.0-0-0-0
+1011/1093 Test #1020: tools.pacer.mix-cycle.0-0-0-0-1-1-1-1 .............................................   Passed   28.86 sec
+          Start 1149: tools.pacer.plant.collectives-timed
+1012/1093 Test #1145: tools.pacer.plant.rma-ptr-null ....................................................   Passed    1.84 sec
+          Start 1150: tools.pacer.plant.collectives-timed.0-0-0-0
+1013/1093 Test #1147: tools.pacer.plant.collectives-status ..............................................   Passed    1.03 sec
+          Start 1151: tools.pacer.plant.collectives-timed-data
+1014/1093 Test #1148: tools.pacer.plant.collectives-status.0-0-0-0 ......................................   Passed    0.41 sec
+          Start 1152: tools.pacer.plant.collectives-timed-data.0-0-0-0
+1015/1093 Test #1150: tools.pacer.plant.collectives-timed.0-0-0-0 .......................................   Passed    0.48 sec
+          Start 1153: tools.pacer.plant.teams-exhaust
+1016/1093 Test #1153: tools.pacer.plant.teams-exhaust ...................................................   Passed    0.25 sec
+          Start 1154: tools.pacer.plant.teams-exhaust.0-0-0-0
+1017/1093 Test #1152: tools.pacer.plant.collectives-timed-data.0-0-0-0 ..................................   Passed    0.58 sec
+          Start 1155: tools.pacer.plant.teams-renew
+1018/1093 Test #1154: tools.pacer.plant.teams-exhaust.0-0-0-0 ...........................................   Passed    0.09 sec
+          Start 1156: tools.pacer.plant.teams-renew.0-0-0-0
+1019/1093 Test #1156: tools.pacer.plant.teams-renew.0-0-0-0 .............................................   Passed    0.05 sec
+          Start 1157: tools.pacer.plant.teams-back
+1020/1093 Test #1149: tools.pacer.plant.collectives-timed ...............................................   Passed    0.90 sec
+          Start 1158: tools.pacer.plant.teams-back.0-0-0-0
+1021/1093 Test #1151: tools.pacer.plant.collectives-timed-data ..........................................   Passed    0.83 sec
+          Start 1159: tools.pacer.plant.print-hash
+1022/1093 Test #1158: tools.pacer.plant.teams-back.0-0-0-0 ..............................................   Passed    0.06 sec
+          Start 1160: tools.pacer.plant.print-hash.0-0-0-0
+1023/1093 Test #1155: tools.pacer.plant.teams-renew .....................................................   Passed    0.15 sec
+          Start 1161: tools.pacer.plant.deprecated-reduce
+1024/1093 Test #1160: tools.pacer.plant.print-hash.0-0-0-0 ..............................................   Passed    0.06 sec
+          Start 1162: tools.pacer.plant.deprecated-reduce.0-0-0-0
+1025/1093 Test #1159: tools.pacer.plant.print-hash ......................................................   Passed    0.14 sec
+          Start 1163: tools.pacer.plant.deprecated-data
+1026/1093 Test #1157: tools.pacer.plant.teams-back ......................................................   Passed    0.20 sec
+          Start 1164: tools.pacer.plant.deprecated-data.0-0-0-0
+1027/1093 Test #1162: tools.pacer.plant.deprecated-reduce.0-0-0-0 .......................................   Passed    0.07 sec
+          Start 1165: tools.pacer.plant.deprecated-outside
+1028/1093 Test #1164: tools.pacer.plant.deprecated-data.0-0-0-0 .........................................   Passed    0.06 sec
+          Start 1166: tools.pacer.plant.deprecated-outside.0-0-0-0
+1029/1093 Test #1161: tools.pacer.plant.deprecated-reduce ...............................................   Passed    0.19 sec
+          Start 1167: tools.pacer.plant.deprecated-barrier
+1030/1093 Test #1166: tools.pacer.plant.deprecated-outside.0-0-0-0 ......................................   Passed    0.07 sec
+          Start 1168: tools.pacer.plant.deprecated-barrier.0-0-0-0
+1031/1093 Test #1163: tools.pacer.plant.deprecated-data .................................................   Passed    0.17 sec
+          Start 1169: tools.pacer.plant.deprecated-amo
+1032/1093 Test #1165: tools.pacer.plant.deprecated-outside ..............................................   Passed    0.19 sec
+          Start 1170: tools.pacer.plant.deprecated-amo.0-0-0-0
+1033/1093 Test #1168: tools.pacer.plant.deprecated-barrier.0-0-0-0 ......................................   Passed    0.07 sec
+          Start 1171: tools.pacer.plant.deprecated-word
+1034/1093 Test #1170: tools.pacer.plant.deprecated-amo.0-0-0-0 ..........................................   Passed    0.06 sec
+          Start 1172: tools.pacer.plant.deprecated-word.0-0-0-0
+1035/1093 Test #1167: tools.pacer.plant.deprecated-barrier ..............................................   Passed    0.20 sec
+          Start 1173: tools.pacer.plant.deprecated-wait
+1036/1093 Test #1172: tools.pacer.plant.deprecated-word.0-0-0-0 .........................................   Passed    0.06 sec
+          Start 1174: tools.pacer.plant.deprecated-wait.0-0-0-0
+1037/1093 Test #1169: tools.pacer.plant.deprecated-amo ..................................................   Passed    0.19 sec
+          Start 1175: tools.pacer.plant.waits-value
+1038/1093 Test #1174: tools.pacer.plant.deprecated-wait.0-0-0-0 .........................................   Passed    0.06 sec
+          Start 1176: tools.pacer.plant.waits-value.0-0-0-0
+1039/1093 Test #1171: tools.pacer.plant.deprecated-word .................................................   Passed    0.21 sec
+          Start 1177: tools.pacer.plant.waits-index
+1040/1093 Test #1176: tools.pacer.plant.waits-value.0-0-0-0 .............................................   Passed    0.11 sec
+          Start 1178: tools.pacer.plant.waits-index.0-0-0-0
+1041/1093 Test #1173: tools.pacer.plant.deprecated-wait .................................................   Passed    0.22 sec
+          Start 1179: tools.pacer.plant.waits-count
+1042/1093 Test #1175: tools.pacer.plant.waits-value .....................................................   Passed    0.61 sec
+          Start 1180: tools.pacer.plant.waits-count.0-0-0-0
+1043/1093 Test #1178: tools.pacer.plant.waits-index.0-0-0-0 .............................................   Passed    0.59 sec
+          Start 1181: tools.pacer.plant.waits-excluded
+1044/1093 Test #1177: tools.pacer.plant.waits-index .....................................................   Passed    0.69 sec
+          Start 1182: tools.pacer.plant.waits-excluded.0-0-0-0
+1045/1093 Test #1179: tools.pacer.plant.waits-count .....................................................   Passed    0.66 sec
+          Start 1183: tools.pacer.plant.rma-signal
+1046/1093 Test #1180: tools.pacer.plant.waits-count.0-0-0-0 .............................................   Passed    0.82 sec
+          Start 1184: tools.pacer.plant.rma-signal.0-0-0-0
+1047/1093 Test #1181: tools.pacer.plant.waits-excluded ..................................................   Passed    0.79 sec
+          Start 1185: tools.pacer.plant.print-route
+1048/1093 Test #1182: tools.pacer.plant.waits-excluded.0-0-0-0 ..........................................   Passed    0.80 sec
+          Start 1186: tools.pacer.plant.print-route.0-0-0-0
+1049/1093 Test #1186: tools.pacer.plant.print-route.0-0-0-0 .............................................   Passed    0.07 sec
+          Start 1187: tools.pacer.plant.print-fold
+1050/1093 Test #1185: tools.pacer.plant.print-route .....................................................   Passed    0.20 sec
+          Start 1188: tools.pacer.plant.print-fold.0-0-0-0
+1051/1093 Test #1188: tools.pacer.plant.print-fold.0-0-0-0 ..............................................   Passed    0.09 sec
+          Start 1189: tools.pacer.plant.mix-locks-count
+1052/1093 Test #1187: tools.pacer.plant.print-fold ......................................................   Passed    0.18 sec
+          Start 1190: tools.pacer.plant.mix-locks-count.0-0-0-0
+1053/1093 Test #1190: tools.pacer.plant.mix-locks-count.0-0-0-0 .........................................   Passed    0.18 sec
+          Start 1191: tools.pacer.plant.mix-waits-value
+1054/1093 Test #1189: tools.pacer.plant.mix-locks-count .................................................   Passed    0.47 sec
+          Start 1192: tools.pacer.plant.mix-waits-value.0-0-0-0
+1055/1093 Test #1191: tools.pacer.plant.mix-waits-value .................................................   Passed    0.46 sec
+          Start 1193: tools.pacer.plant.mix-rma-ptr
+1056/1093 Test #1192: tools.pacer.plant.mix-waits-value.0-0-0-0 .........................................   Passed    0.21 sec
+          Start 1194: tools.pacer.plant.mix-rma-ptr.0-0-0-0
+1057/1093 Test #1183: tools.pacer.plant.rma-signal ......................................................   Passed    1.70 sec
+          Start 1195: tools.pacer.plant.relay-block
+1058/1093 Test #1194: tools.pacer.plant.mix-rma-ptr.0-0-0-0 .............................................   Passed    0.17 sec
+          Start 1196: tools.pacer.plant.relay-stale
+1059/1093 Test #1184: tools.pacer.plant.rma-signal.0-0-0-0 ..............................................   Passed    1.27 sec
+          Start 1197: tools.pacer.plant.relay-quiet
+1060/1093 Test #1193: tools.pacer.plant.mix-rma-ptr .....................................................   Passed    0.54 sec
+          Start 1198: tools.pacer.installed.one-node
+1061/1093 Test #1198: tools.pacer.installed.one-node ....................................................   Passed    0.78 sec
+          Start 1199: tools.pacer.threads.0-0-0-0
+1062/1093 Test #1199: tools.pacer.threads.0-0-0-0 .......................................................   Passed    0.30 sec
+          Start 1200: tools.pacer.threads.0-1-2-3
+1063/1093 Test #1195: tools.pacer.plant.relay-block .....................................................   Passed    3.23 sec
+          Start 1201: tools.pacer.threads.0-0-0-1-1-2
+1064/1093 Test #1196: tools.pacer.plant.relay-stale .....................................................   Passed    3.31 sec
+          Start 1202: tools.pacer.threads.0-1-0-1
+1065/1093 Test #1200: tools.pacer.threads.0-1-2-3 .......................................................   Passed    2.39 sec
+          Start 1203: tools.pacer.threads.0-1-2-0-1-0
+1066/1093 Test #1202: tools.pacer.threads.0-1-0-1 .......................................................   Passed    1.18 sec
+          Start 1204: tools.pacer.threads.0-0-1-1-2-2
+1067/1093 Test #1201: tools.pacer.threads.0-0-0-1-1-2 ...................................................   Passed    1.53 sec
+1068/1093 Test #1203: tools.pacer.threads.0-1-2-0-1-0 ...................................................   Passed    1.40 sec
+1069/1093 Test #1204: tools.pacer.threads.0-0-1-1-2-2 ...................................................   Passed    1.05 sec
+1070/1093 Test #1197: tools.pacer.plant.relay-quiet .....................................................   Passed    5.74 sec
+          Start  276: shmem.zero-copy-refusals.64-nodes
+1071/1093 Test  #276: shmem.zero-copy-refusals.64-nodes .................................................   Passed    5.74 sec
+          Start  338: shmem.reply-pool.overflow
+1072/1093 Test  #338: shmem.reply-pool.overflow .........................................................   Passed    0.11 sec
+          Start  472: shmem.fixed-shape.fanout-4-pipeline-2
+1073/1093 Test  #472: shmem.fixed-shape.fanout-4-pipeline-2 .............................................   Passed    2.32 sec
+          Start  473: shmem.fixed-shape.defaults
+1074/1093 Test  #473: shmem.fixed-shape.defaults ........................................................   Passed    2.21 sec
+          Start  758: shmem.shape.chosen.pi.64
+1075/1093 Test  #758: shmem.shape.chosen.pi.64 ..........................................................   Passed    7.71 sec
+          Start  759: shmem.shape.chosen.loopback.64
+1076/1093 Test  #759: shmem.shape.chosen.loopback.64 ....................................................   Passed    2.63 sec
+          Start  773: shmem.circulant.33
+1077/1093 Test  #773: shmem.circulant.33 ................................................................   Passed   11.10 sec
+          Start  774: shmem.circulant.64
+1078/1093 Test  #774: shmem.circulant.64 ................................................................   Passed   25.29 sec
+          Start  775: shmem.circulant.70
+1079/1093 Test  #775: shmem.circulant.70 ................................................................   Passed   30.10 sec
+          Start  789: shmem.circulant.33.ceiling-2
+1080/1093 Test  #789: shmem.circulant.33.ceiling-2 ......................................................   Passed   11.03 sec
+          Start  978: shmem.no-spin.L32
+1081/1093 Test  #978: shmem.no-spin.L32 .................................................................   Passed    3.05 sec
+          Start  979: shmem.global-exit.32-nodes
+1082/1093 Test  #979: shmem.global-exit.32-nodes ........................................................   Passed    0.46 sec
+          Start  980: shmem.deadlock.waits.32-nodes
+1083/1093 Test  #980: shmem.deadlock.waits.32-nodes .....................................................   Passed    2.35 sec
+          Start  981: shmem.barrier.L32
+1084/1093 Test  #981: shmem.barrier.L32 .................................................................   Passed    4.58 sec
+          Start  982: shmem.malloc.L32
+1085/1093 Test  #982: shmem.malloc.L32 ..................................................................   Passed    6.50 sec
+          Start  983: shmem.rma.L32
+1086/1093 Test  #983: shmem.rma.L32 .....................................................................   Passed    6.80 sec
+          Start  984: shmem.amo.L32
+1087/1093 Test  #984: shmem.amo.L32 .....................................................................   Passed    0.06 sec
+          Start  985: shmem.lock.L32
+1088/1093 Test  #985: shmem.lock.L32 ....................................................................   Passed    0.35 sec
+          Start  986: shmem.scan.L32
+1089/1093 Test  #986: shmem.scan.L32 ....................................................................   Passed    0.11 sec
+          Start  987: shmem.team.L32
+1090/1093 Test  #987: shmem.team.L32 ....................................................................   Passed    3.79 sec
+          Start  988: shmem.reduce.L32
+1091/1093 Test  #988: shmem.reduce.L32 ..................................................................   Passed    0.10 sec
+          Start  989: shmem.barrier.L64
+1092/1093 Test  #989: shmem.barrier.L64 .................................................................   Passed    7.38 sec
+          Start  990: shmem.reduce.L64
+1093/1093 Test  #990: shmem.reduce.L64 ..................................................................   Passed    0.16 sec
+
+100% tests passed, 0 tests failed out of 1093
+
+Label Time Summary:
+internode    = 1246.76 sec*proc (603 tests)
+tier2        = 1487.25 sec*proc (1093 tests)
+
+Total Test time (real) = 473.70 sec
+
+The following tests did not run:
+	403 - shmem.quiet.litmus.L2 (Skipped)

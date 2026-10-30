@@ -1,0 +1,4 @@
+== safety: does every quiet complete the gets issued before it was called?
+equality: 2 issuers, 1 quiet                                 SC  states=      1,278 depth= 25 (miss<1e-23) -> ok +live
+
+ALL AS EXPECTED

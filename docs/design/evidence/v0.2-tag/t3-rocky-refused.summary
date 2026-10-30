@@ -1,0 +1,8 @@
+== 2026-10-30T18:25:08Z t3-rocky-refused on Rocky Linux release 9.8 (Blue Onyx), 5.14.0-687.10.1.el9_8.0.1.aarch64; /dev/shm 1824 MiB free, 3118 MiB available
+release, the check on: 0% tests passed, 4 tests failed out of 4
+release, OSOE_SHM_CAPACITY_CHECK=0: The following tests passed:
+100% tests passed, 0 tests failed out of 4; 3 notices of the shortfall
+debug, the check on: 0% tests passed, 4 tests failed out of 4
+debug, OSOE_SHM_CAPACITY_CHECK=0: The following tests passed:
+100% tests passed, 0 tests failed out of 4; 3 notices of the shortfall
+== 18:27:55 done

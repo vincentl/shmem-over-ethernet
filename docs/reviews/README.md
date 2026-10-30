@@ -11,12 +11,13 @@ synthesis was written - fresh agents from round four.
 
 `archive/` holds the finished reviews, named for the work they reviewed
 (`CLAUDE.md` gives the rule; the first round predates it), so that a finding can
-be traced to the tree that produced it: nine rounds - the first against the
+be traced to the tree that produced it: ten rounds - the first against the
 design alone, the second against the first steps built, the third before the
 first release, the fourth to sixth at merge points of its task, the sixth on
 the release candidate, the seventh and eighth at the merge points of v0.2's
-first and last steps (`v0.2-step1-*`, `v0.2-step4-*`), and the ninth before
-0.2's tag, Part 4 aside (`v0.2-before-part4-*`); three reviews of single
+first and last steps (`v0.2-step1-*`, `v0.2-step4-*`), the ninth before
+0.2's tag, Part 4 aside (`v0.2-before-part4-*`), and the tenth on the tree to
+be tagged (`v0.2-before-tag-*`); three reviews of single
 slices; and the adversarial reads of v0.2's parts, a fresh agent's read of a
 part before it merged and again after its fixes where the first found
 something serious (`v0.2-step2-adversarial-read.md` to

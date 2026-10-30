@@ -1,0 +1,15 @@
+installed over 0.1.0: libosoe.so.0 libosoe.so.0.1.0 libosoe.so.0.2.0 
+the ring binds: libosoe.so.0 -> /var/tmp/t8-prefix/lib/libosoe.so.0 -> libosoe.so.0.2.0
+== the tagged library, osoe-launch -n 4 :
+PE 0 of 4: my box holds 3
+PE 1 of 4: my box holds 0
+PE 2 of 4: my box holds 1
+PE 3 of 4: my box holds 2
+exit 0
+== the tagged library, osoe-launch -n 4 -m 0,0,1,1:
+PE 0 of 4: my box holds 3
+PE 1 of 4: my box holds 0
+PE 2 of 4: my box holds 1
+PE 3 of 4: my box holds 2
+exit 0
+t8 exit 0

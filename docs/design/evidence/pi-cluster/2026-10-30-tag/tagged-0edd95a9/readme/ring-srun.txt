@@ -1,0 +1,8 @@
+PE 5 of 8: my box holds 4
+PE 6 of 8: my box holds 5
+PE 7 of 8: my box holds 6
+PE 1 of 8: my box holds 0
+PE 2 of 8: my box holds 1
+PE 3 of 8: my box holds 2
+PE 0 of 8: my box holds 7
+PE 4 of 8: my box holds 3

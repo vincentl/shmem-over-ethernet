@@ -118,43 +118,65 @@ until the tree to be tagged has them; the author tags.
   had let it ship without); `docs/fast-link.md` is its runbook. Done: three
   sessions on eight `c4-standard-16` nodes, 2026-10-12, 10-20 and 10-28
   (`docs/fast-link-results.md`), H1 to H19 with H25 and H26 closed.
-- [ ] **The review's findings settled on the candidate.** Round eight, at step
+- [x] **The review's findings settled on the candidate.** Round eight, at step
   4's merge point, said *release after named changes*, and they were made
   (`docs/decisions/2026-10-10-step4-merge-point.md`); every change since is read
   adversarially before it merges. The ninth, before Part 4, said the same,
   and its changes were made and read (`docs/decisions/2026-10-11.md`); a tenth
   runs before the tag, once every open item is cleared
   (`docs/prompts/task-v0.2-to-the-tag.md`) - begun 2026-10-30 on `5cefc7fb`,
-  P1's merge, the last change of code an open item asked for.
-- [ ] **The four presets, `models`, `tier3` and the suite under load** on the tree
+  P1's merge, the last change of code an open item asked for. Done 2026-10-30:
+  round ten, *tag after the named changes*, all three made the same day,
+  nothing blocking (`docs/reviews/archive/v0.2-before-tag-review.md`).
+- [x] **The four presets, `models`, `tier3` and the suite under load** on the tree
   to be tagged, at `OSOE_PROGRESS_HELPERS=0` set outright and at two and three
   where the merge point ran them, and with the setting unset, the default
   `auto` since 2026-10-28 - ThreadSanitizer's as `ctest` judges every test there
   since the ninth review's C9-1, its reports judged by `tsan.reports` at each
   count, none included, and no gate run apart; the six `SHMEM_THREAD_MULTIPLE` models with `-DOSOE_MULTIPLE_MODELS=ON`,
   last run at 0.1.0's tag; the single-node build in its presets and on Rocky
-  Linux 9.
-- [ ] **The SOS test suite on the tree to be tagged**, at four logical nodes of
+  Linux 9. Done 2026-10-30 (T1 to T3, `docs/decisions/2026-10-30.md`), on
+  `0edd95a9` but the six `MULTIPLE` models, on `518f5a46`, its code but the
+  version: nine builds without a warning; `release` and `debug` 1,214 of 1,214,
+  `asan` 1,174 and `tsan` 841 at each of the four helper settings,
+  `tsan.reports` passing at each; the 47 models the build registers, on the
+  Mac; tier 3 138 of 138; the suite beside eight busy loops 1,214 of 1,214; the
+  six `MULTIPLE` models 6 of 6; the single-node build whole in its presets, and
+  on Rocky Linux 9.8 whole but four starts its 3.6 GiB VM's `/dev/shm` refuses
+  by name, which pass with the check reporting instead.
+- [x] **The SOS test suite on the tree to be tagged**, at four logical nodes of
   two PEs at `OSOE_PROGRESS_HELPERS=0` set outright and at two, and its team
   programs at 70 PEs, as at step
   4's merge point (`docs/decisions/2026-10-10-step4-merge-point.md`), which ran
   them before its review's fixes and every change since; and the README's
   sentence on Sandia OpenSHMEM's suite "on the tree tagged 0.1.0" made the
-  tree tagged 0.2's (the ninth review's readiness Q5-4).
-- [ ] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
+  tree tagged 0.2's (the ninth review's readiness Q5-4). Done 2026-10-30 (T4):
+  161 of 165 at both counts, the four SOS's own; the team programs at 70 PEs
+  20 of 20 at each; the README's sentence the tag's checks'.
+- [x] **`shmem_global_exit` under Slurm by hand, and the floor test's pins**, as
   for 0.1.0 (above): the sixteen cases in the development VM's Slurm, and
-  `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on.
-- [ ] **The x86-64 item at two and three helpers too** (portability P3, under
+  `OSOE_TEST_FLOOR_PINS=1` on the machines the pins were set on. Done
+  2026-10-30 (T5, T6): sixteen of sixteen, on `518f5a46`, the code but the
+  version; the pins held in the VM, three runs and tier 3's three floor tests,
+  and on the Pi on the tree to be tagged, its round trips 1.09 to 1.10 times
+  an io_uring echo's.
+- [x] **The x86-64 item at two and three helpers too** (portability P3, under
   "After the release"), and the README's sentence on what "the tagged tree"
   did on x86-64 made 0.2's (readiness Q5-4). Until an x86-64 kernel runs a
   timing test of the helpers' wakes, what stands for x86's order on them is
   `lead_wake_model.py`, the owners' wake, and `helper_request_model.py`, the
   helpers' requests, which run under x86-TSO with breakages that must fail
-  (portability P3's third fix, raised again by the ninth review's P9-5).
+  (portability P3's third fix, raised again by the ninth review's P9-5). Done
+  2026-10-12 (T7): natively at two and three helpers on the cluster's first
+  session, and the README's sentence with it (`docs/decisions/2026-10-12.md`).
 - [ ] **An hour of `mix` on the Pi cluster, `failures=0`**, on the tree to be
   tagged, and the runbook end to end with its floor: no 0.2 tree has had either.
-- [ ] **The README's commands on the Pi cluster, and its quick start on Raspberry
-  Pi OS**, as for 0.1.0.
+- [x] **The README's commands on the Pi cluster, and its quick start on Raspberry
+  Pi OS**, as for 0.1.0. Done 2026-10-30 on the tree to be tagged (T11, T12):
+  the quick start on the head node, a Pi 5, in 119 s with no warning, both
+  rings and the probe; the installed `oshcc`'s ring under `srun`; the probe on
+  every node; `osoe-pacer --quick`; the batch script with its secret; and
+  `osoe-stat --summary` on every node of a running job through `srun --overlap`.
 - [ ] **The release note**: `docs/release-notes/0.2.0.md`, drafted 2026-10-10 and
   fact-checked against its sources, made true of the tree tagged - its numbers
   marked "at the tag" filled in from the runs above, its provisional checks
@@ -173,9 +195,11 @@ until the tree to be tagged has them; the author tags.
   against 0.2: the ninth review's investigators built the README's ring against
   a 0.1.0 install and ran it once 0.2 was installed over it, on one node and
   two, with the right lines. The library's file is `libosoe.so.0.2.0`.
-- [ ] **The upgrade run again on the tree tagged**: a program built against the
+- [x] **The upgrade run again on the tree tagged**: a program built against the
   0.1.0 install, run against the tagged library installed over it (readiness
-  Q5-3, Q5-4).
+  Q5-3, Q5-4). Done 2026-10-30 (T8): the README's ring built against 0.1.0's
+  install printed its four lines on one node and on two against
+  `libosoe.so.0.2.0` installed over it, not rebuilt.
 - [x] **If Part 4 turns the zero-copy send on by default**, its locked-memory
   questions are the tag's, since every user with a low `ulimit -l` then meets
   them: whether a connection that met the limit lends again after a while,

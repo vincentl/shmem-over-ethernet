@@ -1,0 +1,13 @@
+abort_owners/wait: holds (57 states)
+abort_owners/wait_no_excuse: holds (57 states)
+abort_owners/no_wait: FAILS: NO_FATAL: a fatal at P (27 states)
+   trace: N agent sends ABORT on C ; N ends (END behind what it sent) ; P helper reads END on D: FATAL
+abort_owners/abrupt_p_ending: holds (24 states)
+abort_owners/abrupt_p_ending_no_excuse: FAILS: NO_FATAL: a fatal at P (18 states)
+   trace: N ends (END behind what it sent) ; P declares for another reason ; P agent reads END on C: FATAL
+abort_owners/abrupt_p_ending_fin_stream: holds (24 states)
+abort_owners/abrupt_p_ending_reset_idle: holds (24 states)
+abort_owners/abrupt_p_ending_reset_stream: holds (44 states)
+abort_owners/abrupt_p_ending_reset_stream_unchecked: FAILS: NO_FATAL: a fatal at P (29 states)
+   trace: N ends (RESET behind what it sent) ; P declares for another reason ; P agent reads RESET on C (excused) ; P agent flushes C: send_from on its error: FATAL
+abort_owners/wait_reset_stream: holds (85 states)

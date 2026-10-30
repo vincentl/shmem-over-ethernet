@@ -1,0 +1,23 @@
+== 2026-10-30T16:07:11Z t3-rocky on Rocky Linux release 9.8 (Blue Onyx), 5.14.0-687.10.1.el9_8.0.1.aarch64, gcc (GCC) 11.5.0 20240719 (Red Hat 11.5.0-14)
+built release: 0 warnings
+release: 99% tests passed, 4 tests failed out of 583
+	393 - shmem.stat.view.many-pes (Failed)                 tier2
+	470 - shmem.rma.L32 (Failed)                            tier2
+	476 - shmem.barrier.L64 (Failed)                        tier2
+	477 - shmem.reduce.L64 (Failed)                         tier2
+built debug: 0 warnings
+debug: 99% tests passed, 4 tests failed out of 583
+	393 - shmem.stat.view.many-pes (Failed)                 tier2
+	470 - shmem.rma.L32 (Failed)                            tier2
+	476 - shmem.barrier.L64 (Failed)                        tier2
+	477 - shmem.reduce.L64 (Failed)                         tier2
+built asan: 0 warnings
+asan: 100% tests passed, 0 tests failed out of 563
+built tsan: 9 warnings
+tsan: 100% tests passed, 0 tests failed out of 559
+== 16:22:12 done
+== 16:30 the four failures read again, one at a time: each a start refused by name by osoe's
+/dev/shm check on this 3.6 GiB VM - 1,822 MiB free, against 2,637 MiB for 64 heaps of 40 MiB
+(barrier.L64, reduce.L64) and 2,343 MiB for 32 of 72 MiB (rma.L32), stat.view.many-pes the same;
+the capacity check as designed, not a defect. tsan's 9 warnings not reproduced: two builds of the
+same tree after, one from scratch, 0 warnings.

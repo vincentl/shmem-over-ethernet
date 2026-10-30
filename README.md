@@ -187,15 +187,16 @@ machine alone, [On a desktop](#on-a-desktop-the-single-node-build) is shorter:
 1. Build where every node sees the tree, such as a shared home directory
    ([Building](#building)).
 2. Check every node: `srun -N<nodes> --ntasks-per-node=1 build/release/tools/probe/probe`
-   prints a line a facility, all "ok".
+   prints a line a facility, each "ok" or "info", and ends `PROBE PASSED (0 failures)`.
 3. Install to a prefix every node sees ([Installing](#installing)).
 4. Check the job path: `srun -K1 --cpu-bind=none -N<nodes> --ntasks-per-node=4 osoe-pacer --quick`
-   ends `failures=0`.
+   ends with a line that begins `osoe-pacer failures=0`.
 5. Build a program with `oshcc` and run it with `srun`, or submit the batch
    script ([Running a program with `srun`](#running-a-program-with-srun)).
 
-A problem is worth a report: the line `SHMEM_VERSION=1` prints, the probe's
-output on each node, the first error line, and for a hang `osoe-stat`'s.
+A report of a problem is worth these: the line `SHMEM_VERSION=1` prints
+(Installing, below), the probe's output on each node, the first error line,
+and for a hang `osoe-stat`'s.
 
 ### Requirements
 
@@ -379,7 +380,7 @@ from the repository root start in the same directory inside the VM, and
 ### Installing
 
 ```sh
-cmake --install build/release --prefix /opt/osoe
+cmake --install build/release --prefix /opt/osoe    # as root, or a prefix you can write
 ```
 
 installs the library, its headers - `shmem.h`, `pshmem.h`, `shmemx.h`, and the
@@ -587,7 +588,8 @@ srun --jobid=1234 --overlap -N4 --ntasks-per-node=1 osoe-stat --summary 1234
 A job that hangs shows, for every PE, the routine it is blocked in, the
 collective's epoch - how many collectives its team has begun - and for how
 long; and for a node of a job across nodes, each owner of its wires - the
-lead's agent and its progress helpers (`OSOE_PROGRESS_HELPERS`) - with the
+lead's agent and its progress helpers (`OSOE_PROGRESS_HELPERS`; [How osoe
+works](#how-osoe-works) says what each is) - with the
 wires it holds, its passes and how long ago the last one ended, its wakes and
 what it has sent and applied. An idle owner passes ten times a second, so one
 whose last pass is more than a fraction of a second old while PEs wait toward
@@ -693,7 +695,7 @@ where to find what among the documents.
 | `docs/release-checklist.md` | what a release needs, ticked where it is done |
 | `docs/release-notes/` | a note for each release: what it is and what changed, what was checked before its tag, and what it leaves for later |
 | `docs/ceilings.md` | every ceiling a job can meet, where in the source each is set, and the largest run of each ([Ceilings, and how far each is tested](#ceilings-and-how-far-each-is-tested)) |
-| `docs/design/` | the design notes, `shmem-ethernet-design.md`; five proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
+| `docs/design/` | the design notes, `shmem-ethernet-design.md`; six proposals, and a note and a proposal on a smaller successor API; virtual traces of reference workloads (`workloads/`); and the raw outputs behind the notes and records (`evidence/`) |
 | `docs/decisions/` | the decisions in force, one line each (`README.md`), and the dated records that say who took each one, why, and how to undo it |
 | `docs/prompts/` | the written briefs each working session was given; the finished ones are in `done/` |
 | `docs/reviews/` | the adversarial reviews: the prompt that runs one, the finished ones (`archive/`), and the raw material of the first two rounds, of two reads of v0.2 step 4's first part and of round eight's scale S4 on the Pi (`evidence/`) |
@@ -769,6 +771,11 @@ build tree.
   backend this project builds (below).
 
 ## How osoe works
+
+A label in parentheses - (H15), (P4), (T35) - names the item of v0.2's open
+list where that work was asked for and closed
+([`docs/prompts/v0.2-open-items.md`](docs/prompts/v0.2-open-items.md), which
+gives each one's record); the rest of the README cites them the same way.
 
 - **PEs are processes.** Each PE's symmetric heap is a shared-memory object, and
   every process on a node maps every heap on that node, its own at a fixed
@@ -1297,8 +1304,9 @@ specification or takes a choice the specification leaves open.
   sections, up to 512 PEs. The suite, which checks results, ran on one node, a
   job's logical nodes talking over loopback, so it has not run across separate
   x86-64 machines; the stress tester has, its `mix` for 300 s at 32 PEs on all
-  eight without a failure, and Sandia OpenSHMEM's suite, 159 of its 161 programs
-  that build passing at 2 PEs a node on eight (2026-10-28); 14 of the 41 models
+  eight without a failure, and Sandia OpenSHMEM's suite, 159 of the 163 programs
+  of the cluster kit's sweep, the same four short as everywhere, at 2 PEs a
+  node on eight (2026-10-28); 14 of the 41 models
   (Python, so the same result on any machine) have not run natively at all.
   Before that,
   on x86-64 the tagged tree built without warnings and passed every test that
@@ -1669,8 +1677,8 @@ specification or takes a choice the specification leaves open.
 
 ## Toward RDMA: a RoCE backend
 
-osoe has no RDMA backend, and building one is not this project's work before
-its release point: no RoCE hardware is at hand. What the design guarantees is
+osoe has no RDMA backend, and building one is no part of 0.1 or 0.2: no RoCE
+hardware is at hand. What the design guarantees is
 that one could be added without touching the OpenSHMEM layer.
 
 - **The seam is two headers.** `transport.h` is point-to-point: put, get, an
@@ -1713,8 +1721,8 @@ that one could be added without touching the OpenSHMEM layer.
   measure, and recommended DC at medium confidence. That is a recommendation
   from recalled limits, not a decision; both lie below the seam, and neither is
   built. The one road to testing a verbs backend without hardware is
-  Soft-RoCE (`rdma_rxe`), for function, not performance: post-release work,
-  if hardware is still far off then.
+  Soft-RoCE (`rdma_rxe`), for function, not performance: possible later work,
+  should hardware still be far off.
 
 ## How osoe is tested
 
@@ -1744,8 +1752,8 @@ that one could be added without touching the OpenSHMEM layer.
   ```
 
   On x86-64, where only the fence's `mfence` orders the two, it runs in every
-  preset, and it passed natively on Google Cloud's x86-64 nodes in tier 2
-  (2026-10-28).
+  preset, and it passed natively on Google Cloud's x86-64 nodes in tier 2, the
+  tests of jobs on one machine (design §8.2 sets out the tiers; 2026-10-28).
 - **The measured link.** Every test of more than one node runs with
   `OSOE_TEST_PRINT_LINK=1`, so that its output gives the link the job measured
   as it started, as the three `OSOE_LINK_*` settings that run it again on the
@@ -1759,13 +1767,13 @@ that one could be added without touching the OpenSHMEM layer.
   judges at every helper count, none included - its failure the run's, and a
   canary's race, which it must find first, showing that the files are written
   (`cmake/thread-sanitizer-gate.py`). With no helpers there is no report at
-  all. With two or three, about a hundred, in about 27 of the tests across
-  nodes, each a put or an atomic a helper applies in a PE's heap mapping
-  against a local thread's access to the same place, or another helper's put
-  there in an earlier collective. The ordering that makes them safe runs
+  all. With two or three, about a hundred or more - at three, on 0.2.0's tree,
+  145 in 31 of the tests across nodes - each a put or an atomic a helper
+  applies in a PE's heap mapping against a local thread's access to the same
+  place, or another helper's put there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
   leaves out 347 of the 633 tests labelled `internode`, `shmem.internode`'s
-  maps among them (§8.2) - and with no helpers the
+  maps among them (design §8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
   of those: a data race, naming a helper's thread, in a heap mapping; and of
@@ -1855,7 +1863,7 @@ that one could be added without touching the OpenSHMEM layer.
   for half a second after a RELEASE is queued there
   (`OSOE_TEST_HOLD_RELEASE`), counts the release held and, with the hold
   removed, ends the job naming the block at its first round. The
-  active-set collectives' model (`active-set.c`) runs up to ten members through up
+  active-set collectives' model (`active_set_model.py`, of `active-set.c`) runs up to ten members through up
   to seven calls back to back on one pSync, over a network that lands each put
   and atomic add in any order a fence, a quiet or put-with-signal allows, with
   members that share a node and members that do not. The checker runs a model
@@ -1874,13 +1882,15 @@ that one could be added without touching the OpenSHMEM layer.
   readers on the machine. In an optimized build it fails when the library's
   reader loads the name plainly again; a plain writer, or `osoe-stat`'s reader,
   tore nothing it could see on these machines.
-- **Sandia OpenSHMEM's test suite**, on the tree tagged 0.1.0: 161 of its 165
-  programs passed at 4 × 2 on the Pi cluster, 8 PEs, where `bigget` is run with
-  a smaller loop count, since its default is 16 GiB of gets a PE over gigabit
-  Ethernet (2026-10-05); in the development VM, 159 passed on both of two maps
-  of logical nodes, on the tree of 28 September; natively on x86-64, on eight
-  Google Cloud nodes at 2 PEs a node (2026-10-28), 159 of the 161 of its 163
-  programs that build. The single-node build, at v0.2
+- **Sandia OpenSHMEM's test suite**: 161 of its 165 programs passed on 0.2.0's
+  tree at four logical nodes of two PEs in the development VM, with no progress
+  helpers and with two, and the same day at 4 × 2 on the Pi cluster, 8 PEs, on
+  its code before the version was changed (2026-10-30), as on the tree tagged
+  0.1.0 - on the Pi with `bigget` at a smaller loop count, since its default is
+  16 GiB of gets a PE over gigabit Ethernet; natively on x86-64, on eight
+  Google Cloud nodes at 2 PEs a node (2026-10-28), 159 of the 163 programs of
+  the cluster kit's sweep, which leaves out two variants, the same four short.
+  The single-node build, at v0.2
   step 1's review, on one node: 161 of 165 in the development VM, and every C
   program but the same four on Rocky Linux 9. The four that do not are SOS's own: two use an extension of the
   type-generic interfaces and do not build, one overflows its own buffer (osoe
@@ -1892,7 +1902,10 @@ that one could be added without touching the OpenSHMEM layer.
   again, the programs saying nothing and the library a line for each round,
   naming the variable (Limits).
 - **Applications**: ISx, NPB IS, the Parallel Research Kernels and the
-  OpenSHMEM examples, built with `oshcc`.
+  OpenSHMEM examples, built with `oshcc` - on the Pi cluster on 0.2.0's code
+  (2026-10-30), IS verifying at classes A and B, PRK's three kernels
+  validating, ISx weak and strong, and 64 of the 72 examples, the other eight
+  as the runbook says (`docs/pi-cluster.md`).
 - **`shmem.floor`'s pins.** In each of seven pairs, in a job of two nodes on one
   machine, `shmem.floor` times the library's get, put with quiet, and fetch-add
   against 8-byte round trips on a bare io_uring TCP connection between the same
@@ -1924,8 +1937,8 @@ that one could be added without touching the OpenSHMEM layer.
   and 23.7 hours after boot; with it on, 13 hours after, calls stalled 45 ms
   at them - not F1's seconds, and with no retransmission timeout. F1 is not
   explained - three hours of `mix` with the offload off still counted 87
-  retransmission timeouts (`docs/pi-cluster-results.md`, "F1, investigated"
-  and "H29 and H22"). There an 8-byte put with
+  retransmission timeouts (`docs/pi-cluster-results.md`, "F1, investigated",
+  the timeouts in "The pacer's fourth phase", and "H29 and H22"). There an 8-byte put with
   quiet, a get or a fetch-add between two nodes took 172 to 176 µs a round trip
   against a bare io_uring TCP echo's 158 to 159, by the medians of seven pairs
   in each of three runs: within 9 to 11% of the echo. The ratio does not
@@ -2025,7 +2038,7 @@ moves every message of the node, and the helpers that can share the work
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split, and a put's part is cut shorter, down to a sixteenth of the chunk (4,094 bytes at the default), where it fills the room a buffer has left. *Checked* among a node's PEs in a job of more than one node, the refusal naming `OSOE_AM_*`. |
+| `OSOE_AM_CHUNK` | `65536` | The largest message on a connection: a power of two from `1024` to `1048576`; larger transfers are split, and a put's part is cut shorter, down to a sixteenth of a put message's largest payload (4,094 bytes at the default chunk), where it fills the room a buffer has left. *Checked* among a node's PEs in a job of more than one node, the refusal naming `OSOE_AM_*`. |
 | `OSOE_AM_BUFFER` | four chunks, `262144` | Bytes of each connection's buffer: a power of two from twice `OSOE_AM_CHUNK` - the least allowed: a smaller value is refused, not raised - up to 1 GiB. The default is four chunks, twice the least. *Checked* among a node's PEs in a job of more than one node, as the buffer the budget leaves it, the refusal naming `OSOE_AM_*`. |
 | `OSOE_AM_BUFFER_BUDGET` | `1073741824` | Bytes a node may spend on its connections' buffers together - two buffers for each other node. A decimal number of bytes, from twice `OSOE_AM_CHUNK` up to `68719476736` (64 GiB). Where the buffers do not fit, a buffer above its floor, twice the chunk, is halved until they do, and each node's lead says so once. At the defaults the 256 KiB buffers hold to 2,049 nodes, are halved to the floor from 2,050, and 4,097 nodes fit and 4,098 are refused: raise the budget or lower the chunk. With `OSOE_MESH_DATA_WIRES=on-demand` the buffers are chosen the same way, so on demand refuses nothing an eager job runs; past where even the floor holds every peer - 4,097 nodes at the defaults - it takes the floor and the budget counts the data wires a node makes instead of its peers, a buffer pair each, 4,096 a node at the defaults, each lead saying so once, and a data wire past the count ends the job naming the node, the count and both settings. The area keeps a place for every peer, which costs nothing until written, since a node writes only its wires' buffers. *Checked* among a node's PEs in a job of more than one node, as the buffer it leaves, the refusal naming `OSOE_AM_*`. |
 | `OSOE_AM_CREDITS` | `64` | A connection's flow-control credits: `1` to `65536`. |
@@ -2354,13 +2367,15 @@ The scope and goals of osoe were first defined by the author and then Claude
 Code, Anthropic's agentic coding tool, was used to consider the goals and the
 OpenSHMEM specification to generate plans, carry out implementation, and perform
 testing on an Arm VM running on macOS and a Raspberry Pi 5 cluster running
-Raspberry Pi OS (Trixie). The work was carried out starting in September 2026.
+Raspberry Pi OS (Trixie), and in three sessions on eight x86-64 nodes of Google
+Cloud. The work was carried out starting in September 2026.
 The models were the ones Anthropic offered during September/October 2026:
 Claude Opus 5, and from 22 September Claude Opus 5.5, led each working session;
 Claude Sonnet 5 and 5.5 took parts of some sessions and of the tasks a session
 handed off, and Claude Fable 5.1 did periodic reviews and deep planning. Every
 commit names the model that wrote it beside the author, in a `Co-Authored-By`
-line, but the first, ten merges and one work-in-progress commit, `de1e2f8`,
+line, but the first, eleven merges, fourteen commits of the overnight batches
+of 19 and 20 October, and one work-in-progress commit, `de1e2f8`,
 kept because the evidence of v0.2 step 2's comparison on the Pi names it, the
 rebased form of the commit that comparison ran on
 (`docs/design/evidence/pi-cluster/README.md`); and the history is
@@ -2390,8 +2405,8 @@ The work ran from goals down to code, and each level is in the repository:
   checkpoints, the README true of the tree at every commit.
 - **Review**: a fresh Claude agent read changes adversarially before they
   merged - every part of the release fixes and the team redesign among them. At
-  seven points - the round-two review onward,
-  round one having read the design alone - five more reviewed the whole tree:
+  nine points - rounds two to ten,
+  round one having read the design alone - four or five more reviewed the whole tree:
   is it OpenSHMEM 1.6, is it correct, does it scale as claimed, does it run
   elsewhere, is it ready to be public; from round three a refutation pass tried
   to knock down every finding rated serious, and a synthesis said what had to

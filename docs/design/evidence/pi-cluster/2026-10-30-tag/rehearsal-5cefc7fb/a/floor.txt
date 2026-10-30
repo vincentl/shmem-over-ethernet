@@ -1,0 +1,18 @@
+pair 0 fastest_us floor=151.5 get=163.1 put_quiet=161.9 fetch_add=164.6 median_us floor=153.1 get=166.3 put_quiet=164.5 fetch_add=165.5 stream_mib_per_s floor=112 library=112
+pair 1 fastest_us floor=154.1 get=170.3 put_quiet=169.1 fetch_add=170.6 median_us floor=157.5 get=173.5 put_quiet=172.2 fetch_add=173.1 stream_mib_per_s floor=112 library=112
+pair 2 fastest_us floor=155.4 get=170.8 put_quiet=168.1 fetch_add=155.5 median_us floor=157.4 get=174.0 put_quiet=172.4 fetch_add=173.5 stream_mib_per_s floor=112 library=112
+pair 3 fastest_us floor=129.3 get=170.2 put_quiet=167.8 fetch_add=168.7 median_us floor=157.2 get=173.6 put_quiet=171.9 fetch_add=172.9 stream_mib_per_s floor=112 library=112
+pair 4 fastest_us floor=154.6 get=171.7 put_quiet=170.7 fetch_add=171.9 median_us floor=157.4 get=175.0 put_quiet=173.2 fetch_add=174.3 stream_mib_per_s floor=112 library=112
+pair 5 fastest_us floor=155.6 get=170.2 put_quiet=169.4 fetch_add=170.9 median_us floor=157.7 get=174.9 put_quiet=173.1 fetch_add=174.2 stream_mib_per_s floor=112 library=112
+pair 6 fastest_us floor=155.5 get=170.9 put_quiet=169.8 fetch_add=171.0 median_us floor=157.7 get=175.0 put_quiet=173.2 fetch_add=174.3 stream_mib_per_s floor=112 library=112
+ratio, the median of 7 pairs (range):
+  fastest get/floor=1.099 (1.08-1.32)
+  fastest put_quiet/floor=1.092 (1.07-1.30)
+  fastest fetch_add/floor=1.100 (1.00-1.30)
+  median put_quiet/get=0.990 (0.99-0.99)
+  median fetch_add/get=0.996 (1.00-1.00)
+  stream library/floor=0.999 (0.999-0.999)
+  reported: median get/floor=1.105 (1.09-1.11)
+  reported: median put_quiet/floor=1.095 (1.07-1.10)
+  reported: median fetch_add/floor=1.102 (1.08-1.11)
+pins not checked: they are the project's regression guard (a fastest trip at most 3.0x the floor's, a median at most 1.5x a get's, the stream at least 0.30x the floor's), set on its own machines; set OSOE_TEST_FLOOR_PINS=1 to check them, as cmake -DOSOE_TEST_PINS=ON does for ctest

@@ -1,0 +1,58 @@
+== 2026-10-30T16:04:29Z t1 from tree-tag.tar; load 0.11 0.34 0.41
+built release: 0 warnings
+built debug: 0 warnings
+built asan: 0 warnings
+built tsan: 0 warnings
+built tier3: 0 warnings
+built single-node-release: 0 warnings
+built single-node-debug: 0 warnings
+built single-node-asan: 0 warnings
+built single-node-tsan: 0 warnings
+static: 100% tests passed, 0 tests failed out of 14
+-- 16:08:39 release-helpers-default
+release-helpers-default: 100% tests passed, 0 tests failed out of 1214
+-- 16:16:24 debug-helpers-default
+debug-helpers-default: 100% tests passed, 0 tests failed out of 1214
+-- 16:26:55 asan-helpers-default
+asan-helpers-default: 100% tests passed, 0 tests failed out of 1174
+-- 16:33:58 tsan-helpers-default
+tsan-helpers-default: 100% tests passed, 0 tests failed out of 841
+-- 16:40:25 release-helpers-0
+release-helpers-0: 100% tests passed, 0 tests failed out of 1214
+-- 16:47:02 debug-helpers-0
+debug-helpers-0: 100% tests passed, 0 tests failed out of 1214
+-- 16:55:29 asan-helpers-0
+asan-helpers-0: 100% tests passed, 0 tests failed out of 1174
+-- 17:00:56 tsan-helpers-0
+tsan-helpers-0: 100% tests passed, 0 tests failed out of 841
+-- 17:06:14 release-helpers-2
+release-helpers-2: 100% tests passed, 0 tests failed out of 1214
+-- 17:11:33 debug-helpers-2
+debug-helpers-2: 100% tests passed, 0 tests failed out of 1214
+-- 17:18:03 asan-helpers-2
+asan-helpers-2: 100% tests passed, 0 tests failed out of 1174
+-- 17:23:14 tsan-helpers-2
+tsan-helpers-2: 100% tests passed, 0 tests failed out of 841
+-- 17:29:26 release-helpers-3
+release-helpers-3: 100% tests passed, 0 tests failed out of 1214
+-- 17:34:45 debug-helpers-3
+debug-helpers-3: 100% tests passed, 0 tests failed out of 1214
+-- 17:41:09 asan-helpers-3
+asan-helpers-3: 100% tests passed, 0 tests failed out of 1174
+-- 17:46:12 tsan-helpers-3
+tsan-helpers-3: 100% tests passed, 0 tests failed out of 841
+-- 17:52:15 single-node-release
+single-node-release: 100% tests passed, 0 tests failed out of 585
+-- 17:53:28 single-node-debug
+single-node-debug: 100% tests passed, 0 tests failed out of 585
+-- 17:54:53 single-node-asan
+single-node-asan: 100% tests passed, 0 tests failed out of 565
+-- 17:56:03 single-node-tsan
+single-node-tsan: 100% tests passed, 0 tests failed out of 561
+-- 17:57:53 tier3
+tier3: 100% tests passed, 0 tests failed out of 138
+-- 18:00:03 release-under-load
+release-under-load: 
+counts: release 1214, internode 633; tsan 841; single-node 585; tier3 138
+kernel log: 0 lines naming a memory kill in six hours
+== 18:00:03 exit 0: done

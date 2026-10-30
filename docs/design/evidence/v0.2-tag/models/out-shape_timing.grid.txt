@@ -1,0 +1,1 @@
+../../shmem/tests/shape-grid.txt: 11880 lines, as the model writes them
