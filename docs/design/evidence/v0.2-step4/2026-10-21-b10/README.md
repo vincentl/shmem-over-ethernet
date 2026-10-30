@@ -137,7 +137,7 @@ copies.
 Found on the way:
 
 - **Restarting logind started the manager of the VM's own account.** Logind starts the manager
-  (`user@501.service`) of every lingering user when it starts. `vincent` lingers (since the VM was
+  (`user@501.service`) of every lingering user when it starts. `<user>` lingers (since the VM was
   made, 2026-09-19), but its manager had been dead since 2026-10-07 00:49:30 (`Main process exited,
   code=killed, status=9/KILL`), so the restart brought it back, with rootless containerd, buildkitd
   and stargz-snapshotter under it: 220 MB in an 8 GiB VM that sanitizer jobs strain. It was stopped by

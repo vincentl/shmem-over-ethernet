@@ -34,7 +34,7 @@ check "no group entry for $account" bash -c "! getent group $account"
 check "no home /home/$account" absent "/home/$account"
 check "no mail spool /var/mail/$account" absent "/var/mail/$account"
 check "no lingering file for $account" absent "/var/lib/systemd/linger/$account"
-check "lingering files: vincent's alone (as before)" equals "$(ls /var/lib/systemd/linger)" vincent
+check "lingering files: <user>'s alone (as before)" equals "$(ls /var/lib/systemd/linger)" <user>
 check "no processes of uid 1000" bash -c "[ -z \"\$(ps -u 1000 -o pid=)\" ]"
 check "no file of uid 1000 on the root file system, /tmp, /var/tmp, /dev/shm or /run" \
     bash -c "[ -z \"\$(find / /tmp /var/tmp /dev/shm /run -xdev -uid 1000 2> /dev/null | head -1)\" ]"
@@ -69,11 +69,11 @@ check "logind's UserStopDelayUSec 10 s" equals "$(busctl get-property org.freede
     /org/freedesktop/login1 org.freedesktop.login1.Manager UserStopDelayUSec)" "t 10000000"
 check "logind's KillUserProcesses off" equals "$(busctl get-property org.freedesktop.login1 \
     /org/freedesktop/login1 org.freedesktop.login1.Manager KillUserProcesses)" "b false"
-check "logind lists vincent's one session alone (as before)" \
-    equals "$(loginctl list-sessions --no-legend | awk '{ print $3 }' | sort | uniq -c | tr -s ' ')" " 1 vincent"
-check "logind lists vincent alone as a user" \
-    equals "$(loginctl list-users --no-legend | awk '{ print $2 }')" vincent
-check "vincent's user manager not running (as before: killed on 2026-10-07)" \
+check "logind lists <user>'s one session alone (as before)" \
+    equals "$(loginctl list-sessions --no-legend | awk '{ print $3 }' | sort | uniq -c | tr -s ' ')" " 1 <user>"
+check "logind lists <user> alone as a user" \
+    equals "$(loginctl list-users --no-legend | awk '{ print $2 }')" <user>
+check "<user>'s user manager not running (as before: killed on 2026-10-07)" \
     bash -c "[ \"\$(systemctl is-active user@501.service)\" != active ]"
 
 # The experiment's own leavings
