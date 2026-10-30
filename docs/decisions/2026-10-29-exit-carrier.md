@@ -183,7 +183,28 @@ once can lose a caller's output") gone and "How a job ends" saying what is now t
 §3.15's carrier rules and a paragraph of P1's; the release note's change and its known limit
 gone; the checklist's items for P1 and P2 struck; the models' README; P1 closed, 18 items.
 
-**Verified** <<VERIFY>>
+**Verified whole** in the VM on `abfeba29`'s tree (`build/scratch/carrier/verify.sh`, last
+night's less P2's two wake runs): every preset, tier 3's and the single-node build without a
+warning; the static checks 14 of 14; the internode suite 633 of 633 at no helpers, on demand and on
+demand at no helpers, and on demand under asan 610 of 610; tier 3's 138 of 138; the models
+`abort_exit`, `carrier` and `selftest`; no process killed for memory. But for two kinds of
+failure, both the tests', fixed in `e5335414`:
+
+- `shmem.stat.L2`, `.L4` and `.link` in every preset: `osoe-stat` decodes the watch word only to
+  the newest layout it knows, 42, and printed layout 43's raw - as `tools/stat/segment.h` says a
+  newer layout must until the tool is told it kept the encoding. Layout 43 changes no field the
+  tool decodes; its newest is now 43.
+- Under tsan, every-PE callers (`all-callers`, four tests in each tsan run): each job ended right -
+  one rank nonzero, nobody killed, every handler that began finished, no report from the gate -
+  but 6.1 to 8.2 s after the first call, past the 6 s the script allows an end not left waiting:
+  tsan's exits run the chain of ends (the outranked node's handlers, its lead, the carrier's lead,
+  the carrier's handler) in whole seconds. They are kept out of the tsan build, as the held-stdout
+  tests are; `two-nodes` reaches the same path under it, and passes.
+
+On the fixes' tree: every preset built again without a warning, the static checks 14 of 14, and
+the tests of `osoe-stat` and the global exit in each preset - release and debug 88 of 88, asan 84,
+tsan 66, the single-node build 43, tsan's on demand 24 - all passing; the counts now debug 1,214,
+633 of them internode, tsan 841, 286 internode, the single-node build 632 (`verify-fix.sh`).
 
 **On the Pi under `srun -K1`** (the development VM's Slurm has one node; the cluster's four
 nodes, offload off, two PEs a node): one source of `test-global-exit.c`, compiled by each build's
