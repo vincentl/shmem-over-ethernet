@@ -14,6 +14,8 @@ unchanged, and this directory holds a copy of it with the proposal's variants.
 | `three-cases.txt` | `three` again without the pidfd option, the lead's ring's completion for a sibling's death, which none of the proposal's rules uses: the carrier's and the lead's waits check their PEs' ends themselves, as `osoe_liveness_outlast` polls their pidfds |
 | `single-breakages.txt` | The six breakages, each failing as its variant's line says |
 | `long_three.py`, `long-three.txt` | `three` with the proposal's options and four hours, run alone, and what it gave: the engine's bound of 100 million states, in 73 minutes, without a violation |
+| `suite-2026-10-30.txt`, `carrier-2026-10-30.txt` | The suite's models at the build (2026-10-30): `abort_exit_model.py` with the rules built, its 37 cases, and `carrier_model.py`, its five |
+| `pi-srun.sh`, `pi-2026-10-30/` | The build under `srun -K1` on the Pi's four nodes against the library before it: every PE calling on two and four nodes, and two callers on two nodes with a goodbye held, ten runs each - `summary.txt`, `runs.txt` and each run's output |
 | `old-cases.txt` | The suite's 29 cases run from this copy: every verdict and state count the same as the suite's copy gives, so that the proposal's lines change nothing they do not name |
 
 Run from this directory: `python3 abort_exit_model.py single` for the

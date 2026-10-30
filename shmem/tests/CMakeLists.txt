@@ -5272,13 +5272,32 @@ if(OSOE_INTERNODE)
   set_tests_properties(shmem.global-exit.zero.0-0-1-1
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
   # Two callers at once on one node: the declaration that wins carries its status
-  # and leaves last; the other caller leaves with 0 (abort.c).
+  # and leaves last; the other caller leaves with 0 (abort.c). And on two nodes,
+  # and every PE at once on two and three, the job's single carrier (P1): the
+  # lowest-ranked of the nodes' carriers, each node's own winning its word.
   add_test(NAME shmem.global-exit.two-callers.0-0-1-1
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
             $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 two-callers)
-  set_tests_properties(shmem.global-exit.two-callers.0-0-1-1
+  add_test(NAME shmem.global-exit.two-nodes.0-0-1-1
+    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+            $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 1 two-nodes)
+  set_tests_properties(shmem.global-exit.two-callers.0-0-1-1 shmem.global-exit.two-nodes.0-0-1-1
     PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
-  osoe_internode_label(shmem.global-exit.zero.0-0-1-1 shmem.global-exit.two-callers.0-0-1-1)
+  osoe_internode_label(shmem.global-exit.zero.0-0-1-1 shmem.global-exit.two-callers.0-0-1-1
+    shmem.global-exit.two-nodes.0-0-1-1)
+  # Not under tsan, every PE a caller: its exits, a second or more each, run the
+  # chain of ends - the outranked node's handlers, its lead, the carrier's lead,
+  # the carrier's handler - to 6 to 8 s, past the 6 s the script allows for an
+  # end not left waiting (the verification of 2026-10-30, the job's ends right
+  # and no report from the gate); two-nodes reaches the same path under it.
+  if(NOT CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    add_test(NAME shmem.global-exit.all-callers.0-0-1-1
+      COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>
+              $<TARGET_FILE:shmem_test_global-exit> 4 0,0,1,1 7 7 0 all-callers)
+    set_tests_properties(shmem.global-exit.all-callers.0-0-1-1
+      PROPERTIES LABELS "tier2" TIMEOUT 90 PASS_REGULAR_EXPRESSION "GLOBAL EXIT OK")
+    osoe_internode_label(shmem.global-exit.all-callers.0-0-1-1)
+  endif()
 endif()
 # Under a launcher that ends the job at the first bad exit, as srun -K1 does
 # (KILLS=yes: no -k): the PE carrying the status leaves last (abort.c), so its
@@ -5290,12 +5309,24 @@ endif()
 # node (2 and 7 runs of 30 under srun before); a second caller, inside its
 # handlers; and PEs whose end waits on stdout's lock, which their grace ends
 # after 10 s - not under tsan, whose _exit waits on the lock for good (below).
+# And what conformance F1 of round four found and P1 closed: callers on more than
+# one node, each node's own carrying until then, the first to leave a bad exit
+# while the other nodes ran - two callers on two nodes, either way round, and
+# every PE a caller on one, two and three nodes, each finishing a second-long
+# handler; one carrier for the job now, the lowest-ranked of the nodes'.
 foreach(case "L4;4;-;0;compute" "slow-handler.0-0-1-1;4;0,0,1,1;1;slow-handler"
              "slow-handler.one-node;4;-;1;slow-handler" "nonlead.one-node;4;-;1;compute"
              "two-callers.one-node;4;-;0;two-callers"
              "nonlead.0-0-1-1;4;0,0,1,1;1;compute"
              "nonlead-other-node.0-0-1-1;4;0,0,1,1;3;compute"
-             "two-callers.0-0-1-1;4;0,0,1,1;0;two-callers")
+             "two-callers.0-0-1-1;4;0,0,1,1;0;two-callers"
+             "two-nodes.0-0-1-1;4;0,0,1,1;1;two-nodes"
+             "two-nodes.1-1-0-0;4;1,1,0,0;1;two-nodes"
+             "two-nodes.0-1-0-1;4;0,1,0,1;2;two-nodes"
+             "all-callers.one-node;4;-;0;all-callers"
+             "all-callers.0-0-1-1;4;0,0,1,1;0;all-callers"
+             "all-callers.1-1-0-0;4;1,1,0,0;0;all-callers"
+             "all-callers.0-0-1-1-2-2;6;0,0,1,1,2,2;0;all-callers")
   list(GET case 0 label)
   list(GET case 1 count)
   list(GET case 2 map)
@@ -5304,6 +5335,9 @@ foreach(case "L4;4;-;0;compute" "slow-handler.0-0-1-1;4;0,0,1,1;1;slow-handler"
   osoe_map_nodes("${map}" nodes)
   if(nodes GREATER 1 AND NOT OSOE_INTERNODE)
     continue()
+  endif()
+  if(mode STREQUAL "all-callers" AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+    continue()                          # its chain of exits under tsan: above
   endif()
   add_test(NAME shmem.global-exit.kills.${label}
     COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/global-exit.sh $<TARGET_FILE:osoe-launch>

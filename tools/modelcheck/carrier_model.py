@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """Two concurrent shmem_global_exit callers on two nodes, each its node's
-carrier (abort.h; design §3.15, §6.4; v0.2 step 4, Part 2).
+carrier (abort.h; design §3.15, §6.4; v0.2 step 4, Part 2; P1).
 
 The carrier rule - progress-host.c's osoe_progress_host_abort; progress.c's
-osoe_progress_peers_ended, flush_aborting and flush_control_aborting - with one
-wire a pair and with two, written by the second adversarial read of Part 2
-(S1). abort_exit_model.py sends every abortive goodbye whether or not the
-peer's has arrived, a superset of the code's sends, which hides this case.
+osoe_progress_outranked, osoe_progress_peers_ended, flush_aborting and
+flush_control_aborting - with one wire a pair and with two, written by the
+second adversarial read of Part 2 (S1) and made the job's single carrier's by
+P1 (2026-10-30). abort_exit_model.py has one wire a pair, which hides what two
+make of the order goodbyes arrive in.
 
 Each node's PE has declared its own global exit (its node's abort word names its
-own PE, so it is a carrier). Its agent then aborts: for each wire, in any order
-(a data wire's send may wait behind a segment in flight), it sends its abortive
-goodbye - unless the peer's abortive goodbye has already arrived on that wire,
-when it has nobody to tell. Then, a carrier, it waits until every peer wire has
-ended, but a wire on which the peer's own abort - naming another caller -
-arrived: peers_ended's carrier rule. Its process then ends, which ends its
-streams (keep_stream: the end of stream comes with the process's end).
+own PE, so it is a carrier); node 0's caller is ranked below node 1's. Its
+agent then aborts: for each wire, in any order (a data wire's send may wait
+behind a segment in flight), it sends its abortive goodbye - unless the peer's
+has already arrived on that wire naming a caller not ranked above its own,
+when it has nobody to tell: node 1 tells nobody where node 0's has arrived,
+node 0 tells node 1 even there (progress.c's peer_outranked_here). Then, a
+carrier, it waits: outranked - a goodbye from the lower caller's node arrived on
+a wire it judges - it waits no longer; otherwise until every wire it judges has
+ended. Its process then ends, which ends its streams (keep_stream: the end of
+stream comes with the process's end).
 
 Checked: from every state, a state where both nodes have ended is reachable
 (AG EF), the bound OSOE_ABORT_LEAD_WAIT_SECONDS left out. A state from which it
@@ -24,22 +28,28 @@ is not is two carriers each waiting for the other: both run to the bound.
 
 Variants
   one_wire        one connection a pair, as before v0.2 step 4's Part 2.
-  two_wires       two, every rule per wire, as first built: two goodbyes
-                  that cross arrive on different wires, and each carrier waits
-                  for the other's stream to the bound (a breakage).
-  either_wire     two, peers_ended skipping both of a peer's wires once its
-                  abort has arrived on either: the design with no helpers.
-  control_only    two, the design with helpers (v0.2 step 4, Part 3): the
-                  data wire is a helper's, whose sends the lead's process waits
-                  for - so a node waits once every wire's send or silence is
-                  done, as here - and the lead judges the peers by their
-                  control wires alone, the wires it holds: a peer's abort
-                  naming another caller on its control wire, or its control
-                  wire's end. A process's end ends all its streams at once, so
-                  a control wire's end says what a data wire's would; and of
-                  two carriers at least one tells the other on the control
-                  wire, the first to begin, so they never wait each for the
-                  other.
+  two_wires       two, with no helpers: one owner holds both of a peer's wires,
+                  so a goodbye from the lower caller on either outranks it, and
+                  it otherwise waits for both to end.
+  control_only    two, with helpers (v0.2 step 4, Part 3): the data wire is a
+                  helper's, whose sends the lead's process waits for - so a node
+                  waits once every wire's send or silence is done, as here - and
+                  the lead judges the peers by their control wires alone, the
+                  wires it holds: the lower caller's goodbye on its control
+                  wire, or its control wire's end. A process's end ends all its
+                  streams at once, so a control wire's end says what a data
+                  wire's would; and the lower carrier's lead tells the higher on
+                  its control wire whatever arrived first.
+  old_send, old_send_one_wire
+                  the send before P1, nothing to a peer whose goodbye has
+                  arrived: node 1's arriving first on every wire, node 0 tells
+                  it nothing, and each waits for the other (a breakage, as
+                  abort_exit_model.py's single_old_send).
+
+Until P1 the rule was each carrier its own node's, a node excluding a peer whose
+goodbye named another caller: per wire (two_wires as first built) that failed
+LIVE_END, and judged on either wire, or on the control wire with helpers, it
+held; its variants went with it.
 """
 import sys
 from collections import deque
@@ -48,7 +58,8 @@ import engine
 
 
 def run(variant):
-    wires = ('D',) if variant == 'one_wire' else ('C', 'D')
+    wires = ('D',) if variant in ('one_wire', 'old_send_one_wire') else ('C', 'D')
+    old_send = variant.startswith('old_send')
     W = len(wires)
     # node: (phase, sent[W], nobody[W], peer_aborted[W], ended_in[W]); phase:
     # 0 declared, 1 aborting, 2 waiting, 3 ended
@@ -63,6 +74,7 @@ def run(variant):
         for x in (0, 1):
             y = 1 - x
             phase, sent, nobody, pab, ended = nodes[x]
+            lower = y < x               # the peer's caller ranked below this node's
 
             def mk(nx, cx=None, cy=None, label=''):
                 ns, cs = list(nodes), list(chans)
@@ -94,7 +106,7 @@ def run(variant):
                 for k in range(W):
                     if sent[k] or nobody[k]:
                         continue
-                    if pab[k]:
+                    if pab[k] and (old_send or not y > x):
                         nb = list(nobody)
                         nb[k] = True
                         mk((1, sent, tuple(nb), pab, ended), label=f'{x}: nobody to tell on {wires[k]}')
@@ -108,12 +120,10 @@ def run(variant):
                 if all(sent[k] or nobody[k] for k in range(W)):
                     mk((2, sent, nobody, pab, ended), label=f'{x} waits for its peers')
             elif phase == 2:
-                if variant == 'either_wire' and any(pab):
-                    done = True
-                elif variant == 'control_only':
-                    done = pab[0] or ended[0]
+                if variant == 'control_only':
+                    done = (lower and pab[0]) or ended[0]
                 else:
-                    done = all(pab[k] or ended[k] for k in range(W))
+                    done = (lower and any(pab)) or all(ended)
                 if done:
                     cx = tuple(c + ('EOF',) for c in chans[x])
                     mk((3, sent, nobody, pab, ended), cx=cx, label=f'{x} ends')
@@ -155,8 +165,8 @@ def run(variant):
 
 def main():
     ok = True
-    for variant, expect in (('one_wire', True), ('two_wires', 'LIVE_END'), ('either_wire', True),
-                            ('control_only', True)):
+    for variant, expect in (('one_wire', True), ('two_wires', True), ('control_only', True),
+                            ('old_send', 'LIVE_END'), ('old_send_one_wire', 'LIVE_END')):
         held, states, tr = run(variant)
         failure = None if held else 'LIVE_END: both carriers wait for each other'
         wrong = engine.judge(held, engine.named(failure), expect)

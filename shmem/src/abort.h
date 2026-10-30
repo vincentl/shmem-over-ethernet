@@ -34,8 +34,15 @@
  *                   its own, whose end of stream then tells the carrier's node
  *                   that its node is done; and the carrier's node's lead waits
  *                   for every other node's end of stream after its goodbyes
- *                   (progress-host.c) - but a node whose goodbye named another
- *                   caller, which carries that one.
+ *                   (progress-host.c). With callers on several nodes there is
+ *                   one carrier for the job, the lowest-ranked of the nodes'
+ *                   (P1): a node whose lead reads a goodbye naming a caller
+ *                   ranked below its own carrier is outranked (node.h's
+ *                   `outranked`) - it waits for no other node, its lead waits
+ *                   for every PE of it, and its carrier, rereading the word as
+ *                   it waits, leaves with 0 by exit - and a carrier's node
+ *                   tells such a peer even where the peer's goodbye arrived
+ *                   first, so that it learns it is outranked.
  *   a fatal         _exit with the declarer's status, as a fatal does.
  *
  * Either way the end can wait on a lock another thread holds - a stream's, or

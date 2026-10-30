@@ -210,11 +210,14 @@ rated them (round six's readiness Q5-5).
 - **The 1.6 session routines' semantics, should they ever be more than
   no-ops** - what design §10's "thorough 1.6 spec read" had left when the author
   closed it (`docs/decisions/2026-10-04.md` item 11).
-- **The global exit's single job-wide carrier**, modelled first, which closes
-  what the README's second limit leaves open (round four, conformance F1).
-- **A hand-on wake for a reopened connection buffer** - a writer that reserves
+- ~~**The global exit's single job-wide carrier**, modelled first, which closes
+  what the README's second limit leaves open (round four, conformance F1)~~ -
+  done 2026-10-30 (P1: modelled 2026-10-29, built at the author's word, the
+  lowest-ranked of the nodes' carriers the job's).
+- ~~**A hand-on wake for a reopened connection buffer** - a writer that reserves
   and leaves room wakes the next, a woken writer that finds none passes the
-  wake on - `wait_word_model.py` first (scale S1).
+  wake on - `wait_word_model.py` first (scale S1)~~ - done 2026-10-29 (P2: the
+  room count the default, `OSOE_TURNOVER_WAKE`, the hand-on a setting).
 - ~~**The pipeline's window on links faster than gigabit**: measure, then the
   default (scale S2)~~ - done 2026-10-28 (P37: timed at the third cluster
   session, the default 8).

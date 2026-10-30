@@ -1,0 +1,31 @@
+ending the job at 1793363525.737812265
+ending the job at 1793363525.737978037
+ending the job at 1793363525.734500886
+ending the job at 1793363525.738658356
+PE 3: computing
+ending the job at 1793363525.734726045
+ending the job at 1793363525.737410683
+ending the job at 1793363525.738734243
+ending the job at 1793363525.737409406
+PE 5: handler began
+PE 7: computing
+PE 2: handler began
+PE 6: handler began
+PE 0: handler began
+PE 5: computing
+PE 5: handler ran after a second
+PE 4: handler began
+PE 2: computing
+PE 2: handler ran after a second
+PE 0: computing
+PE 0: handler ran after a second
+PE 6: computing
+PE 6: handler ran after a second
+PE 1: handler began
+srun: error: pi-004: task 6: Exited with exit code 13
+srun: Terminating StepId=2103.0
+srun: error: pi-002: task 2: Exited with exit code 9
+slurmstepd-pi-001: error: *** STEP 2103.0 ON pi-001 CANCELLED AT 2026-10-30T08:32:06 ***
+srun: error: pi-003: task 4: Terminated
+srun: error: pi-001: task 1: Terminated
+srun: Force Terminated StepId=2103.0

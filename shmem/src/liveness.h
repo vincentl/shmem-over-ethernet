@@ -25,6 +25,7 @@
 #ifndef OSOE_LIVENESS_H
 #define OSOE_LIVENESS_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /* From the node's rendezvous, once every local PE has published its pid, to
@@ -46,12 +47,15 @@ struct osoe_deadline;
 /*
  * On a global exit, before this PE's own end (abort.c): wait until every other
  * local PE but local id `besides` (none if it is no local id) has ended, or
- * `until`. A pidfd for each, opened now - a PE gone already, or that never
+ * `until`, or - where `stop` is given - until it returns true, asked at each
+ * poll: at least every 100 ms (the carrier's wait, which a peer's lower caller
+ * ends, P1). A pidfd for each, opened now - a PE gone already, or that never
  * published its pid, is nothing to wait for - or, where none can be had,
  * kill(pid, 0) every millisecond. Takes no lock and allocates nothing: another
  * thread of this process may hold any lock while it ends, and two threads may
  * wait at once.
  */
-void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until);
+void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until,
+                           bool (*stop)(void));
 
 #endif /* OSOE_LIVENESS_H */

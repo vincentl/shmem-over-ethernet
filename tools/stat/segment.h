@@ -405,14 +405,16 @@ void osoe_segment_close(struct osoe_segment *s);
  *       and what it waits for, team.tree.data_* (D1); each owner's flags
  *       raised late, transport.am.late_flags (T38); and a blocked record's
  *       detail kind for a data wire still being made, kept for H23
+ *   43  the header's `outranked`, node.outranked, beside the abort word: this
+ *       node's carrier of a global exit outranked by another node's (P1)
  *
- * None of 5 to 42 changed the watch word's encoding: 17 gave it a region
+ * None of 5 to 43 changed the watch word's encoding: 17 gave it a region
  * value it could already carry, 23 gave each thread a word of its own, and 37
  * lengthened the context pool, after which the thread records that hold the
  * watch words are found by threads_offset as before.
  */
 #define OSOE_SEGMENT_WATCH_ENCODING_FIRST_LAYOUT 4
-#define OSOE_SEGMENT_NEWEST_LAYOUT               42
+#define OSOE_SEGMENT_NEWEST_LAYOUT               43
 /* The first layout whose published epochs carry their block (node.h). */
 #define OSOE_SEGMENT_EPOCH_BLOCK_FIRST_LAYOUT    30
 

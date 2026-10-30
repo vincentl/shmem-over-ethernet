@@ -118,3 +118,107 @@ not the highest any carrier gave or 143 - still one of the callers', as §9.1.6 
 takes one more goodbye's round trip and the outranked node's own end, its carrier's handlers
 included, within the bounds as they are (`abort.h`: the lowest node's 20 s wait outlasts an
 outranked carrier's 10 s grace).
+
+## The author's answer, 2026-10-30
+
+To "Build P1's single carrier before round ten?": "Build it". Then, leaving for the day: "I want
+you to exhaust the available tokens in an attempt to close all open items" - so the build went on
+to its merge without stopping for his word.
+
+## Built
+
+On branch `single-carrier` off `main` at `d7b53241`, the three rules as modelled:
+
+- **The word.** `struct osoe_node_header`'s `outranked`, beside the abort word (layout 43; the
+  metric `node.outranked`): stored once, with release, by the lead's agent (`osoe_node_outrank`),
+  loaded with acquire (`osoe_node_outranked`).
+- **Tell the higher.** `progress.c`'s `peer_outranked_here`: a carrier's node - its word naming one
+  of its own PEs, which `osoe_progress_abort` is now told (`carries`) - still sends its abortive
+  goodbye on a wire whose peer's goodbye has arrived naming a caller ranked above its carrier, in
+  `flush_aborting` and `flush_control_aborting` alike.
+- **Outranked.** `osoe_progress_outranked`: a goodbye on any wire the owner holds naming a caller
+  ranked below this node's carrier. The carrier's node's lead waits, after its goodbyes, until it is
+  outranked or every peer has ended (`osoe_progress_peers_ended`, now with no exclusion), and marks
+  the word if outranked (`progress-host.c`). Before its end the lead then waits for every other PE,
+  the carrier among them (`abort.c`). The carrier's wait for its node (`osoe_liveness_outlast`, which
+  takes a `stop` it asks at each poll, at least every 100 ms) ends on the word, and the carrier
+  leaves with 0 by `exit`, its grace's status 0 too.
+- **The lowest waits for all**: no peer excluded from the wait.
+
+**The models.** `tools/modelcheck/abort_exit_model.py` is the evidence copy with these rules as
+built (`built`) and the rules before P1 a variant (`per_node`, `both` under `kills` NO_KILL in 37
+states); its 37 cases each as expected, 11.8 minutes on the Mac
+(`docs/design/evidence/exit-carrier/suite-2026-10-30.txt`) - `no_exclusion`, the old rule's
+breakage, went with the rule. `carrier_model.py`, the goodbyes' two wires a pair, rewritten for
+the rules: one wire, two without helpers, and the control wire alone with them hold; the send
+before P1, `old_send`, fails LIVE_END on one wire and on two (`carrier-2026-10-30.txt`).
+
+**The tests** (`test-global-exit.c`, `global-exit.sh`):
+
+- `two-nodes`: PE `CALLER` and the PE after it on another node, 100 ms later, `CALLER`'s node
+  holding its goodbye to that node half a second (`OSOE_TEST_HOLD_GOODBYE`, set by the script), so
+  both win their nodes' words and the higher node's goodbye arrives first; the lower caller must
+  carry, and the outranked caller - the only one with a handler, a second long - must finish its
+  handler before the carrier leaves. On `0,0,1,1` and `1,1,0,0` the outranked carrier is its node's
+  lead; on `0,1,0,1` neither caller is. Under `osoe-launch` without `-k`, as `srun -K1`
+  (`shmem.global-exit.kills.two-nodes.*`), and with it (`shmem.global-exit.two-nodes.0-0-1-1`).
+- `all-callers`: every PE calls at once with 7 + its rank, each with a second-long handler, on one,
+  two (`0,0,1,1` and `1,1,0,0`) and three nodes (`0,0,1,1,2,2`): one rank alone leaves nonzero,
+  with its own status, nobody is killed, and every handler that began finishes. **Which PE
+  carries is not fixed** when every PE calls: a PE whose call another node's goodbye outruns
+  leaves as one that did not call, running no handler - the README says so - and the first
+  version of the test, requiring every handler, failed on exactly that, as did a two-node test
+  without the hold, whose higher caller's goodbye ended the lower before it called.
+- Each rule broken in the C (`build/scratch/carrier/mutants.sh`, each mutant built and the nine
+  new kill-mode tests run against it): the send before P1 caught by 5; the word never marked by
+  7; the carrier not rereading it by 2 (`kills.two-nodes.0-1-0-1` and `all-callers.0-0-1-1`); the
+  outranked lead not waiting for its carrier by 1 (`kills.two-nodes.0-1-0-1`, once the outranked
+  caller alone had a handler - with the carrier's own second-long handler beside it, the demoted
+  carrier finished first and nothing was caught). The first run of the mutants restored each file
+  with `mv`, keeping an mtime older than its object, so every later mutant ran on the earlier ones
+  too; restored with `cp` and `touch`, each ran alone.
+
+**The documents**: the README's limit ("PEs of more than one node calling `shmem_global_exit` at
+once can lose a caller's output") gone and "How a job ends" saying what is now true; design
+§3.15's carrier rules and a paragraph of P1's; the release note's change and its known limit
+gone; the checklist's items for P1 and P2 struck; the models' README; P1 closed, 18 items.
+
+**Verified whole** in the VM on `abfeba29`'s tree (`build/scratch/carrier/verify.sh`, last
+night's less P2's two wake runs): every preset, tier 3's and the single-node build without a
+warning; the static checks 14 of 14; the internode suite 633 of 633 at no helpers, on demand and on
+demand at no helpers, and on demand under asan 610 of 610; tier 3's 138 of 138; the models
+`abort_exit`, `carrier` and `selftest`; no process killed for memory. But for two kinds of
+failure, both the tests', fixed in `e5335414`:
+
+- `shmem.stat.L2`, `.L4` and `.link` in every preset: `osoe-stat` decodes the watch word only to
+  the newest layout it knows, 42, and printed layout 43's raw - as `tools/stat/segment.h` says a
+  newer layout must until the tool is told it kept the encoding. Layout 43 changes no field the
+  tool decodes; its newest is now 43.
+- Under tsan, every-PE callers (`all-callers`, four tests in each tsan run): each job ended right -
+  one rank nonzero, nobody killed, every handler that began finished, no report from the gate -
+  but 6.1 to 8.2 s after the first call, past the 6 s the script allows an end not left waiting:
+  tsan's exits run the chain of ends (the outranked node's handlers, its lead, the carrier's lead,
+  the carrier's handler) in whole seconds. They are kept out of the tsan build, as the held-stdout
+  tests are; `two-nodes` reaches the same path under it, and passes.
+
+On the fixes' tree: every preset built again without a warning, the static checks 14 of 14, and
+the tests of `osoe-stat` and the global exit in each preset - release and debug 88 of 88, asan 84,
+tsan 66, the single-node build 43, tsan's on demand 24 - all passing; the counts now debug 1,214,
+633 of them internode, tsan 841, 286 internode, the single-node build 632 (`verify-fix.sh`).
+
+**On the Pi under `srun -K1`** (the development VM's Slurm has one node; the cluster's four
+nodes, offload off, two PEs a node): one source of `test-global-exit.c`, compiled by each build's
+`oshcc`, against the library before P1 (`main` at `cbfaa7e1`) and after (`abfeba29`), ten runs of
+each shape (`pi-srun.sh`, `docs/design/evidence/exit-carrier/pi-2026-10-30/`):
+
+| shape | before P1: srun's status | tasks terminated, handlers cut | after P1: srun's status | tasks terminated, handlers cut |
+|---|---|---|---|---|
+| every PE calling, two nodes | 143 seven times; 9, 10 and 10 | 7 runs; 4 | 7 three times, 8 seven | none; none |
+| every PE calling, four nodes | 143 nine times; 14 | 9 runs; 3 | 7 three times, 8 seven | none; none |
+| two callers on two nodes, one goodbye held | 143 every time | 10 runs; 10 | 7 every time | none; none |
+
+Before P1, Slurm killed a PE in 26 of the 30 runs - in `two-nodes` the outranked caller inside its
+handler each time, its buffered line lost - and returned 143 in each of those 26: round four's
+conformance F1 as it reached a user. After it, in 30 runs, nothing was killed, every handler that
+began finished, and the status was always a caller's of the node holding rank 0 - 7 or 8 - the
+lowest-ranked of the nodes' carriers.

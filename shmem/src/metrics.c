@@ -408,6 +408,7 @@ static const struct osoe_metric_descriptor record_metrics[] = {
      * 15 reads it by, when the rank was a field of its own. */
     { "node.abort_pe", "", OSOE_MTYPE_U32, OSOE_MKIND_STATE, OSOE_MSCOPE_NODE, 4,
       (uint32_t)offsetof(struct osoe_node_header, aborting), 0 },
+    ND("node.outranked", outranked, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.world_size", world_size, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),
     ND("node.job", job, OSOE_MTYPE_U64, OSOE_MKIND_STATE, ""),
     ND("node.step", step, OSOE_MTYPE_U32, OSOE_MKIND_STATE, ""),

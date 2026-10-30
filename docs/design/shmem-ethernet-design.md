@@ -2408,7 +2408,8 @@ Slurm kill the caller inside `exit`; measured under the VM's Slurm with
 handlers of 0 to 5 s; `abort_exit_model.py`'s STATUS,
 `shmem.global-exit.kills.*`). Callers racing each other leave the job one of
 their statuses, as §9.1.6 asks: the first declaration on a node fixes the
-status there, and every other caller leaves with 0.
+status there, the lowest-ranked of the nodes' first callers carries the job
+(below, P1), and every other caller leaves with 0.
 
 **The carrier leaves last.** Such a launcher kills every task still running at
 the first bad exit, and a killed task counts 143, which `srun`'s status would
@@ -2423,9 +2424,7 @@ carrier waits for every other PE of its node, by pidfds opened then
 than one node waits for its node's others but the carrier before its own end,
 so that its end of stream - its end makes it - tells the carrier's node that
 its node is done; and the carrier's node's lead, after its goodbyes, waits for
-every other node's end of stream (`progress-host.c`), but a node whose own
-goodbye named another caller (`peer_abort_origin`), which carries that one -
-each waiting for the other would only run both to the bound. The waits are
+every other node's end of stream (`progress-host.c`). The waits are
 bounded, `OSOE_ABORT_LEAD_WAIT_SECONDS` (20) and
 `OSOE_ABORT_CARRIER_WAIT_SECONDS` (30), each above the grace of what it waits
 for: a PE whose end is held still ends first, by its own grace. Within a node
@@ -2441,12 +2440,46 @@ stream at once, which that node took for its PEs having ended (Part 2's second
 adversarial read; the model, of two nodes, relays no goodbye) (`abort_exit_model.py`'s
 NO_KILL and JOB_STATUS, with srun -K1 as a thread that kills; its variants
 `no_carrier_wait`, `no_lead_wait`, `no_remote_wait`, `wait_every_node`,
-`no_exclusion`, `called_carries`; `shmem.global-exit.kills.*` require no rank
-killed). Two limits stay: a site's `WaitTime`, or `srun -W n`, ends the other
-tasks n seconds after the first leaves, whatever its code; and two PEs of two
-nodes calling at once, each first on its own node, each carry their node's end,
-and the first to leave can still have a PE of the other killed (the model's
-`both` with `kills`). A process stopped outright outlasts every bound, and is
+`called_carries`; `shmem.global-exit.kills.*` require no rank killed). One limit
+stays: a site's `WaitTime`, or `srun -W n`, ends the other tasks n seconds after
+the first leaves, whatever its code.
+
+**One carrier for the job** (P1, 0.2; `docs/decisions/2026-10-29-exit-carrier.md`).
+Until it, two PEs of two nodes calling at once, each first on its own node,
+each carried their node's end, each carrier's node excluding the other's - a
+node whose goodbye named another caller carried that one, and each waiting for
+the other would only have run both to the bound - so the first to leave could
+still have a PE of the other killed (round four's conformance F1; the model's
+`per_node` with `kills`), the ordinary shape of an error every PE detects. Now
+the job's carrier is the lowest-ranked of the nodes' carriers. A carrier's node
+whose lead reads a goodbye naming a caller ranked below its own carrier is
+outranked: the lead stores the node's `outranked` word (layout 43), waits for no
+other node, and before its end waits for every PE of its node, the carrier
+among them; the carrier rereads the word at each poll of its wait for its node
+(`osoe_liveness_outlast`, at least every 100 ms) and, outranked, waits for
+nobody and leaves with 0 by `exit`, its handlers run (`abort.c`). A carrier's
+node not outranked waits for every other node's end, none excluded. And a
+carrier's node tells a peer whose own goodbye has arrived when that goodbye
+named a caller ranked above its own (`progress.c`'s `peer_outranked_here`),
+where until P1 it told nobody: the higher node learns it is outranked from
+that goodbye alone. Each rule is needed: broken, the model's `old_send`,
+`carrier_unmoved` and `outranked_waits` are STUCK, `demoted_unwaited`,
+`status_kept` and `lowest_excludes` NO_KILL (`abort_exit_model.py`; the
+goodbyes' two wires a pair in `carrier_model.py`, whose `old_send` is two
+carriers waiting each for the other). The end of a job whose callers are on
+several nodes takes one more goodbye's trip and the outranked node's own end,
+its carrier's handlers included, within the waits' bounds as they are: the
+lowest node's lead's 20 s outlasts an outranked carrier's grace of 10.
+`shmem.global-exit.two-nodes.*` and `.kills.two-nodes.*` hold one node's goodbye so
+that both callers win their words and the higher node's goodbye arrives first,
+and require the lower caller's status - on `0,1,0,1` both callers not their
+nodes' leads, the outranked one finishing a second-long handler before the
+carrier, which has none, leaves; `shmem.global-exit.kills.all-callers.*` have
+every PE call at once, on one, two and three nodes, and require one bad exit,
+nobody killed and every handler that began finished. Which caller carries is
+not fixed when every PE calls: a caller whose call another node's goodbye
+outruns leaves as one that did not call. Each rule broken in the C fails some
+of them (the record's mutants). A process stopped outright outlasts every bound, and is
 left behind. And one narrow case waits out the grace again: on the
 caller's PE, another thread already inside `exit` - main returned into the
 library's handler while a second thread called `shmem_global_exit` - holds the

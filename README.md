@@ -325,7 +325,7 @@ inside such a container - and Podman with `ENOSYS`. There jobs on one node run, 
 480 of the 951 tests the suite had on 2026-10-17 failed at `shmem_init` or at
 opening a ring - all of them among the 523 then labelled `internode` but
 `env.probe`, which need more than one node or test the internode backend's own
-files, io_uring or futex2 (`ctest -L internode`, 625 tests now); the
+files, io_uring or futex2 (`ctest -L internode`, 633 tests now); the
 single-node build has neither them nor io_uring. Set
 the sysctl to 0 as root, or run the container with a seccomp profile that allows
 io_uring. Container runtimes also give a container 64 MiB of `/dev/shm` unless
@@ -470,7 +470,7 @@ must be at that path on each.
   reached the library ("How a job starts", below). A job ended by
   `shmem_global_exit(status)` still reaches `srun` as `status` under `-K1`:
   every PE but the caller leaves with 0, and the caller leaves last, so its exit
-  is the one bad one Slurm sees - with the limits under "How a job ends".
+  is the one bad one Slurm sees - with the limit under "How a job ends".
 - **`--cpu-bind=none`**; `SLURM_CPU_BIND=none` in the environment does the same.
   Where a node runs as many tasks as it has cores, Slurm binds each task to one
   core by default, and the thread that moves every message of the node - the
@@ -1378,12 +1378,6 @@ specification or takes a choice the specification leaves open.
   a call undefined. A PE that does nothing - a size of 0, a null pointer to
   free - where the others do something returns at once, and the others wait in
   the check until the deadlock detector ends the job.
-- **Under `srun -K1`, or `osoe-launch` without `-k`, PEs of more than one node
-  calling `shmem_global_exit` at once can lose a caller's output**, where the
-  specification has every PE's output flushed (§9.1.6): the first node to leave
-  can have the launcher end the other nodes' PEs still ending, callers among
-  them, whose handlers and buffered output are then lost, and `srun` may return
-  143 ("How a job ends"). Call it from one PE.
 
 **Transport and API**
 
@@ -1674,7 +1668,7 @@ that one could be added without touching the OpenSHMEM layer.
   against a local thread's access to the same place, or another helper's put
   there in an earlier collective. The ordering that makes them safe runs
   through another process, which the tool cannot see - the reason that preset
-  leaves out 343 of the 625 tests labelled `internode`, `shmem.internode`'s
+  leaves out 347 of the 633 tests labelled `internode`, `shmem.internode`'s
   maps among them (§8.2) - and with no helpers the
   one agent applies every peer's puts and has met the local thread through the
   barrier's handoff, which the tool does see. So a report passes only as one
@@ -1718,11 +1712,11 @@ that one could be added without touching the OpenSHMEM layer.
   every wake and every put received
   (`docs/decisions/2026-10-27-layout-42.md`).
 - **Two builds.** The single-node build runs the same suite less the
-  625 tests labelled `internode` - those of a job of more than one node, of
+  633 tests labelled `internode` - those of a job of more than one node, of
   the internode backend's own files, and of io_uring and futex2 - and less
   the full build's check that the single-node build configures, and with
   five of its own, in the same four presets, on Rocky Linux 9 and in the
-  development VM with liburing hidden: 579 of the full build's 1,205 tests in
+  development VM with liburing hidden: 580 of the full build's 1,214 tests in
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
@@ -2220,18 +2214,17 @@ caller after it; only processes held in several places at once, or stopped
 outright, can outlast the waits' bounds, the longest 50 s, and with them the
 order. `srun` then returns the caller's status, and `osoe-launch`
 does the same. When several PEs call it at once, the job's status is one of
-theirs, as §9.1.6 asks: on each node the first call carries it, and the other
-callers leave with 0, usually after their handlers - a caller whose call loses
-the race with another node's end leaves as a PE that did not call.
+theirs, as §9.1.6 asks: on each node the first call wins, and of the nodes'
+winners the lowest-ranked carries the job and leaves last of it; every other
+caller leaves with 0, usually after its handlers - a caller whose call loses
+the race with another node's end leaves as a PE that did not call. So PEs of
+every node calling at once, as they all do when each detects the same failure,
+still end the job with one bad exit, the last, and `-K1` kills nobody: a node
+whose winner learns of a lower one from that node's goodbye leaves with 0
+everywhere before the job's carrier leaves (design §3.15).
 
-Two limits remain. A site that sets `WaitTime`, or `srun -W n`, ends the
-other tasks n seconds after the first one leaves, whatever its status. And
-under `-K1`, when PEs of more than one node call `shmem_global_exit` - as they
-all do when each detects the same failure - each node's first caller carries
-that node's end, and the first to leave can have Slurm kill the other nodes'
-PEs still ending, callers among them, whose handlers and buffered output are
-then lost: `srun` may then return 143. To keep the status and the output, call
-it from one PE.
+One limit remains. A site that sets `WaitTime`, or `srun -W n`, ends the
+other tasks n seconds after the first one leaves, whatever its status.
 A job proved deadlocked ends the same way as a failure, with status 1, after
 each node has printed where its PEs wait.
 

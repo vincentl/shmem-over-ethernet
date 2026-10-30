@@ -23,7 +23,13 @@
 # must find no rank for the launcher to kill, and finish - every line and, in
 # slow-handler, its handler's written - and the launcher's status must be the
 # carrier's. In two-callers the PE after CALLER calls too, with STATUS + 1, and
-# either may carry; the other leaves with 0. A non-lead's fatal must name its
+# either may carry; the other leaves with 0. In two-nodes it is on another node
+# and calls 100 ms later, CALLER's node holding its goodbye to it half a second
+# (OSOE_TEST_HOLD_GOODBYE, set here): both win their nodes' words, and CALLER,
+# ranked lower, must carry - the job's single carrier (P1) - its node telling
+# the other though that node's goodbye arrived first. In all-callers every PE
+# calls, with STATUS + its rank: one alone leaves nonzero, with its own, and
+# every handler that began - a second long - finishes. A non-lead's fatal must name its
 # caller on every node, which only its lead's abortive goodbye can carry
 # there. The job must end within 6 s of the caller's end, before the grace,
 # 10 s, but where MODE holds stdout and the grace is what ends it.
@@ -39,6 +45,14 @@ KEEP=-k
 flushes=yes
 [ "$HOW" = fatal ] || [ "$MODE" = immediate ] && flushes=no
 case $MODE in held-stdout|caller-held-stdout|held-other-node) flushes=no ;; esac
+# two-nodes: the caller's node holds its goodbye to the second caller's node.
+if [ "$MODE" = two-nodes ]; then
+    second=$(( (CALLER + 1) % RANKS ))
+    from=$(printf '%s\n' "$MAP" | cut -d, -f$((CALLER + 1)))
+    to=$(printf '%s\n' "$MAP" | cut -d, -f$((second + 1)))
+    OSOE_TEST_HOLD_GOODBYE=$from:$to
+    export OSOE_TEST_HOLD_GOODBYE
+fi
 if [ "$MAP" = - ]; then
     out=$(${WRAP:-} "$LAUNCHER" -n "$RANKS" -t 60 $KEEP -- "$PROGRAM" "$HOW" "$CALLER" "$MODE" 2>&1)
 else
@@ -51,13 +65,25 @@ echo "$out"
 nonzero=$(printf '%s\n' "$out" | grep -c "exited with status [0-9]*\$")
 with_status=$(printf '%s\n' "$out" | grep -c "exited with status $STATUS\$")
 caller_left=$(printf '%s\n' "$out" | grep -c "rank $CALLER exited with status $STATUS\$")
-# Two callers: the one whose declaration won carries its status.
+# Two callers: the one whose declaration won carries its status - in two-nodes
+# the caller, ranked lower, the job's single carrier (P1).
 expected=$STATUS
 if [ "$MODE" = two-callers ]; then
     second=$(( (CALLER + 1) % RANKS ))
     second_status=$((STATUS + 1))
     second_left=$(printf '%s\n' "$out" | grep -c "rank $second exited with status $second_status\$")
     [ "$second_left" -eq 1 ] && caller_left=1 && expected=$second_status
+fi
+# Every PE a caller: one of them carries, with its own status.
+if [ "$MODE" = all-callers ]; then
+    caller_left=0
+    expected=-1
+    for r in $(seq 0 $((RANKS - 1))); do
+        if printf '%s\n' "$out" | grep -q "rank $r exited with status $((STATUS + r))\$"; then
+            caller_left=$((caller_left + 1))
+            expected=$((STATUS + r))
+        fi
+    done
 fi
 written=$(printf '%s\n' "$out" | grep -c "^PE [0-9]*: computing\$")
 killed=$(printf '%s\n' "$out" | grep -c "killed by signal")
@@ -154,5 +180,17 @@ handlers)
 slow-handler)
     # The caller's handler takes a second, and the caller must finish it.
     printf '%s\n' "$out" | grep -q "^PE $CALLER: handler ran after a second\$" || exit 1 ;;
+two-nodes)
+    # The outranked caller's handler finishes, before its node's lead ends its
+    # stream and so before the carrier, which has none, leaves.
+    second=$(( (CALLER + 1) % RANKS ))
+    printf '%s\n' "$out" | grep -q "^PE $second: handler ran after a second\$" || exit 1 ;;
+all-callers)
+    # Every handler that began finishes, none killed inside it by a launcher
+    # ending the step at an earlier bad exit; the carrier's among them.
+    handlers_began=$(printf '%s\n' "$out" | grep -c "^PE [0-9]*: handler began\$")
+    ran=$(printf '%s\n' "$out" | grep -c "^PE [0-9]*: handler ran after a second\$")
+    echo "all-callers: $ran of the $handlers_began handlers that began finished"
+    [ "$ran" -ge 1 ] && [ "$ran" -eq "$handlers_began" ] || exit 1 ;;
 esac
 echo "GLOBAL EXIT OK"

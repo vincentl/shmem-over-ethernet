@@ -29,6 +29,12 @@ static bool outlasts;
 static uint32_t outlast_besides;
 static struct osoe_deadline outlast_until;
 
+/* The carrier's wait's stop (osoe_liveness_outlast): its node outranked (P1). */
+static bool outranked(void)
+{
+    return osoe_node_outranked(&osoe.node);
+}
+
 bool osoe_abort_pending(void)
 {
     return osoe.node.hdr &&
@@ -73,7 +79,7 @@ static void *grace(void *unused)
     /* Not before what this end must outlast: the grace bounds a process's own
      * end, not the order of ends a global exit keeps (osoe_abort_end). */
     if (outlasts)
-        osoe_liveness_outlast(outlast_besides, &outlast_until);
+        osoe_liveness_outlast(outlast_besides, &outlast_until, NULL);
     /* An end still waiting may be waiting on a lock another thread holds -
      * a stream's, or on the caller's PE exit's own, held by a thread in a
      * program's handler (abort.h): stdout's buffered lines are then what can
@@ -127,9 +133,16 @@ _Noreturn void osoe_abort_end(void)
      * so that its end of stream, which its end makes, tells the carrier's node
      * that its whole node is done (progress-host.c). A fatal's status is every
      * PE's, and nobody waits. The grace below leaves with the same.
+     *
+     * One carrier for the job (P1): where callers on several nodes each carry
+     * their own node, a node whose lead has read a peer's goodbye naming a
+     * caller ranked below its own carrier is outranked (node.h), and nobody
+     * there carries: the lowest-ranked of the nodes' carriers leaves last of
+     * the whole job, alone with a status (abort_exit_model.py's single rules).
      */
     bool caller = atomic_load_explicit(&called, memory_order_acquire) != 0;
-    bool carrier = how == OSOE_ABORT_GLOBAL_EXIT && pe == osoe.bootstrap.rank;
+    bool carrier = how == OSOE_ABORT_GLOBAL_EXIT && pe == osoe.bootstrap.rank &&
+                   !osoe_node_outranked(&osoe.node);
     grace_status = how == OSOE_ABORT_GLOBAL_EXIT && !carrier ? 0 : status;
     /* A caller's wait comes before its grace, which then bounds its own end -
      * its handlers and its flush - as it bounds any caller's: the carrier's,
@@ -140,16 +153,28 @@ _Noreturn void osoe_abort_end(void)
     if (carrier) {
         struct osoe_deadline until = osoe_deadline_in(UINT64_C(1000000000) *
                                                       OSOE_ABORT_CARRIER_WAIT_SECONDS);
-        osoe_liveness_outlast(UINT32_MAX, &until);
+        /* Or until outranked, read at each poll: the lead, which marks it,
+         * then waits for this PE, which waits for nobody and leaves with 0
+         * (the model's single_carrier_unmoved, STUCK without the read). */
+        osoe_liveness_outlast(UINT32_MAX, &until, outranked);
+        if (osoe_node_outranked(&osoe.node)) {
+            carrier = false;
+            grace_status = 0;
+        }
     } else if (how == OSOE_ABORT_GLOBAL_EXIT && osoe.bootstrap.local_id == 0 &&
                osoe.bootstrap.node_count > 1) {
         outlast_besides = UINT32_MAX;               /* none here: another node's */
-        for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
-            if (osoe.bootstrap.gtids[i] == pe)
-                outlast_besides = i;
+        /* An outranked node's carrier is waited for too: it now leaves as any
+         * PE does, and this lead's end of stream must not tell the job's
+         * carrier that the node is done before it is (single_demoted_unwaited,
+         * NO_KILL). Marked by this thread, before this end (progress-host.c). */
+        if (!osoe_node_outranked(&osoe.node))
+            for (uint32_t i = 0; i < osoe.bootstrap.local_count; i++)
+                if (osoe.bootstrap.gtids[i] == pe)
+                    outlast_besides = i;
         outlast_until = osoe_deadline_in(UINT64_C(1000000000) * OSOE_ABORT_LEAD_WAIT_SECONDS);
         if (caller)
-            osoe_liveness_outlast(outlast_besides, &outlast_until);
+            osoe_liveness_outlast(outlast_besides, &outlast_until, NULL);
         else
             outlasts = true;
     }
@@ -177,7 +202,7 @@ _Noreturn void osoe_abort_end(void)
         }
         fflush(NULL);
         if (outlasts)
-            osoe_liveness_outlast(outlast_besides, &outlast_until);
+            osoe_liveness_outlast(outlast_besides, &outlast_until, NULL);
         osoe_fatal_await_first_word();
         _exit(0);
     }

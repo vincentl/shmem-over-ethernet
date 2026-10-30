@@ -88,9 +88,16 @@ const char *osoe_blocked_where(char *buf, size_t len)
     return buf;
 }
 
-void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until)
+void osoe_liveness_outlast(uint32_t besides, const struct osoe_deadline *until,
+                           bool (*stop)(void))
 {
-    (void)besides; (void)until;
+    (void)besides; (void)until; (void)stop;
+}
+
+bool osoe_node_outranked(const struct osoe_node *n)
+{
+    (void)n;
+    return false;
 }
 
 static const char held_word[] = "THE FIRST WORD\n";

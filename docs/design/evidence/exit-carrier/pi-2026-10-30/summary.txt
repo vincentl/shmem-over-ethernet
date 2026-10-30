@@ -1,0 +1,8 @@
+# 2026-10-30T08:31:36 old cbfaa7e1, new abfeba29; offload (tso,gso): pi-001=00 pi-002=00 pi-003=00 pi-004=00 
+new all-callers.2: 10 runs; statuses 8 8 8 8 8 8 7 7 7 8; 0 with a task terminated; 0 with a handler cut short
+new all-callers.4: 10 runs; statuses 8 7 8 7 7 8 8 8 8 8; 0 with a task terminated; 0 with a handler cut short
+new two-nodes.2: 10 runs; statuses 7 7 7 7 7 7 7 7 7 7; 0 with a task terminated; 0 with a handler cut short
+old all-callers.2: 10 runs; statuses 143 143 143 9 143 10 10 143 143 143; 7 with a task terminated; 4 with a handler cut short
+old all-callers.4: 10 runs; statuses 143 143 143 143 143 143 143 143 143 14; 9 with a task terminated; 3 with a handler cut short
+old two-nodes.2: 10 runs; statuses 143 143 143 143 143 143 143 143 143 143; 10 with a task terminated; 10 with a handler cut short
+# 08:34:09 done

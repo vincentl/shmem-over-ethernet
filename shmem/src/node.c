@@ -2027,6 +2027,17 @@ enum osoe_abort_disposition osoe_node_abort_read(const struct osoe_node *n, uint
     return (enum osoe_abort_disposition)(uint8_t)(word >> OSOE_ABORT_DISPOSITION_SHIFT);
 }
 
+void osoe_node_outrank(struct osoe_node *n)
+{
+    if (n->hdr)
+        atomic_store_explicit(&n->hdr->outranked, 1, memory_order_release);
+}
+
+bool osoe_node_outranked(const struct osoe_node *n)
+{
+    return n->hdr && atomic_load_explicit(&n->hdr->outranked, memory_order_acquire) != 0;
+}
+
 void osoe_node_leave(struct osoe_node *n, const struct osoe_bootstrap *b)
 {
     struct osoe_pe_slot *me = &n->slots[b->local_id];

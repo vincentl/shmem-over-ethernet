@@ -1,0 +1,10 @@
+ending the job at 1793363546.331742049
+ending the job at 1793363546.428371379
+PE 3: computing
+PE 0: computing
+PE 1: computing
+PE 2: handler began
+srun: error: pi-001: task 1: Exited with exit code 7
+srun: Terminating StepId=2119.0
+srun: error: pi-002: task 2: Terminated
+srun: Force Terminated StepId=2119.0
