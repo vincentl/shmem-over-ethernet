@@ -4865,7 +4865,7 @@ if(OSOE_INTERNODE)
               $<TARGET_FILE:shmem_test_circulant-reduce> ${arguments})
     # Two nodes of the Pi's link take the tree at every size (P4), which the
     # program cannot hold them to - it asks the chooser it compiles in, which
-    # took Träff's for 6 of its calls while a tree's partial last piece was
+    # took Träff's for 154 of its calls while a tree's partial last piece was
     # charged a whole period - so the line is pinned here.
     set(pass "CIRCULANT REDUCE: .* on ${nodes} nodes")
     if(case STREQUAL "2")

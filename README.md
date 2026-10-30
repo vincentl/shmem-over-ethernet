@@ -846,11 +846,11 @@ two send the same bytes, the cost model takes the tree at every size on the Pi
 cluster's link; measured there (P4, 2026-10-29), the tree was the faster to
 16 KiB, Träff's taking up to 1.7 times as long, and from 32 KiB the two's
 medians came within 12% of each other, Träff's the faster from 48 to 128 KiB
-and, at four PEs a node, to 2 MiB; Träff's
-takes 2⌈log₂ n⌉ rounds where a tree takes 2⌈log_k n⌉ levels, each round a row
-of a lane, and a lane has the ceiling's + 1 rows or the ⌈log₂ n⌉ the rounds
-need, whichever is more, so Träff's runs on a team of up to 65,536 nodes at any
-`OSOE_COLLECTIVE_FANOUT` - past that the reduce-scatter's words hold no more
+and, at four PEs a node, to 2 MiB; Träff's takes 2⌈log₂ n⌉ rounds where a
+tree takes 2⌈log_k n⌉ levels, each round a row of a lane, and a lane has the
+ceiling's + 1 rows or the ⌈log₂ n⌉ the rounds need, whichever is more, so
+Träff's runs on a team of up to 65,536 nodes at any `OSOE_COLLECTIVE_FANOUT` -
+past that the reduce-scatter's words hold no more
 rows, and a team takes the tree at every size - at the price, past 512 nodes at
 the default of 8, of a longer lane, 128 KiB for each doubling of the nodes on
 each of a PE's 17: 2.1 MiB a PE at 1,024 nodes, 6.4 at 4,096 (Memory, below);

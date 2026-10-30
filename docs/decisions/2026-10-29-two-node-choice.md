@@ -36,8 +36,8 @@ off before and after each batch, the nodes 26 hours up.
 
 **How each algorithm was forced** - by the link's numbers, no test hook:
 - *the tree*: `OSOE_COLLECTIVE_SHAPE=tree`;
-- *Träff's*: the shape `link` on a link set so that Träff's is the cheaper at every size measured
-  - `OSOE_LINK_HOP_NS=10000 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=116000000`. The
+- *Träff's*: the shape `link` on a link set so that Träff's is the cheaper at every size measured,
+  `OSOE_LINK_HOP_NS=10000 OSOE_LINK_MESSAGE_NS=0 OSOE_LINK_BYTES_PER_SECOND=116000000`. The
   tree's arm ran on the same link, so the two differ in the algorithm alone: on two nodes every
   fan-out is the same tree, and the bandwidth leaves every data wire's unsent limit at its 16 KiB
   floor, as the Pi's measured link does. Every call of the tree's arms took the tree and every
@@ -172,7 +172,7 @@ adds its own bytes on the busiest link.
 | `shmem.shape.choice`, `check_last_piece` | on two nodes of the Pi, 16 KiB k + 1 costs the tree 9 ns more than 16 KiB k and half a piece more 70,621 ns, and 16 KiB k - 1, k and + 1 take the tree, k to 256 | the fix reverted (`cbfaa7e1`'s `collective-shape.c`) | 768 checks |
 | `shmem.shape.choice`, `check_crossovers` | from three nodes to 512 on the Pi's link, Träff's from 3,500 bytes to under 16 KiB and at every size above, on a ladder to 1 MiB; on three exactly from 16,184 | the tail's bytes not multiplied by the busiest link's count (`tail = last_ns`) | three nodes: "from 16192 bytes, and the tree above it" |
 | `shmem.shape.grid`, `shmem.shape.places-grid` | the C against the model, line by line | either mutation | 1,045 and 733 lines |
-| `shmem.circulant.2`'s line, pinned in `shmem/tests/CMakeLists.txt` | "Träff's from 0 bytes, 0 calls checked as Träff's" - the program asks the chooser it compiles in, so a chooser that took Träff's would have the program agree | the fix reverted | (the VM, below) |
+| `shmem.circulant.2`'s line, pinned in `shmem/tests/CMakeLists.txt` | "Träff's from 0 bytes, 0 calls checked as Träff's" - the program asks the chooser it compiles in, so a chooser that took Träff's would have the program agree | the fix reverted | in the VM: "154 calls checked as Träff's, 4 of them on teams that are not the world" - the review's 6 were at `5cbd47e`, before the phases since added |
 
 - The README's two-node sentence; the design notes' §5.8, as built at v0.2; the release
   checklist's item from step 3; the decisions in force; P4 closed in the open items. No test was
@@ -198,4 +198,4 @@ adds its own bytes on the busiest link.
 
 Revert the build's commit: `osoe_shape_cost` charges a partial last piece a period again, the
 grids go back, and `shmem.circulant.2`'s pinned line must go with it, since two nodes take
-Träff's for 6 of its calls again.
+Träff's for 154 of its calls again.

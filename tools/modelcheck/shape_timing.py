@@ -34,9 +34,10 @@ One rule, in three forms, in the form of grant_timing.py:
               later piece at the pace of the busiest link or of the window's
               loop, whichever is slower, and a partial last piece its own
               bytes on the busiest link or the window's pace less what its
-              shorter loop gives back, whichever is more (P4). Its choices sit between the two link
-              models': choosing by it costs less, against either, than choosing
-              by one and running under the other.
+              shorter loop gives back, whichever is more (P4). Its choices
+              sit between the two link models': choosing by it costs less,
+              against either, than choosing by one and running under the
+              other.
   tree_terms()  what cost() needs of a tree, in closed form, as the C computes
               it, from the tree being full to its last level; checked against
               tree_terms_walk(), which walks every node.
