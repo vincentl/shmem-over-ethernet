@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
-# The third cluster session as one chain (docs/prompts/cluster-session-3-plan.md,
+# The third cluster session as one chain (docs/prompts/done/cluster-session-3-plan.md,
 # the author's plan of 2026-10-27, docs/decisions/2026-10-27.md): the plan's
 # sections in turn, one measurement at a time, each by the kit's own scripts
 # with the plan's settings, from the head node and unattended - the author

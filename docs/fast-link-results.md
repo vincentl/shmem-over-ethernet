@@ -355,7 +355,7 @@ interrupt coalescing at 20 µs receiving and 50 sending, liburing 2.9,
 was `2dd3a623`, layout 42 and H23's data wires on demand merged into it, cloned
 on the head node from a bundle of `main`. The session was one chain,
 `docs/fast-link/session-3.sh` (§21), the author's plan
-(`docs/prompts/cluster-session-3-plan.md`) section by section, one round each
+(`docs/prompts/done/cluster-session-3-plan.md`) section by section, one round each
 where the plan named no other, from 22:38:56 to 23:23:05 UTC: **44.1 minutes**
 against the plan's 52, every section done, 357 jobs, two of them failed (H11,
 below). The machines' start-up scripts were done before it began, so its wait

@@ -352,8 +352,8 @@ whole model about two and a half minutes; `selftest.py` passes.
 
 ## Stage 2, as built
 
-*The second cloud session, 2026-10-13 (`docs/prompts/cloud-session-2-prompt.md`);
-its manifest, `docs/prompts/cloud-session-2-manifest.md`, has the commands and
+*The second cloud session, 2026-10-13 (`docs/prompts/done/cloud-session-2-prompt.md`);
+its manifest, `docs/prompts/done/cloud-session-2-manifest.md`, has the commands and
 the evidence.* Built as stage 1 designs it - the leads' scan, the gather by
 ranges, the way chosen in `collect_varying`, the runs' order kept by the walk,
 the count, the model beside the reductions - with five points the design left

@@ -3,7 +3,7 @@
 ## The brief
 
 From the session that planned the third cluster session with the author the same day
-(`docs/decisions/2026-10-27.md`): prepare the kit as `docs/prompts/cluster-session-3-plan.md`
+(`docs/decisions/2026-10-27.md`): prepare the kit as `docs/prompts/done/cluster-session-3-plan.md`
 lays it out, so that the session is one unattended chain of about an hour - H12's section, the
 chain, and the chain's dry run in the `osoe` VM, timing each section and adjusting the plan's
 estimates where they are off. Committed on this session's branch, not merged, not pushed.

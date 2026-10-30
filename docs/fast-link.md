@@ -14,7 +14,7 @@ the sweep runs; the runs are in `docs/design/evidence/v0.2-step4/`,
 `c4-standard-16`; §8's loop over PE counts and §12 to §16, added by the third
 cloud session for B14 of `docs/prompts/v0.2-open-items.md`, have run only in
 that session's dry run, on an x86-64 sandbox's logical nodes,
-`docs/prompts/cloud-session-3-manifest.md`; §20 and the third session's chain,
+`docs/prompts/done/cloud-session-3-manifest.md`; §20 and the third session's chain,
 §21, in the development VM's dry run of 2026-10-27,
 `2026-10-27-session-3-kit/`). The first session on a cluster, on 2026-10-12
 (`docs/fast-link-results.md`), ran §1 and §2, §3's probe and suite, §4, §6, §8
@@ -897,7 +897,7 @@ about seven minutes, at most twelve.
 docs/fast-link/session-3.sh NODES out
 ```
 
-The author's plan for the third session (`docs/prompts/cluster-session-3-plan.md`,
+The author's plan for the third session (`docs/prompts/done/cluster-session-3-plan.md`,
 2026-10-27) as one script on the head node, the sections in turn and one
 measurement at a time: the wait for every machine's start-up script, by its
 unit's state (§1), then the setup - the packages on every machine at once,
