@@ -52,8 +52,8 @@ beside its own (TERMINATES, STATUS, JOB_STATUS, NO_KILL, ONE_END). Its 29 cases 
 give every verdict and state count the suite's copy gives (`old-cases.txt`), so the new lines
 change nothing they do not name. The suite's model is unchanged until the author decides.
 
-The proposal's cases (`single-cases.txt`, `three-lead-b-cases.txt`, `three-cases.txt`), each
-under `srun -K1` but one:
+The proposal's cases (`single-cases.txt`, `three-lead-b-cases.txt`, `three-cases.txt`,
+`long-three.txt`), each under `srun -K1` but one:
 
 | Case | Shape | States | Result |
 |---|---|---|---|
@@ -61,7 +61,7 @@ under `srun -K1` but one:
 | `single [both_lead_a]` | A's lead the lower caller | 2,520,775 | holds, live |
 | `single [both_lead_b]` | B's lead the outranked carrier | 2,409,391 | holds, live |
 | `single [three_lead_b]` | A's PA, and B's lead and PB, at once | 24,570,080 | holds; the trapped-state check skipped past 12 million states, as the engine does |
-| `single [three]` | A's PA, and B's PB and QB, at once | 42.2 million, and 32.6 million without the pidfd option | no violation, but unfinished at the model's half hour each; `long_three.py` gives it four hours |
+| `single [three]` | A's PA, and B's PB and QB, at once | 100 million, the engine's bound, in 73 minutes alone (`long_three.py`); 42.2 and 32.6 million, without the pidfd option, at the model's half hour | no violation found, but not exhaustive: the case is larger than the engine's bound |
 | `single [nonlead]`, `[finish]`, `[exiting]` | one caller, and beside a finalize and an exit | 119,673 each | holds, live |
 | `single [nonlead]`, no pidfd | one caller, no help | 119,673 | holds, live |
 | `single [lead]` | a lead the caller | 55,707 | holds, live |

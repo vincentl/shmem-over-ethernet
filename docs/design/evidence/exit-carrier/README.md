@@ -13,7 +13,7 @@ unchanged, and this directory holds a copy of it with the proposal's variants.
 | `three-lead-b-cases.txt` | `three_lead_b`, three callers on the two-process nodes - A's PA, and B's lead and PB - complete |
 | `three-cases.txt` | `three` again without the pidfd option, the lead's ring's completion for a sibling's death, which none of the proposal's rules uses: the carrier's and the lead's waits check their PEs' ends themselves, as `osoe_liveness_outlast` polls their pidfds |
 | `single-breakages.txt` | The six breakages, each failing as its variant's line says |
-| `long_three.py` | `three` with the proposal's options and four hours, run alone |
+| `long_three.py`, `long-three.txt` | `three` with the proposal's options and four hours, run alone, and what it gave: the engine's bound of 100 million states, in 73 minutes, without a violation |
 | `old-cases.txt` | The suite's 29 cases run from this copy: every verdict and state count the same as the suite's copy gives, so that the proposal's lines change nothing they do not name |
 
 Run from this directory: `python3 abort_exit_model.py single` for the
@@ -54,5 +54,5 @@ included - where the built rules fail NO_KILL in 37; so do `both_lead_a`
 outranked node and its lead one (24,570,080, the trapped-state check skipped
 past 12 million states, as the engine does). `three` found nothing in 42.2
 million states with the pidfd option and 32.6 million without, each at the
-model's half hour, so it is not exhaustive; `long_three.py` gives it four
-hours alone. The six breakages fail as their lines say, in 35 to 42,012 states.
+model's half hour, and nothing in 100 million alone (`long_three.py`), the
+engine's bound, reached in 73 minutes: so it is not exhaustive. The six breakages fail as their lines say, in 35 to 42,012 states.
