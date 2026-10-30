@@ -31,10 +31,11 @@ Linux 6.12) passed the four build presets (`debug`, `release`, and the
 sanitizers `asan` and `tsan`) at no helpers, two and three (progress helpers:
 extra threads that share a node's network traffic), tier 3 (tests over network
 namespaces), the single-node build and the stress tester `osoe-pacer`, each on a
-node by itself, and ran jobs of up to 512 PEs across the nodes over a link of 23
-Gbit/s, the stress tester and Sandia OpenSHMEM's test suite among them
-([the results](docs/fast-link-results.md)). It was written with Claude Code, under its
-author's direction ([How osoe was made](#how-osoe-was-made)).
+node by itself, and ran jobs across the nodes over a link of 23 Gbit/s: streams
+of puts and five collectives at 512 PEs, 256 on each of two nodes, and on all
+eight the stress tester's `mix` at 32 PEs and Sandia OpenSHMEM's test suite at
+16 ([the results](docs/fast-link-results.md)). It was written with Claude Code,
+under its author's direction ([How osoe was made](#how-osoe-was-made)).
 
 ## OpenSHMEM in two minutes
 
@@ -234,8 +235,10 @@ machine, and natively on x86-64: on 2026-10-12 eight Google Cloud
 four presets at no helpers, two and three - ThreadSanitizer's gate with them -
 tier 3, the single-node build and `osoe-pacer`'s runs, each on a node by itself,
 and jobs of up to 128 PEs ran across the nodes at 23 Gbit/s; and in two sessions
-since, jobs of up to 512, the stress tester's `mix` on all eight nodes and Sandia
-OpenSHMEM's test suite among them ([the results](docs/fast-link-results.md)). Before that, an x86-64 build passed every test an emulator on an aarch64
+since, jobs of up to 512 - streams of puts and five collectives at 256 PEs on
+each of two nodes - with the stress tester's `mix` at 32 PEs and Sandia
+OpenSHMEM's test suite at 16, on all eight nodes
+([the results](docs/fast-link-results.md)). Before that, an x86-64 build passed every test an emulator on an aarch64
 kernel can run - the full build with a shim standing in for the futex2 calls the
 emulator refuses, the single-node build with none, since the emulator passes the
 classic futex through - and an aarch64 build made to order memory as x86-64 does
