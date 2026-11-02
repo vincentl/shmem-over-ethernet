@@ -575,9 +575,12 @@ static uint64_t create_own_heap(struct osoe_node *n, const struct osoe_bootstrap
                        MAP_SHARED | MAP_FIXED_NOREPLACE | (UNDER_THREAD_SANITIZER ? MAP_FIXED : 0),
                        fd, 0);
         *refused = p == MAP_FAILED ? errno : 0;
-        if (p == want)
+        if (p == want) {
             mapped_at = candidates[i];
-        else if (p != MAP_FAILED)
+            /* The huge-pages study's measurement (docs/design/huge-pages-proposal.md): not for main. */
+            if (getenv("OSOE_HUGE_PAGES_PROBE"))
+                madvise(p, n->heap_bytes, MADV_HUGEPAGE);
+        } else if (p != MAP_FAILED)
             munmap(p, n->heap_bytes);   /* a kernel without NOREPLACE placed it elsewhere */
     }
     close(fd);
@@ -748,6 +751,9 @@ static void map_siblings(struct osoe_node *n, const struct osoe_bootstrap *b)
         /* A sibling's heap is in the sibling's own core; in this one it would
          * make every core L heaps large (review round two, omissions 4). */
         madvise(p, s->heap_bytes, MADV_DONTDUMP);
+        /* The huge-pages study's measurement (docs/design/huge-pages-proposal.md): not for main. */
+        if (getenv("OSOE_HUGE_PAGES_PROBE"))
+            madvise(p, s->heap_bytes, MADV_HUGEPAGE);
         n->heap_of[i] = p;
 
         if (!n->statics_bytes)

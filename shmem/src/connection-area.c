@@ -430,6 +430,9 @@ again:;
     /* Every PE of the node maps it, and a core of each would hold the node's
      * whole traffic (review round two, omissions 4). */
     madvise(p, a->bytes, MADV_DONTDUMP);
+    /* The huge-pages study's measurement (docs/design/huge-pages-proposal.md): not for main. */
+    if (getenv("OSOE_HUGE_PAGES_PROBE"))
+        madvise(p, a->bytes, MADV_HUGEPAGE);
     a->map = p;
 
     struct osoe_connection_area_header *h = p;
