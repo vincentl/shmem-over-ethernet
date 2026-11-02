@@ -37,7 +37,10 @@ nine's changes, `v0.2-round-nine-fixes-adversarial-read.md` and the kit's
 third, `v0.2-fast-link-kit-round-nine-adversarial-read.md`); and fresh
 agents' fact-checks, line by line against their sources, of the 0.2 release
 note's draft (`v0.2-release-notes-fact-check.md`) and of round nine's minor
-changes (`v0.2-round-nine-minor-fixes-fact-check.md`). Start with a round's synthesis,
+changes (`v0.2-round-nine-minor-fixes-fact-check.md`); and, after the tag, a
+fresh agent's read of the large-cluster playbook before the author saw it
+(`large-cluster-playbook-adversarial-read.md`, 2026-11-01), named for its work
+alone, as reads of work after 0.2 are. Start with a round's synthesis,
 whose first section is its verdict: `archive/v0.2-before-part4-review.md` is
 round nine's, `archive/v0.2-step4-review.md` round eight's, and
 `archive/phase1-step7-slice4-review.md` round six's, on the first release's
