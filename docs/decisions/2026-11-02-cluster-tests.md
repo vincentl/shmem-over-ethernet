@@ -88,8 +88,8 @@ library; nothing decided about defaults or protocols without the author.
   paragraph, its repository table and the Limits sentence on the suite across
   machines; `docs/pi-cluster.md` §4 made the suite's run, the by-hand smoke
   test kept under it, and §5 naming `cluster.floor`; design §8.2's "Tier 4
-  under `ctest`"; the decisions index; and the playbook's A4, C1 and G1 (in the
-  author's uncommitted copy; below).
+  under `ctest`"; the decisions index; and the playbook's A4, C1 and G1
+  (question 5 below on how they reached the tree).
 
 ## What was checked
 
@@ -190,10 +190,13 @@ under another name (question 3).
 4. **The cluster's preset runs the tests one at a time** (`ctest`'s default),
    since two steps on the same nodes would share their cores and `/dev/shm`;
    nothing stops `-j`. Should the tests carry `RUN_SERIAL`?
-5. **The playbook's copy.** A4, C1 and G1 were amended in the author's
-   uncommitted `docs/prompts/large-cluster-playbook.md` in the main checkout,
-   not in this branch, since the file is not yet committed; the note in the
-   side sessions' folder says what changed.
+5. **The playbook's amendments twice.** A4, C1 and G1 were first amended in
+   the main checkout's working copy, while this branch's base still lacked the
+   playbook (`e1be26bc` committed it that morning); the sibling session's
+   commit `a3e4bc89`, the intranode combine's model, then swept that edit into
+   itself from the shared working tree. The same three replacements are on
+   this branch, from `e1be26bc`, so the two merge without a conflict - but
+   `a3e4bc89`'s message does not name them. Nothing to do but know it.
 
 ## To undo
 
