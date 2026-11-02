@@ -16,7 +16,10 @@ the team redesign's, `progress-helpers-proposal.md`, v0.2 step 4's,
 built (H23), `blocking-get-proposal.md`, question 4's exploration of a
 blocking get a piece at a time, decided and built as its (b), and
 `collect-scan-proposal.md`, P30's design and model for `collect`'s places,
-built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
+built by the second cloud session (its "Stage 2, as built"); a note,
+`small-collective-model.md`, on the cost model of the small collectives' shapes
+between node leads (`tools/modelcheck/small_collective_timing.py`, 2026-11-02;
+the large-cluster playbook's §5), which changes nothing in the library; and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,
 item by item with its alternatives and the questions put to the author.

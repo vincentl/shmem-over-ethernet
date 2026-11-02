@@ -282,7 +282,7 @@ checks of the build itself and jobs of a few processes. On four cores of an
 idle virtual machine it took about thirteen minutes, one for the build and
 twelve for the tests (2026-10-17, when they were about 950). Both may run four at a time, as this
 project's own runs do (`cmake --build --preset release -j4`, `ctest --preset
-release -j4`). The 47 tests of the model checker (`tools/modelcheck`, which
+release -j4`). The 48 tests of the model checker (`tools/modelcheck`, which
 needs Python 3) took 62 minutes in a development VM one at a time on
 2026-10-11, when they were 40, the longest of them, `model.reservation`, 14 of
 those, and check the design, which does not vary with the machine. They want
