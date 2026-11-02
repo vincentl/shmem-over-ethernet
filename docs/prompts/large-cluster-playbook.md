@@ -492,6 +492,20 @@ from node 0 already, so a lead would hold k + 1 control wires and the data
 wires traffic opens - a protocol: the abort's carrier judges the peers by their
 control wires (`carrier_model.py`, `control_only`), and the detector's probes
 and the silent-peer check would travel a tree; a design change for the author.
+*Modelled on 2026-11-02* (`docs/design/control-tree-proposal.md`,
+`model.control_tree_abort`, `deadlock_model.py`'s `tree`,
+`model.control_tree_timing`): the control wires of the collectives' trees
+alone - the world team's ceiling tree eager, k + 1 a lead, every other tree's
+made as a call first needs it by the schedule's caller, both ends knowing the
+edge - the detector's probes down the world tree and its answers ANDed up it,
+an abort as a notice a node relays to its neighbours, a second allowed on a
+wire where today's goodbye is the last, and the ends gathering toward the
+lowest caller's node, which leaves last; the data-wire request routed over the
+tree. The abort's protocol holds in sixteen cases and today's rules on a tree
+fail it; the detector's argument is unchanged. 18 sockets a node against 8,190
+at 4,096 nodes, the detector's collection and an abort's spread about a
+hundred times faster there, the tree slower than the star below 64 nodes; the
+author decides whether it is built, and when.
 
 **C18 The detector, the liveness check and the idle wakes at thousands of
 nodes.** The deadlock detector is a star from node 0 - 4(n - 1) control
@@ -567,7 +581,7 @@ there.
 | **Topology** | trees in level order by node index, Slurm's order; Träff's partners n/2 apart; one link measured | nodes numbered by rack so that a subtree is a rack (a pre-order tree, as the scans'), and a link class a rack | a reduction's traffic stays in the rack until the top levels; the spine carries log n streams a rack instead of most of the tree's edges | needs the site's topology (`scontrol show topology`, or a name's pattern), which not every site gives; Träff's schedule is circulant and has no racks | the ladder's reductions at rungs that span racks against ones that do not; a model with two link classes |
 | **`collect`'s places** | the nodes' totals through the tree, a scan or an exchange to 16 nodes; a vector a PE otherwise | hierarchical under every distribution (C10) | 1 MB a call at 128,000 PEs under `plane` becomes 8 bytes a PE a node, exchanged within the node | the mapping of ranks to places needs the node's order of its PEs, which the rank map has | the ladder's `collect` under `plane=4` |
 | **`fcollect`** | Bruck's allgather among the leads, the node's PEs' blocks together | kept | each node receives every other's data once, in ⌈log₂ n⌉ steps | at 4,096 nodes the 12 steps' late messages are n/2 blocks; no better bound exists | nothing; measured on the ladder |
-| **Start-up** | the rendezvous tree of fan-out 8, then the mesh by schedule, control wires eager | control wires on demand or along the collectives' tree (C17) | a lead holds k + 1 wires at start instead of n - 1, and the kernel 2(k + 1) sockets a node instead of 2(n - 1) | the detector's and the carrier's views assume a control wire to every node (`carrier_model.py`); the abort's broadcast would travel the tree | question 1's start-up curve; a model of the carrier and the detector over a tree; the author's |
+| **Start-up** | the rendezvous tree of fan-out 8, then the mesh by schedule, control wires eager | control wires along the collectives' trees (C17): the world tree's eager, the others made as a call first needs them | a lead holds k + 1 wires at start instead of n - 1, and the kernel 2(k + 1) sockets a node instead of 2(n - 1); the detector's collection and an abort's spread about a hundred times faster at 4,096 nodes by `control_tree_timing.py` | the carrier's wait and the outranked rule rebuilt on relays (`control_tree_abort_model.py`); a second notice on a wire after the goodbye; a death's far side cut off until its own fatals; a request routed over the tree for a data wire | modelled 2026-11-02 (`control-tree-proposal.md`; the protocol holds, today's rules on a tree fail it); question 1's start-up curve and `ss -tm` at the top rungs, then built at the author's word |
 | **Hot-spot atomics** | applied in arrival order by the target's owner threads | none that keeps the semantics; more owners a node (C3, C4) | - | combining changes the values each caller sees | A7's `histo` and GUPS rates; measure |
 | **Small puts** | coalesced already: a connection with a send in flight fills its buffer and the next send carries everything queued, no threshold; 32 bytes of wire an 8-byte put; three locked operations a put on the node's shared lines | a sub-buffer a PE, or a socket's PEs, within a pair's connection, merged by the owner; a wire header that batches same-peer puts under one header | the mailbox's 1.25 million a second on eight nodes is bound by the progress thread's cost a message and by the writers' contention, not the link | rewrites the model-checked reservation protocol of §3.5; a batch header changes the wire | the mailbox's rate at the ladder's rungs at 16 to 256 PEs a node; a model of the sub-buffers' merge |
 

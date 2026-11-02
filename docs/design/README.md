@@ -23,7 +23,10 @@ by a message a member a destination node, its cost model fitted to the cloud's
 alltoalls on 2026-11-02 and not built (C8), `hierarchical-scan-proposal.md`, a
 prefix scan within each node and among the node leads where every node is one
 run of the team's ranks, modelled and timed in hops on 2026-11-02 and not built
-(C9),
+(C9), `control-tree-proposal.md`, the control wires of the collectives' trees
+alone in place of a control wire to every node, the detector's probes and an
+abort's notices along the world team's tree, modelled and costed on 2026-11-02
+and not built (C17),
 built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,

@@ -56,6 +56,15 @@ Designs
                       part 2; the progress helpers proposal's §3.1). This
                       assumes the acknowledgement; control_ack_model.py checks
                       the protocol that gives it.
+  tree                the root's probes down the control tree and the answers
+                      up it (docs/design/control-tree-proposal.md, the
+                      large-cluster playbook's C17): node 1 is node 2's
+                      parent; probed, it samples and passes the probe to its
+                      child, and answers its parent only once its own sample
+                      and its child's answer are in, the two ANDed. The
+                      argument is unchanged: every node's two samples still
+                      bracket t*, the end of the first collection, whatever
+                      order the relays sample in.
 Breakages
   waits_only          activity counts the PEs' waits but not the messages a
                       node applies: a get's request applied between the
@@ -79,6 +88,9 @@ Breakages
                       step 4 part 2, F1).
   no_blocked          quiet ignores whether the PE waits: a PE computing
                       through both samples, sending nothing (SAFETY).
+  tree_no_wait        the relay answers for itself alone, without its child's
+                      answer: the root hears from every child and declares a
+                      job whose far node still runs (SAFETY; put_wakes).
 
 Usage: deadlock_model.py [substring ...]   runs the cases whose names match
 """
@@ -116,6 +128,18 @@ CONTROL_KINDS = ('probe1', 'probe2', 'report_ok', 'report_bad')
 # the adversarial read's F1). control_wire_acked is the design: a control
 # wire's segments acknowledged as a data wire's are, and quiet waiting for them.
 UNACKED = ('control_wire',)
+
+
+def parent_of(i, design):
+    """Node i's parent for the probes: the root for every node, but in the
+    tree, where node 2 hangs from node 1."""
+    if design.startswith('tree') and i == 2:
+        return 1
+    return 0
+
+
+def children_of(i, design):
+    return [j for j in range(1, N) if parent_of(j, design) == i]
 
 
 def acked_kind(k, design):
@@ -267,15 +291,29 @@ def agent(i, design):
                              {}, f'node {i} hears node {j} applied one'))
         # A sample's second half, whole with the pass (or, broken, without).
         ready = M[HALF(i)] == 2 or (design == 'no_pass' and M[HALF(i)] == 1)
+        children = children_of(i, design)
+        got = sum(M[CHAN(j, i, 'report_ok')] + M[CHAN(j, i, 'report_bad')] for j in children)
+        all_ok = all(M[CHAN(j, i, 'report_ok')] for j in children)
+        clear = {}
+        for j in children:
+            clear[CHAN(j, i, 'report_ok')] = 0
+            clear[CHAN(j, i, 'report_bad')] = 0
         if not root:
-            # A probe: its first half now.
+            up = parent_of(i, design)
+            # A probe: its first half now, and in the tree the probe on to
+            # the children.
             for c in (1, 2):
-                if M[CHAN(0, i, f'probe{c}')] and M[HALF(i)] == 0:
+                if M[CHAN(up, i, f'probe{c}')] and M[HALF(i)] == 0:
                     upd = first_half(M)
-                    upd[CHAN(0, i, f'probe{c}')] = 0
+                    upd[CHAN(up, i, f'probe{c}')] = 0
                     upd[PROBED(i)] = c
+                    for j in children:
+                        upd[CHAN(i, j, f'probe{c}')] = 1
                     alts.append((upd, {}, f'node {i} is probed ({c}) and begins a sample'))
-            if ready:
+            # The answer: its own sample, and in the tree its children's
+            # answers ANDed with it - or, broken, its own alone.
+            waits_children = design != 'tree_no_wait'
+            if ready and (not waits_children or got == len(children)):
                 start = second_half(M)
                 if M[PROBED(i)] == 1:
                     ok = start != 0
@@ -283,20 +321,16 @@ def agent(i, design):
                 else:
                     ok = start != 0 and start == M[FIRST(i)]
                     upd = {}
+                if waits_children:
+                    ok = ok and all_ok
                 kind = 'report_ok' if ok else 'report_bad'
+                upd.update(clear)
                 upd.update({HALF(i): 0, START(i): 0, PROBED(i): 0,
-                            CHAN(i, 0, kind): M[CHAN(i, 0, kind)] + 1})
+                            CHAN(i, up, kind): M[CHAN(i, up, kind)] + 1})
                 alts.append((upd, {}, f'node {i} reports: {"quiet" if ok else "busy"}'))
         else:
             ph = L['phase']
-            others = N - 1
-            got = sum(M[CHAN(j, 0, 'report_ok')] + M[CHAN(j, 0, 'report_bad')]
-                      for j in range(1, N))
-            all_ok = all(M[CHAN(j, 0, 'report_ok')] for j in range(1, N))
-            clear = {}
-            for j in range(1, N):
-                clear[CHAN(j, 0, 'report_ok')] = 0
-                clear[CHAN(j, 0, 'report_bad')] = 0
+            others = len(children)
             if ph in (0, 3) and M[HALF(0)] == 0 and not M[DECLARED]:
                 alts.append((first_half(M), {'phase': ph + 1},
                              f'the root begins its {"first" if ph == 0 else "second"} sample'))
@@ -304,7 +338,7 @@ def agent(i, design):
                 start = second_half(M)
                 upd = {HALF(0): 0, START(0): 0, FIRST(0): start}
                 if start != 0:
-                    for j in range(1, N):
+                    for j in children:
                         upd[CHAN(0, j, 'probe1')] = 1
                     alts.append((upd, {'phase': 2}, 'the root was quiet: it probes'))
                 else:
@@ -323,7 +357,7 @@ def agent(i, design):
                 start = second_half(M)
                 upd = {HALF(0): 0, START(0): 0}
                 if start != 0 and start == M[FIRST(0)]:
-                    for j in range(1, N):
+                    for j in children:
                         upd[CHAN(0, j, 'probe2')] = 1
                     alts.append((upd, {'phase': 5}, 'the root unmoved: it probes again'))
                 else:
@@ -402,6 +436,16 @@ CASES = [
     # The barrier's arrival on the control wire (v0.2 step 4 part 2).
     ('control_wire_acked', 'barrier', True),
     ('control_wire', 'barrier', 'SAFETY'),
+    # The probes down a control tree and the answers up it (C17).
+    ('tree', 'deadlock', True),
+    ('tree', 'put_wakes', True),
+    ('tree', 'put_silent', True),
+    ('tree', 'get', True),
+    ('tree', 'get_far', True),
+    ('tree', 'compute', True),
+    ('tree', 'chain', True),
+    ('tree', 'barrier', True),
+    ('tree_no_wait', 'put_wakes', 'SAFETY'),
 ]
 
 

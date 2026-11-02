@@ -46,7 +46,7 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
                   team_block split_numbers pool_dry posted_bitmap lane lane_scan visit
                   control_ack carrier helper_request deadlock_owners abort_owners exchange
                   mesh active_set data_wire turnover_wake intranode_combine
-                  hierarchical_scan)
+                  hierarchical_scan control_tree_abort)
   if(OSOE_MULTIPLE_MODELS)
     list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim
                             pe_quiet)
@@ -96,6 +96,14 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME model.scan_timing
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scan_timing.py check)
   set_tests_properties(model.scan_timing PROPERTIES LABELS "tier1;model" TIMEOUT 300)
+  # A control tree against the mesh of control wires (the large-cluster
+  # playbook's C17; 2026-11-02, not built): sockets a node and flows a job,
+  # the detector's collection and an abort's spread, the star against the
+  # tree at the cloud's hop and message cost and at four message costs, and
+  # the control wires' start-up by the schedule against the tree's.
+  add_test(NAME model.control_tree_timing
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/control_tree_timing.py check)
+  set_tests_properties(model.control_tree_timing PROPERTIES LABELS "tier1;model" TIMEOUT 300)
   # Träff's circulant reduce-scatter and allgather (v0.2 step 3): the rounds'
   # arithmetic for every node count from 2 to 70, against the fold the brief
   # described (rabenseifner_model.py, kept as that comparison's evidence); the
