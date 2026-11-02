@@ -45,7 +45,8 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
                   abort abort_exit lock pipeline allgather scan scan_pipeline deadlock
                   team_block split_numbers pool_dry posted_bitmap lane lane_scan visit
                   control_ack carrier helper_request deadlock_owners abort_owners exchange
-                  mesh active_set data_wire turnover_wake intranode_combine)
+                  mesh active_set data_wire turnover_wake intranode_combine
+                  hierarchical_scan)
   if(OSOE_MULTIPLE_MODELS)
     list(APPEND osoe_models dirty_set get_completion watch_list landing_extent copy_out_claim
                             pe_quiet)
@@ -87,6 +88,14 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME model.alltoall_timing
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/alltoall_timing.py check)
   set_tests_properties(model.alltoall_timing PROPERTIES LABELS "tier1;model" TIMEOUT 300)
+  # A scan's cost in hops, the members' tree as built against the
+  # hierarchical scan (the large-cluster playbook's C9; 2026-11-02, not
+  # built): the hierarchical design faster under a block layout at every
+  # node count from 4, 1.5 times or better at 512 nodes x 256 PEs, and the
+  # cyclic layout, where it does not apply, pinned.
+  add_test(NAME model.scan_timing
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scan_timing.py check)
+  set_tests_properties(model.scan_timing PROPERTIES LABELS "tier1;model" TIMEOUT 300)
   # Träff's circulant reduce-scatter and allgather (v0.2 step 3): the rounds'
   # arithmetic for every node count from 2 to 70, against the fold the brief
   # described (rabenseifner_model.py, kept as that comparison's evidence); the

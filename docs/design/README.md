@@ -20,7 +20,10 @@ blocking get a piece at a time, decided and built as its (b), and
 the node's members, modelled and timed on 2026-11-02 and not built (the
 large-cluster playbook's C5), `two-level-alltoall-proposal.md`, an alltoall
 by a message a member a destination node, its cost model fitted to the cloud's
-alltoalls on 2026-11-02 and not built (C8),
+alltoalls on 2026-11-02 and not built (C8), `hierarchical-scan-proposal.md`, a
+prefix scan within each node and among the node leads where every node is one
+run of the team's ranks, modelled and timed in hops on 2026-11-02 and not built
+(C9),
 built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,
