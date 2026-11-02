@@ -11,6 +11,7 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## Scope and goals
 
+- **The large cluster runs the TCP design first.** On a cluster with InfiniBand or RoCE NICs the first campaign measures osoe's floor beside the fabric's own (`ib_write_lat`, `ib_write_bw`) and builds no backend; a backend is decided from those numbers after. The campaign is two sessions at least - the gates and the lower rungs, then the top rungs - by `docs/prompts/large-cluster-playbook.md`, whose grants G2 to G4 the cluster agent has (the small changes, models written there and nothing built from them, the one-allocation kit change) and whose harness (G1) is built here first. Author, [2026-11-01](2026-11-01.md), answers 1, 3, 4 and 14.
 - **Release point first.** 1.5 complete through step 8, 1.6 less its known gaps, the SOS suite clean of its own extensions, a green Pi runbook, a license, `cmake --install`, a README, a version tag. Author, [2026-09-26-day](2026-09-26-day.md) item 2.
 - **RoCE is a constraint, not work.** The seams stay RDMA-capable; no RoCE backend before the release; Soft-RoCE at most after it. Author, [2026-09-26-day](2026-09-26-day.md) item 1. Still out of 0.2, which clears every other open item: design motivation, no code. Author, [2026-10-11](2026-10-11.md) item 4.
 - **v0.2 is four steps in order**: the single-node build, the tree's shape from the link, Rabenseifner's reduction, progress helpers (`docs/prompts/task-v0.2.md`); x86-64 work is gated on hardware, not in the order; development stays aarch64-first. Author, [2026-10-05-v0.2](2026-10-05-v0.2.md) items 1 and 5. Step 4's Part 4, a fast link, is in 0.2's scope, and 0.2's tag waits for it - where [2026-10-09](2026-10-09.md) item 3 let 0.2 ship without it. Author, [2026-10-10](2026-10-10.md) item 3.
@@ -112,6 +113,7 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## Settings and defaults
 
+- **`shmem_finalize`'s wait has no bound of its own**: `OSOE_NO_PROGRESS_TIMEOUT` is the user's. **`OSOE_AM_HUGEPAGES`**, retired on 2026-10-11 and still in the tree, goes or stays after a study of what real huge-page support would cost. Author, [2026-11-01](2026-11-01.md), answers 9 and 10.
 - **`OSOE_MAX_TEAMS`** defaults to 256, at most 1,024, since step E made a number about 14 KiB a PE (24 KiB at v0.2's ceiling of 8 and capacity of 4). Author, [2026-10-02](2026-10-02.md) item 8 ("256 max teams is more than sufficient"), built in [2026-10-04-team-scans](2026-10-04-team-scans.md); 64 from [2026-09-26-day](2026-09-26-day.md) item 4 until then. It counts the numbers one PE holds at once, the three predefined included, since step D's second part ([2026-10-03-team-allocation](2026-10-03-team-allocation.md)).
 - **`OSOE_TEAM_BLOCKS`**, a node's pool of team blocks: default 1,024, from 8 to 65,536, agreed among a node's PEs and free to differ between nodes; a node holds that many teams at once, a destroyed team's block given back by the last of its members there to leave; the default kept through step E, the README stating its reach. Author, [2026-10-02](2026-10-02.md) item 8, and [2026-10-04](2026-10-04.md) item 3; built by Claude, [2026-10-03-team-storage](2026-10-03-team-storage.md) and [2026-10-03-team-allocation](2026-10-03-team-allocation.md).
 - **`OSOE_MAX_CONTEXTS`** defaults to 64, from 1 to 4,096, agreed by a node's PEs at start. Claude, [2026-09-26-evening](2026-09-26-evening.md) item 2.
@@ -139,6 +141,7 @@ without the author, under a standing mandate, and the record carries the undo.
 
 ## How work is done
 
+- **A review of work after 0.2 is named for the work**, as `CLAUDE.md` says, with no version prefix: `large-cluster-playbook-adversarial-read.md` is the first. Author, [2026-11-01](2026-11-01.md), answer 16.
 - **Merge as each slice verifies**, and keep going without waiting, with every decision written down with its undo. The author's standing direction, [2026-09-23-autonomous](2026-09-23-autonomous.md); reaffirmed as "merge into `main` at green checkpoints" for the release fixes and the team slices, [2026-10-02](2026-10-02.md) item 4.
 - **The README is true of the tree at every commit.** A change carries the README sentences for what it changes; a sentence later work will replace says so ("temporary", "work in progress"). Author, [2026-10-02](2026-10-02.md) item 6.
 - **Every `OSOE_` setting the library and its tools read is named in the README**, in its settings or the launcher's table, which `shmem.settings-documented` checks; and design §3.12 says how the progress threads are as built. Author, [2026-10-09](2026-10-09.md) items 5 and 6.

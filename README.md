@@ -491,7 +491,12 @@ must be at that path on each.
   64 KiB broadcast stayed within 1% - and a stream of 64 KiB puts between PEs of
   one node fell from 23,300 MiB/s to 13,600. So a program bound by small
   collectives or by traffic within a node, rather than by pipelined messages
-  between nodes, may prefer Slurm's binding.
+  between nodes, may prefer Slurm's binding. Under that binding the progress
+  helpers (`OSOE_PROGRESS_HELPERS`, two by default on three nodes or more where
+  a node's PEs fit its CPUs) share the lead PE's core with its agent and its
+  own thread, so at many PEs a node either set `OSOE_AGENT_CPUS=node`, which
+  lets them run on any CPU of the node's tasks, or leave a core or two without
+  a PE; neither has been measured on a node whose every core runs a PE.
 - **`OSOE_NO_PROGRESS_TIMEOUT=60`** while a cluster is new, so that a wait on
   the library's own progress - a connection's acknowledgements, buffer space,
   a reply - that stops moving ends the job and says what it waited for.

@@ -19,7 +19,9 @@ questions only scale answers, listed below, each with how to measure it.
 Measure first; change code only where a run cannot go on without it or a defect
 shows, and keep each change small. The session's product is one Markdown file,
 written for the worst case, that it is the only thing that comes back (the last
-section).
+section). `docs/prompts/large-cluster-playbook.md` (2026-11-01) frames this
+brief: its gates come before these questions, its ladder carries them, and its
+phase C says where the code is likely to bend; read it first where you have it.
 
 ## Read first
 
