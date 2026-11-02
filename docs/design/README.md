@@ -9,14 +9,18 @@ the open questions (§10). The code's comments cite it by section, as `§4.10`;
 start with §1, for the goals and the release point, and §2, for the layers, then
 §4.10, the boundary that the layout of `shmem/src/` follows.
 
-Beside the notes are six proposals, each saying at its head what became of
+Beside the notes are seven proposals, each saying at its head what became of
 it: `osoe-pacer-proposal.md`, the stress tester's, `team-resources-proposal.md`,
 the team redesign's, `progress-helpers-proposal.md`, v0.2 step 4's,
 `mesh-schedule-proposal.md`, a start-up schedule for the connection mesh,
 built (H23), `blocking-get-proposal.md`, question 4's exploration of a
-blocking get a piece at a time, decided and built as its (b), and
+blocking get a piece at a time, decided and built as its (b),
 `collect-scan-proposal.md`, P30's design and model for `collect`'s places,
-built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
+built by the second cloud session (its "Stage 2, as built"), and
+`huge-pages-proposal.md`, the 2026-11-02 study of huge pages for the heaps and
+the connection area - transparent by `madvise`, hugetlbfs, or `memfd` objects -
+with what each costs and buys and a measurement in the VM, for the author to
+decide whether `OSOE_AM_HUGEPAGES` is removed or replaced; and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,
 item by item with its alternatives and the questions put to the author.

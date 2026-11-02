@@ -1,0 +1,34 @@
+# run-probe.sh in the development VM (Debian 13, Linux 6.12.113+deb13-cloud-arm64,
+# 4 KiB pages, hpage_pmd_size 2 MiB), 2026-11-02, under flock /tmp/osoe-vm.lock.
+# The first touch of the first run, 3.149 s, is the hypervisor backing the VM's
+# memory for the first time; later touches of 256 MiB take 0.04 to 0.12 s.
+== 1. defaults: shmem_enabled=always within_size advise [never] deny force, /dev/shm rw,nosuid,nodev,inode64)
+/dev/shm object: mapping a at 0xffffa7230000 (not on 2 MiB), b at 0xffff97000000 (aligned)
+advise=1 ShmemHugePages 0 -> 0 kB; ShmemPmdMapped a=0 kB b=0 kB; VmPTE 44 -> 1068 kB; touch b 3.149 s, a 0.033 s
+/dev/shm object: mapping a at 0xffff95a70000 (not on 2 MiB), b at 0xffff85800000 (aligned)
+advise=0 ShmemHugePages 0 -> 0 kB; ShmemPmdMapped a=0 kB b=0 kB; VmPTE 44 -> 1068 kB; touch b 1.000 s, a 0.027 s
+== 2. sysfs shmem_enabled=advise, /dev/shm as mounted
+always within_size [advise] never deny force
+/dev/shm object: mapping a at 0xffff70930000 (not on 2 MiB), b at 0xffff60600000 (aligned)
+advise=1 ShmemHugePages 0 -> 0 kB; ShmemPmdMapped a=0 kB b=0 kB; VmPTE 44 -> 1072 kB; touch b 0.041 s, a 0.023 s
+memfd object: mapping a at 0xffff75e00000 (on 2 MiB), b at 0xffff65c00000 (aligned)
+advise=1 ShmemHugePages 0 -> 262144 kB; ShmemPmdMapped a=262144 kB b=262144 kB; VmPTE 40 -> 44 kB; touch b 0.621 s, a 0.001 s
+memfd object: mapping a at 0xffffa9200000 (on 2 MiB), b at 0xffff99000000 (aligned)
+advise=0 ShmemHugePages 0 -> 0 kB; ShmemPmdMapped a=0 kB b=0 kB; VmPTE 44 -> 1068 kB; touch b 0.050 s, a 0.024 s
+== 3. /dev/shm remounted huge=advise, sysfs never
+tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev,inode64,huge=advise)
+/dev/shm object: mapping a at 0xffff7f400000 (on 2 MiB), b at 0xffff6f200000 (aligned)
+advise=1 ShmemHugePages 0 -> 262144 kB; ShmemPmdMapped a=262144 kB b=262144 kB; VmPTE 40 -> 44 kB; touch b 0.007 s, a 0.001 s
+/dev/shm object: mapping a at 0xffff7b000000 (on 2 MiB), b at 0xffff6ae00000 (aligned)
+advise=0 ShmemHugePages 0 -> 0 kB; ShmemPmdMapped a=0 kB b=0 kB; VmPTE 44 -> 1072 kB; touch b 0.120 s, a 0.025 s
+== 4. /dev/shm remounted huge=within_size
+tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev,inode64,huge=within_size)
+/dev/shm object: mapping a at 0xffffa1800000 (on 2 MiB), b at 0xffff91600000 (aligned)
+advise=0 ShmemHugePages 0 -> 262144 kB; ShmemPmdMapped a=262144 kB b=262144 kB; VmPTE 44 -> 44 kB; touch b 0.042 s, a 0.000 s
+== 5. /dev/shm remounted huge=always
+tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev,inode64,huge=always)
+/dev/shm object: mapping a at 0xffff8ea00000 (on 2 MiB), b at 0xffff7e800000 (aligned)
+advise=0 ShmemHugePages 0 -> 262144 kB; ShmemPmdMapped a=262144 kB b=262144 kB; VmPTE 44 -> 48 kB; touch b 0.006 s, a 0.000 s
+== restored: shmem_enabled=always within_size advise [never] deny force; tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev,inode64)
+ShmemHugePages:        0 kB
+HugePages_Total:       0
