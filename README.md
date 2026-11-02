@@ -1736,7 +1736,7 @@ that one could be added without touching the OpenSHMEM layer.
 - **Four build presets** - `debug`, `release`, AddressSanitizer with
   UndefinedBehaviorSanitizer, and ThreadSanitizer - each with the whole suite
   run before every merge, on the exact tree that merges: about 1,200 tests in
-  release, and the model checker's 48 tests beside them, which run in that build
+  release, and the model checker's 49 tests beside them, which run in that build
   only; fewer under ThreadSanitizer, which cannot see an ordering that runs
   through another process, and so leaves most tests across nodes to the other
   three.

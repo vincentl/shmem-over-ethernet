@@ -80,6 +80,13 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   set_tests_properties(model.shape_timing model.shape_timing.grid
                        model.shape_timing.places-grid PROPERTIES
                        LABELS "tier1;model" TIMEOUT 600)
+  # An alltoall's cost, as built against a two-level form and a node-level
+  # Bruck (the large-cluster playbook's C8; 2026-11-02, not built): the
+  # as-built form's fit to the third cloud session's alltoalls, its broken
+  # variant without a message cost missing them, and two pins of the table.
+  add_test(NAME model.alltoall_timing
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/alltoall_timing.py check)
+  set_tests_properties(model.alltoall_timing PROPERTIES LABELS "tier1;model" TIMEOUT 300)
   # Träff's circulant reduce-scatter and allgather (v0.2 step 3): the rounds'
   # arithmetic for every node count from 2 to 70, against the fold the brief
   # described (rabenseifner_model.py, kept as that comparison's evidence); the

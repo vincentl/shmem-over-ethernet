@@ -18,7 +18,9 @@ blocking get a piece at a time, decided and built as its (b), and
 `collect-scan-proposal.md`, P30's design and model for `collect`'s places,
 `intranode-combine-proposal.md`, a reduction's intranode combine sliced over
 the node's members, modelled and timed on 2026-11-02 and not built (the
-large-cluster playbook's C5),
+large-cluster playbook's C5), `two-level-alltoall-proposal.md`, an alltoall
+by a message a member a destination node, its cost model fitted to the cloud's
+alltoalls on 2026-11-02 and not built (C8),
 built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,
