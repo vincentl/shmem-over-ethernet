@@ -5793,6 +5793,11 @@ endforeach()
 # and a node whose link is cut, which only TCP keepalive can find. Left out are
 # the tests that never reach a socket, and those whose subject is a PE that
 # dies or stops rather than the link.
+# The stress settings tier 2 gives the tests whose traffic crosses nodes - small
+# AM segments and buffers, and the wire's fault injection (§8.1) - which tier 3
+# and the cluster tests below give the same programs.
+set(osoe_stress_wire_environment OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
+    OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
 option(OSOE_TIER3 "register the tier-3 tests, which need passwordless sudo" OFF)
 # Every tier-3 test is a job of several logical nodes, each in a network
 # namespace of its own: the single-node build, which refuses such a job, has
@@ -5816,8 +5821,6 @@ if(OSOE_INTERNODE)
     # cmake/OsoeInternode.cmake) goes through env, inside sudo.
     set(osoe_tier3 sudo -n env OSOE_TEST_PRINT_LINK=1
         ${PROJECT_SOURCE_DIR}/tools/launch/tier3.sh)
-    set(osoe_tier3_wire OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
-        OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919)
     # tier3.<shape>.<name>: PROGRAM [ARGS...] launched on MAP, with ENV's NAME=VALUE
     # pairs in the job's environment.
     function(osoe_tier3_test name shape map program)
@@ -5842,19 +5845,19 @@ if(OSOE_INTERNODE)
       foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
         string(REPLACE "," "-" label "${map}")
         osoe_tier3_test(internode.${label} ${shape} ${map} shmem_test_internode
-                        ENV ${osoe_tier3_wire} OSOE_AM_CREDITS=2)
+                        ENV ${osoe_stress_wire_environment} OSOE_AM_CREDITS=2)
       endforeach()
       osoe_tier3_test(barrier-am.0-1-2 ${shape} 0,1,2 shmem_test_barrier_am
-                      ENV ${osoe_tier3_wire})
+                      ENV ${osoe_stress_wire_environment})
       osoe_tier3_test(get-nbi.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_get-nbi
-                      ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
+                      ENV ${osoe_stress_wire_environment} OSOE_GET_LANDING_BYTES=4096
                           OSOE_AM_CREDITS=2)
       # Contexts' gets sharing the landing zone, and a team context's traffic,
       # over the shaped link (phase 1 step 8 slice 1).
       osoe_tier3_test(scan.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_scan
-                      ENV ${osoe_tier3_wire})
+                      ENV ${osoe_stress_wire_environment})
       osoe_tier3_test(context.0-1-2-0-1-0 ${shape} 0,1,2,0,1,0 shmem_test_context
-                      ENV ${osoe_tier3_wire} OSOE_GET_LANDING_BYTES=4096
+                      ENV ${osoe_stress_wire_environment} OSOE_GET_LANDING_BYTES=4096
                           OSOE_AM_CREDITS=2)
       # Created teams spanning nodes over the shaped link (the team redesign's step
       # D): the team split program's forty teams on the interleaved map, where the
@@ -5927,10 +5930,10 @@ if(OSOE_INTERNODE)
                       ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096
                           OSOE_TEST_PUT_BYTES=984 SHMEM_SYMMETRIC_SIZE=16m)
       osoe_tier3_test(tree.k2.n8.p8 ${shape} 0,1,2,3,4,5,6,7 shmem_test_multinode
-                      ENV OSOE_COLLECTIVE_FANOUT=2 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
+                      ENV OSOE_COLLECTIVE_FANOUT=2 ${osoe_stress_wire_environment} SHMEM_SYMMETRIC_SIZE=16M)
       osoe_tier3_test(tree.k4.n13.p16 ${shape} 0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12
                       shmem_test_multinode
-                      ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_tier3_wire} SHMEM_SYMMETRIC_SIZE=16M)
+                      ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_stress_wire_environment} SHMEM_SYMMETRIC_SIZE=16M)
       osoe_tier3_test(job.0-1-2-3 ${shape} 0,1,2,3 shmem_test_job)
       # A 64 MiB stream: at 1 Gbit/s the default gigabyte takes nine seconds a trial.
       # The pins are checked only when asked (shmem.floor's comment above), and sudo
@@ -6065,6 +6068,253 @@ if(OSOE_INTERNODE)
       PASS_REGULAR_EXPRESSION "REFUSAL OK")
     osoe_internode_label(tier3.pi.start-up.wrong-address)
   endif()
+endif()
+
+# The cluster tests (design §8.2's tier 4; docs/decisions/2026-11-02-cluster-tests.md):
+# tier 3's programs across real nodes, each a step under srun, so that the
+# suite that checks results runs on a cluster - where until now it ran on
+# logical nodes of one machine only, and a cluster got the programs by hand
+# (docs/pi-cluster.md §4). Registered only when asked for, in a build directory
+# of their own, the cluster preset (`cmake --preset cluster`, then `ctest
+# --preset cluster` from a login node, or inside an allocation of the nodes the
+# maps need); each test is the same program, with the same environment, as its
+# tier-3 registration above, launched as srun launches it:
+#
+#   - a block map, 0,0,1,1, is `srun -N<nodes> --ntasks-per-node=<P>`, srun's
+#     default distribution;
+#   - a cyclic one, 0,1,0,1, the same with --distribution=cyclic;
+#   - any other - uneven (0,0,0,1,2,2; 0,1,2,0,1,0, the interleaved map most of
+#     the list runs on) or out of the ranks' order (1,1,0,0,2,2) - goes through
+#     tools/launch/srun-map.sh, which writes the hostfile --distribution=arbitrary
+#     takes, one host a rank, from the allocation's nodes.
+#
+# cluster.map.<map> checks each kind of translation against Slurm itself:
+# every task's SLURM_NODEID must be its rank's entry of the map. The
+# environment reaches the tasks as srun exports it, ctest's own included -
+# OSOE_PROGRESS_HELPERS, OSOE_TEST_PRINT_LINK (osoe_internode_label) - so the
+# helpers' sweep is the environment's here as in every preset. The site's
+# partition and srun's flags are the cache variables below; -K1 ends a step
+# at its first bad exit, as the README's "Running a program with `srun`"
+# asks, and --cpu-bind=none is what the Pi runbook ran with.
+#
+# Left out, each for its reason, and named in the README's "How osoe is
+# tested": the tests that need osoe-launch's own doing - a rank left to the
+# library after another dies (-k: global-exit.sh), a link cut (tier3.sh's
+# TIER3_CUT: vanished-node.sh), a host list naming a namespace's address
+# (refusal.sh, start-up.wrong-address), the differential over four maps - and
+# the kill-based tests (dead-pe.sh, death-in-wait.sh), which are tier 2's and
+# not tier 3's anyway.
+option(OSOE_CLUSTER_TESTS "register the cluster tests: tier 3's programs across real nodes under srun" OFF)
+set(OSOE_CLUSTER_PARTITION "" CACHE STRING
+    "the partition the cluster tests' steps run in (srun -p); empty for the site's default")
+set(OSOE_CLUSTER_SRUN_FLAGS "-K1 --cpu-bind=none" CACHE STRING
+    "the flags every cluster test gives srun, before the node count and the distribution")
+set(OSOE_CLUSTER_NODES "" CACHE STRING
+    "how many nodes a cluster test may ask for; a test of more is registered disabled; empty for no limit")
+if(OSOE_CLUSTER_TESTS AND OSOE_SINGLE_NODE)
+  message(FATAL_ERROR "OSOE_CLUSTER_TESTS=ON registers jobs of several nodes, which the single-node "
+                      "build (OSOE_SINGLE_NODE=ON) refuses: the cluster tests are the full build's")
+endif()
+if(OSOE_CLUSTER_TESTS AND CMAKE_C_FLAGS MATCHES "sanitize=thread")
+  message(FATAL_ERROR "OSOE_CLUSTER_TESTS: the multi-node data-path tests do not run under "
+                      "ThreadSanitizer (shmem.internode's reason); use the cluster preset")
+endif()
+if(NOT OSOE_CLUSTER_NODES MATCHES "^[0-9]*$")
+  message(FATAL_ERROR "OSOE_CLUSTER_NODES='${OSOE_CLUSTER_NODES}' is not a node count")
+endif()
+if(OSOE_INTERNODE AND OSOE_CLUSTER_TESTS)
+  find_program(OSOE_SRUN srun DOC "srun, which the cluster tests launch their steps with")
+  if(NOT OSOE_SRUN)
+    message(FATAL_ERROR "OSOE_CLUSTER_TESTS=ON needs srun, which was not found on PATH "
+                        "(-DOSOE_SRUN=/path/to/srun names it)")
+  endif()
+  separate_arguments(osoe_cluster_flags UNIX_COMMAND "${OSOE_CLUSTER_SRUN_FLAGS}")
+  if(OSOE_CLUSTER_PARTITION)
+    list(APPEND osoe_cluster_flags -p ${OSOE_CLUSTER_PARTITION})
+  endif()
+  set(osoe_cluster_srun_map sh ${PROJECT_SOURCE_DIR}/tools/launch/srun-map.sh)
+
+  # osoe_cluster_command(<map> <command> <nodes>): the command that launches a
+  # program on the map - everything before the program - and the nodes it asks
+  # for, by the three kinds above.
+  function(osoe_cluster_command map out_command out_nodes)
+    string(REPLACE "," ";" ranks "${map}")
+    list(LENGTH ranks count)
+    osoe_map_nodes("${map}" nodes)
+    set(kind arbitrary)
+    math(EXPR remainder "${count} % ${nodes}")
+    if(remainder EQUAL 0)
+      math(EXPR per_node "${count} / ${nodes}")
+      set(block "")
+      set(cyclic "")
+      math(EXPR last "${count} - 1")
+      foreach(rank RANGE ${last})
+        math(EXPR block_node "${rank} / ${per_node}")
+        math(EXPR cyclic_node "${rank} % ${nodes}")
+        list(APPEND block ${block_node})
+        list(APPEND cyclic ${cyclic_node})
+      endforeach()
+      if(ranks STREQUAL block)
+        set(kind block)
+      elseif(ranks STREQUAL cyclic)
+        set(kind cyclic)
+      endif()
+    endif()
+    if(kind STREQUAL "arbitrary")
+      set(command ${osoe_cluster_srun_map} ${map} ${osoe_cluster_flags} --)
+    else()
+      set(command ${OSOE_SRUN} ${osoe_cluster_flags} -N${nodes} --ntasks-per-node=${per_node})
+      if(kind STREQUAL "cyclic")
+        list(APPEND command --distribution=cyclic)
+      endif()
+    endif()
+    set(${out_command} ${command} PARENT_SCOPE)
+    set(${out_nodes} ${nodes} PARENT_SCOPE)
+  endfunction()
+
+  # osoe_cluster_register(<test> <nodes>): the labels every cluster test
+  # carries, and a test of more nodes than OSOE_CLUSTER_NODES allows disabled,
+  # which ctest reports as such rather than failing it in srun.
+  function(osoe_cluster_register test nodes)
+    set_property(TEST ${test} APPEND PROPERTY LABELS cluster)
+    osoe_internode_label(${test})
+    if(OSOE_CLUSTER_NODES AND nodes GREATER OSOE_CLUSTER_NODES)
+      set_tests_properties(${test} PROPERTIES DISABLED TRUE)
+    endif()
+  endfunction()
+
+  # cluster.<name>: PROGRAM [ARGS...] on MAP, with ENV's NAME=VALUE pairs in
+  # the step's environment, within TIMEOUT seconds (300 unless given).
+  function(osoe_cluster_test name map program)
+    cmake_parse_arguments(PARSE_ARGV 3 cluster "" "TIMEOUT" "ENV;ARGS")
+    if(NOT cluster_TIMEOUT)
+      set(cluster_TIMEOUT 300)
+    endif()
+    osoe_cluster_command(${map} command nodes)
+    add_test(NAME cluster.${name}
+      COMMAND ${CMAKE_COMMAND} -E env ${cluster_ENV} ${command}
+              $<TARGET_FILE:${program}> ${cluster_ARGS})
+    set_tests_properties(cluster.${name} PROPERTIES TIMEOUT ${cluster_TIMEOUT})
+    osoe_cluster_register(cluster.${name} ${nodes})
+  endfunction()
+
+  # The harness's own checks first. cluster.map.<map>: the three translations
+  # against Slurm's placement - every task's SLURM_NODEID is its entry of the
+  # map - on one node (which the development VM's Slurm runs), a block map, a
+  # cyclic one, the interleaved map and the unordered one.
+  foreach(map 0,0,0,0 0,0,1,1 0,1,0,1 0,1,2,3 0,1,2,0,1,0 1,1,0,0,2,2)
+    string(REPLACE "," "-" label "${map}")
+    osoe_cluster_command(${map} command nodes)
+    add_test(NAME cluster.map.${label}
+      COMMAND ${command} sh -c
+              "test \"$SLURM_NODEID\" = \"$(echo ${map} | cut -d, -f$((SLURM_PROCID + 1)))\"")
+    set_tests_properties(cluster.map.${label} PROPERTIES TIMEOUT 120)
+    osoe_cluster_register(cluster.map.${label} ${nodes})
+  endforeach()
+  # cluster.rank-environment: what osoe-launch -e gives, under srun - the
+  # named rank alone sees the variable (tools/launch/rank-environment.sh).
+  # No tier-3 registration needs it; the one that uses -e,
+  # start-up.wrong-address, names a namespace's address and is left out.
+  osoe_cluster_command(0,0 command nodes)
+  add_test(NAME cluster.rank-environment
+    COMMAND ${command} sh ${PROJECT_SOURCE_DIR}/tools/launch/rank-environment.sh
+            1:CLUSTER_TEST_WORD=given -- sh -c
+            "if test \"$SLURM_PROCID\" = 1; then test \"$CLUSTER_TEST_WORD\" = given; else test -z \"$CLUSTER_TEST_WORD\"; fi")
+  set_tests_properties(cluster.rank-environment PROPERTIES TIMEOUT 120)
+  osoe_cluster_register(cluster.rank-environment ${nodes})
+  # The library on one node under srun, with tier 2's stress settings: the
+  # site's bootstrap path (§6.1) and the step's environment before anything
+  # crosses a node, and what the development VM's one-node Slurm runs end to
+  # end.
+  osoe_cluster_test(internode.0-0-0-0 0,0,0,0 shmem_test_internode
+                    ENV ${osoe_stress_wire_environment} OSOE_AM_CREDITS=2)
+
+  # Tier 3's list, kept in step with it by hand: every osoe_tier3_test above
+  # is here with its map, program, environment and arguments, once - the
+  # cluster's link is whatever it is, where tier 3 has three shapes - and
+  # every test of tier 3's that is not here is in the README's list of what
+  # is left out.
+  osoe_cluster_test(wire-pair 0,1 shmem_test_wire_pair
+                    ENV OSOE_WIRE_BYTES=64 OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
+  osoe_cluster_test(progress 0,0,1,1 shmem_test_progress
+                    ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=256
+                        OSOE_WIRE_SPLIT=3000 OSOE_WIRE_SEED=20260919)
+  foreach(map 0,1,2 0,0,1,1,2,2 0,0,0,1,2,2 0,1,2,0,1,0)
+    string(REPLACE "," "-" label "${map}")
+    osoe_cluster_test(internode.${label} ${map} shmem_test_internode
+                      ENV ${osoe_stress_wire_environment} OSOE_AM_CREDITS=2)
+  endforeach()
+  osoe_cluster_test(barrier-am.0-1-2 0,1,2 shmem_test_barrier_am ENV ${osoe_stress_wire_environment})
+  osoe_cluster_test(get-nbi.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_get-nbi
+                    ENV ${osoe_stress_wire_environment} OSOE_GET_LANDING_BYTES=4096 OSOE_AM_CREDITS=2)
+  osoe_cluster_test(scan.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_scan ENV ${osoe_stress_wire_environment})
+  osoe_cluster_test(context.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_context
+                    ENV ${osoe_stress_wire_environment} OSOE_GET_LANDING_BYTES=4096 OSOE_AM_CREDITS=2)
+  osoe_cluster_test(team-split.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_team-split
+                    ENV SHMEM_SYMMETRIC_SIZE=16m)
+  osoe_cluster_test(team-split.reuse.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_team-split
+                    ENV OSOE_TEST_SPLIT=reuse SHMEM_SYMMETRIC_SIZE=16m)
+  osoe_cluster_test(team-threads.0-1 0,1 shmem_test_team-threads)
+  osoe_cluster_test(reduce.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_reduce)
+  osoe_cluster_test(broadcast.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_broadcast)
+  osoe_cluster_test(active-set.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_active-set)
+  osoe_cluster_test(collect.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_collect)
+  foreach(case "block:0,0,0,1,1,2,2,2,2,3" "negative-stride:0,0,0,1,1,2,2,2,2,3"
+               "cyclic:0,1,2,0,1,2,0,1,2" "scan:block:0,1,1,2,3,3,4,5,6"
+               "scan:negative-stride:0,1,1,2,3,3,4,5,6" "scan:cyclic:0,1,2,0,1,2,0,1,2"
+               "exchange:block:0,1,1,2,3,3,4,5,6" "exchange:unordered:1,1,0,0,2,2")
+    string(REPLACE ":" ";" parts "${case}")
+    list(LENGTH parts fields)
+    set(forced "")
+    set(prefix "")
+    if(fields EQUAL 3)
+      list(GET parts 0 way)
+      list(REMOVE_AT parts 0)
+      set(forced OSOE_COLLECTIVE_PLACES=${way})
+      set(prefix ${way}.)
+    endif()
+    list(GET parts 0 kind)
+    list(GET parts 1 map)
+    string(REPLACE "," "-" label "${map}")
+    osoe_cluster_test(collect-places.${prefix}${kind}.${label} ${map}
+                      shmem_test_collect-places ENV OSOE_TEST_MAP=${map} ${forced}
+                      ARGS ${kind})
+  endforeach()
+  osoe_cluster_test(alltoall.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_alltoall)
+  osoe_cluster_test(statics.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_statics)
+  osoe_cluster_test(lock.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_lock)
+  osoe_cluster_test(deadlock.mismatch.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_deadlock
+                    ENV OSOE_DEADLOCK_SECONDS=1 ARGS mismatch)
+  set_tests_properties(cluster.deadlock.mismatch.0-1-2-0-1-0 PROPERTIES
+    PASS_REGULAR_EXPRESSION "every PE of the job waits in the library"
+    FAIL_REGULAR_EXPRESSION "DEADLOCK TEST REACHED|a wait it did not record|timeout after")
+  osoe_cluster_test(deadlock.computing.0-1-2-0-1-0 0,1,2,0,1,0 shmem_test_deadlock
+                    ENV OSOE_DEADLOCK_SECONDS=1 ARGS computing)
+  set_tests_properties(cluster.deadlock.computing.0-1-2-0-1-0 PROPERTIES
+    PASS_REGULAR_EXPRESSION "DEADLOCK TEST OK: computing"
+    FAIL_REGULAR_EXPRESSION "osoe: deadlock|CHECK[(]")
+  osoe_cluster_test(reduce.0-1-2-3-4.k2 0,1,2,3,4 shmem_test_reduce ENV OSOE_COLLECTIVE_FANOUT=2)
+  osoe_cluster_test(reply-starvation.0-1-1-1-1-1-1 0,1,1,1,1,1,1 shmem_test_reply-starvation
+                    ENV OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_WIRE_BYTES=4096
+                        OSOE_TEST_PUT_BYTES=984 SHMEM_SYMMETRIC_SIZE=16m)
+  osoe_cluster_test(tree.k2.n8.p8 0,1,2,3,4,5,6,7 shmem_test_multinode
+                    ENV OSOE_COLLECTIVE_FANOUT=2 ${osoe_stress_wire_environment} SHMEM_SYMMETRIC_SIZE=16M)
+  osoe_cluster_test(tree.k4.n13.p16 0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12 shmem_test_multinode
+                    ENV OSOE_COLLECTIVE_FANOUT=4 ${osoe_stress_wire_environment} SHMEM_SYMMETRIC_SIZE=16M)
+  osoe_cluster_test(job.0-1-2-3 0,1,2,3 shmem_test_job)
+  # The floor's pins are checked only when asked (shmem.floor's comment above).
+  set(osoe_cluster_floor_environment)
+  if(OSOE_TEST_PINS)
+    set(osoe_cluster_floor_environment ENV OSOE_TEST_FLOOR_PINS=1)
+  endif()
+  osoe_cluster_test(floor 0,1 shmem_test_floor ${osoe_cluster_floor_environment} ARGS 64
+                    TIMEOUT 400)
+  # Keepalive at its defaults between nodes with addresses of their own, which
+  # a cluster's are (tier3.pi.keepalive.default-on.0-1's comment above).
+  osoe_cluster_test(keepalive.default-on.0-1 0,1 shmem_test_keepalive ENV SHMEM_DEBUG=1 ARGS on)
+  set_tests_properties(cluster.keepalive.default-on.0-1 PROPERTIES
+    PASS_REGULAR_EXPRESSION "KEEPALIVE ON OK"
+    FAIL_REGULAR_EXPRESSION "makes no silent-peer check")
 endif()
 
 # No PE's wait spins (T14; test-no-spin.c): PE 0 asleep outside the library

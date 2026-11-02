@@ -110,23 +110,47 @@ The listing must show the new `captured-*` names, and every one must pass. One
 that fails is either the bootstrap misreading Slurm or §6.1 describing it
 wrongly; which one is the finding.
 
-## 4. The smoke test
+## 4. The suite across the nodes
 
-For the first runs, a wait that stops moving should say what it waits for, and
-a task that fails at start-up should end the rest (`-K1`):
+The cross-node test programs run under `ctest` through `srun` since
+2026-11-02 (the README's "How osoe is tested";
+`docs/decisions/2026-11-02-cluster-tests.md`): the `cluster` preset registers
+tier 3's programs, each with its registration's environment, as steps shaped
+by their maps - block and cyclic by `srun`'s own distributions, the uneven
+and interleaved ones through a hostfile `tools/launch/srun-map.sh` writes.
+On the head node, in the checkout under `/home`, with a login session held
+open on each node (§1's `RemoveIPC`), and a wait that stops moving made to say
+what it waits for:
 
 ```sh
 export OSOE_NO_PROGRESS_TIMEOUT=60
-T="env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2 OSOE_WIRE_BYTES=256 \
-     OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919"
-srun -K1 -N4 --ntasks-per-node=4 $T build/release/shmem/tests/shmem_test_internode
-srun -K1 -N4 --ntasks-per-node=4 --distribution=cyclic $T build/release/shmem/tests/shmem_test_internode
+cmake --preset cluster -DOSOE_CLUSTER_NODES=4
+cmake --build build/cluster -j4
+ctest --preset cluster                              # 39 tests on the four nodes
+OSOE_PROGRESS_HELPERS=2 ctest --preset cluster      # and again with two helpers
 ```
 
-Both must exit 0 on every task. The settings are the test's own (its ctest
-registration): small segments and two reply credits, so that segment splitting
-and the credit limits cross the real link. The cyclic run is the layout the
-environment cannot describe and the rendezvous must assemble (design §6.1).
+Every test must pass at no helpers and at two. Six of the 45 need more than
+four nodes - the two trees, `reduce.0-1-2-3-4.k2` and three of
+`collect-places` - and are registered disabled, which `ctest` reports as such.
+The first tests check the harness itself, every task comparing its
+`SLURM_NODEID` with the map; then `cluster.internode.*` is the smoke test
+these replaced, `shmem_test_internode` with its registration's settings -
+small segments and two reply credits, so that segment splitting and the
+credit limits cross the real link - on a block map, an uneven one and the
+interleaved one, the layout the environment cannot describe and the
+rendezvous must assemble (design §6.1). By hand, for a first look at a node
+set, the same program at four PEs a node is:
+
+```sh
+T="env OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2 OSOE_WIRE_BYTES=256 \
+     OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=20260919"
+srun -K1 -N4 --ntasks-per-node=4 $T build/cluster/shmem/tests/shmem_test_internode
+srun -K1 -N4 --ntasks-per-node=4 --distribution=cyclic $T build/cluster/shmem/tests/shmem_test_internode
+```
+
+Both must exit 0 on every task; a task that fails at start-up ends the rest
+(`-K1`).
 
 ## 5. The library against its floor
 
@@ -140,7 +164,10 @@ would share a core, and that cost would read as the Pi's:
 srun -K1 -N2 --ntasks-per-node=1 -c4 build/release/shmem/tests/shmem_test_floor > floor.txt
 ```
 
-Keep `floor.txt`. Its `ratio` lines are the numbers to compare with tier 3's
+(`cluster.floor`, in §4's suite, runs the same program at 64 MiB a stream
+under the suite's flags, and checks its pins only with `-DOSOE_TEST_PINS=ON`;
+this run, with `-c4` and the default gigabyte, is the one to keep.) Keep
+`floor.txt`. Its `ratio` lines are the numbers to compare with tier 3's
 `pi` link: fastest trips at 1.01–1.06× the floor there, and streams at line
 rate.
 
