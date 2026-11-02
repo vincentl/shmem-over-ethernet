@@ -16,6 +16,9 @@ the team redesign's, `progress-helpers-proposal.md`, v0.2 step 4's,
 built (H23), `blocking-get-proposal.md`, question 4's exploration of a
 blocking get a piece at a time, decided and built as its (b), and
 `collect-scan-proposal.md`, P30's design and model for `collect`'s places,
+`intranode-combine-proposal.md`, a reduction's intranode combine sliced over
+the node's members, modelled and timed on 2026-11-02 and not built (the
+large-cluster playbook's C5),
 built by the second cloud session (its "Stage 2, as built"); and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,

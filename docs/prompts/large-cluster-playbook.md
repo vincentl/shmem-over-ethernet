@@ -102,7 +102,7 @@ is understood and does not touch it.
 | **A1 The build** | the `release` preset, with no network, where the nodes' own libraries are; `build/release/tools/probe/probe` on every node through `srun`; `ctest --test-dir build/release -R 'shmem[.](exports\|license-lines\|info)'` (CMake's alternation is `\|` in this table's cell, a plain bar in the shell) | the build without a warning; `ok` for every facility on every node | a facility the probe refuses on some nodes and not others: a heterogeneous cluster, and the job must stay on nodes alike (the README's "Every node of a job must have the same architecture, and run the same osoe"; a heterogeneous Slurm job is refused by name) |
 | **A2 One node, the suite** | on one compute node, whole and exclusive - tier 2's jobs share one port range and `/dev/shm`, so another user's osoe job on the node would collide - through an allocation: `ctest --preset release -LE internode`, then `-L internode` - tier 2, the tests of jobs of logical nodes on one machine, every one of which starts its job with `osoe-launch` - at the four helper settings the suite runs (`OSOE_PROGRESS_HELPERS` 0, 2, 3 and unset); then the `debug` and the AddressSanitizer presets' tier 2 once; `OSOE_TEST_FLOOR_PINS=1` on the `release` build, its ratios recorded | every test passes but those the preset leaves out; on one `c4-standard-16` tier 2 passed 1,071 of 1,071 in 148 s (the third cloud session). The floor's pins were set on the project's machines: a pin missed here is a number for the report, not a stop | a test that fails here fails on a machine the project has never had: the first finding, before any job across nodes. Read its output with the link it printed (`OSOE_TEST_PRINT_LINK`), repeat it alone, and record it |
 | **A3 Two nodes** | the README's quick start under `srun -N2`; `osoe-bench quick` at 1 and 8 PEs a node; `floor.sh` with `PARTS="floor iperf3"` between two nodes, the yardstick for every stream and round trip after (its `echo-uring` part met its timeout on the cloud and is left out); `osoe-stat --summary` on a live job through `srun --overlap`; a job killed by its timeout and `osoe-stat --gc` after it, inside the allocation | the ring prints its lines; the bench's results check; the floor's ratios recorded against the Pi's (round trips 9 to 11% above an io_uring echo's) and Google Cloud's (a put's fastest round trip 41 µs); `osoe-stat` finds the job | a hang in `shmem_init` on two nodes is the ports (`OSOE_PORT_RANGE`, `OSOE_MESH_PORT_RANGE`, the site's firewall - one that drops a handshake rather than refusing it costs up to 32 s a rendezvous round, a second a candidate port), the names (A0) or `RemoveIPC` (the README's Limits), in that order |
-| **A4 The suite's results across machines** | osoe's own suite has never run across separate machines: every one of its tests that starts a job starts it with `osoe-launch`, and nothing in the registrations can put `srun` in its place (C1). Until that exists, the Pi runbook's way (`docs/pi-cluster.md` §4, §5, §7): the test programs themselves under `srun` on two, four and eight nodes - `shmem_test_internode` with the stress settings its registration gives it (`OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2 OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=...`), block and `--distribution=cyclic`; `shmem_test_floor`; `shmem_test_global-exit` and `shmem_test_dead-pe` with `-K0`; and the tier-3 registrations' other programs where their map is one `srun` can give, each with the environment its registration sets. Then `osoe-pacer`'s every pattern but `mix`, each short, at the site's PEs a node - the stress tester checks every result against an oracle, and is the result-checking suite the project has for separate machines; `shmem.quiet.litmus.L2`'s litmus on one node, which x86-64 runs in every preset | every program passes, every pattern `failures=0` | a program or pattern that fails across machines and passes on logical nodes is the finding this gate exists for: a kernel's TCP, a switch or a NIC offload between two processes that one machine never had. Record it with `osoe-stat`'s counters (`transport.am.receive_enobufs`, the retransmissions `nstat` counts) and stop the ladder |
+| **A4 The suite's results across machines** | the `cluster` preset (C1, built 2026-11-02): `cmake --preset cluster -DOSOE_CLUSTER_NODES=<nodes> -DOSOE_CLUSTER_PARTITION=<partition>`, built on the shared filesystem, then `ctest --preset cluster` at `OSOE_PROGRESS_HELPERS` 0 and 2, from a login node or inside `salloc -N<nodes> --ntasks-per-node=<P>` - 45 tests, tier 3's programs under `srun` with their registrations' environments (maps of one to thirteen nodes; a test of more than `OSOE_CLUSTER_NODES` is reported disabled), its own `cluster.map.*` first, which must pass before anything else is read, since the uneven maps rest on `srun-map.sh`'s hostfile order; the harness has run in the development VM's one-node Slurm only, so its first cluster run is this gate's first job, and `docs/pi-cluster.md` §4 is its runbook. Then what the harness leaves out, the Pi runbook's way (§7): the test programs themselves under `srun` on two, four and eight nodes - `shmem_test_internode` with the stress settings its registration gives it (`OSOE_AM_CHUNK=1024 OSOE_AM_BUFFER=2048 OSOE_AM_CREDITS=2 OSOE_WIRE_BYTES=256 OSOE_WIRE_SPLIT=2000 OSOE_WIRE_SEED=...`), block and `--distribution=cyclic`; `shmem_test_floor`; `shmem_test_global-exit` and `shmem_test_dead-pe` with `-K0`; and the tier-3 registrations' other programs where their map is one `srun` can give, each with the environment its registration sets. Then `osoe-pacer`'s every pattern but `mix`, each short, at the site's PEs a node - the stress tester checks every result against an oracle, and is the result-checking suite the project has for separate machines; `shmem.quiet.litmus.L2`'s litmus on one node, which x86-64 runs in every preset | every program passes, every pattern `failures=0` | a program or pattern that fails across machines and passes on logical nodes is the finding this gate exists for: a kernel's TCP, a switch or a NIC offload between two processes that one machine never had. Record it with `osoe-stat`'s counters (`transport.am.receive_enobufs`, the retransmissions `nstat` counts) and stop the ladder |
 | **A5 Eight nodes, the yardstick** | the kit on eight nodes at 8 and 16 PEs a node, each in three rounds: the start-up probe alone (`kit/startup`, as `scale.sh` runs it - not `scale.sh` whole, which also runs the bench, ten minutes of `mix` and the SOS sweep), `helpers.sh`, `window.sh`, `collect.sh`, `fan-in.sh` and `gets.sh`; `osoe-bench` at 64 and 128 PEs; the `OSOE_LINK_*` each job measured recorded from `SHMEM_DEBUG` | every number set beside the third Google Cloud session's (H11, H12, H26, H28, P37, P38, `docs/fast-link-results.md`) with the two links' speeds beside them; a ratio past 2 either way, after the links' ratio is taken out, is a finding to explain before the ladder - a faster link should make streams faster and round trips not slower | a measurement that varies by more than its spread between rounds is the link's measurement unsteady (P38 found 0.88 to 5.68 GB/s from job to job at 23 Gbit/s): record the three numbers of each job, and set `OSOE_LINK_*` by hand from the floor for the timed runs that follow, saying so |
 | **A6 The stress tester at size** | `osoe-pacer mix` at 8 nodes for 600 s, at 64 nodes for 3,600 s, at the whole cluster for 600 s, at the site's PEs a node, two helpers and none; one run of `mix` at the whole cluster for a night where the allocation allows; the planted-defect runs (`tools.pacer.plant.*`) once at 8 nodes, each of which must fail | `failures=0` in every run, and every planted defect caught. The largest so far across machines: 300 s at 32 PEs on eight nodes, an hour at 16 on the Pi | a failure of `mix` is the project's own oracle saying a result was wrong: the ladder stops. Keep the run's `osoe-stat` output and the first line; repeat at the same size once, and at half |
 | **A7 The corpus** | at 8 and 64 nodes, built with `oshcc` from the carried-in corpus (`docs/pi-cluster.md` §8): Sandia OpenSHMEM's suite by `sos.sh` (161 of 165 expected, the four SOS's own); OSU's collectives and `osu_oshm_put` and `_get`; ISx weak and strong; NPB IS at class C, D where memory allows; the PRK kernels; the OpenSHMEM examples. If time allows, bale's `histo`, `ig`, `randperm` and `topo`, whose atomics into one array from every PE are the hot-spot pattern of C13 - bale is in the corpus's manifest but no recipe in the tree builds it, and its build is the agent's to work out and record | each program verifies its own result | a program that verifies on 8 nodes and not on 64 is a scale failure of osoe's until shown otherwise; record and stop |
@@ -208,23 +208,28 @@ few dozen lines with its test), a *protocol* (modelled first), or a *design
 change* (the author's, described and not made). Ranked by how soon the ladder
 meets it: the first two are met before the ladder starts.
 
-**C1 The suite cannot run across machines.** Every test of a job starts it with
-`osoe-launch -n N -m MAP` - 239 registrations in `shmem/tests/CMakeLists.txt` -
-and there is no launcher switch, so the suite that checks results has run on
-logical nodes of one machine only (the README's Limits). The tier-3
-registrations (`osoe_tier3_test`, about 70 of them over three shapes, each a
-map, a program and an environment) are the natural unit: a sibling that emits
-`srun -K1 -N<nodes> --ntasks-per-node=<P>` for a block map and
-`--distribution=cyclic` for a cyclic one, under a CMake option naming the
-partition, would run those programs across real nodes under `ctest`. What does
-not map: uneven maps (`0,0,0,1,2,2` needs `--distribution=arbitrary` and a
-hostfile), the per-rank environment `osoe-launch -e RANK:NAME=VALUE` gives
-(about 70 registrations, which a wrapper keyed on `SLURM_PROCID` could), and the
-kill-based tests (`dead-pe.sh`, `death-in-wait.sh`, `-k`), which stay the
-launcher's. A test harness, more than a few dozen lines, and not a protocol:
-the brief's rule of "change code only where a run cannot go on without it"
-does not admit it, so it is built only where §6 says the author granted it;
-A4's by-hand runs stand until then.
+**C1 The suite cannot run across machines** - *built, 2026-11-02*
+(`docs/decisions/2026-11-02-cluster-tests.md`). Every test of a job started it
+with `osoe-launch -n N -m MAP` - 239 registrations in
+`shmem/tests/CMakeLists.txt` - and there was no launcher switch, so the suite
+that checks results had run on logical nodes of one machine only (the README's
+Limits). The `cluster` preset (`OSOE_CLUSTER_TESTS`) now registers the tier-3
+list's programs (`osoe_tier3_test`'s 37 registrations, each a map, a program
+and an environment) a second time, as steps under `srun`: a block map as `-N<nodes>
+--ntasks-per-node=<P>`, a cyclic one with `--distribution=cyclic`, and the
+uneven and interleaved maps (`0,0,0,1,2,2`; `0,1,2,0,1,0`, which most of the
+list runs on) through `tools/launch/srun-map.sh`, the hostfile
+`--distribution=arbitrary` takes; `OSOE_CLUSTER_PARTITION` and
+`OSOE_CLUSTER_SRUN_FLAGS` (`-K1 --cpu-bind=none`) are the site's, and
+`OSOE_CLUSTER_NODES` disables the maps the site cannot give. The per-rank
+environment `osoe-launch -e RANK:NAME=VALUE` gives is
+`tools/launch/rank-environment.sh`, keyed on `SLURM_PROCID`, which no tier-3
+registration needs. Left to the launcher, and to A4's by-hand runs: the
+kill-based tests (`dead-pe.sh`, `death-in-wait.sh`, `-k`), `global-exit.sh`'s
+judgement by the launcher's per-rank lines, a link cut inside a namespace, the
+differential's transcripts. It has run in the development VM's one-node Slurm
+alone (the Pi cluster was unreachable the day it was built): the first cluster
+run is A4's.
 
 **C2 Node names, addresses and the interface.** `base/hostlist.c` takes one
 bracketed range a name (`node[1-8]`, not `rack[1-4]n[1-8]`), and nothing under
@@ -293,7 +298,11 @@ member's vector, a reduce-scatter in shared memory, then the lead's internode
 phase on the combined vector, each element still combined once in a fixed order
 so that rule 3's bit-identical results hold - a protocol with a model, since the
 PEs' arrivals and the lead's reads are two-sided and `MULTIPLE` threads may
-lead; a design change for the author. §5 weighs it.
+lead; a design change for the author. §5 weighs it. *Modelled on 2026-11-02*
+(`docs/design/intranode-combine-proposal.md`, `model.intranode_combine`): the
+sliced combine holds §5.5's three properties in every case, and a standalone
+probe in the four-core VM ran the combine 3.5 to 4 times faster at four
+processes; the author decides whether it is built, and when.
 
 **C6 The pipeline's cap on a fast link, and the transport's defaults.** A large
 collective's pieces are 16 KiB, a compile-time constant
@@ -533,7 +542,7 @@ there.
 
 | Collective | Today | Alternative | Might win because | Might not because | Decided by |
 |---|---|---|---|---|---|
-| **The intranode reduction** | the lead combines P vectors serially, O(P × bytes), and wakes every member at once | a shared-memory reduce-scatter among the node's PEs: each PE combines one P-th of every vector, O(bytes) a PE, then the lead's internode phase | at 256 PEs a node it takes the 255 MiB of combining off one thread; rule 3 holds since each element is combined once in a fixed order | small reductions gain nothing and pay a sync; the PEs' arrival and the lead's read are a two-sided protocol under `MULTIPLE`; the release's O(P) wake stays | a model of the arrivals; timed in the VM at 32 PEs on 4 cores, then the PEs-a-node ladder |
+| **The intranode reduction** | the lead combines P vectors serially, O(P × bytes), and wakes every member at once | a shared-memory reduce-scatter among the node's PEs: each PE combines one P-th of every vector, O(bytes) a PE, then the lead's internode phase | at 256 PEs a node it takes the 255 MiB of combining off one thread; rule 3 holds since each element is combined once in a fixed order | small reductions gain nothing and pay a sync; the PEs' arrival and the lead's read are a two-sided protocol under `MULTIPLE`; the release's O(P) wake stays | modelled and timed, 2026-11-02 (`intranode-combine-proposal.md`; the model holds, the probe 3.5 to 4 times at four cores); built at the author's word, then the PEs-a-node ladder |
 | **`alltoall`** | direct puts, P(N - P) messages into a node, then a barrier | two-level: pack the node's blocks to each destination node into one message a node pair (n - 1 a node), a pairwise schedule (node k's message to node (k + s) mod n in step s), unpack in shared memory; Bruck's for blocks under a few hundred bytes | messages a node fall from P(N - P) to n - 1, 32.7 million to 499 at 500 × 256; one stream a link at a time ends the incast | a copy in and out at each end, and the pack needs scratch of P × P × block bytes a node pair - 64 MiB at 256 PEs and 1 KiB blocks, so it goes in pieces through the lanes | the alltoall's time at the ladder's rungs; a model of the pack's pieces; built behind `internode.h` |
 | **The prefix scans** | a pre-order tree over the team's ranks, fan-out 4, two pieces, 2P messages | hierarchical: an intranode scan, a scan of the node totals over the leads (the primitive exists), each PE's result from its node's prefix | about 13 hops become about 6 at 500 × 256 under a block distribution, 45 under a cyclic one; the lanes already carry a scan's pieces | a team whose nodes' PEs are not runs of its ranks needs the per-PE vector (C10's shape); no corpus program calls a scan | `scan_timing.py` extended; a model; the ladder's scan at 1 and P PEs a node |
 | **Large broadcasts** | a pipelined tree, fan-out from the link, eight pieces of 16 KiB in flight; an interior lead's link carries k copies | scatter down the tree then Träff's allgather among the leads (van de Geijn's shape), which the reduction's second half already implements | about one vector in and one out at every lead, where the tree's interior sends k; on a link where bandwidth binds, up to k/2 times at large sizes | 2⌈log₂ n⌉ rounds of latency against the tree's ⌈log_k n⌉ levels; at 64 KiB the tree wins, as the reductions' crossover shows; C6's cap binds both | `shape_timing.py`'s closed form for the shape, as Träff's reduction was added; question 3's cases with broadcasts |
@@ -558,8 +567,10 @@ more in four places; the author answered on 2026-11-02
 
 - **G1** C1's harness, the suite's cross-node registrations under `srun`: *not
   the cluster agent's* - built here, in the development VM's Slurm, before the
-  session, so that A4 runs the programs under `ctest` from the first day. If
-  the tree given to the session lacks it, A4's by-hand runs stand.
+  session (the `cluster` preset, 2026-11-02;
+  `docs/decisions/2026-11-02-cluster-tests.md`), so that A4 runs the programs
+  under `ctest` from the first day. If the tree given to the session lacks it,
+  A4's by-hand runs stand.
 - **G2** *granted*: the small changes of C2 (the parser; the interface
   setting), C12 (the neighbour table's check), C19 (`pe_quiet`'s allocation,
   the kit's `--gc`) and C20 (the kit's `SHMEM_DEBUG` on the leads): each a few
