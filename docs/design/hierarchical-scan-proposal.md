@@ -223,6 +223,8 @@ at a Pi's 77 µs hop), the members' tree at fan-out 4 and the leads' at 8.
 
 ## 6. Questions for the author
 
+*Answered 2026-11-03*: the author took every recommendation below as his answer (`docs/decisions/2026-11-03.md`).
+
 1. **Build it?** *Recommended*: only if the first cluster session's ladder
    (its scan row, at 1 and P PEs a node) or a program the author means to run
    makes scans matter; otherwise leave it modelled. Of the four, C5 and C8 go

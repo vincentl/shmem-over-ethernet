@@ -169,6 +169,8 @@ the model cannot say is the incast's cost, which the schedule is for.
 
 ## 6. Questions for the author
 
+*Answered 2026-11-03*: the author took every recommendation below as his answer (`docs/decisions/2026-11-03.md`).
+
 1. **Build it?** The model says the gain is 6 to 8 times at small blocks and
    nothing at large ones, on the cloud's costs. *Recommended*: after the first
    cluster session's ladder has an alltoall row at 64 nodes - the model's

@@ -277,6 +277,8 @@ node sets could make n - 1 again.
 
 ## 6. Questions for the author
 
+*Answered 2026-11-03*: the author took every recommendation below as his answer (`docs/decisions/2026-11-03.md`).
+
 1. **Build it?** *Recommended*: after the first cluster session's start-up
    curve and `ss -tm` reads at 512 nodes and above, and before any run past
    about 2,000 nodes, where the buffer budget halves and refuses at 4,097

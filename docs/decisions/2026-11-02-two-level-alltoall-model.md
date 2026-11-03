@@ -69,3 +69,6 @@ before the second); the schedule's order (*recommended*: node order, measured
 against the as-built start); the chunking (*recommended*: as a put's parts);
 and the strided form (*recommended*: one change, both forms). Next of the four
 models: C9, the hierarchical scan, and C17, the control tree.
+
+*2026-11-03*: every recommendation taken by the author
+([2026-11-03](2026-11-03.md)).

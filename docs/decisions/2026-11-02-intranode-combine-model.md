@@ -75,3 +75,6 @@ serial (*recommended*: slices of at least 1 KiB, a setting only if asked for);
 the arrival's wake (*recommended*: wake-all, measured); and the release's O(L)
 wake beside it (*recommended*: measured in the same run). Next of the four:
 C8, the two-level alltoall.
+
+*2026-11-03*: every recommendation taken by the author
+([2026-11-03](2026-11-03.md)).

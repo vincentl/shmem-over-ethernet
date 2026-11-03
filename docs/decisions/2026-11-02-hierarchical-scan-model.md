@@ -91,3 +91,6 @@ corpus program calls a scan); both classes or the small one (*recommended*:
 both); the epoch a scan would take (*recommended*: yes, P24's check comes with
 it); and C5's slices for the lead's two passes (*recommended*: C5 on the
 reduction first). Last of the four models: C17, the control tree.
+
+*2026-11-03*: every recommendation taken by the author
+([2026-11-03](2026-11-03.md)).

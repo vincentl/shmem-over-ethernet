@@ -101,3 +101,6 @@ message kind with a wire version bump (*recommended*) or a kind of its own;
 and a dead node's far side, accepted (*recommended*) or waited for. The four
 models the author's answer 6 asked for are done; the small-collective cost
 model runs in its own session.
+
+*2026-11-03*: every recommendation taken by the author
+([2026-11-03](2026-11-03.md)).

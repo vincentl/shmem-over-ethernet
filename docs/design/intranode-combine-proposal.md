@@ -211,6 +211,8 @@ scheduler, not of osoe; the suite's timing is the measurement that decides
 
 ## 7. Questions for the author
 
+*Answered 2026-11-03*: the author took every recommendation below as his answer (`docs/decisions/2026-11-03.md`).
+
 1. **Build it?** The model holds, the probe shows the arithmetic; the author
    decides whether the change - about sixty lines, a layout bump, a counter,
    invariant 16 amended - is built, and when: before the first cluster session
