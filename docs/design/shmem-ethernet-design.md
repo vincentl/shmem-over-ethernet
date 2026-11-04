@@ -604,7 +604,6 @@ mistake as a second data socket, in a different place.
 | `OSOE_AM_CHUNK` | 64 KiB | §3.2's fragmentation size, and so the largest message on the wire |
 | `OSOE_AM_BUFFER` | `4 × chunk` | Bytes per connection buffer, 256 KiB at the default chunk; a power of two, refused below the floor, `2 × chunk` |
 | `OSOE_AM_BUFFER_BUDGET` | 1 GiB | Per-node ceiling on `2 × (nodes − 1) × buffer` |
-| `OSOE_AM_HUGEPAGES` | 0 | Opt in to huge pages for the area - no effect as built: the area is a `/dev/shm` object, on which Linux refuses `MAP_HUGETLB` |
 
 **The floor is the default, because everything except aggregation pushes down.**
 §3.2 bounds head-of-line blocking at roughly two segments — about 2 ms on 1 GbE
@@ -641,17 +640,18 @@ with it — 64 logical nodes cost about 2 GB at the default chunk and 250 MB at
 8 KiB. Tier-2 tests set the sizes explicitly rather than inheriting the
 production default.
 
-**Huge pages are off by default**, and heaps do not use them either (§6.2).
-Connection buffers are touched sparsely, because a halo exchange faults six
-peers' worth of the whole area; `hugetlbfs` pages are reserved up front, so
-opting in trades away exactly the demand paging that makes a large node count
-affordable. *As built, the opt-in has no effect*: it adds `MAP_HUGETLB` to the
-mapping of the area's `/dev/shm` object, and Linux refuses that flag for a file
-that is not on hugetlbfs, before it looks for a page - so every PE warns and
-maps ordinary pages, whatever huge pages are reserved (the step-2 review's F9,
-and the release fixes' review found it again). A `/dev/shm` mounted `huge=always`
-or `within_size` gives the area transparent huge pages regardless. A hugetlbfs
-area is designed and not built.
+**No huge pages are asked for**, by the area or the heaps (§6.2). Connection
+buffers are touched sparsely, because a halo exchange faults six peers' worth
+of the whole area; `hugetlbfs` pages are reserved up front, so a hugetlbfs
+area would trade away exactly the demand paging that makes a large node count
+affordable. An opt-in, `OSOE_AM_HUGEPAGES`, added `MAP_HUGETLB` to the mapping
+of the area's `/dev/shm` object, which Linux refuses for a file not on
+hugetlbfs before it looks for a page (the step-2 review's F9, and the release
+fixes' review found it again); it had no effect from the first, and was
+removed on 2026-11-04 after the huge-pages study (`huge-pages-proposal.md`).
+A `/dev/shm` mounted `huge=within_size` gives the area and every heap
+transparent huge pages with no code; `memfd` heaps with `MADV_HUGEPAGE` are
+the change that study names to design if a cluster shows the need.
 
 **Known and not addressed: NUMA first touch.** On a multi-socket node the lead
 creates the area, so first touch places every buffer on the lead's NUMA node and
@@ -2860,7 +2860,8 @@ target = base_of[t][region] + (a - base_of[me][region]);
 space — 256 GiB for 256 PEs at 1 GiB, comfortable in 48-bit aarch64. Heap pages
 are committed only when touched. They are ordinary pages: a hugetlbfs option,
 reserved up front with a fallback when there are none, was designed and is not
-built (§6.2). `SHMEM_SYMMETRIC_SIZE` must agree across PEs and is checked at
+built (§6.2), and a `/dev/shm` mounted `huge=within_size` gives them
+transparent huge pages (§3.4). `SHMEM_SYMMETRIC_SIZE` must agree across PEs and is checked at
 rendezvous.
 
 The progress thread maps the same physical pages as the owning PE and its local
@@ -6898,8 +6899,8 @@ the ones it meets when it creates its own, a leftover whose creator is gone
 (above); `osoe-stat --gc` removes them once nothing uses them (§3.14); and a
 site's epilog may remove `/dev/shm/osoe.<job>.*` at the end of every job. Heaps
 are ordinary pages of `/dev/shm`, under the same names: no code asks for huge
-pages for them (`MAP_HUGETLB` is used only by the connection area, when
-`OSOE_AM_HUGEPAGES=1`, and Linux refuses it there, §3.4). Every process maps every node-mate's heap, so a
+pages for them or for the connection area (§3.4; a `/dev/shm` mounted
+`huge=within_size` gives both transparent huge pages). Every process maps every node-mate's heap, so a
 PE's page tables grow with the bytes it touches in all of them; a hugetlbfs path
 was designed and is not built.
 

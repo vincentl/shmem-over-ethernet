@@ -80,7 +80,6 @@ struct osoe_am_configuration {
     uint64_t buffer;        /* OSOE_AM_BUFFER */
     uint64_t budget;        /* OSOE_AM_BUFFER_BUDGET */
     uint32_t credits;       /* OSOE_AM_CREDITS: §3.8's C, per connection */
-    bool hugepages;         /* OSOE_AM_HUGEPAGES */
     uint64_t get_landing_bytes;     /* OSOE_GET_LANDING_BYTES, per PE, or its default */
 };
 

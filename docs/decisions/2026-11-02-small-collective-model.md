@@ -90,6 +90,8 @@ helpers, the control wire's buffer; the small class's 1 KiB end, which
 
 ## For the author
 
+*Answered 2026-11-04*: the author took every recommendation ([2026-11-04](2026-11-04.md)).
+
 1. **Should the chooser shape the small class from the link too** - the fan-out
    from this model's closed form, as the large class's comes from
    `shape_timing.py`'s? *What the model says*: nothing to gain below 585

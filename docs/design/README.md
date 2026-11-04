@@ -33,8 +33,8 @@ between node leads (`tools/modelcheck/small_collective_timing.py`, 2026-11-02;
 the large-cluster playbook's §5), which changes nothing in the library, and
 `huge-pages-proposal.md`, the 2026-11-02 study of huge pages for the heaps and
 the connection area - transparent by `madvise`, hugetlbfs, or `memfd` objects -
-with what each costs and buys and a measurement in the VM, for the author to
-decide whether `OSOE_AM_HUGEPAGES` is removed or replaced; and two documents on a smaller API after osoe, which bind nothing:
+with what each costs and buys and a measurement in the VM, on which the
+author removed `OSOE_AM_HUGEPAGES` on 2026-11-04; and two documents on a smaller API after osoe, which bind nothing:
 `successor-api-stage-setting.md`, the lessons building osoe taught and a
 strawman, and `core-api-proposal.md`, the proposal that follows from them,
 item by item with its alternatives and the questions put to the author.

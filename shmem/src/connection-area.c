@@ -405,22 +405,14 @@ again:;
     }
 
     /*
-     * MAP_HUGETLB only where asked for. This is the opposite of §6.2's rule for
-     * heaps, deliberately: heaps are touched densely, while connection buffers
-     * are touched sparsely - a halo exchange faults six peers' worth of the
-     * whole area - and hugetlbfs pages are reserved up front, which trades away
-     * exactly the demand paging that makes a large node count affordable.
+     * Ordinary pages, demand-paged: connection buffers are touched sparsely -
+     * a halo exchange faults six peers' worth of the whole area - and
+     * hugetlbfs pages are reserved up front, which would trade away exactly
+     * the demand paging that makes a large node count affordable (§3.4). A
+     * /dev/shm mounted huge=within_size gives the area transparent huge pages
+     * with no code (docs/design/huge-pages-proposal.md).
      */
-    int flags = MAP_SHARED;
-    if (config.hugepages)
-        flags |= MAP_HUGETLB;
-    void *p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, flags, fd, 0);
-    if (p == MAP_FAILED && config.hugepages) {
-        osoe_print_line("osoe: OSOE_AM_HUGEPAGES=1 but the connection area could not "
-                        "be mapped with huge pages (%s); using ordinary pages\n",
-                        strerror(errno));
-        p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    }
+    void *p = mmap(NULL, a->bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         close(fd);
         if (a->creator)

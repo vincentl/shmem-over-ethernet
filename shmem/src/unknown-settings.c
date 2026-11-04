@@ -27,7 +27,6 @@ static const char *const known_settings[] = {
     "OSOE_AM_BUFFER_BUDGET",
     "OSOE_AM_CHUNK",
     "OSOE_AM_CREDITS",
-    "OSOE_AM_HUGEPAGES",
     "OSOE_CHECK_COLLECTIVES",
     "OSOE_CHECK_QUIET",
     "OSOE_COLLECTIVE_FANOUT",

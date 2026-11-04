@@ -137,3 +137,7 @@ removed.
   change was in question; the arithmetic is the estimate.
 - The README's and the playbook's text about the mount option, which the
   recommendation asks for, is not written: it follows the author's decision.
+
+*2026-11-04*: merged into main without the measurement patch, and the five
+questions answered by their recommendations ([2026-11-04](2026-11-04.md)):
+`OSOE_AM_HUGEPAGES` removed the same day.

@@ -431,6 +431,8 @@ most of its design.
 
 ## Questions for the author
 
+*Answered 2026-11-04*: the author took every recommendation (`docs/decisions/2026-11-04.md`); the setting is removed.
+
 1. Remove `OSOE_AM_HUGEPAGES` now, as recommended, with the README's and the
    playbook's text about the mount option - or hold it until the cluster's
    first rung has run?

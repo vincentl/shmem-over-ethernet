@@ -69,11 +69,6 @@ void osoe_am_configuration_read(struct osoe_am_configuration *c, uint32_t local_
                    getenv("OSOE_AM_CREDITS"), OSOE_AM_MIN_CREDITS, OSOE_AM_MAX_CREDITS);
     c->credits = credits;
 
-    uint32_t huge = 0;
-    if (osoe_environment_u32("OSOE_AM_HUGEPAGES", &huge) == OSOE_ENVIRONMENT_INVALID || huge > 1)
-        osoe_fatal("OSOE_AM_HUGEPAGES='%s' is not 0 or 1", getenv("OSOE_AM_HUGEPAGES"));
-    c->hugepages = huge != 0;
-
     /* Tunable for the same reason as the credits: a test reaches a full landing
      * zone only by making it small. Its extents count what is in flight since
      * phase 1 step 8 slice 2, so OSOE_GETS_IN_FLIGHT, which counted it apart,
