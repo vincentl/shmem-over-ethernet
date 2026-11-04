@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # Runs the probe under each setting, restoring the VM's defaults after.
 set -u
 cd /var/tmp/osoe-huge/probe || exit 1

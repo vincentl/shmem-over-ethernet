@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
 # The huge-pages study's measurement: random-puts and osoe-bench quick on the
 # release build of the branch, /dev/shm as shipped, remounted huge=advise with
 # the branch's MADV_HUGEPAGE patch on, and remounted huge=within_size with no

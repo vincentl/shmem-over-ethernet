@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-3.0-or-later */
 /* Does madvise(MADV_HUGEPAGE) give a /dev/shm object huge pages under the
  * current settings? Creates a 256 MiB object, maps it (a) at an address the
  * kernel chooses and (b) at a 2 MiB-aligned address, advises, touches every
