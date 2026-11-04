@@ -8095,6 +8095,16 @@ does (`osoe_listener_node_address`), and no library code assumes one host.
 Everything else passed on all three shapes the first time. The library's ratios
 to its floor there are in §8.4.
 
+*Tier 4 under `ctest`* (2026-11-02). The `cluster` preset registers tier 3's
+programs a second time, each with its environment, as a step under `srun`: a
+block map by `--ntasks-per-node`, a cyclic one by `--distribution=cyclic`, and
+the uneven and interleaved maps through a hostfile `tools/launch/srun-map.sh`
+writes for `--distribution=arbitrary`, one host a rank, so that node *k* of the
+map is `SLURM_NODEID` *k*. What stays the launcher's - a rank left to the library
+after another's death, a link cut inside a namespace, the differential's
+transcripts - is named in the README's "How osoe is tested"
+(`docs/decisions/2026-11-02-cluster-tests.md`).
+
 **Tests the review found missing:**
 
 - **Invariant counters at zero.** *Done.* Every tier-2 test calls

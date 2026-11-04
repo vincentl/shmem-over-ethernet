@@ -303,7 +303,9 @@ Presets: `debug`, `release` (optimized, with debug info), `asan`
 and `tier3`, the release build with tests over network namespaces whose links
 `netem` shapes, which needs `sudo` without a password, and `ip`, `tc` and
 `ethtool` - the full build's only: with the single-node build it is a configure
-error.
+error; and `cluster`, the release build with tier 3's programs registered a
+second time as steps under `srun`, for a Slurm cluster ("How osoe is tested"),
+the full build's as well.
 
 The `env.probe` test checks that the running kernel provides every facility
 osoe relies on, `shmem_init`'s own checks among them: in the full build every
@@ -683,7 +685,7 @@ where to find what among the documents.
 |---|---|
 | `README.md` | this file |
 | `COPYING`, `COPYING.LESSER` | the license texts that [License](#license) names: the GNU General Public License and the Lesser General Public License that supplements it, both version 3 |
-| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.2.0, the option `OSOE_SINGLE_NODE` that makes the single-node build ([On a desktop](#on-a-desktop-the-single-node-build)), and the presets `debug`, `release`, `asan`, `tsan` and `tier3`, with the test presets and workflows over them ([Building](#building)) |
+| `CMakeLists.txt`, `CMakePresets.json` | the build: the project and its one version, 0.2.0, the option `OSOE_SINGLE_NODE` that makes the single-node build ([On a desktop](#on-a-desktop-the-single-node-build)), and the presets `debug`, `release`, `asan`, `tsan`, `tier3` and `cluster`, with the test presets and workflows over them ([Building](#building)) |
 | `.gitignore` | what git ignores: `build/`, `corpus/` and the specification's PDF, among others |
 | `CLAUDE.md` | the working agreements every Claude Code session on this repository follows - delegating to subagents, naming, renames, the names of review files ([How osoe was made](#how-osoe-was-made)) |
 | `base/` | the pieces the library is made from that need nothing from the OpenSHMEM layer above them, among them futex waits - over futex2 in the full build (`futex-futex2.c`), over the classic futex in the single-node build (`futex-classic.c`) - deadlines, epoch counters, a stall watch, memory fences, and the parsers for settings, Slurm host lists and the node map. An object library folded into `libosoe` and never installed; its tests are in `base/tests/` |
@@ -715,7 +717,7 @@ build tree.
 | `wrapper/` | `oshcc`, the compiler wrapper, and `osoe-statics.ld`, the linker script it passes, which makes a program's global and static variables symmetric | yes, both |
 | `stat/` | `osoe-stat`, which reads a running or hung job's counters and state from outside | yes |
 | `pacer/` | `osoe-pacer`, the stress tester; `osoe-pacer-start-pes`, which its tests run to check Annex F's unprefixed routines; and, where Python 3 is found, `osoe-pacer-start-pes-counted` and, in the full build, `osoe-pacer-counted`, builds that count every call to the library | `osoe-pacer` only |
-| `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace, and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | `osoe-launch` only |
+| `launch/` | `osoe-launch`, which starts a job's processes on this machine; beside it `tier3.sh`, which gives each logical node a network namespace; `srun-map.sh` and `rank-environment.sh`, which give the cluster tests a logical node map and a rank's own variable under `srun`; and `capture-slurm-fixtures.sh`, which records Slurm's environment under `srun` | `osoe-launch` only |
 | `bench/` | `osoe-bench`, what the library costs on a cluster, one measurement a line; and `collect-places.sh`, which times `collect`'s places by each way at each count of logical nodes with `osoe-bench places` (H24) | no |
 | `probe/` | `probe`, which checks that the kernel has every facility the build relies on - io_uring and futex2 in the full build, the classic futex in the single-node build (the `env.probe` test) | no |
 | `echo-uring/` | `echo-uring`, a bare io_uring TCP echo and stream that the library is timed against, and `netem-sweep.sh`, which runs it over emulated links; the full build only | no |
@@ -1307,7 +1309,9 @@ specification or takes a choice the specification leaves open.
   round trips, a bare stream, gets, a fan-in, OSU's benchmarks and the sessions'
   sections, up to 512 PEs. The suite, which checks results, ran on one node, a
   job's logical nodes talking over loopback, so it has not run across separate
-  x86-64 machines; the stress tester has, its `mix` for 300 s at 32 PEs on all
+  x86-64 machines - the `cluster` preset, which runs its cross-node programs
+  under `srun` ([How osoe is tested](#how-osoe-is-tested)), has not run there
+  yet; the stress tester has, its `mix` for 300 s at 32 PEs on all
   eight without a failure, and Sandia OpenSHMEM's suite, 159 of the 163 programs
   of the cluster kit's sweep, the same four short as everywhere, at 2 PEs a
   node on eight (2026-10-28); 14 of the 41 models
@@ -1831,6 +1835,59 @@ that one could be added without touching the OpenSHMEM layer.
   the debug preset and its five, two fewer without a C++ compiler, which the
   headers' C++ test needs. `ctest -L internode` on the full build runs the
   tests it lacks but that check, `shmem.single-node.configure`.
+- **Across real nodes: the cluster tests.** Every test above starts its job
+  with `osoe-launch`, on logical nodes of one machine. The `cluster` preset
+  registers tier 3's programs a second time, each as a step under `srun` -
+  the same program, environment and arguments as its tier-3 registration,
+  labelled `cluster` and `internode` - so that the suite that checks results
+  runs on a cluster: a block map (`0,0,1,1`) as `srun -N2 --ntasks-per-node=2`,
+  a cyclic one (`0,1,0,1`) with `--distribution=cyclic`, and any other -
+  uneven, as `0,1,2,0,1,0`, the interleaved map most of the list runs on, or
+  out of the ranks' order, as `1,1,0,0,2,2` - through
+  `tools/launch/srun-map.sh`, which writes the hostfile
+  `--distribution=arbitrary` takes, one host a rank, from the allocation's
+  nodes, and allocates them itself where there is no allocation. The site's
+  partition and `srun`'s flags are configure-time settings
+  (`OSOE_CLUSTER_PARTITION`; `OSOE_CLUSTER_SRUN_FLAGS`, by default `-K1
+  --cpu-bind=none`, the flags of "Running a program with `srun`"), and
+  `OSOE_CLUSTER_NODES` how many nodes the site gives at once: a test of more
+  is registered disabled, which `ctest` reports as such rather than failing it
+  in `srun`. The build directory must be at the same path on every node, as a
+  program under `srun` must be, and the tests run one at a time, since two
+  steps on the same nodes would share their cores:
+
+  ```sh
+  cmake --preset cluster -DOSOE_CLUSTER_NODES=4 -DOSOE_CLUSTER_PARTITION=batch
+  cmake --build --preset cluster -j4
+  ctest --preset cluster          # from a login node, or inside salloc -N4 --ntasks-per-node=4
+  ```
+
+  Forty-five tests: 37 of them tier 3's programs - the maps need one to
+  thirteen nodes, six of them more than four - and eight the harness's own
+  checks, first. `cluster.map.*` runs each kind of translation and has every
+  task compare its `SLURM_NODEID` with its rank's entry of the map;
+  `cluster.rank-environment` checks what `osoe-launch -e RANK:NAME=VALUE`
+  gives a job on one machine - `tools/launch/rank-environment.sh`, which sets
+  a variable in one rank of a step and leaves the others' alone; and
+  `cluster.internode.0-0-0-0` runs the library on one node under `srun`,
+  with tier 2's stress settings. Those three ran in the development VM's
+  one-node Slurm, where the harness was built, and a planted failure there -
+  a wrong `OSOE_TEST_MAP` for `collect-places`, and a refused setting in the
+  one-node test - failed under it (`docs/decisions/2026-11-02-cluster-tests.md`);
+  it has not yet run on a cluster, the Pi cluster being unreachable the day it
+  was built. Left out, each for its reason: tier 3's six `global-exit`
+  registrations, whose `global-exit.sh` judges the job by the launcher's
+  report of every rank's exit, by `-k`, which leaves the survivors to the
+  library, and by how soon the launcher returned - under `srun` only the
+  step's status survives, which the Pi runbook's §7 checks by hand; its three
+  `vanished-node` registrations, which cut a link with `tier3.sh` inside a
+  namespace, where a cluster's cable is pulled by hand; `differential`, which
+  runs one program over four maps of logical nodes, one of them one node, and
+  diffs the transcripts; `start-up.wrong-address`, whose host list names a
+  namespace's address; and the kill-based tests, `dead-pe.sh` and
+  `death-in-wait.sh`, which are tier 2's, not tier 3's, and judge the job by
+  the launcher's lines. No registration of tier 3's needs a rank's own
+  variable; tier 2's 70 that use `osoe-launch -e` are not in the list.
 - **Model checking.** Every lock-free and futex protocol - waking the
   progress thread, waits, the barrier tree, pipelined collectives and the lanes
   their large pieces go through, Bruck's allgather, the scans, get completion

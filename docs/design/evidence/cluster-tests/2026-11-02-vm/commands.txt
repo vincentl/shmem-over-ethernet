@@ -1,0 +1,158 @@
+977: Test command: /usr/bin/srun "-K1" "--cpu-bind=none" "-N1" "--ntasks-per-node=4" "sh" "-c" "test "$SLURM_NODEID" = "$(echo 0,0,0,0 | cut -d, -f$((SLURM_PROCID + 1)))""
+977:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+978: Test command: /usr/bin/srun "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=2" "sh" "-c" "test "$SLURM_NODEID" = "$(echo 0,0,1,1 | cut -d, -f$((SLURM_PROCID + 1)))""
+978:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+979: Test command: /usr/bin/srun "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=2" "--distribution=cyclic" "sh" "-c" "test "$SLURM_NODEID" = "$(echo 0,1,0,1 | cut -d, -f$((SLURM_PROCID + 1)))""
+979:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+980: Test command: /usr/bin/srun "-K1" "--cpu-bind=none" "-N4" "--ntasks-per-node=1" "sh" "-c" "test "$SLURM_NODEID" = "$(echo 0,1,2,3 | cut -d, -f$((SLURM_PROCID + 1)))""
+980:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+981: Test command: /usr/bin/sh "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "sh" "-c" "test "$SLURM_NODEID" = "$(echo 0,1,2,0,1,0 | cut -d, -f$((SLURM_PROCID + 1)))""
+981:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+982: Test command: /usr/bin/sh "<repo>/tools/launch/srun-map.sh" "1,1,0,0,2,2" "-K1" "--cpu-bind=none" "--" "sh" "-c" "test "$SLURM_NODEID" = "$(echo 1,1,0,0,2,2 | cut -d, -f$((SLURM_PROCID + 1)))""
+982:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+983: Test command: /usr/bin/srun "-K1" "--cpu-bind=none" "-N1" "--ntasks-per-node=2" "sh" "<repo>/tools/launch/rank-environment.sh" "1:CLUSTER_TEST_WORD=given" "--" "sh" "-c" "if test "$SLURM_PROCID" = 1; then test "$CLUSTER_TEST_WORD" = given; else test -z "$CLUSTER_TEST_WORD"; fi"
+983:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+984: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_AM_CREDITS=2" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N1" "--ntasks-per-node=4" "<repo>/build/cluster/shmem/tests/shmem_test_internode"
+984:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+985: Test command: /usr/bin/cmake "-E" "env" "OSOE_WIRE_BYTES=64" "OSOE_WIRE_SPLIT=3000" "OSOE_WIRE_SEED=20260919" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_wire_pair"
+985:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+986: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=3000" "OSOE_WIRE_SEED=20260919" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=2" "<repo>/build/cluster/shmem/tests/shmem_test_progress"
+986:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+987: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_AM_CREDITS=2" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N3" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_internode"
+987:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+988: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_AM_CREDITS=2" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N3" "--ntasks-per-node=2" "<repo>/build/cluster/shmem/tests/shmem_test_internode"
+988:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+989: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_AM_CREDITS=2" "sh" "<repo>/tools/launch/srun-map.sh" "0,0,0,1,2,2" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_internode"
+989:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+990: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_AM_CREDITS=2" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_internode"
+990:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+991: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N3" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_barrier_am"
+991:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+992: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_GET_LANDING_BYTES=4096" "OSOE_AM_CREDITS=2" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_get-nbi"
+992:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+993: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_scan"
+993:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+994: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "OSOE_GET_LANDING_BYTES=4096" "OSOE_AM_CREDITS=2" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_context"
+994:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+995: Test command: /usr/bin/cmake "-E" "env" "SHMEM_SYMMETRIC_SIZE=16m" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_team-split"
+995:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+996: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_SPLIT=reuse" "SHMEM_SYMMETRIC_SIZE=16m" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_team-split"
+996:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+997: Test command: /usr/bin/cmake "-E" "env" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_team-threads"
+997:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+998: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_reduce"
+998:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+999: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_broadcast"
+999:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+1000: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_active-set"
+1000:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1000: cluster.active-set.0-1-2-0-1-0 (Disabled)
+1001: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect"
+1001:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1001: cluster.collect.0-1-2-0-1-0 (Disabled)
+1002: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,0,0,1,1,2,2,2,2,3" "sh" "<repo>/tools/launch/srun-map.sh" "0,0,0,1,1,2,2,2,2,3" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "block"
+1002:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1002: cluster.collect-places.block.0-0-0-1-1-2-2-2-2-3 (Disabled)
+1003: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,0,0,1,1,2,2,2,2,3" "sh" "<repo>/tools/launch/srun-map.sh" "0,0,0,1,1,2,2,2,2,3" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "negative-stride"
+1003:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1003: cluster.collect-places.negative-stride.0-0-0-1-1-2-2-2-2-3 (Disabled)
+1004: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,1,2,0,1,2,0,1,2" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N3" "--ntasks-per-node=3" "--distribution=cyclic" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "cyclic"
+1004:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1004: cluster.collect-places.cyclic.0-1-2-0-1-2-0-1-2 (Disabled)
+1005: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,1,1,2,3,3,4,5,6" "OSOE_COLLECTIVE_PLACES=scan" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,1,2,3,3,4,5,6" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "block"
+1005:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1005: cluster.collect-places.scan.block.0-1-1-2-3-3-4-5-6 (Disabled)
+1006: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,1,1,2,3,3,4,5,6" "OSOE_COLLECTIVE_PLACES=scan" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,1,2,3,3,4,5,6" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "negative-stride"
+1006:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1006: cluster.collect-places.scan.negative-stride.0-1-1-2-3-3-4-5-6 (Disabled)
+1007: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,1,2,0,1,2,0,1,2" "OSOE_COLLECTIVE_PLACES=scan" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N3" "--ntasks-per-node=3" "--distribution=cyclic" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "cyclic"
+1007:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1007: cluster.collect-places.scan.cyclic.0-1-2-0-1-2-0-1-2 (Disabled)
+1008: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=0,1,1,2,3,3,4,5,6" "OSOE_COLLECTIVE_PLACES=exchange" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,1,2,3,3,4,5,6" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "block"
+1008:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1008: cluster.collect-places.exchange.block.0-1-1-2-3-3-4-5-6 (Disabled)
+1009: Test command: /usr/bin/cmake "-E" "env" "OSOE_TEST_MAP=1,1,0,0,2,2" "OSOE_COLLECTIVE_PLACES=exchange" "sh" "<repo>/tools/launch/srun-map.sh" "1,1,0,0,2,2" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_collect-places" "unordered"
+1009:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1009: cluster.collect-places.exchange.unordered.1-1-0-0-2-2 (Disabled)
+1010: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_alltoall"
+1010:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1010: cluster.alltoall.0-1-2-0-1-0 (Disabled)
+1011: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_statics"
+1011:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1011: cluster.statics.0-1-2-0-1-0 (Disabled)
+1012: Test command: /usr/bin/cmake "-E" "env" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_lock"
+1012:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1012: cluster.lock.0-1-2-0-1-0 (Disabled)
+1013: Test command: /usr/bin/cmake "-E" "env" "OSOE_DEADLOCK_SECONDS=1" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_deadlock" "mismatch"
+1013:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1013: cluster.deadlock.mismatch.0-1-2-0-1-0 (Disabled)
+1014: Test command: /usr/bin/cmake "-E" "env" "OSOE_DEADLOCK_SECONDS=1" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,2,0,1,0" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_deadlock" "computing"
+1014:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1014: cluster.deadlock.computing.0-1-2-0-1-0 (Disabled)
+1015: Test command: /usr/bin/cmake "-E" "env" "OSOE_COLLECTIVE_FANOUT=2" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N5" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_reduce"
+1015:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1015: cluster.reduce.0-1-2-3-4.k2 (Disabled)
+1016: Test command: /usr/bin/cmake "-E" "env" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=4096" "OSOE_TEST_PUT_BYTES=984" "SHMEM_SYMMETRIC_SIZE=16m" "sh" "<repo>/tools/launch/srun-map.sh" "0,1,1,1,1,1,1" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_reply-starvation"
+1016:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1016: cluster.reply-starvation.0-1-1-1-1-1-1 (Disabled)
+1017: Test command: /usr/bin/cmake "-E" "env" "OSOE_COLLECTIVE_FANOUT=2" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "SHMEM_SYMMETRIC_SIZE=16M" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N8" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_multinode"
+1017:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1017: cluster.tree.k2.n8.p8 (Disabled)
+1018: Test command: /usr/bin/cmake "-E" "env" "OSOE_COLLECTIVE_FANOUT=4" "OSOE_AM_CHUNK=1024" "OSOE_AM_BUFFER=2048" "OSOE_WIRE_BYTES=256" "OSOE_WIRE_SPLIT=2000" "OSOE_WIRE_SEED=20260919" "SHMEM_SYMMETRIC_SIZE=16M" "sh" "<repo>/tools/launch/srun-map.sh" "0,0,1,2,3,3,4,5,6,7,8,9,10,11,12,12" "-K1" "--cpu-bind=none" "--" "<repo>/build/cluster/shmem/tests/shmem_test_multinode"
+1018:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1018: cluster.tree.k4.n13.p16 (Disabled)
+1019: Test command: /usr/bin/cmake "-E" "env" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N4" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_job"
+1019:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1019: cluster.job.0-1-2-3 (Disabled)
+1020: Test command: /usr/bin/cmake "-E" "env" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_floor" "64"
+1020:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1020: cluster.floor (Disabled)
+1021: Test command: /usr/bin/cmake "-E" "env" "SHMEM_DEBUG=1" "/usr/bin/srun" "-K1" "--cpu-bind=none" "-N2" "--ntasks-per-node=1" "<repo>/build/cluster/shmem/tests/shmem_test_keepalive" "on"
+1021:  OSOE_TEST_PRINT_LINK=set:1
+Labels: cluster internode
+  Test #1021: cluster.keepalive.default-on.0-1 (Disabled)
+Total Tests: 45
