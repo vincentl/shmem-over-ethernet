@@ -104,6 +104,15 @@ if(Python3_Interpreter_FOUND AND CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME model.control_tree_timing
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/control_tree_timing.py check)
   set_tests_properties(model.control_tree_timing PROPERTIES LABELS "tier1;model" TIMEOUT 300)
+  # The small collectives' shapes between node leads (the large-cluster playbook's
+  # §5 and C16; docs/design/small-collective-model.md): the k-ary tree's closed form
+  # against its walk and every shape's against its event simulation, the tree at
+  # k = 8 against the Pi's and the cloud's records, the pins, and four planted
+  # errors each failing its check. Nothing in the C reads it: no grid.
+  add_test(NAME model.small_collective_timing
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/small_collective_timing.py check)
+  set_tests_properties(model.small_collective_timing PROPERTIES LABELS "tier1;model"
+                       TIMEOUT 600)
   # Träff's circulant reduce-scatter and allgather (v0.2 step 3): the rounds'
   # arithmetic for every node count from 2 to 70, against the fold the brief
   # described (rabenseifner_model.py, kept as that comparison's evidence); the
