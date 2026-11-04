@@ -1853,8 +1853,9 @@ that one could be added without touching the OpenSHMEM layer.
   `OSOE_CLUSTER_NODES` how many nodes the site gives at once: a test of more
   is registered disabled, which `ctest` reports as such rather than failing it
   in `srun`. The build directory must be at the same path on every node, as a
-  program under `srun` must be, and the tests run one at a time, since two
-  steps on the same nodes would share their cores:
+  program under `srun` must be, and the tests run one at a time whatever
+  `-j` says - each carries `RUN_SERIAL` - since two steps on the same nodes
+  would share their cores and `/dev/shm`:
 
   ```sh
   cmake --preset cluster -DOSOE_CLUSTER_NODES=4 -DOSOE_CLUSTER_PARTITION=batch

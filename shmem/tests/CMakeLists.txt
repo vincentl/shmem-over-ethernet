@@ -6173,10 +6173,14 @@ if(OSOE_INTERNODE AND OSOE_CLUSTER_TESTS)
   endfunction()
 
   # osoe_cluster_register(<test> <nodes>): the labels every cluster test
-  # carries, and a test of more nodes than OSOE_CLUSTER_NODES allows disabled,
-  # which ctest reports as such rather than failing it in srun.
+  # carries; RUN_SERIAL, since two steps on the same nodes would share their
+  # cores and /dev/shm, so that the tests run one at a time whatever -j says
+  # (the author, 2026-11-04); and a test of more nodes than OSOE_CLUSTER_NODES
+  # allows disabled, which ctest reports as such rather than failing it in
+  # srun.
   function(osoe_cluster_register test nodes)
     set_property(TEST ${test} APPEND PROPERTY LABELS cluster)
+    set_tests_properties(${test} PROPERTIES RUN_SERIAL TRUE)
     osoe_internode_label(${test})
     if(OSOE_CLUSTER_NODES AND nodes GREATER OSOE_CLUSTER_NODES)
       set_tests_properties(${test} PROPERTIES DISABLED TRUE)

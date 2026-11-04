@@ -207,3 +207,6 @@ cluster tests' comment to its `endif()`), the four `cluster` entries of
 settings' `set()` back inside tier 3's block under its old name if wanted
 (the shared variable is a rename, nothing more). The runbook's §4 then goes
 back to the by-hand smoke test, kept under the new text.
+
+*2026-11-04*: merged into main at the author's word and the five questions
+decided ([2026-11-04](2026-11-04.md)).
