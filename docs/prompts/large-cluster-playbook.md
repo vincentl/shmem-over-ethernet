@@ -538,7 +538,9 @@ after a kill of its own, by an `srun` outside the killed job's allocation, so
 a step Slurm's time limit ends leaves its names on every node. Each a small
 change with its test; the finalize wait a question for the author, since a
 timeout that ends a job is a thing the project has refused (design §3.15, "a
-fatal timeout by another name"; the decisions index).
+fatal timeout by another name"; the decisions index). *Decided 2026-11-01*,
+answer 10: no bound of the library's own, `OSOE_NO_PROGRESS_TIMEOUT` the
+user's, the README's "How a job ends" saying so since 2026-11-04.
 
 **C20 Slurm's time limit, its signals, and the output.** A step that reaches
 its time limit gets `SIGTERM` and then `SIGKILL`: osoe has no handler for the

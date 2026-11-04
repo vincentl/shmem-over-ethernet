@@ -2403,6 +2403,19 @@ which first required every handler, failed on exactly that
 (`docs/decisions/2026-10-29-exit-carrier.md`) - so a program whose handlers
 must run does that work before it calls.
 
+`shmem_finalize` has no bound of its own. It is a barrier of every PE, which
+no setting times, so a PE still computing holds every other's finalize until
+it arrives, as it holds their next collective; a PE that left without calling
+it ends the job, as above, and PEs every one asleep in a library wait,
+finalize's among them, are the deadlock detector's. After the last finalize
+each node's lead closes its connections, waiting until every peer's wires
+have ended at the far end, which is a wait on the library's own progress:
+`OSOE_NO_PROGRESS_TIMEOUT` ends it where it is set, naming how many wires
+had ended, and nothing does otherwise, so one hung node holds every other's
+exit until that, or the allocation, ends. The library adds no timeout of its
+own there: a timeout that ends a job is a fatal by another name (design
+§3.15), and the one the user sets is the bound.
+
 One limit remains. A site that sets `WaitTime`, or `srun -W n`, ends the
 other tasks n seconds after the first one leaves, whatever its status.
 A job proved deadlocked ends the same way as a failure, with status 1, after
